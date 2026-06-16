@@ -143,6 +143,11 @@ GitHub source connection status on 2026-06-16:
   access error. If the GitHub App is already installed under `Bucrepinfo-lab`,
   refresh or reconnect GitHub from Railway's source selector/account settings so
   Railway re-reads the installation.
+- Stable deployment workaround: use the Railway CLI local-workspace deploy
+  scripts in `package.json` until GitHub source access is fixed:
+  `npm.cmd run deploy:railway:web`, `npm.cmd run deploy:railway:api`, or
+  `npm.cmd run deploy:railway`.
+- Full runbook: `docs/GIT_RAILWAY_RUNBOOK.md`.
 
 ### Web Service
 
