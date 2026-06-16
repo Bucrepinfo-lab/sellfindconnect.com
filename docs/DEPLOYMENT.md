@@ -117,6 +117,17 @@ The production container images were optimized on 2026-06-16:
 - Docker is not installed on the local workstation, so local validation used
   `npm` build/test/typecheck/lint plus Railway Docker builder validation.
 
+GitHub source connection status on 2026-06-16:
+
+- Local Git remote is `https://github.com/Bucrepinfo-lab/sellfindconnect.com.git`.
+- Local `main` is pushed and tracking `origin/main`.
+- Railway CLI source connection attempt:
+  `railway service source connect --repo Bucrepinfo-lab/sellfindconnect.com --branch main --service web`
+- Result: blocked with `User does not have access to the repo`.
+- Required next action: authorize the Railway account/GitHub App for the
+  `Bucrepinfo-lab` owner or grant the Railway-connected GitHub user access to
+  `Bucrepinfo-lab/sellfindconnect.com`.
+
 ### Web Service
 
 - Workspace: `@telpen/web`
