@@ -13,7 +13,7 @@ RUN npm ci
 
 COPY . .
 
-RUN npm run build:domain && npm run build -w @telpen/api
+RUN npm run build:api
 
 FROM node:24-alpine AS runner
 

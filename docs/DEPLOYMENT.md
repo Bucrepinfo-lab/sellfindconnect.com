@@ -153,6 +153,10 @@ GitHub source connection status on 2026-06-16:
 
 - Workspace: `@telpen/web`
 - Dockerfile: `deploy/web.Dockerfile`
+- Railway/Nixpacks build command if not using the Dockerfile:
+  `npm run build:web`
+- Expanded web build command:
+  `npm run build -w @telpen/domain && npm run build -w @telpen/web`
 - Public domain: `adverts.telpen.net`
 - Health check: `/`
 - Environment:
@@ -163,6 +167,8 @@ GitHub source connection status on 2026-06-16:
 
 - Workspace: `@telpen/api`
 - Dockerfile: `deploy/api.Dockerfile`
+- Railway/Nixpacks build command if not using the Dockerfile:
+  `npm run build:api`
 - Public domain: `api.adverts.telpen.net`
 - Health check: `/v1/health`
 - Environment:

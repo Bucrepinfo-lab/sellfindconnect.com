@@ -16,7 +16,7 @@ COPY . .
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
-RUN npm run build:domain && npm run build -w @telpen/web
+RUN npm run build:web
 
 FROM node:24-alpine AS runner
 

@@ -62,6 +62,32 @@ Use this order:
 
 `SLEEPING` is a successful state because Serverless/App Sleeping is enabled.
 
+## Railway Build Commands
+
+If Railway is building from GitHub/Nixpacks instead of the checked-in
+Dockerfiles, set the web service build command to:
+
+```powershell
+npm.cmd run build:web
+```
+
+This expands to:
+
+```powershell
+npm.cmd run build -w @telpen/domain
+npm.cmd run build -w @telpen/web
+```
+
+Do not set the web service to build only `@telpen/web`. The web app imports
+compiled exports from `@telpen/domain`, and Next.js cannot resolve those imports
+until the domain package has produced its `dist` output.
+
+For the API service, use:
+
+```powershell
+npm.cmd run build:api
+```
+
 ## Service-Specific Deploys
 
 Deploy only web:
