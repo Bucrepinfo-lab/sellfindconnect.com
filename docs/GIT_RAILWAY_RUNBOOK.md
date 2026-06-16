@@ -81,6 +81,14 @@ Do not set the web service to build only `@telpen/web`. The web app imports
 compiled exports from `@telpen/domain`, and Next.js cannot resolve those imports
 until the domain package has produced its `dist` output.
 
+Set the web service watch patterns to include:
+
+```text
+/packages/domain/**
+```
+
+This ensures shared domain changes trigger web rebuilds.
+
 As an additional guard, the `@telpen/web` workspace build script also builds
 `@telpen/domain` first. This means Railway's auto-detected command
 `npm run build --workspace=@telpen/web` is safe too.

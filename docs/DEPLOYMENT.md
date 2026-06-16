@@ -157,6 +157,8 @@ GitHub source connection status on 2026-06-16:
   `npm run build -w @telpen/domain && npm run build -w @telpen/web`
 - Equivalent repository script:
   `npm run build:web`
+- Watch patterns must include `/packages/domain/**` so domain-package changes
+  trigger web rebuilds.
 - Public domain: `adverts.telpen.net`
 - Health check: `/`
 - Environment:
