@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 
 import { AnalyticsModule } from './analytics/analytics.module';
+import { AdvertsModule } from './adverts/adverts.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { HealthModule } from './health/health.module';
 import { ProfilesModule } from './profiles/profiles.module';
@@ -17,6 +18,7 @@ import { SafetyModule } from './safety/safety.module';
     SafetyModule,
     ProfilesModule,
     AnalyticsModule,
+    AdvertsModule,
   ],
 })
 export class AppModule {}

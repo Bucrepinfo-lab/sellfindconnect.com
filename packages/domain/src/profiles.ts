@@ -18,3 +18,18 @@ export type ProfileDraft = ProfileDraftInput & {
   createdAt: string;
   updatedAt: string;
 };
+
+export type AdvertStatus = 'LIVE' | 'RENEWAL_DUE' | 'AUTO_DELETED';
+
+export type AdvertPost = ProfileDraftInput & {
+  id: string;
+  tenantId: string;
+  title: string;
+  status: AdvertStatus;
+  publishedAt: string;
+  expiresAt: string;
+  deletedAt?: string;
+  renewalAlertsSent: number[];
+  createdAt: string;
+  updatedAt: string;
+};

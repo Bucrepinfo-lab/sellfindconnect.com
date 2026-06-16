@@ -9,6 +9,7 @@ import {
   ChartNoAxesCombined,
   ChevronRight,
   CircleAlert,
+  Clock,
   Eye,
   FileCheck2,
   Flag,
@@ -26,6 +27,8 @@ import { useMemo, useState } from 'react';
 
 import {
   countries,
+  advertLifecyclePolicy,
+  calculateAdvertLifecycle,
   evaluateSafetyText,
   getCountry,
   industryCategories,
@@ -55,6 +58,12 @@ type MarketResult = {
 };
 
 const tenantId = '11111111-1111-4111-8111-111111111111';
+const lifecycleDemoNow = new Date(Date.UTC(2026, 6, 10, 0, 0, 0)).toISOString();
+const dayMs = 24 * 60 * 60 * 1000;
+
+function publishedAtFromDaysLive(daysLive: number) {
+  return new Date(Date.parse(lifecycleDemoNow) - daysLive * dayMs).toISOString();
+}
 
 const marketResults: MarketResult[] = [
   {
@@ -241,6 +250,13 @@ export default function Home() {
       )
     : 0;
   const clickThroughRate = totals.views ? Math.round((totals.clicks / totals.views) * 100) : 0;
+  const renewalQueue = filteredResults
+    .map((item) => ({
+      ...item,
+      lifecycle: calculateAdvertLifecycle(publishedAtFromDaysLive(item.daysLive), lifecycleDemoNow),
+    }))
+    .filter((item) => item.lifecycle.status !== 'LIVE')
+    .sort((a, b) => b.daysLive - a.daysLive);
 
   return (
     <main className="app-shell">
@@ -537,6 +553,48 @@ export default function Home() {
                     <strong>{formatNumber(item.views)}</strong>
                   </div>
                 ))}
+              </div>
+            </section>
+
+            <section className="side-panel">
+              <div className="panel-heading tight">
+                <h2>Advert Lifecycle</h2>
+                <span>{advertLifecyclePolicy.liveDays} days</span>
+              </div>
+              <AnalyticsRow label="Renewal alert 1" value="Day 35" />
+              <AnalyticsRow label="Renewal alert 2" value="Day 39" />
+              <AnalyticsRow label="Auto-delete" value="Day 40" />
+              <div className="lifecycle-list">
+                {renewalQueue.length > 0 ? (
+                  renewalQueue.slice(0, 4).map((item) => (
+                    <div
+                      key={item.id}
+                      className={
+                        item.lifecycle.shouldAutoDelete
+                          ? 'lifecycle-row danger'
+                          : 'lifecycle-row warning'
+                      }
+                    >
+                      <Clock size={15} />
+                      <div>
+                        <strong>{item.name}</strong>
+                        <span>
+                          {item.lifecycle.shouldAutoDelete
+                            ? 'Auto-delete now'
+                            : `${item.lifecycle.daysRemaining} day before deletion`}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="lifecycle-row">
+                    <Clock size={15} />
+                    <div>
+                      <strong>No renewals due</strong>
+                      <span>Alerts will appear on days 35 and 39.</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </section>
 

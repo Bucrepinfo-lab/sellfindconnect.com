@@ -357,6 +357,8 @@ Requirements:
 - Users can edit live listings through draft versions.
 - Users can schedule posts.
 - Users can pause, archive, duplicate, renew, or boost listings if future monetization allows.
+- Every post, advert, and listing expires automatically after 40 days unless renewed.
+- Renewal notification alerts must be sent on day 35 and day 39 before automatic deletion.
 - Regulated categories require extra verification and moderator approval.
 - Listings must support country, continent, and global visibility controls.
 

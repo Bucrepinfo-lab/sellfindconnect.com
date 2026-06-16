@@ -33,9 +33,26 @@ enum ProfileStatus {
   DRAFT
   PENDING_REVIEW
   LIVE
+  RENEWAL_DUE
   PAUSED
+  EXPIRED
+  AUTO_DELETED
   ARCHIVED
   REJECTED
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  PUSH
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  READ
+  FAILED
 }
 
 enum PolicyAction {
@@ -168,6 +185,7 @@ model Tenant {
   taxSnapshots      TaxCalculationSnapshot[]
   analyticsEvents   AnalyticsEvent[]
   auditLogs         AuditLog[]
+  notifications     Notification[]
 
   @@index([countryCode])
   @@index([status])
@@ -222,13 +240,39 @@ model PublishedProfile {
   status       ProfileStatus @default(LIVE)
   version      Int
   publishedAt  DateTime      @default(now())
+  expiresAt    DateTime?
+  renewalAlert35At DateTime?
+  renewalAlert39At DateTime?
+  archivedAt   DateTime?
+  deletedAt    DateTime?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   country      Country       @relation(fields: [countryCode], references: [code])
 
   @@index([tenantId, status])
+  @@index([status, expiresAt])
   @@index([countryCode, industryCode])
+}
+
+model Notification {
+  id          String             @id @default(uuid())
+  tenantId    String
+  userId      String?
+  channel     NotificationChannel @default(IN_APP)
+  status      NotificationStatus  @default(PENDING)
+  title       String             @db.VarChar(160)
+  message     String
+  entityType  String             @db.VarChar(80)
+  entityId    String             @db.VarChar(120)
+  scheduledFor DateTime
+  sentAt      DateTime?
+  readAt      DateTime?
+  createdAt   DateTime           @default(now())
+  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status, scheduledFor])
+  @@index([entityType, entityId])
 }
 
 model AnalyticsEvent {

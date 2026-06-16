@@ -81,8 +81,20 @@ and publish a safe profile.
 - Generate thumbnails and media metadata.
 - Run malware and content moderation.
 - Preview, publish, pause, archive, and renew.
+- Auto-delete adverts after 40 days unless renewed.
+- Send renewal notifications on day 35 and day 39.
 
 Exit: a safe listing with up to 10 media assets can be published.
+
+Progress:
+
+- Added shared advert lifecycle policy for 40-day expiry and day-35/day-39
+  renewal alerts.
+- Added tenant-scoped advert lifecycle API that creates renewal notifications
+  and auto-deletes expired adverts in the MVP in-memory store.
+- Added database fields for expiry, renewal alerts, deletion timestamps, and
+  notification records.
+- A durable scheduler/queue and persisted advert repository remain next.
 
 ## Epic 5: Source Finder and Relationship Graph
 

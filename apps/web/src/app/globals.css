@@ -523,7 +523,14 @@ textarea {
   margin-top: 10px;
 }
 
-.visited-row {
+.lifecycle-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.visited-row,
+.lifecycle-row {
   min-height: 34px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -534,6 +541,39 @@ textarea {
   background: #f7fbf9;
   padding: 7px 9px;
   font-size: 12px;
+}
+
+.lifecycle-row {
+  grid-template-columns: auto minmax(0, 1fr);
+  background: #fbfcfa;
+}
+
+.lifecycle-row.warning {
+  border-color: #e5d49c;
+  background: #fff8df;
+}
+
+.lifecycle-row.danger {
+  border-color: #e1bcbc;
+  background: #f8e7e7;
+}
+
+.lifecycle-row svg {
+  color: var(--amber);
+}
+
+.lifecycle-row.danger svg {
+  color: var(--red);
+}
+
+.lifecycle-row strong,
+.lifecycle-row span {
+  display: block;
+}
+
+.lifecycle-row span {
+  margin-top: 2px;
+  color: var(--muted);
 }
 
 .visited-row span {
