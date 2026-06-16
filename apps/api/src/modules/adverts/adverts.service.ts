@@ -129,6 +129,20 @@ export class AdvertsService {
     };
   }
 
+  runAllLifecycles(input: RunAdvertLifecycleDto = {}) {
+    const tenantIds = [...new Set(Array.from(this.adverts.values()).map((advert) => advert.tenantId))];
+    const checkedAt = input.now ?? new Date().toISOString();
+    return {
+      checkedAt,
+      policy: advertLifecyclePolicy,
+      tenantsChecked: tenantIds.length,
+      results: tenantIds.map((tenantId) => ({
+        tenantId,
+        ...this.runLifecycle(tenantId, { ...input, now: checkedAt }),
+      })),
+    };
+  }
+
   private createRenewalNotification(
     tenantId: string,
     advert: AdvertPost,

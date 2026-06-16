@@ -92,6 +92,8 @@ Progress:
   renewal alerts.
 - Added tenant-scoped advert lifecycle API that creates renewal notifications
   and auto-deletes expired adverts in the MVP in-memory store.
+- Added an internal job-key protected endpoint for daily all-tenant lifecycle
+  sweeps: `POST /v1/operations/adverts/lifecycle/run`.
 - Added database fields for expiry, renewal alerts, deletion timestamps, and
   notification records.
 - A durable scheduler/queue and persisted advert repository remain next.

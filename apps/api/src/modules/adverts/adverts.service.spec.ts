@@ -60,6 +60,36 @@ describe('AdvertsService', () => {
     expect(service.listAdverts(tenantId)).toHaveLength(0);
   });
 
+  it('runs lifecycle for all tenants for scheduler jobs', () => {
+    const service = new AdvertsService();
+    const otherTenantId = '22222222-2222-4222-8222-222222222222';
+
+    service.createAdvert(tenantId, {
+      title: 'Fresh vegetable supply',
+      displayName: 'Nairobi Fresh Produce',
+      industryCode: 'AGRICULTURE',
+      role: 'SUPPLIER',
+      description: 'We supply fresh vegetables to hotels and retailers in Nairobi.',
+      countryCode: 'KE',
+      publishedAt: '2026-06-01T00:00:00.000Z',
+    });
+    service.createAdvert(otherTenantId, {
+      title: 'Packaging supply',
+      displayName: 'Kiambu Packaging Works',
+      industryCode: 'MANUFACTURING',
+      role: 'SUPPLIER',
+      description: 'We supply food packaging and cartons to retailers in Kiambu.',
+      countryCode: 'KE',
+      publishedAt: '2026-06-01T00:00:00.000Z',
+    });
+
+    const result = service.runAllLifecycles({ now: '2026-07-06T00:00:00.000Z' });
+
+    expect(result.tenantsChecked).toBe(2);
+    expect(result.results).toHaveLength(2);
+    expect(result.results.every((tenant) => tenant.alertsCreated.length === 1)).toBe(true);
+  });
+
   it('blocks prohibited advert content', () => {
     const service = new AdvertsService();
 

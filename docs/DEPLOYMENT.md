@@ -117,6 +117,11 @@ The production service settings were further optimized on 2026-06-16:
   current Railway trial-plan limit.
 - Cron schedules are intentionally disabled because serverless services do not
   support cron schedules in this configuration.
+- The API exposes a protected lifecycle sweep endpoint for future scheduling:
+  `POST /v1/operations/adverts/lifecycle/run` with the `x-internal-job-key`
+  header. Configure `INTERNAL_JOB_KEY` before enabling Railway Cron or an
+  external scheduler. Run it daily to create day-35/day-39 renewal alerts and
+  auto-delete day-40 adverts.
 - CDN caching was not enabled yet. The current app will become tenant-aware and
   authenticated, so edge caching should wait until cache-control headers clearly
   separate public static assets from tenant or user-specific pages.

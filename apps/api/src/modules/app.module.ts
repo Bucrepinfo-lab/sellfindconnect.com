@@ -6,6 +6,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { AdvertsModule } from './adverts/adverts.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { HealthModule } from './health/health.module';
+import { OperationsModule } from './operations/operations.module';
 import { ProfilesModule } from './profiles/profiles.module';
 import { SafetyModule } from './safety/safety.module';
 
@@ -19,6 +20,7 @@ import { SafetyModule } from './safety/safety.module';
     ProfilesModule,
     AnalyticsModule,
     AdvertsModule,
+    OperationsModule,
   ],
 })
 export class AppModule {}
