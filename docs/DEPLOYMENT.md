@@ -51,6 +51,7 @@ Railway project:
 - Project: `telpen-adverts`
 - Project ID: `84794ef4-c31c-41cd-8048-089f59040f1f`
 - Environment: `production`
+- GitHub repository: `https://github.com/Bucrepinfo-lab/sellfindconnect.com.git`
 - Temporary web URL: `https://web-production-32b7d.up.railway.app`
 - Temporary API URL: `https://api-production-ae5f.up.railway.app`
 - API documentation: `https://api-production-ae5f.up.railway.app/docs`
