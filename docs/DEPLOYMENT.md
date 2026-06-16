@@ -72,6 +72,10 @@ GitHub-connected Railway project currently visible to `bucrepinfo@gmail.com`:
 - Advert lifecycle deployment on 2026-06-16:
   - API deployment: `960bafd5-c445-4c6f-90b1-e68181e20162` (`SUCCESS`)
   - Web deployment: `e9b5d4ee-f2f3-4c76-a59b-f3b83065616f` (`SUCCESS`)
+- Next.js prerender hardening:
+  - Keep `apps/web/src/app/global-error.tsx` and `apps/web/src/app/not-found.tsx`
+    committed so Railway/Next does not rely on auto-generated error pages.
+  - Keep the web build script forcing `NODE_ENV=production`.
 
 Both production deployments completed successfully on 2026-06-15. The
 temporary web URL returned HTTP 200, the API health endpoint returned `ok`, and
