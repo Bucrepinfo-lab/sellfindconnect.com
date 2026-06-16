@@ -13,6 +13,13 @@ Last updated: 2026-06-16
   versioned zero-tolerance evaluator before persistence, indexing, matching,
   messaging, sharing, downloading, payment, or export. Client-only warnings do
   not satisfy acceptance criteria.
+- Require every user-content and discovery endpoint to also enforce
+  hosting-provider acceptable-use restrictions aligned with Railway-style
+  rules: no illegal activity, child exploitation, terrorism or violent
+  extremism, human trafficking, nonconsensual intimate imagery, fraud,
+  phishing, impersonation, malware, unauthorized access, DDoS, botnets, spam,
+  abusive scraping, copyright piracy, crypto mining, torrenting, open proxies,
+  anonymizers, compute resale, or infrastructure abuse.
 - Require explicit acceptance of the active terms, privacy, subscription, and
   prohibited-content policy versions before publishing, media upload, messaging,
   paid promotion, or payment enablement.
@@ -36,6 +43,7 @@ Exit: clean install, type check, tests, and production builds pass.
 - Seed the 21 top-level industry categories.
 - Model supply-chain roles.
 - Add zero-tolerance category and synonym policy rules.
+- Add hosting-provider acceptable-use category and synonym policy rules.
 - Expose public geography and industry APIs.
 
 Exit: web onboarding can select a permitted industry and Kenya/local currency.

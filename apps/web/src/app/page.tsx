@@ -145,8 +145,16 @@ const termsClauses = [
     text: 'Blocked goods, services, searches, media, links, messages, payments and relationship claims are never allowed and cannot be approved by accepting terms.',
   },
   {
+    title: 'Platform acceptable use',
+    text: 'Users must not use Telpen for illegal activity, exploitation, terrorism, trafficking, fraud, phishing, malware, DDoS, botnets, scraping abuse, spam, crypto mining, torrenting, proxy abuse or compute resale.',
+  },
+  {
     title: 'Truthful advertising',
     text: 'Claims, prices, offers, endorsements, guarantees, taxes, availability and disclosures must be accurate, current and compliant in the advertiser country.',
+  },
+  {
+    title: 'Rights and permissions',
+    text: 'Users must own or have permission for all names, brands, images, clips, files, links, code, descriptions and intellectual-property claims they submit.',
   },
   {
     title: 'Data and consent',
@@ -158,7 +166,7 @@ const termsClauses = [
   },
   {
     title: 'Moderation rights',
-    text: 'Telpen may block, remove, restrict, preserve evidence, suspend accounts and report severe abuse while honoring mandatory platform and regulatory duties.',
+    text: 'Telpen may block, remove, restrict, preserve evidence, suspend accounts, rate-limit abuse and report severe violations while honoring mandatory platform, hosting-provider and regulatory duties.',
   },
 ];
 

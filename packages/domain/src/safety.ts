@@ -8,7 +8,11 @@ export type BlockedCategory =
   | 'HATE_THREATS'
   | 'SELF_HARM_GRAPHIC_VIOLENCE'
   | 'CRIMINAL_SERVICES'
-  | 'ILLEGAL_WILDLIFE_TRADE';
+  | 'ILLEGAL_WILDLIFE_TRADE'
+  | 'PLATFORM_ABUSE'
+  | 'SPAM_SCAMS'
+  | 'INTELLECTUAL_PROPERTY_ABUSE'
+  | 'PROHIBITED_INFRASTRUCTURE_USE';
 
 export type SafetyDecision =
   | { allowed: true; action: 'ALLOW' }
@@ -82,6 +86,26 @@ export const prohibitedCategorySummaries: ProhibitedCategorySummary[] = [
     category: 'ILLEGAL_WILDLIFE_TRADE',
     label: 'Illegal wildlife trade',
     summary: 'Poaching or trade in protected species, ivory, endangered wildlife or related products.',
+  },
+  {
+    category: 'PLATFORM_ABUSE',
+    label: 'Platform abuse and cyber harm',
+    summary: 'Unauthorized access, malware, phishing, botnets, DDoS, credential abuse or evasion tooling.',
+  },
+  {
+    category: 'SPAM_SCAMS',
+    label: 'Spam, scams and deceptive automation',
+    summary: 'Spam, fake engagement, deceptive automation, impersonation, scraping abuse or mass unsolicited messaging.',
+  },
+  {
+    category: 'INTELLECTUAL_PROPERTY_ABUSE',
+    label: 'Piracy and intellectual-property abuse',
+    summary: 'Copyright piracy, bootleg media, cracked software, stolen creative work or infringement services.',
+  },
+  {
+    category: 'PROHIBITED_INFRASTRUCTURE_USE',
+    label: 'Prohibited infrastructure use',
+    summary: 'Crypto mining, torrenting, compute resale, open proxies, anonymizers or hosting abuse.',
   },
 ];
 
@@ -256,6 +280,12 @@ const policyGroups: PolicyGroup[] = [
       'money laundering service',
       'bribery service',
       'sanctions evasion',
+      'identity theft',
+      'carding service',
+      'account takeover',
+      'fraudulent payment',
+      'payment fraud',
+      'bank drop',
     ],
   },
   {
@@ -269,6 +299,93 @@ const policyGroups: PolicyGroup[] = [
       'ivory for sale',
       'rhino horn for sale',
       'illegal wildlife trade',
+    ],
+  },
+  {
+    category: 'PLATFORM_ABUSE',
+    policyCode: 'ZT-PLATFORM-001',
+    terms: [
+      'unauthorized access',
+      'unauthorised access',
+      'credential stuffing',
+      'credential abuse',
+      'password dump',
+      'stolen credentials',
+      'malware',
+      'ransomware',
+      'spyware',
+      'keylogger',
+      'trojan',
+      'botnet',
+      'ddos',
+      'denial of service',
+      'phishing',
+      'phishing kit',
+      'spoofed login',
+      'exploit kit',
+      'zero day exploit',
+      'bypass security',
+      'captcha bypass',
+      'account cracking',
+    ],
+  },
+  {
+    category: 'SPAM_SCAMS',
+    policyCode: 'ZT-SPAM-001',
+    terms: [
+      'spam service',
+      'bulk unsolicited email',
+      'bulk unsolicited sms',
+      'mass unsolicited messaging',
+      'fake reviews',
+      'fake followers',
+      'fake engagement',
+      'click farm',
+      'impersonation service',
+      'romance scam',
+      'investment scam',
+      'advance fee scam',
+      'scraping service',
+      'abusive scraping',
+      'automated account creation',
+    ],
+  },
+  {
+    category: 'INTELLECTUAL_PROPERTY_ABUSE',
+    policyCode: 'ZT-IP-001',
+    terms: [
+      'pirated software',
+      'software crack',
+      'cracked software',
+      'license key generator',
+      'serial key generator',
+      'bootleg movies',
+      'bootleg music',
+      'copyright piracy',
+      'stolen design files',
+      'stolen artwork',
+      'counterfeit brand',
+      'trademark infringement service',
+    ],
+  },
+  {
+    category: 'PROHIBITED_INFRASTRUCTURE_USE',
+    policyCode: 'ZT-INFRA-001',
+    terms: [
+      'crypto mining hosting',
+      'cryptocurrency mining hosting',
+      'mining rig hosting',
+      'torrent tracker',
+      'torrent seeding',
+      'seedbox hosting',
+      'open proxy',
+      'proxy service for abuse',
+      'anonymizer service',
+      'traffic relay service',
+      'resell railway compute',
+      'compute resale',
+      'server resale',
+      'hosting resale without authorization',
     ],
   },
 ];

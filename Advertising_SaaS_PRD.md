@@ -162,6 +162,8 @@ Each category must support:
 
 The platform must entirely block weapons, pornography, human trafficking/human trade, and other categories of similar severity. These categories are not "regulated industries" on Telpen; they are prohibited across signup, profiles, listings, media, search, matching, recommendations, chat, payment, links, and analytics exports.
 
+Hosting-provider acceptable-use alignment is mandatory. Because the current deployment uses Railway, Telpen must not allow users to publish, search, link, message, upload, promote, automate, or transact around activity that would violate Railway-style acceptable-use rules, including illegal activity, child exploitation, terrorism or violent extremism, human trafficking, nonconsensual intimate imagery, fraud, phishing, impersonation, malware, unauthorized access, DDoS, botnets, spam, abusive scraping, copyright piracy, crypto mining, torrenting, open proxies, anonymizers, compute resale, or other infrastructure abuse.
+
 Blocked categories:
 
 - Weapons, firearms, ammunition, explosives, weapon parts, weapon accessories, firearm conversion devices, bomb-making materials, tactical weapon kits, 3D-printable weapon files, and instructions for manufacturing, modifying, sourcing, or using weapons.
@@ -180,6 +182,7 @@ Enforcement requirements:
 
 - The taxonomy must exclude these categories and synonyms from selectable industries, subcategories, and tags.
 - Users attempting to create blocked profiles, listings, media, links, chats, or search queries must receive a policy-block response rather than a publishable draft.
+- Users attempting hosting-provider-prohibited activity must receive the same policy-block response and must not receive search results, match suggestions, related entities, chat prompts, paid promotion, analytics exports, or publishable drafts.
 - Blocked content must not be indexed, recommended, matched, boosted, shared, downloaded, or monetized.
 - Detection must combine keyword/synonym lists, image/video moderation, link/domain checks, entity recognition, user reports, country-specific prohibited terms, and human review for ambiguous cases.
 - Confirmed severe violations must remove the content, suspend or terminate the account, preserve evidence according to legal policy, and escalate to the appropriate country authority or child-safety reporting body where required.
@@ -202,10 +205,12 @@ Required terms clauses:
 - The user confirms lawful authority to create, post, sell, source, promote, link, message, distribute, and transact around the advertised goods or services.
 - The user is responsible for truthfulness, current pricing, availability, qualifications, licenses, permits, safety claims, health claims, financial claims, endorsements, guarantees, taxes, delivery terms, refunds, and dispute handling.
 - The user must not submit, search for, link to, message about, pay for, or attempt to source any zero-tolerance prohibited category.
+- The user must not use Telpen or its hosting infrastructure for spam, phishing, malware, botnets, DDoS, unauthorized access, abusive scraping, proxies/anonymizers, torrenting, crypto mining, compute resale, copyright piracy, fraud, impersonation, or any other infrastructure abuse.
+- The user must own or have lawful permission for all uploaded names, brands, images, clips, files, links, code, descriptions, endorsements, and intellectual-property claims.
 - The user must only upload or use contact data, biodata, buyer signals, supplier data, media, documents, and personal data with lawful notice, consent, contract, legitimate interest, or another valid legal basis in the relevant country.
 - The user accepts responsibility for their own profile, listing, content, chats, contracts, deliveries, payments, taxes, customs, licenses, and disputes. Telpen is not a party to user-to-user transactions unless a separate written agreement says otherwise.
 - The user indemnifies and holds Telpen harmless for claims arising from the user's unlawful or inaccurate content, transactions, communications, tax failures, intellectual-property violations, or prohibited conduct to the maximum extent allowed by law.
-- Telpen retains the right to block, reject, remove, de-rank, disable sharing/downloading, suspend, terminate, preserve evidence, and report severe violations.
+- Telpen retains the right to block, reject, remove, de-rank, disable sharing/downloading, rate-limit, suspend, terminate, preserve evidence, and report severe violations where allowed or required.
 - No clause may be drafted, displayed, or enforced as a waiver of non-waivable duties owed by Telpen under consumer protection, privacy, tax, platform, app-store, child-safety, marketplace, criminal-reporting, or other mandatory law.
 
 Execution requirements:

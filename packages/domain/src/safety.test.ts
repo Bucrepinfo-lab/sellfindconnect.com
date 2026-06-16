@@ -40,6 +40,10 @@ describe('evaluateSafetyText', () => {
     ['SELF_HARM_GRAPHIC_VIOLENCE', 'suicide kit'],
     ['CRIMINAL_SERVICES', 'counterfeit goods supplier'],
     ['ILLEGAL_WILDLIFE_TRADE', 'rhino horn for sale'],
+    ['PLATFORM_ABUSE', 'phishing kit setup'],
+    ['SPAM_SCAMS', 'fake reviews and click farm package'],
+    ['INTELLECTUAL_PROPERTY_ABUSE', 'cracked software license key generator'],
+    ['PROHIBITED_INFRASTRUCTURE_USE', 'crypto mining hosting'],
   ] as const)('blocks %s content', (category, text) => {
     const decision = evaluateSafetyText(text);
 
@@ -72,7 +76,7 @@ describe('evaluateSafetyText', () => {
   });
 
   it('publishes a summary for every blocked category', () => {
-    expect(prohibitedCategorySummaries).toHaveLength(10);
-    expect(new Set(prohibitedCategorySummaries.map((item) => item.category)).size).toBe(10);
+    expect(prohibitedCategorySummaries).toHaveLength(14);
+    expect(new Set(prohibitedCategorySummaries.map((item) => item.category)).size).toBe(14);
   });
 });

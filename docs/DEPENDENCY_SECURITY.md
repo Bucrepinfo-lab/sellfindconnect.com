@@ -26,3 +26,20 @@ Required follow-up:
 - Keep deployment CLIs out of production runtime images.
 - Do not use `npm audit fix --force` without reviewing framework compatibility,
   builds, tests, and runtime behavior.
+
+## Hosting Acceptable-Use Alignment
+
+Railway is the current deployment host, so application input guards and terms
+must prevent users from using Telpen surfaces for activity that would violate
+Railway-style acceptable-use restrictions. User-generated profiles, listings,
+searches, messages, media, links, payment descriptors, automation, and exports
+must block illegal activity, child exploitation, terrorism or violent
+extremism, human trafficking, nonconsensual sexual content, fraud, phishing,
+impersonation, malware, unauthorized access, DDoS, botnets, spam, abusive
+scraping, copyright piracy, crypto mining, torrenting, open proxies,
+anonymizers, compute resale, or infrastructure abuse.
+
+Official policy references:
+
+- Railway Acceptable Use Policy: https://railway.com/legal/acceptable-use
+- Railway Terms of Service: https://railway.com/legal/terms

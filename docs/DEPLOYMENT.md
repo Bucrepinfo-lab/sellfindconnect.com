@@ -127,6 +127,10 @@ GitHub source connection status on 2026-06-16:
 - Required next action: authorize the Railway account/GitHub App for the
   `Bucrepinfo-lab` owner or grant the Railway-connected GitHub user access to
   `Bucrepinfo-lab/sellfindconnect.com`.
+- Repeated attempts after GitHub-side authorization still returned the same
+  access error. If the GitHub App is already installed under `Bucrepinfo-lab`,
+  refresh or reconnect GitHub from Railway's source selector/account settings so
+  Railway re-reads the installation.
 
 ### Web Service
 
