@@ -1,0 +1,29 @@
+{
+  "name": "telpen-adverts",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build:domain": "npm run build -w @telpen/domain",
+    "build": "npm run build:domain && npm run generate -w @telpen/database && npm run build -w @telpen/api && npm run build -w @telpen/web",
+    "dev": "npm run build:domain && concurrently --names api,web --prefix-colors cyan,magenta \"npm run dev -w @telpen/api\" \"npm run dev -w @telpen/web\"",
+    "typecheck": "npm run typecheck -w @telpen/domain && npm run typecheck -w @telpen/api && npm run typecheck -w @telpen/web",
+    "test": "npm run test -w @telpen/domain && npm run test -w @telpen/api",
+    "lint": "npm run lint -w @telpen/web",
+    "format": "prettier --write .",
+    "db:validate": "npm run validate -w @telpen/database",
+    "db:generate": "npm run generate -w @telpen/database"
+  },
+  "devDependencies": {
+    "@railway/cli": "^5.12.1",
+    "concurrently": "10.0.3",
+    "prettier": "3.8.4",
+    "typescript": "6.0.3"
+  },
+  "engines": {
+    "node": ">=20.9"
+  }
+}
