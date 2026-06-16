@@ -56,6 +56,20 @@ Railway project:
 - Temporary API URL: `https://api-production-ae5f.up.railway.app`
 - API documentation: `https://api-production-ae5f.up.railway.app/docs`
 
+GitHub-connected Railway project currently visible to `bucrepinfo@gmail.com`:
+
+- Project: `resplendent-fulfillment`
+- Project ID: `42716fff-95b0-4755-b0b2-59faf081eb86`
+- Environment: `production`
+- Environment ID: `bc3f4b4e-0101-4f70-b346-3df2b8e5405b`
+- GitHub repository: `https://github.com/Bucrepinfo-lab/sellfindconnect.com.git`
+- API service: `@telpen/api`
+- API service ID: `99fb3c7e-487c-4a77-ba08-369a83ac7e0d`
+- Web service: `@telpen/web`
+- Web service ID: `9b5a1466-f105-44e1-a16e-0b5c45f04ace`
+- Latest API deployment: `c3478884-b803-4d8a-be05-ceeb7e67c6e6` (`SUCCESS`)
+- Latest web deployment: `6a837a7e-b421-408c-b804-520b26a3f0f9` (`SUCCESS`)
+
 Both production deployments completed successfully on 2026-06-15. The
 temporary web URL returned HTTP 200, the API health endpoint returned `ok`, and
 the API documentation returned HTTP 200.
