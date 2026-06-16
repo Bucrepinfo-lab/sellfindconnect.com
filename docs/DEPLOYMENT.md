@@ -154,9 +154,9 @@ GitHub source connection status on 2026-06-16:
 - Workspace: `@telpen/web`
 - Dockerfile: `deploy/web.Dockerfile`
 - Railway/Nixpacks build command if not using the Dockerfile:
-  `npm run build:web`
-- Expanded web build command:
   `npm run build -w @telpen/domain && npm run build -w @telpen/web`
+- Equivalent repository script:
+  `npm run build:web`
 - Public domain: `adverts.telpen.net`
 - Health check: `/`
 - Environment:

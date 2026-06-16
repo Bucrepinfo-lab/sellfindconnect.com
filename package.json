@@ -8,8 +8,8 @@
   ],
   "scripts": {
     "build:domain": "npm run build -w @telpen/domain",
-    "build:web": "npm run build:domain && npm run build -w @telpen/web",
-    "build:api": "npm run build:domain && npm run generate -w @telpen/database && npm run build -w @telpen/api",
+    "build:web": "npm run build -w @telpen/web",
+    "build:api": "npm run build -w @telpen/api",
     "build": "npm run build:api && npm run build -w @telpen/web",
     "dev": "npm run build:domain && concurrently --names api,web --prefix-colors cyan,magenta \"npm run dev -w @telpen/api\" \"npm run dev -w @telpen/web\"",
     "typecheck": "npm run typecheck -w @telpen/domain && npm run typecheck -w @telpen/api && npm run typecheck -w @telpen/web",

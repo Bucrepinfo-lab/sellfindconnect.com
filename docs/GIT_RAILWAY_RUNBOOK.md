@@ -68,25 +68,32 @@ If Railway is building from GitHub/Nixpacks instead of the checked-in
 Dockerfiles, set the web service build command to:
 
 ```powershell
-npm.cmd run build:web
+npm.cmd run build -w @telpen/domain && npm.cmd run build -w @telpen/web
 ```
 
-This expands to:
+The equivalent repository script is:
 
 ```powershell
-npm.cmd run build -w @telpen/domain
-npm.cmd run build -w @telpen/web
+npm.cmd run build:web
 ```
 
 Do not set the web service to build only `@telpen/web`. The web app imports
 compiled exports from `@telpen/domain`, and Next.js cannot resolve those imports
 until the domain package has produced its `dist` output.
 
+As an additional guard, the `@telpen/web` workspace build script also builds
+`@telpen/domain` first. This means Railway's auto-detected command
+`npm run build --workspace=@telpen/web` is safe too.
+
 For the API service, use:
 
 ```powershell
 npm.cmd run build:api
 ```
+
+The `@telpen/api` workspace build script builds `@telpen/domain` and generates
+the database client before compiling the API, so Railway's auto-detected API
+workspace build remains safe as well.
 
 ## Service-Specific Deploys
 
