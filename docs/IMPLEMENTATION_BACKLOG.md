@@ -119,6 +119,15 @@ Exit: a match can become an inquiry, conversation, and qualified lead.
 
 Exit: each hierarchy level sees only its permitted analytics.
 
+Progress:
+
+- Added the shared analytics event taxonomy and consent states.
+- Added tenant-scoped API endpoints for recording analytics events and reading
+  tenant summaries.
+- Added web dashboard metrics for most visited, sorted, clicks, enquiries,
+  shares, downloads, and age.
+- Database persistence and hierarchy dashboards remain next.
+
 ## Epic 8: Subscription, Finance, and Tax
 
 - Implement first-month-free subscription state machine.

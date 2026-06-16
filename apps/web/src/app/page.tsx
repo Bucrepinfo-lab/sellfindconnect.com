@@ -234,6 +234,13 @@ export default function Home() {
     }),
     { views: 0, clicks: 0, inquiries: 0, shares: 0, downloads: 0 },
   );
+  const mostVisited = [...filteredResults].sort((a, b) => b.views - a.views).slice(0, 3);
+  const averageDaysLive = filteredResults.length
+    ? Math.round(
+        filteredResults.reduce((memo, item) => memo + item.daysLive, 0) / filteredResults.length,
+      )
+    : 0;
+  const clickThroughRate = totals.views ? Math.round((totals.clicks / totals.views) * 100) : 0;
 
   return (
     <main className="app-shell">
@@ -513,6 +520,28 @@ export default function Home() {
 
             <section className="side-panel">
               <div className="panel-heading tight">
+                <h2>Analytics Command</h2>
+                <span>Tenant</span>
+              </div>
+              <AnalyticsRow label="Most visited" value={mostVisited[0]?.name ?? 'No visits'} />
+              <AnalyticsRow label="Sorted by" value="Match score" />
+              <AnalyticsRow label="Click rate" value={`${clickThroughRate}%`} />
+              <AnalyticsRow label="Average age" value={`${averageDaysLive} days`} />
+              <AnalyticsRow label="Enquiries" value={formatNumber(totals.inquiries)} />
+              <AnalyticsRow label="Shared" value={formatNumber(totals.shares)} />
+              <AnalyticsRow label="Downloaded" value={formatNumber(totals.downloads)} />
+              <div className="visited-list">
+                {mostVisited.map((item) => (
+                  <div key={item.id} className="visited-row">
+                    <span>{item.name}</span>
+                    <strong>{formatNumber(item.views)}</strong>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="side-panel">
+              <div className="panel-heading tight">
                 <h2>Opportunity Signals</h2>
                 <span>Live</span>
               </div>
@@ -542,6 +571,15 @@ function Metric({ label, value, icon }: { label: string; value: string; icon: Re
 function FinanceRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="finance-row">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function AnalyticsRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="analytics-row">
       <span>{label}</span>
       <strong>{value}</strong>
     </div>

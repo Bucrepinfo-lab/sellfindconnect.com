@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "npm run build -w @telpen/domain && next build",
     "start": "next start",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "npm run build -w @telpen/domain && tsc -p tsconfig.json --noEmit",
     "lint": "eslint ."
   },
   "dependencies": {

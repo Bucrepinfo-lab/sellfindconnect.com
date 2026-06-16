@@ -71,6 +71,36 @@ enum TaxRemittanceStatus {
   FAILED
 }
 
+enum AnalyticsEventType {
+  IMPRESSION
+  VIEW
+  CLICK
+  INQUIRY
+  SHARE
+  DOWNLOAD
+  SAVE
+  SEARCH
+  MATCH
+  CHAT_MESSAGE
+  RESPONSE_TIME
+}
+
+enum AnalyticsEntityType {
+  PROFILE
+  LISTING
+  SEARCH_RESULT
+  MATCH
+  CHAT_THREAD
+  MEDIA_ASSET
+}
+
+enum ConsentState {
+  GRANTED
+  DENIED
+  NOT_REQUIRED
+  UNKNOWN
+}
+
 model Continent {
   code      String    @id @db.VarChar(8)
   name      String    @db.VarChar(80)
@@ -136,6 +166,7 @@ model Tenant {
   profileDrafts     ProfileDraft[]
   publishedProfiles PublishedProfile[]
   taxSnapshots      TaxCalculationSnapshot[]
+  analyticsEvents   AnalyticsEvent[]
   auditLogs         AuditLog[]
 
   @@index([countryCode])
@@ -198,6 +229,26 @@ model PublishedProfile {
 
   @@index([tenantId, status])
   @@index([countryCode, industryCode])
+}
+
+model AnalyticsEvent {
+  id           String              @id @default(uuid())
+  tenantId     String
+  eventType    AnalyticsEventType
+  entityType   AnalyticsEntityType
+  entityId     String              @db.VarChar(120)
+  countryCode  String              @db.VarChar(2)
+  industryCode String?             @db.VarChar(80)
+  consentState ConsentState
+  metadata     Json?
+  occurredAt   DateTime
+  createdAt    DateTime            @default(now())
+  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, occurredAt])
+  @@index([tenantId, eventType, occurredAt])
+  @@index([countryCode, industryCode, occurredAt])
+  @@index([entityType, entityId, occurredAt])
 }
 
 model SafetyPolicyDecision {

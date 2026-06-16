@@ -482,6 +482,7 @@ textarea {
 }
 
 .finance-row,
+.analytics-row,
 .signal-row {
   min-height: 36px;
   display: flex;
@@ -493,6 +494,7 @@ textarea {
 }
 
 .finance-row span,
+.analytics-row span,
 .signal-row span {
   color: var(--muted);
 }
@@ -504,8 +506,43 @@ textarea {
 }
 
 .signal-row:first-of-type,
+.analytics-row:first-of-type,
 .finance-row:first-of-type {
   border-top: 0;
+}
+
+.analytics-row strong {
+  max-width: 58%;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.visited-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.visited-row {
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid #d8e4df;
+  border-radius: 8px;
+  background: #f7fbf9;
+  padding: 7px 9px;
+  font-size: 12px;
+}
+
+.visited-row span {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.visited-row strong {
+  color: var(--green);
 }
 
 .signal-row svg {
