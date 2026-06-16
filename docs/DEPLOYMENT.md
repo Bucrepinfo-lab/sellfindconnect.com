@@ -117,6 +117,18 @@ The production container images were optimized on 2026-06-16:
 - Docker is not installed on the local workstation, so local validation used
   `npm` build/test/typecheck/lint plus Railway Docker builder validation.
 
+The Railway acceptable-use terms and input-guard update was deployed on
+2026-06-16:
+
+- Web deployment: `45d70d4c-bc08-42a9-88b3-501a101e8331`
+- API deployment: `1e720ddd-fa0d-4e51-882a-e88291b322dd`
+- Web deployment status: `SUCCESS`
+- API deployment status: `SUCCESS`
+- Web keeps healthcheck path `/`, runtime `V2`, Dockerfile
+  `deploy/web.Dockerfile`, and Serverless/App Sleeping enabled.
+- API keeps healthcheck path `/v1/health`, runtime `V2`, Dockerfile
+  `deploy/api.Dockerfile`, and Serverless/App Sleeping enabled.
+
 GitHub source connection status on 2026-06-16:
 
 - Local Git remote is `https://github.com/Bucrepinfo-lab/sellfindconnect.com.git`.
