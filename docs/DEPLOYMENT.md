@@ -67,11 +67,15 @@ GitHub-connected Railway project currently visible to `bucrepinfo@gmail.com`:
 - API service ID: `99fb3c7e-487c-4a77-ba08-369a83ac7e0d`
 - Web service: `@telpen/web`
 - Web service ID: `9b5a1466-f105-44e1-a16e-0b5c45f04ace`
-- Latest API deployment: `c3478884-b803-4d8a-be05-ceeb7e67c6e6` (`SUCCESS`)
-- Latest web deployment: `6a837a7e-b421-408c-b804-520b26a3f0f9` (`SUCCESS`)
+- Latest API deployment: `e0301a63-e739-4eff-af26-c73781aa657c` (`SUCCESS`)
+- Latest web deployment: `e9b5d4ee-f2f3-4c76-a59b-f3b83065616f` (`SUCCESS`)
 - Advert lifecycle deployment on 2026-06-16:
   - API deployment: `960bafd5-c445-4c6f-90b1-e68181e20162` (`SUCCESS`)
   - Web deployment: `e9b5d4ee-f2f3-4c76-a59b-f3b83065616f` (`SUCCESS`)
+- Protected advert lifecycle sweep deployment on 2026-06-16:
+  - API deployment: `e0301a63-e739-4eff-af26-c73781aa657c` (`SUCCESS`)
+  - Commit: `3453dd3` (`Add protected advert lifecycle sweep`)
+  - Web deployment was unchanged because the commit only touched API/docs/env files.
 - Next.js prerender hardening:
   - Keep `apps/web/src/app/global-error.tsx` and `apps/web/src/app/not-found.tsx`
     committed so Railway/Next does not rely on auto-generated error pages.
