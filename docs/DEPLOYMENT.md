@@ -69,6 +69,9 @@ GitHub-connected Railway project currently visible to `bucrepinfo@gmail.com`:
 - Web service ID: `9b5a1466-f105-44e1-a16e-0b5c45f04ace`
 - Latest API deployment: `c3478884-b803-4d8a-be05-ceeb7e67c6e6` (`SUCCESS`)
 - Latest web deployment: `6a837a7e-b421-408c-b804-520b26a3f0f9` (`SUCCESS`)
+- Advert lifecycle deployment on 2026-06-16:
+  - API deployment: `960bafd5-c445-4c6f-90b1-e68181e20162` (`SUCCESS`)
+  - Web deployment: `e9b5d4ee-f2f3-4c76-a59b-f3b83065616f` (`SUCCESS`)
 
 Both production deployments completed successfully on 2026-06-15. The
 temporary web URL returned HTTP 200, the API health endpoint returned `ok`, and
