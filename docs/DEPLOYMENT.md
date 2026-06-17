@@ -67,8 +67,8 @@ GitHub-connected Railway project currently visible to `bucrepinfo@gmail.com`:
 - API service ID: `99fb3c7e-487c-4a77-ba08-369a83ac7e0d`
 - Web service: `@telpen/web`
 - Web service ID: `9b5a1466-f105-44e1-a16e-0b5c45f04ace`
-- Latest API deployment: `e0301a63-e739-4eff-af26-c73781aa657c` (`SUCCESS`)
-- Latest web deployment: `e9b5d4ee-f2f3-4c76-a59b-f3b83065616f` (`SUCCESS`)
+- Latest API deployment: `2187c01e-7204-4660-be68-742ef6ba22bc` (`SUCCESS`)
+- Latest web deployment: `e4947ac7-018c-4096-a00e-7abbe1bf1595` (`SUCCESS`)
 - Advert lifecycle deployment on 2026-06-16:
   - API deployment: `960bafd5-c445-4c6f-90b1-e68181e20162` (`SUCCESS`)
   - Web deployment: `e9b5d4ee-f2f3-4c76-a59b-f3b83065616f` (`SUCCESS`)
@@ -76,6 +76,10 @@ GitHub-connected Railway project currently visible to `bucrepinfo@gmail.com`:
   - API deployment: `e0301a63-e739-4eff-af26-c73781aa657c` (`SUCCESS`)
   - Commit: `3453dd3` (`Add protected advert lifecycle sweep`)
   - Web deployment was unchanged because the commit only touched API/docs/env files.
+- Finance/tax command slice deployment on 2026-06-17:
+  - API deployment: `2187c01e-7204-4660-be68-742ef6ba22bc` (`SUCCESS`)
+  - Web deployment: `e4947ac7-018c-4096-a00e-7abbe1bf1595` (`SUCCESS`)
+  - Commit: `d848b2e` (`Add finance tax command slice`)
 - Next.js prerender hardening:
   - Keep `apps/web/src/app/global-error.tsx` and `apps/web/src/app/not-found.tsx`
     committed so Railway/Next does not rely on auto-generated error pages.
