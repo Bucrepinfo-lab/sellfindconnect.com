@@ -4,6 +4,7 @@ export * from './geography';
 export * from './industries';
 export * from './lead-conversion';
 export * from './lifecycle';
+export * from './messaging';
 export * from './profiles';
 export * from './safety';
 export * from './source-finder';

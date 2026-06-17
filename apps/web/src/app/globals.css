@@ -745,6 +745,36 @@ textarea {
   margin-top: 8px;
 }
 
+.chat-field {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.chat-field textarea {
+  min-height: 116px;
+}
+
+.saved-reply-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 9px;
+}
+
+.saved-reply-button {
+  min-height: 32px;
+  border: 1px solid #c8d9e8;
+  border-radius: 8px;
+  background: #edf5fc;
+  color: #224b70;
+  padding: 0 9px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 @media (max-width: 1120px) {
   .app-shell {
     grid-template-columns: 72px minmax(0, 1fr);

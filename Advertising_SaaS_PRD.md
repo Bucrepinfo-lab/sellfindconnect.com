@@ -461,7 +461,8 @@ Implementation progress on 2026-06-17:
 - Added API support for safe inquiry/RFQ creation, with current terms acceptance required before a match can become a lead.
 - Added a tenant lead inbox with status transitions for new, contacted, qualified, negotiating, won, lost, and blocked leads.
 - Added a web Lead Conversion panel showing selected match, confidence, SLA, feedback action, lead status, inquiry lock/unlock state, and next-best actions.
-- Remaining hardening: realtime chat, lead assignment, saved replies, notification delivery, SLA timers, audit logs, and durable persistence.
+- Added the first messaging and SLA workspace: shared conversation rules, saved replies, terms-gated tenant conversation API, safe message submission, assignment, SLA notification checks, Prisma conversation/message/notification models, and a web Conversation Workspace panel.
+- Remaining hardening: live websocket delivery, read receipts, typing/presence, attachments with malware/media moderation, provider-backed email/push delivery, audit logs, and durable repository wiring.
 
 ### 7.7 Relationship Links
 
@@ -499,6 +500,15 @@ MVP decision:
 - Start with in-app chat and email/push notifications.
 - Add WhatsApp/deep link contact options if locally compliant.
 - Add voice/video later only after moderation and safety review.
+
+Implementation progress on 2026-06-17:
+
+- Added shared conversation states, participant roles, notification types, saved reply suggestions, and response-SLA decisions.
+- Added tenant-scoped conversation endpoints for creating a thread from a safe match, listing messages, sending safe messages, assigning an owner, changing status, listing notifications, and running SLA checks.
+- Required current terms acceptance before conversation creation or message sending.
+- Added zero-tolerance safety checks before any message, assignment metadata, or conversation starter can be persisted.
+- Added a web Conversation Workspace preview for owner assignment, SLA state, status transitions, safe reply drafting, and saved replies.
+- Added Prisma models for durable `Conversation`, `ConversationMessage`, and `ConversationNotification` records.
 
 ### 7.9 Analytics and Monitoring
 

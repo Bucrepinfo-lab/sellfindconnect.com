@@ -5,6 +5,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AdvertsModule } from './adverts/adverts.module';
 import { CatalogModule } from './catalog/catalog.module';
+import { ConversationsModule } from './conversations/conversations.module';
 import { FinanceModule } from './finance/finance.module';
 import { HealthModule } from './health/health.module';
 import { LeadsModule } from './leads/leads.module';
@@ -27,6 +28,7 @@ import { SourceFinderModule } from './source-finder/source-finder.module';
     FinanceModule,
     SourceFinderModule,
     LeadsModule,
+    ConversationsModule,
   ],
 })
 export class AppModule {}

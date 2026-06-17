@@ -75,7 +75,8 @@ without validating it against the authenticated user's assignments.
 - Relationships: producer, supplier, consumer, distributor, installer, logistics,
   financier, and certifier links.
 - Matching: rules first, then semantic and graph ranking.
-- Conversations: inquiries, chat, RFQs, quotes, assignments, and response SLAs.
+- Conversations: inquiries, chat, RFQs, quotes, assignment, saved replies,
+  response SLAs, message safety checks, and notification alerts.
 - Billing: trial, subscription, invoice, payment, refund, and chargeback.
 - Finance: country tax profiles, tax snapshots, ledger, reconciliation, returns,
   remittances, alerts, approvals, and evidence.
@@ -151,4 +152,3 @@ requires it. This avoids premature distributed-system complexity.
   chat inquiry, and subscription/tax flows.
 - Security tests for broken object-level authorization.
 - Accessibility checks for primary web workflows.
-

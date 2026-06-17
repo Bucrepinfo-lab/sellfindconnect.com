@@ -146,8 +146,18 @@ Progress:
 - Added tenant lead inbox and lead status updates.
 - Added web Lead Conversion controls for selected match, feedback action,
   status, inquiry lock/unlock, and next-best actions.
-- Realtime chat, assignment, SLA timers, notifications, saved replies, durable
-  persistence, and audit logs remain next.
+- Added shared conversation states, participant roles, saved replies, and SLA
+  decisions.
+- Added tenant-scoped conversation APIs for terms-gated thread creation, safe
+  message sending, assignment, status updates, message listing, notifications,
+  and SLA checks.
+- Added a web Conversation Workspace for owner assignment, SLA state, safe reply
+  drafting, saved replies, and status updates.
+- Added Prisma conversation, message, and notification models for durable
+  persistence wiring.
+- Live websocket delivery, read receipts, typing/presence, attachments,
+  provider-backed email/push delivery, audit logs, and repository persistence
+  remain next.
 
 ## Epic 7: Analytics
 

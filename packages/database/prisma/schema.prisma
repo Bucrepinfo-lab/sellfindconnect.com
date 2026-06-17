@@ -111,6 +111,30 @@ enum AnalyticsEntityType {
   MEDIA_ASSET
 }
 
+enum ConversationStatus {
+  OPEN
+  ASSIGNED
+  WAITING_ON_ADVERTISER
+  WAITING_ON_REQUESTER
+  RESOLVED
+  BLOCKED
+}
+
+enum ConversationParticipantRole {
+  REQUESTER
+  ADVERTISER
+  TENANT_AGENT
+  SYSTEM
+}
+
+enum ConversationNotificationType {
+  NEW_CONVERSATION
+  NEW_MESSAGE
+  ASSIGNMENT
+  SLA_DUE_SOON
+  SLA_BREACHED
+}
+
 enum ConsentState {
   GRANTED
   DENIED
@@ -164,6 +188,7 @@ model User {
   memberships    TenantMembership[]
   auditLogs      AuditLog[]
   financeAlerts  FinanceAlert[]     @relation("FinanceAlertAssignee")
+  assignedConversations Conversation[] @relation("ConversationAssignee")
 }
 
 model Tenant {
@@ -186,6 +211,9 @@ model Tenant {
   analyticsEvents   AnalyticsEvent[]
   auditLogs         AuditLog[]
   notifications     Notification[]
+  conversations     Conversation[]
+  conversationMessages ConversationMessage[]
+  conversationNotifications ConversationNotification[]
 
   @@index([countryCode])
   @@index([status])
@@ -293,6 +321,71 @@ model AnalyticsEvent {
   @@index([tenantId, eventType, occurredAt])
   @@index([countryCode, industryCode, occurredAt])
   @@index([entityType, entityId, occurredAt])
+}
+
+model Conversation {
+  id                    String             @id @default(uuid())
+  tenantId              String
+  sourceRecordId        String             @db.VarChar(120)
+  sourceName            String             @db.VarChar(200)
+  sourceRole            String             @db.VarChar(80)
+  inquiryType           String             @db.VarChar(80)
+  status                ConversationStatus @default(OPEN)
+  priority              String             @db.VarChar(40)
+  matchConfidence       Int
+  responseSlaHours      Int
+  assigneeUserId        String?
+  assigneeDisplayName   String?            @db.VarChar(160)
+  openedAt              DateTime
+  firstResponseDueAt    DateTime
+  firstResponseAt       DateTime?
+  lastInboundMessageAt  DateTime
+  lastMessageAt         DateTime
+  resolvedAt            DateTime?
+  blockedAt             DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  tenant                Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignee              User?              @relation("ConversationAssignee", fields: [assigneeUserId], references: [id])
+  messages              ConversationMessage[]
+  notifications         ConversationNotification[]
+
+  @@index([tenantId, status, updatedAt])
+  @@index([tenantId, assigneeUserId, status])
+  @@index([tenantId, firstResponseDueAt])
+  @@index([sourceRecordId])
+}
+
+model ConversationMessage {
+  id             String                      @id @default(uuid())
+  tenantId       String
+  conversationId String
+  senderRole     ConversationParticipantRole
+  body           String
+  createdAt      DateTime                    @default(now())
+  tenant         Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversation   Conversation                @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, conversationId, createdAt])
+  @@index([senderRole, createdAt])
+}
+
+model ConversationNotification {
+  id             String                       @id @default(uuid())
+  tenantId       String
+  conversationId String
+  type           ConversationNotificationType
+  title          String                       @db.VarChar(160)
+  message        String
+  scheduledFor   DateTime
+  sentAt         DateTime?
+  readAt         DateTime?
+  createdAt      DateTime                     @default(now())
+  tenant         Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversation   Conversation                 @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, type, scheduledFor])
+  @@index([conversationId])
 }
 
 model SafetyPolicyDecision {

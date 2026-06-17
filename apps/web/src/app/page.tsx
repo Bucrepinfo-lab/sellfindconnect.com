@@ -28,9 +28,12 @@ import { useState } from 'react';
 import {
   countries,
   advertLifecyclePolicy,
+  buildSavedReplySuggestions,
   buildLeadConversionIntelligence,
   calculateAdvertLifecycle,
+  calculateConversationSlaDecision,
   calculateTaxSnapshotAmounts,
+  conversationStatuses,
   evaluateSafetyText,
   getRemittanceAlertDecision,
   getCountry,
@@ -43,6 +46,7 @@ import {
   matchFeedbackActions,
   type LeadStatus,
   type MatchFeedbackAction,
+  type ConversationStatus,
   type SourceFinderSearchResult,
   type SourceFinderSortOption,
   supplyChainRoles,
@@ -51,6 +55,8 @@ import {
 
 const tenantId = '11111111-1111-4111-8111-111111111111';
 const lifecycleDemoNow = new Date(Date.UTC(2026, 6, 10, 0, 0, 0)).toISOString();
+const conversationDemoOpenedAt = '2026-06-17T08:00:00.000Z';
+const conversationDemoNow = '2026-06-17T11:15:00.000Z';
 
 const termsClauses = [
   {
@@ -122,6 +128,11 @@ export default function Home() {
   const [sortBy, setSortBy] = useState<SourceFinderSortOption>('RELEVANCE');
   const [matchFeedback, setMatchFeedback] = useState<MatchFeedbackAction>('SAVE');
   const [leadStatus, setLeadStatus] = useState<LeadStatus>('NEW');
+  const [conversationStatus, setConversationStatus] = useState<ConversationStatus>('OPEN');
+  const [conversationAssignee, setConversationAssignee] = useState('sales-desk');
+  const [chatMessage, setChatMessage] = useState(
+    'Please share price terms, availability, delivery coverage and minimum order.',
+  );
   const [profileDescription, setProfileDescription] = useState(
     'We supply fresh vegetables to hotels, restaurants and retailers in Nairobi.',
   );
@@ -189,6 +200,41 @@ export default function Home() {
     ? buildLeadConversionIntelligence(selectedMatch)
     : null;
   const canCreateLead = Boolean(termsAccepted && querySafetyDecision.allowed && selectedMatch);
+  const chatSafetyDecision = evaluateSafetyText(chatMessage);
+  const conversationSla =
+    leadIntelligence && selectedMatch
+      ? calculateConversationSlaDecision(
+          {
+            openedAt: conversationDemoOpenedAt,
+            lastInboundMessageAt: conversationDemoOpenedAt,
+            firstResponseAt:
+              conversationStatus === 'WAITING_ON_REQUESTER' || conversationStatus === 'RESOLVED'
+                ? '2026-06-17T09:10:00.000Z'
+                : undefined,
+            responseSlaHours: leadIntelligence.responseSlaHours,
+            priority: leadIntelligence.priority,
+            status: conversationStatus,
+          },
+          conversationDemoNow,
+        )
+      : null;
+  const savedReplies =
+    selectedMatch && leadIntelligence
+      ? buildSavedReplySuggestions({
+          sourceName: selectedMatch.name,
+          inquiryType: 'RFQ',
+          quantity: '100 crates per week',
+          urgency: 'This week',
+          nextBestActions: leadIntelligence.nextBestActions,
+        })
+      : [];
+  const canSendChat = Boolean(
+    canCreateLead &&
+      chatSafetyDecision.allowed &&
+      chatMessage.trim().length >= 2 &&
+      conversationStatus !== 'BLOCKED' &&
+      conversationStatus !== 'RESOLVED',
+  );
   const renewalQueue = filteredResults
     .map((item) => ({
       ...item,
@@ -596,6 +642,109 @@ export default function Home() {
                 {leadIntelligence?.nextBestActions.map((action) => (
                   <Signal key={action} text={action} />
                 ))}
+              </div>
+            </section>
+
+            <section className="side-panel">
+              <div className="panel-heading tight">
+                <h2>Conversation Workspace</h2>
+                <span>{conversationSla?.state ? codeLabel(conversationSla.state) : 'No thread'}</span>
+              </div>
+              <FinanceRow
+                label="Assignment"
+                value={
+                  conversationAssignee === 'sales-desk'
+                    ? 'Sales desk'
+                    : conversationAssignee === 'country-lead'
+                      ? 'Country lead'
+                      : 'Support agent'
+                }
+              />
+              <FinanceRow
+                label="SLA window"
+                value={conversationSla ? `${conversationSla.responseSlaHours}h` : '-'}
+              />
+              <FinanceRow
+                label="Due signal"
+                value={conversationSla ? `${conversationSla.minutesUntilDue}m` : '-'}
+              />
+              <label className="lead-select-row">
+                <span>Status</span>
+                <select
+                  value={conversationStatus}
+                  onChange={(event) => setConversationStatus(event.target.value as ConversationStatus)}
+                >
+                  {conversationStatuses.map((status) => (
+                    <option key={status} value={status}>
+                      {codeLabel(status)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="lead-select-row">
+                <span>Owner</span>
+                <select
+                  value={conversationAssignee}
+                  onChange={(event) => setConversationAssignee(event.target.value)}
+                >
+                  <option value="sales-desk">Sales desk</option>
+                  <option value="country-lead">Country lead</option>
+                  <option value="support-agent">Support agent</option>
+                </select>
+              </label>
+              <label className="chat-field">
+                <span>Safe reply</span>
+                <textarea
+                  value={chatMessage}
+                  onChange={(event) => setChatMessage(event.target.value)}
+                  rows={5}
+                  aria-invalid={!chatSafetyDecision.allowed}
+                />
+              </label>
+              <div className="saved-reply-list" aria-label="Saved replies">
+                {savedReplies.slice(0, 3).map((reply) => (
+                  <button
+                    className="saved-reply-button"
+                    key={reply.id}
+                    type="button"
+                    onClick={() => setChatMessage(reply.body)}
+                  >
+                    {reply.title}
+                  </button>
+                ))}
+              </div>
+              <div className="terms-actions">
+                <button
+                  className="primary-button"
+                  type="button"
+                  disabled={!canSendChat}
+                  onClick={() => setConversationStatus('WAITING_ON_REQUESTER')}
+                >
+                  <MessageSquareText size={16} />
+                  Send Message
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={!selectedMatch}
+                  onClick={() => setConversationStatus('ASSIGNED')}
+                >
+                  <UserCheck size={16} />
+                  Assign
+                </button>
+              </div>
+              <div className={canSendChat ? 'policy-box ok compact' : 'policy-box block compact'}>
+                {canSendChat ? <ShieldCheck size={18} /> : <CircleAlert size={18} />}
+                <div>
+                  <strong>{canSendChat ? 'Messaging unlocked' : 'Messaging locked'}</strong>
+                  <span>
+                    {canSendChat
+                      ? `${conversationSla?.message ?? 'SLA active'}`
+                      : chatSafetyDecision.allowed
+                        ? 'Accepted terms and an open safe match are required.'
+                        : `Message blocked - ${chatSafetyDecision.policyCode}`}
+                  </span>
+                </div>
               </div>
             </section>
 
