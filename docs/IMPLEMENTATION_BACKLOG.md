@@ -135,6 +135,20 @@ Progress:
 
 Exit: a match can become an inquiry, conversation, and qualified lead.
 
+Progress:
+
+- Added shared lead-conversion intelligence for match confidence, priority,
+  response SLA, reason codes, and next-best actions.
+- Added tenant-scoped match feedback API for accept, save, dismiss, hide, and
+  report actions.
+- Added inquiry/RFQ creation with terms acceptance and zero-tolerance checks
+  before a match can become a lead.
+- Added tenant lead inbox and lead status updates.
+- Added web Lead Conversion controls for selected match, feedback action,
+  status, inquiry lock/unlock, and next-best actions.
+- Realtime chat, assignment, SLA timers, notifications, saved replies, durable
+  persistence, and audit logs remain next.
+
 ## Epic 7: Analytics
 
 - Define event schema and consent state.

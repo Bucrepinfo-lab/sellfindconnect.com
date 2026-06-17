@@ -28,6 +28,7 @@ import { useState } from 'react';
 import {
   countries,
   advertLifecyclePolicy,
+  buildLeadConversionIntelligence,
   calculateAdvertLifecycle,
   calculateTaxSnapshotAmounts,
   evaluateSafetyText,
@@ -38,6 +39,10 @@ import {
   prohibitedCategorySummaries,
   searchSourceFinderRecords,
   sourceFinderSortOptions,
+  leadStatuses,
+  matchFeedbackActions,
+  type LeadStatus,
+  type MatchFeedbackAction,
   type SourceFinderSearchResult,
   type SourceFinderSortOption,
   supplyChainRoles,
@@ -99,11 +104,15 @@ function formatResponseTime(minutes: number) {
   return `${Math.round(minutes / 60)}h`;
 }
 
-function roleLabel(role: string) {
-  return role
+function codeLabel(value: string) {
+  return value
     .split('_')
     .map((part) => `${part.charAt(0)}${part.slice(1).toLowerCase()}`)
     .join(' ');
+}
+
+function roleLabel(role: string) {
+  return codeLabel(role);
 }
 
 export default function Home() {
@@ -111,6 +120,8 @@ export default function Home() {
   const [role, setRole] = useState<SupplyChainRole | 'ALL'>('ALL');
   const [industryCode, setIndustryCode] = useState('ALL');
   const [sortBy, setSortBy] = useState<SourceFinderSortOption>('RELEVANCE');
+  const [matchFeedback, setMatchFeedback] = useState<MatchFeedbackAction>('SAVE');
+  const [leadStatus, setLeadStatus] = useState<LeadStatus>('NEW');
   const [profileDescription, setProfileDescription] = useState(
     'We supply fresh vegetables to hotels, restaurants and retailers in Nairobi.',
   );
@@ -173,6 +184,11 @@ export default function Home() {
       )
     : 0;
   const clickThroughRate = totals.views ? Math.round((totals.clicks / totals.views) * 100) : 0;
+  const selectedMatch = filteredResults[0];
+  const leadIntelligence = selectedMatch
+    ? buildLeadConversionIntelligence(selectedMatch)
+    : null;
+  const canCreateLead = Boolean(termsAccepted && querySafetyDecision.allowed && selectedMatch);
   const renewalQueue = filteredResults
     .map((item) => ({
       ...item,
@@ -508,6 +524,79 @@ export default function Home() {
                     : 'Calendar clear'
                 }
               />
+            </section>
+
+            <section className="side-panel">
+              <div className="panel-heading tight">
+                <h2>Lead Conversion</h2>
+                <span>{leadIntelligence?.priority ?? 'No match'}</span>
+              </div>
+              <FinanceRow label="Selected match" value={selectedMatch?.name ?? 'No safe match'} />
+              <FinanceRow
+                label="Confidence"
+                value={leadIntelligence ? `${leadIntelligence.confidence}%` : '0%'}
+              />
+              <FinanceRow
+                label="Response SLA"
+                value={leadIntelligence ? `${leadIntelligence.responseSlaHours}h` : '-'}
+              />
+              <label className="lead-select-row">
+                <span>Feedback</span>
+                <select
+                  value={matchFeedback}
+                  onChange={(event) => setMatchFeedback(event.target.value as MatchFeedbackAction)}
+                >
+                  {matchFeedbackActions.map((action) => (
+                    <option key={action} value={action}>
+                      {codeLabel(action)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="lead-select-row">
+                <span>Status</span>
+                <select
+                  value={leadStatus}
+                  onChange={(event) => setLeadStatus(event.target.value as LeadStatus)}
+                >
+                  {leadStatuses.map((status) => (
+                    <option key={status} value={status}>
+                      {codeLabel(status)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="terms-actions">
+                <button className="primary-button" type="button" disabled={!canCreateLead}>
+                  <MessageSquareText size={16} />
+                  Create Inquiry
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={!selectedMatch}
+                  onClick={() => setLeadStatus('QUALIFIED')}
+                >
+                  <FileCheck2 size={16} />
+                  Qualify
+                </button>
+              </div>
+              <div className={canCreateLead ? 'policy-box ok compact' : 'policy-box block compact'}>
+                {canCreateLead ? <ShieldCheck size={18} /> : <CircleAlert size={18} />}
+                <div>
+                  <strong>{canCreateLead ? 'Inquiry unlocked' : 'Inquiry locked'}</strong>
+                  <span>
+                    {canCreateLead
+                      ? `${codeLabel(matchFeedback)} match can move into the lead inbox.`
+                      : 'Safe search result and accepted terms are required before outreach.'}
+                  </span>
+                </div>
+              </div>
+              <div className="lead-actions-list">
+                {leadIntelligence?.nextBestActions.map((action) => (
+                  <Signal key={action} text={action} />
+                ))}
+              </div>
             </section>
 
             <section className="side-panel">

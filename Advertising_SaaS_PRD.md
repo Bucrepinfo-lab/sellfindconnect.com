@@ -454,6 +454,15 @@ Recommended matching architecture:
 - Phase 4: ML ranking using feedback and outcomes.
 - Phase 5: explainable AI assistant for lead recommendations and profile improvements, subject to privacy disclosures.
 
+Implementation progress on 2026-06-17:
+
+- Added shared lead-conversion intelligence that turns a Source Finder match into match confidence, priority, response SLA, reason codes, and next-best actions.
+- Added API support for match feedback actions: accept, save, dismiss, hide, and report.
+- Added API support for safe inquiry/RFQ creation, with current terms acceptance required before a match can become a lead.
+- Added a tenant lead inbox with status transitions for new, contacted, qualified, negotiating, won, lost, and blocked leads.
+- Added a web Lead Conversion panel showing selected match, confidence, SLA, feedback action, lead status, inquiry lock/unlock state, and next-best actions.
+- Remaining hardening: realtime chat, lead assignment, saved replies, notification delivery, SLA timers, audit logs, and durable persistence.
+
 ### 7.7 Relationship Links
 
 Requirements:
