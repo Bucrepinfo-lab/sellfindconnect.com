@@ -67,8 +67,8 @@ GitHub-connected Railway project currently visible to `bucrepinfo@gmail.com`:
 - API service ID: `99fb3c7e-487c-4a77-ba08-369a83ac7e0d`
 - Web service: `@telpen/web`
 - Web service ID: `9b5a1466-f105-44e1-a16e-0b5c45f04ace`
-- Latest API deployment: `2187c01e-7204-4660-be68-742ef6ba22bc` (`SUCCESS`)
-- Latest web deployment: `e4947ac7-018c-4096-a00e-7abbe1bf1595` (`SUCCESS`)
+- Latest API deployment: `c1ace549-e96d-4a97-b564-12cef6161997` (`SUCCESS`)
+- Latest web deployment: `3ca76bbf-78e2-45cd-8b34-dd0f865eb0ed` (`SUCCESS`)
 - Advert lifecycle deployment on 2026-06-16:
   - API deployment: `960bafd5-c445-4c6f-90b1-e68181e20162` (`SUCCESS`)
   - Web deployment: `e9b5d4ee-f2f3-4c76-a59b-f3b83065616f` (`SUCCESS`)
@@ -80,6 +80,10 @@ GitHub-connected Railway project currently visible to `bucrepinfo@gmail.com`:
   - API deployment: `2187c01e-7204-4660-be68-742ef6ba22bc` (`SUCCESS`)
   - Web deployment: `e4947ac7-018c-4096-a00e-7abbe1bf1595` (`SUCCESS`)
   - Commit: `d848b2e` (`Add finance tax command slice`)
+- Explainable Source Finder deployment on 2026-06-17:
+  - API deployment: `c1ace549-e96d-4a97-b564-12cef6161997` (`SUCCESS`)
+  - Web deployment: `3ca76bbf-78e2-45cd-8b34-dd0f865eb0ed` (`SUCCESS`)
+  - Commit: `e6303f5` (`Add explainable source finder`)
 - Next.js prerender hardening:
   - Keep `apps/web/src/app/global-error.tsx` and `apps/web/src/app/not-found.tsx`
     committed so Railway/Next does not rely on auto-generated error pages.
