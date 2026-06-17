@@ -2,7 +2,7 @@
 
 Status: Services deployed; brand domain purchased; Railway custom-domain limit blocks connection
 Date: 2026-06-15
-Last updated: 2026-06-16
+Last updated: 2026-06-17
 
 ## Proposed Production Domains
 
@@ -67,8 +67,8 @@ GitHub-connected Railway project currently visible to `bucrepinfo@gmail.com`:
 - API service ID: `99fb3c7e-487c-4a77-ba08-369a83ac7e0d`
 - Web service: `@telpen/web`
 - Web service ID: `9b5a1466-f105-44e1-a16e-0b5c45f04ace`
-- Latest API deployment: `e339094d-305f-4398-a517-9f021075ae9c` (`SUCCESS`)
-- Latest web deployment: `2783a9ef-e0a1-4aad-a4be-f4d05e50599d` (`SUCCESS`)
+- Latest API deployment: `95f24983-4c69-46a0-a610-f2983e467c99` (`SUCCESS`)
+- Latest web deployment: `d8140bfc-3140-4498-8515-9a1b483a4f37` (`SUCCESS`)
 - Advert lifecycle deployment on 2026-06-16:
   - API deployment: `960bafd5-c445-4c6f-90b1-e68181e20162` (`SUCCESS`)
   - Web deployment: `e9b5d4ee-f2f3-4c76-a59b-f3b83065616f` (`SUCCESS`)
@@ -88,6 +88,10 @@ GitHub-connected Railway project currently visible to `bucrepinfo@gmail.com`:
   - API deployment: `e339094d-305f-4398-a517-9f021075ae9c` (`SUCCESS`)
   - Web deployment: `2783a9ef-e0a1-4aad-a4be-f4d05e50599d` (`SUCCESS`)
   - Commit: `e970d2a` (`Add lead conversion workflow`)
+- Conversation SLA workspace deployment on 2026-06-17:
+  - API deployment: `95f24983-4c69-46a0-a610-f2983e467c99` (`SUCCESS`)
+  - Web deployment: `d8140bfc-3140-4498-8515-9a1b483a4f37` (`SUCCESS`)
+  - Commit: `761ba5d` (`Add conversation SLA workspace`)
 - Next.js prerender hardening:
   - Keep `apps/web/src/app/global-error.tsx` and `apps/web/src/app/not-found.tsx`
     committed so Railway/Next does not rely on auto-generated error pages.
@@ -115,6 +119,11 @@ The terms acceptance gate and Railway idle-sleeping update was deployed on
 - Railway Serverless/App Sleeping is enabled for both services. Containers
   scale down to zero during idle periods, then Railway queues requests while
   waking the container on traffic.
+- Note from latest 2026-06-17 deployment metadata: both GitHub-connected
+  service manifests currently report `sleepApplication: false`. Re-enable
+  Railway Serverless/App Sleeping in the Railway service settings if the
+  setting was reset; the current Railway CLI exposes status/listing but not a
+  safe settings mutation command for this flag.
 - Local app verification passed for the terms gate: safe drafts stay locked
   until terms are accepted, accepting terms unlocks safe publishing, and adding
   prohibited content locks publishing again.
