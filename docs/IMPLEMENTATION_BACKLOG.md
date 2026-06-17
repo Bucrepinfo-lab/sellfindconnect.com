@@ -110,6 +110,19 @@ Progress:
 Exit: users can find sources, suppliers, consumers, and likely clients from one
 search workflow.
 
+Progress:
+
+- Added shared rules-based Source Finder ranking with score, reason codes,
+  human-readable reasons, sort modes, and relationship links.
+- Added a tenant-scoped API endpoint: `POST /v1/source-finder/search`.
+- Added server-side zero-tolerance blocking for prohibited Source Finder
+  searches and unsupported country/industry rejection.
+- Updated the web Source Finder to use the shared ranking engine, show match
+  reasons, sort by relevance/newest/most visited/verified/response time, and
+  show related supplier/buyer/service links.
+- Persistence, relationship claim approval, saved searches, opportunity alerts,
+  search analytics feedback, and graph dashboards remain next.
+
 ## Epic 6: Matching and Lead Conversion
 
 - Implement explainable rules-based matching.

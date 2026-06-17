@@ -23,7 +23,7 @@ import {
   UserCheck,
   Sparkles,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 
 import {
   countries,
@@ -34,117 +34,18 @@ import {
   getRemittanceAlertDecision,
   getCountry,
   industryCategories,
+  pilotSourceFinderRecords,
   prohibitedCategorySummaries,
+  searchSourceFinderRecords,
+  sourceFinderSortOptions,
+  type SourceFinderSearchResult,
+  type SourceFinderSortOption,
   supplyChainRoles,
   type SupplyChainRole,
 } from '@telpen/domain';
 
-type MarketResult = {
-  id: string;
-  name: string;
-  role: SupplyChainRole;
-  industryCode: string;
-  countryCode: string;
-  location: string;
-  offers: string[];
-  needs: string[];
-  score: number;
-  responseTime: string;
-  verified: boolean;
-  views: number;
-  clicks: number;
-  inquiries: number;
-  shares: number;
-  downloads: number;
-  daysLive: number;
-};
-
 const tenantId = '11111111-1111-4111-8111-111111111111';
 const lifecycleDemoNow = new Date(Date.UTC(2026, 6, 10, 0, 0, 0)).toISOString();
-const dayMs = 24 * 60 * 60 * 1000;
-
-function publishedAtFromDaysLive(daysLive: number) {
-  return new Date(Date.parse(lifecycleDemoNow) - daysLive * dayMs).toISOString();
-}
-
-const marketResults: MarketResult[] = [
-  {
-    id: 'r1',
-    name: 'Nairobi Fresh Produce Cooperative',
-    role: 'SUPPLIER',
-    industryCode: 'AGRICULTURE',
-    countryCode: 'KE',
-    location: 'Nairobi',
-    offers: ['tomatoes', 'kale', 'onions', 'hotel supply'],
-    needs: ['cold storage', 'transport', 'retail buyers'],
-    score: 94,
-    responseTime: '14m',
-    verified: true,
-    views: 1280,
-    clicks: 342,
-    inquiries: 68,
-    shares: 41,
-    downloads: 17,
-    daysLive: 23,
-  },
-  {
-    id: 'r2',
-    name: 'Rift Valley Cold Chain Logistics',
-    role: 'LOGISTICS_PROVIDER',
-    industryCode: 'LOGISTICS',
-    countryCode: 'KE',
-    location: 'Nakuru',
-    offers: ['cold transport', 'storage', 'last mile delivery'],
-    needs: ['produce suppliers', 'pharma clients'],
-    score: 88,
-    responseTime: '31m',
-    verified: true,
-    views: 920,
-    clicks: 201,
-    inquiries: 46,
-    shares: 28,
-    downloads: 9,
-    daysLive: 39,
-  },
-  {
-    id: 'r3',
-    name: 'Coast Hospitality Buyers Guild',
-    role: 'BUYER',
-    industryCode: 'HOSPITALITY',
-    countryCode: 'KE',
-    location: 'Mombasa',
-    offers: ['bulk hotel procurement', 'supplier contracts'],
-    needs: ['fresh produce', 'cleaning services', 'linen supply'],
-    score: 83,
-    responseTime: '1h',
-    verified: false,
-    views: 740,
-    clicks: 166,
-    inquiries: 31,
-    shares: 22,
-    downloads: 6,
-    daysLive: 12,
-  },
-  {
-    id: 'r4',
-    name: 'Kiambu Packaging Works',
-    role: 'PRODUCER',
-    industryCode: 'MANUFACTURING',
-    countryCode: 'KE',
-    location: 'Kiambu',
-    offers: ['food packaging', 'retail labels', 'cartons'],
-    needs: ['farm suppliers', 'retail distributors'],
-    score: 79,
-    responseTime: '45m',
-    verified: true,
-    views: 650,
-    clicks: 119,
-    inquiries: 22,
-    shares: 12,
-    downloads: 8,
-    daysLive: 54,
-  },
-];
 
 const termsClauses = [
   {
@@ -193,6 +94,11 @@ function formatMoney(value: number, currencyCode: string, locale: string) {
   }).format(value);
 }
 
+function formatResponseTime(minutes: number) {
+  if (minutes < 60) return `${minutes}m`;
+  return `${Math.round(minutes / 60)}h`;
+}
+
 function roleLabel(role: string) {
   return role
     .split('_')
@@ -204,12 +110,14 @@ export default function Home() {
   const [query, setQuery] = useState('fresh produce');
   const [role, setRole] = useState<SupplyChainRole | 'ALL'>('ALL');
   const [industryCode, setIndustryCode] = useState('ALL');
+  const [sortBy, setSortBy] = useState<SourceFinderSortOption>('RELEVANCE');
   const [profileDescription, setProfileDescription] = useState(
     'We supply fresh vegetables to hotels, restaurants and retailers in Nairobi.',
   );
   const [termsAccepted, setTermsAccepted] = useState(false);
 
   const country = getCountry('KE') ?? countries[0]!;
+  const countryCode = country.code;
   const pilotTaxSnapshot = calculateTaxSnapshotAmounts({
     amount: country.monthlySubscriptionAmount,
     taxRate: 0.16,
@@ -229,53 +137,49 @@ export default function Home() {
       ? 'Publishing is disabled until the advertiser accepts the terms'
       : 'Publish draft';
 
-  const filteredResults = useMemo(() => {
-    if (!querySafetyDecision.allowed) return [];
-
-    const normalizedQuery = query.trim().toLowerCase();
-    return marketResults
-      .filter((item) => role === 'ALL' || item.role === role)
-      .filter((item) => industryCode === 'ALL' || item.industryCode === industryCode)
-      .filter((item) => {
-        if (!normalizedQuery) return true;
-        const haystack = [
-          item.name,
-          item.location,
-          item.role,
-          ...item.offers,
-          ...item.needs,
-        ]
-          .join(' ')
-          .toLowerCase();
-        return haystack.includes(normalizedQuery);
-      })
-      .sort((a, b) => b.score - a.score);
-  }, [industryCode, query, querySafetyDecision.allowed, role]);
+  const filteredResults: SourceFinderSearchResult[] = querySafetyDecision.allowed
+    ? searchSourceFinderRecords(
+        {
+          query,
+          role,
+          industryCode,
+          countryCode,
+          sortBy,
+        },
+        pilotSourceFinderRecords,
+      )
+    : [];
 
   const totals = filteredResults.reduce(
     (memo, item) => ({
-      views: memo.views + item.views,
-      clicks: memo.clicks + item.clicks,
-      inquiries: memo.inquiries + item.inquiries,
-      shares: memo.shares + item.shares,
-      downloads: memo.downloads + item.downloads,
+      views: memo.views + item.analytics.views,
+      clicks: memo.clicks + item.analytics.clicks,
+      inquiries: memo.inquiries + item.analytics.inquiries,
+      shares: memo.shares + item.analytics.shares,
+      downloads: memo.downloads + item.analytics.downloads,
     }),
     { views: 0, clicks: 0, inquiries: 0, shares: 0, downloads: 0 },
   );
-  const mostVisited = [...filteredResults].sort((a, b) => b.views - a.views).slice(0, 3);
+  const mostVisited = [...filteredResults]
+    .sort((a, b) => b.analytics.views - a.analytics.views)
+    .slice(0, 3);
   const averageDaysLive = filteredResults.length
     ? Math.round(
-        filteredResults.reduce((memo, item) => memo + item.daysLive, 0) / filteredResults.length,
+        filteredResults.reduce(
+          (memo, item) =>
+            memo + calculateAdvertLifecycle(item.publishedAt, lifecycleDemoNow).daysLive,
+          0,
+        ) / filteredResults.length,
       )
     : 0;
   const clickThroughRate = totals.views ? Math.round((totals.clicks / totals.views) * 100) : 0;
   const renewalQueue = filteredResults
     .map((item) => ({
       ...item,
-      lifecycle: calculateAdvertLifecycle(publishedAtFromDaysLive(item.daysLive), lifecycleDemoNow),
+      lifecycle: calculateAdvertLifecycle(item.publishedAt, lifecycleDemoNow),
     }))
     .filter((item) => item.lifecycle.status !== 'LIVE')
-    .sort((a, b) => b.daysLive - a.daysLive);
+    .sort((a, b) => b.lifecycle.daysLive - a.lifecycle.daysLive);
 
   return (
     <main className="app-shell">
@@ -386,6 +290,19 @@ export default function Home() {
                   </option>
                 ))}
               </select>
+              <select
+                value={sortBy}
+                onChange={(event) => setSortBy(event.target.value as SourceFinderSortOption)}
+              >
+                {sourceFinderSortOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option
+                      .split('_')
+                      .map((part) => `${part.charAt(0)}${part.slice(1).toLowerCase()}`)
+                      .join(' ')}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {!querySafetyDecision.allowed ? (
@@ -405,6 +322,7 @@ export default function Home() {
                   const industry = industryCategories.find(
                     (item) => item.code === result.industryCode,
                   );
+                  const lifecycle = calculateAdvertLifecycle(result.publishedAt, lifecycleDemoNow);
                   return (
                     <article key={result.id} className="result-card">
                       <div className="result-main">
@@ -431,10 +349,24 @@ export default function Home() {
                         ))}
                       </div>
 
+                      <div className="reason-row" aria-label="Match reasons">
+                        {result.reasons.slice(0, 3).map((reason) => (
+                          <span key={reason}>{reason}</span>
+                        ))}
+                      </div>
+
+                      <div className="relationship-row" aria-label="Related commercial links">
+                        {result.relatedLinks.slice(0, 3).map((link) => (
+                          <span key={link.id}>
+                            {roleLabel(link.role)}: {link.label}
+                          </span>
+                        ))}
+                      </div>
+
                       <div className="result-footer">
-                        <span>{result.inquiries} inquiries</span>
-                        <span>{result.responseTime} response</span>
-                        <span>{result.daysLive} days live</span>
+                        <span>{result.analytics.inquiries} inquiries</span>
+                        <span>{formatResponseTime(result.responseTimeMinutes)} response</span>
+                        <span>{lifecycle.daysLive} days live</span>
                         <button className="link-button">
                           Open <ChevronRight size={14} />
                         </button>
@@ -594,7 +526,7 @@ export default function Home() {
                 {mostVisited.map((item) => (
                   <div key={item.id} className="visited-row">
                     <span>{item.name}</span>
-                    <strong>{formatNumber(item.views)}</strong>
+                    <strong>{formatNumber(item.analytics.views)}</strong>
                   </div>
                 ))}
               </div>

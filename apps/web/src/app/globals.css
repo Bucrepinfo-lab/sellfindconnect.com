@@ -272,7 +272,7 @@ h3 {
 
 .search-row {
   display: grid;
-  grid-template-columns: minmax(200px, 1fr) 190px 260px;
+  grid-template-columns: minmax(200px, 1fr) 170px 230px 160px;
   gap: 10px;
   margin-bottom: 12px;
   min-width: 0;
@@ -411,6 +411,37 @@ select {
   color: #5d471b;
   padding: 0 9px;
   font-size: 12px;
+}
+
+.reason-row,
+.relationship-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.reason-row span,
+.relationship-row span {
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 8px;
+  padding: 0 8px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.reason-row span {
+  border: 1px solid #c8d9e8;
+  background: #edf5fc;
+  color: #224b70;
+}
+
+.relationship-row span {
+  border: 1px solid #cbdccf;
+  background: #eef8f0;
+  color: var(--green);
 }
 
 .result-footer {

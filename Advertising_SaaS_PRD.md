@@ -386,6 +386,14 @@ Acceptance criteria:
 - Search result relevance can explain why an item appeared: matching category, location, role, product tag, query text, or relationship graph.
 - A user searching for an item can quickly discover producer, supplier, seller, related service provider, and likely consumer segments.
 
+Implementation progress on 2026-06-17:
+
+- Added a shared Source Finder ranking engine that scores results from query text, offers, declared needs, role, industry, country, verification, popularity, response speed, and relationship links.
+- Added reason codes and human-readable match reasons so users understand why a producer, supplier, buyer, logistics provider, or related service appears.
+- Added a tenant-scoped Source Finder API endpoint with server-side zero-tolerance blocking for prohibited searches.
+- Updated the web Source Finder to use the shared ranking engine, expose sort modes, show match reasons, and display related commercial links.
+- Remaining hardening: persisted search index, saved searches, relationship claim approval, outcome feedback, hierarchy dashboards, and privacy/consent controls for behavioral matching.
+
 ### 7.6 Precision Matching and Link Intelligence
 
 This is the flagship feature.
