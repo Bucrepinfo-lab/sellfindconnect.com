@@ -29,7 +29,9 @@ import {
   countries,
   advertLifecyclePolicy,
   calculateAdvertLifecycle,
+  calculateTaxSnapshotAmounts,
   evaluateSafetyText,
+  getRemittanceAlertDecision,
   getCountry,
   industryCategories,
   prohibitedCategorySummaries,
@@ -183,6 +185,14 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat('en-KE').format(value);
 }
 
+function formatMoney(value: number, currencyCode: string, locale: string) {
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: currencyCode,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
 function roleLabel(role: string) {
   return role
     .split('_')
@@ -200,6 +210,15 @@ export default function Home() {
   const [termsAccepted, setTermsAccepted] = useState(false);
 
   const country = getCountry('KE') ?? countries[0]!;
+  const pilotTaxSnapshot = calculateTaxSnapshotAmounts({
+    amount: country.monthlySubscriptionAmount,
+    taxRate: 0.16,
+    taxInclusivePricing: true,
+  });
+  const nextRemittanceAlert = getRemittanceAlertDecision(
+    '2026-07-31T00:00:00.000Z',
+    '2026-07-24T00:00:00.000Z',
+  );
   const selectedIndustry = industryCategories.find((industry) => industry.code === industryCode);
   const safetyDecision = evaluateSafetyText(profileDescription);
   const querySafetyDecision = evaluateSafetyText(query);
@@ -526,12 +545,37 @@ export default function Home() {
             <section className="side-panel">
               <div className="panel-heading tight">
                 <h2>Finance Readiness</h2>
-                <span>KE</span>
+                <span>{country.currencyCode}</span>
               </div>
-              <FinanceRow label="Country tax profile" value="Required" />
-              <FinanceRow label="Subscription" value="KES 10" />
-              <FinanceRow label="Trial" value="1 month" />
-              <FinanceRow label="Remittance alerts" value="T-30 to overdue" />
+              <FinanceRow label="Country tax profile" value="Approved" />
+              <FinanceRow
+                label="Subscription"
+                value={formatMoney(
+                  country.monthlySubscriptionAmount,
+                  country.currencyCode,
+                  country.locale,
+                )}
+              />
+              <FinanceRow
+                label="Computed tax"
+                value={formatMoney(pilotTaxSnapshot.taxAmount, country.currencyCode, country.locale)}
+              />
+              <FinanceRow
+                label="Net revenue"
+                value={formatMoney(
+                  pilotTaxSnapshot.netRevenueAmount,
+                  country.currencyCode,
+                  country.locale,
+                )}
+              />
+              <FinanceRow
+                label="Next remittance"
+                value={
+                  nextRemittanceAlert
+                    ? `${nextRemittanceAlert.alertType.replaceAll('_', ' ')} T-${nextRemittanceAlert.daysUntilDue}`
+                    : 'Calendar clear'
+                }
+              />
             </section>
 
             <section className="side-panel">

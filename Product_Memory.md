@@ -1,7 +1,7 @@
 # Telpen Adverts Product Memory
 
 Date started: 2026-06-15
-Last updated: 2026-06-16
+Last updated: 2026-06-17
 Purpose: Persistent decision log and strategic memory for the Telpen Adverts multi-tenant advertising SaaS.
 
 This file must be updated whenever product strategy, pricing, compliance, architecture, market positioning, or execution decisions change.
@@ -122,3 +122,4 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - 2026-06-16: Confirmed the intermittent Next.js prerender failure on generated error-boundary pages is mitigated by explicit `apps/web/src/app/global-error.tsx` and `apps/web/src/app/not-found.tsx` files, plus the forced `NODE_ENV=production` web build. Local web build and lint pass with these hardening files present.
 - 2026-06-16: Added a protected internal operations endpoint for advert lifecycle sweeps: `POST /v1/operations/adverts/lifecycle/run`, guarded by `x-internal-job-key` and `INTERNAL_JOB_KEY`. This prepares Railway Cron or an external scheduler to run day-35/day-39 renewal alerts and day-40 auto-deletion daily once the durable repository/scheduler is enabled.
 - 2026-06-16: Deployed the protected advert lifecycle sweep through Railway GitHub autodeploy. API deployment `e0301a63-e739-4eff-af26-c73781aa657c` completed with `SUCCESS` on commit `3453dd3`; the web deployment was unchanged because no watched web files changed.
+- 2026-06-17: Started Epic 8 finance/tax implementation. Added shared configured-rate tax calculation helpers, a tenant-scoped finance API for country tax profiles, effective-dated rules, immutable tax snapshots, ledger entries, draft tax returns, and timed remittance alerts, plus a web Finance Readiness panel. This does not hard-code live country tax rates; country finance admins must approve rule configuration before paid launch.

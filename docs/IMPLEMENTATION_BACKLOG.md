@@ -2,7 +2,7 @@
 
 Status: Execution backlog
 Date: 2026-06-15
-Last updated: 2026-06-16
+Last updated: 2026-06-17
 
 ## Delivery Principles
 
@@ -157,6 +157,20 @@ Progress:
 
 Exit: test transaction produces payment, invoice, tax snapshot, ledger entry,
 alert, draft return, and reconciled remittance evidence.
+
+Progress:
+
+- Added shared finance/tax helpers for configured rates, tax-inclusive and
+  tax-exclusive pricing, and remittance alert timing.
+- Added tenant-scoped finance API endpoints for approved country tax profiles,
+  effective-dated tax rules, tax calculation snapshots, ledger entries, tax
+  return generation, and T-30/T-14/T-7/T-3/T-1/due/overdue alert runs.
+- Added zero-tolerance checks to finance inputs so prohibited content cannot be
+  stored in finance metadata or configuration.
+- Added web Finance Readiness indicators for subscription amount, computed tax,
+  net revenue, and next remittance alert.
+- Persistence, payment adapters, invoices/receipts, reconciliation, approval
+  workflow, evidence attachments, and report exports remain next.
 
 ## Epic 9: Mobile, Localization, and Launch
 

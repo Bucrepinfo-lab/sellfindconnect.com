@@ -1,7 +1,7 @@
 # Product Requirements Document: Multi-Tenant Advertising SaaS
 
 Date: 2026-06-15
-Last updated: 2026-06-16
+Last updated: 2026-06-17
 Owner: Telpen Adverts
 Working name: Telpen Adverts Platform
 Status: Draft for validation
@@ -661,6 +661,14 @@ Acceptance criteria:
 - The system alerts responsible users before every filing and remittance deadline.
 - No tax period can be marked complete without filing evidence, remittance evidence, approver identity, and timestamp.
 - The module can export country-level tax reports for local advisors and tax authorities.
+
+Implementation progress on 2026-06-17:
+
+- Added shared finance/tax calculation helpers for tax-inclusive and tax-exclusive pricing, using configured country rules rather than hard-coded legal rates.
+- Added finance API endpoints for country tax profiles, effective-dated tax rules, tenant tax calculation snapshots, ledger entries, draft tax returns, and timed remittance alerts.
+- Added zero-tolerance input checks to finance configuration and calculation metadata.
+- Added the web Finance Readiness panel with computed subscription tax, net revenue, and next remittance alert status.
+- Remaining hardening: durable database persistence, role-scoped finance permissions, invoice/receipt generation, payment-provider reconciliation, evidence attachments, period locks, and exportable reports.
 
 ### 7.11 Moderation, Trust, and Safety
 
