@@ -17,11 +17,14 @@ import {
 import { createHash, pbkdf2Sync, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 
 import type {
+  AuthAccountChallengePurpose,
+  AuthAccountChallengeRecord,
   AuthMfaChallengeRecord,
   AuthSessionRecord,
   AuthTenantRecord,
   AuthUserRecord,
   IssuedAuthSession,
+  PresentedAccountChallenge,
   PresentedMfaChallenge,
   PresentedAuthSession,
   TenantMembershipRecord,
@@ -29,14 +32,20 @@ import type {
 import { AUTH_REPOSITORY, type AuthRepository } from './auth.repository';
 import type {
   CheckTenantSessionDto,
+  ConfirmEmailVerificationDto,
+  ConfirmPasswordResetDto,
   LoginDto,
   RegisterTenantOwnerDto,
+  RequestEmailVerificationDto,
+  RequestPasswordResetDto,
   VerifyMfaDto,
 } from './dto/auth.dto';
 import { InMemoryAuthRepository } from './in-memory-auth.repository';
 
 const MFA_CHALLENGE_TTL_MS = 10 * 60 * 1000;
 const MFA_MAX_FAILED_ATTEMPTS = 5;
+const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
+const PASSWORD_RESET_TTL_MS = 30 * 60 * 1000;
 
 @Injectable()
 export class AuthService {
@@ -140,6 +149,11 @@ export class AuthService {
       tenant,
       membership,
       session: await this.createSession(user, tenantId),
+      emailVerificationChallenge: await this.createAccountChallenge(
+        user,
+        'EMAIL_VERIFICATION',
+        EMAIL_VERIFICATION_TTL_MS,
+      ),
       termsAcceptance,
       passwordPolicy,
     };
@@ -161,6 +175,80 @@ export class AuthService {
       user: this.presentUser(user),
       tenant: await this.repository.findTenantById(membership.tenantId),
       session: await this.createSession(user, membership.tenantId),
+    };
+  }
+
+  async requestEmailVerification(input: RequestEmailVerificationDto) {
+    const user = await this.repository.findUserByEmail(input.email.trim().toLowerCase());
+    const emailVerificationChallenge =
+      user && !user.emailVerifiedAt
+        ? await this.createAccountChallenge(user, 'EMAIL_VERIFICATION', EMAIL_VERIFICATION_TTL_MS)
+        : undefined;
+
+    return {
+      requested: true,
+      emailVerificationChallenge: this.isProductionRuntime() ? undefined : emailVerificationChallenge,
+    };
+  }
+
+  async confirmEmailVerification(input: ConfirmEmailVerificationDto) {
+    const challenge = await this.requireAccountChallenge(input.token, 'EMAIL_VERIFICATION');
+    const user = await this.repository.findUserById(challenge.userId);
+    if (!user) {
+      throw new UnauthorizedException('Invalid or expired account challenge.');
+    }
+
+    const now = new Date().toISOString();
+    await this.repository.updateAccountChallenge({ ...challenge, consumedAt: now });
+    await this.repository.markUserEmailVerified(challenge.userId, now);
+
+    return {
+      verified: true,
+      emailVerifiedAt: now,
+    };
+  }
+
+  async requestPasswordReset(input: RequestPasswordResetDto) {
+    const user = await this.repository.findUserByEmail(input.email.trim().toLowerCase());
+    const passwordResetChallenge = user
+      ? await this.createAccountChallenge(user, 'PASSWORD_RESET', PASSWORD_RESET_TTL_MS)
+      : undefined;
+
+    return {
+      requested: true,
+      passwordResetChallenge: this.isProductionRuntime() ? undefined : passwordResetChallenge,
+    };
+  }
+
+  async confirmPasswordReset(input: ConfirmPasswordResetDto) {
+    const passwordPolicy = evaluatePasswordPolicy(input.newPassword);
+    if (!passwordPolicy.allowed) {
+      throw new UnprocessableEntityException({
+        message: 'Password does not meet the security policy.',
+        passwordPolicy,
+      });
+    }
+
+    const challenge = await this.requireAccountChallenge(input.token, 'PASSWORD_RESET');
+    const user = await this.repository.findUserById(challenge.userId);
+    if (!user) {
+      throw new UnauthorizedException('Invalid or expired account challenge.');
+    }
+
+    const now = new Date().toISOString();
+    const password = this.hashPassword(input.newPassword);
+    await this.repository.updateAccountChallenge({ ...challenge, consumedAt: now });
+    await this.repository.updateUserPassword(user.id, {
+      passwordHash: password.hash,
+      passwordSalt: password.salt,
+      passwordIterations: password.iterations,
+    });
+    await this.repository.revokeSessionsForUser(user.id, now);
+
+    return {
+      reset: true,
+      sessionsRevokedAt: now,
+      passwordPolicy,
     };
   }
 
@@ -267,6 +355,26 @@ export class AuthService {
     return session;
   }
 
+  private async requireAccountChallenge(
+    token: string,
+    purpose: AuthAccountChallengePurpose,
+  ): Promise<AuthAccountChallengeRecord> {
+    const challenge = await this.repository.findAccountChallengeByTokenHash(
+      this.hashAccountChallengeToken(purpose, token),
+    );
+
+    if (
+      !challenge ||
+      challenge.purpose !== purpose ||
+      challenge.consumedAt ||
+      Date.parse(challenge.expiresAt) <= Date.now()
+    ) {
+      throw new UnauthorizedException('Invalid or expired account challenge.');
+    }
+
+    return challenge;
+  }
+
   private hashPassword(password: string) {
     const salt = randomBytes(16).toString('base64url');
     const iterations = 210_000;
@@ -276,6 +384,10 @@ export class AuthService {
 
   private hashSessionToken(token: string): string {
     return createHash('sha256').update(token).digest('base64url');
+  }
+
+  private hashAccountChallengeToken(purpose: AuthAccountChallengePurpose, token: string): string {
+    return createHash('sha256').update(`${purpose}:${token}`).digest('base64url');
   }
 
   private hashMfaCode(sessionId: string, code: string): string {
@@ -302,6 +414,7 @@ export class AuthService {
       email: user.email,
       displayName: user.displayName,
       phone: user.phone,
+      emailVerifiedAt: user.emailVerifiedAt,
       mfaRequired: user.mfaRequired,
       mfaVerifiedAt: user.mfaVerifiedAt,
       createdAt: user.createdAt,
@@ -331,6 +444,27 @@ export class AuthService {
 
     await this.repository.createMfaChallenge(challenge);
     return this.presentMfaChallenge(challenge, code);
+  }
+
+  private async createAccountChallenge(
+    user: AuthUserRecord,
+    purpose: AuthAccountChallengePurpose,
+    ttlMs: number,
+  ): Promise<PresentedAccountChallenge> {
+    const now = new Date().toISOString();
+    const token = randomBytes(32).toString('base64url');
+    const challenge: AuthAccountChallengeRecord = {
+      id: randomUUID(),
+      userId: user.id,
+      email: user.email,
+      purpose,
+      tokenHash: this.hashAccountChallengeToken(purpose, token),
+      expiresAt: new Date(Date.parse(now) + ttlMs).toISOString(),
+      createdAt: now,
+    };
+
+    await this.repository.createAccountChallenge(challenge);
+    return this.presentAccountChallenge(challenge, token);
   }
 
   private presentSession(session: AuthSessionRecord): PresentedAuthSession;
@@ -375,6 +509,24 @@ export class AuthService {
 
     if (challenge.deliveryChannel === 'DEVELOPMENT' && !this.isProductionRuntime()) {
       return { ...presented, developmentCode };
+    }
+
+    return presented;
+  }
+
+  private presentAccountChallenge(
+    challenge: AuthAccountChallengeRecord,
+    developmentToken?: string,
+  ): PresentedAccountChallenge {
+    const presented: PresentedAccountChallenge = {
+      id: challenge.id,
+      purpose: challenge.purpose,
+      expiresAt: challenge.expiresAt,
+      createdAt: challenge.createdAt,
+    };
+
+    if (!this.isProductionRuntime()) {
+      return { ...presented, developmentToken };
     }
 
     return presented;

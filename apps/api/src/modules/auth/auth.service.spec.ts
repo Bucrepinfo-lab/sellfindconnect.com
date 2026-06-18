@@ -27,6 +27,7 @@ describe('AuthService', () => {
     expect(result.termsAcceptance.termsVersion).toContain('terms-');
     expect(result.session.mfaRequired).toBe(true);
     expect(result.session.mfaChallenge?.developmentCode).toMatch(/^\d{6}$/);
+    expect(result.emailVerificationChallenge.developmentToken).toBeTruthy();
   });
 
   it('rejects weak passwords and duplicate emails', async () => {
@@ -115,6 +116,63 @@ describe('AuthService', () => {
     expect('token' in sessionLookup.session).toBe(false);
     expect(sessionLookup.session.token).toBeUndefined();
     expect('tokenHash' in sessionLookup.session).toBe(false);
+  });
+
+  it('verifies an owner email using the issued account challenge token', async () => {
+    const service = new AuthService();
+    const registered = await service.registerTenantOwner({
+      email: 'owner@example.com',
+      password: strongPassword,
+      displayName: 'Mary Owner',
+      tenantDisplayName: 'Nairobi Fresh Produce Cooperative',
+      countryCode: 'KE',
+      industryCode: 'AGRICULTURE',
+      primaryRole: 'SUPPLIER',
+      userType: 'ADVERTISER',
+      acceptedTerms: true,
+    });
+
+    const token = registered.emailVerificationChallenge.developmentToken ?? '';
+    const result = await service.confirmEmailVerification({ token });
+    const sessionLookup = await service.getSession(registered.session.token);
+
+    expect(result.verified).toBe(true);
+    expect(sessionLookup.user?.emailVerifiedAt).toBe(result.emailVerifiedAt);
+  });
+
+  it('resets a password with an expiring challenge and revokes old sessions', async () => {
+    const service = new AuthService();
+    const registered = await service.registerTenantOwner({
+      email: 'owner@example.com',
+      password: strongPassword,
+      displayName: 'Mary Owner',
+      tenantDisplayName: 'Nairobi Fresh Produce Cooperative',
+      countryCode: 'KE',
+      industryCode: 'AGRICULTURE',
+      primaryRole: 'SUPPLIER',
+      userType: 'ADVERTISER',
+      acceptedTerms: true,
+    });
+
+    const request = await service.requestPasswordReset({ email: 'OWNER@example.com' });
+    const token = request.passwordResetChallenge?.developmentToken ?? '';
+    const result = await service.confirmPasswordReset({
+      token,
+      newPassword: 'New-owner#2026',
+    });
+
+    expect(result.reset).toBe(true);
+    await expect(service.getSession(registered.session.token)).rejects.toThrow();
+    await expect(service.login({ email: 'owner@example.com', password: strongPassword })).rejects.toThrow();
+    await expect(service.login({ email: 'owner@example.com', password: 'New-owner#2026' })).resolves.toMatchObject({
+      session: { token: expect.any(String) },
+    });
+    await expect(
+      service.confirmPasswordReset({
+        token,
+        newPassword: 'Another-owner#2026',
+      }),
+    ).rejects.toThrow();
   });
 
   it('verifies MFA for an owner session', async () => {

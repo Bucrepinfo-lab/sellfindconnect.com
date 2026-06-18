@@ -3,6 +3,7 @@ import {
   PrismaClient,
   TenantRole,
   TenantStatus,
+  type AuthAccountChallenge,
   type AuthMfaChallenge,
   type AuthSession,
   type Country,
@@ -14,11 +15,13 @@ import {
 import type { TermsAcceptanceEvidence } from '@telpen/domain';
 
 import type {
+  AuthAccountChallengeRecord,
   AuthMfaChallengeRecord,
   AuthSessionRecord,
   AuthTenantRecord,
   AuthUserRecord,
   OwnerRegistrationRecords,
+  PasswordUpdateRecord,
   TenantMembershipRecord,
 } from './auth.records';
 import type { AuthRepository } from './auth.repository';
@@ -81,6 +84,13 @@ export class PrismaAuthRepository implements AuthRepository {
     return challenge ? this.mapMfaChallenge(challenge) : undefined;
   }
 
+  async findAccountChallengeByTokenHash(tokenHash: string): Promise<AuthAccountChallengeRecord | undefined> {
+    const challenge = await this.prisma.authAccountChallenge.findUnique({
+      where: { tokenHash },
+    });
+    return challenge ? this.mapAccountChallenge(challenge) : undefined;
+  }
+
   async createOwnerRegistration(records: OwnerRegistrationRecords): Promise<void> {
     await this.prisma.$transaction([
       this.prisma.user.create({
@@ -92,6 +102,9 @@ export class PrismaAuthRepository implements AuthRepository {
           passwordHash: records.user.passwordHash,
           passwordSalt: records.user.passwordSalt,
           passwordIterations: records.user.passwordIterations,
+          emailVerifiedAt: records.user.emailVerifiedAt
+            ? new Date(records.user.emailVerifiedAt)
+            : undefined,
           mfaRequired: records.user.mfaRequired,
           createdAt: new Date(records.user.createdAt),
         },
@@ -197,10 +210,60 @@ export class PrismaAuthRepository implements AuthRepository {
     });
   }
 
+  async createAccountChallenge(challenge: AuthAccountChallengeRecord): Promise<void> {
+    await this.prisma.authAccountChallenge.create({
+      data: {
+        id: challenge.id,
+        userId: challenge.userId,
+        email: challenge.email,
+        purpose: challenge.purpose,
+        tokenHash: challenge.tokenHash,
+        expiresAt: new Date(challenge.expiresAt),
+        consumedAt: challenge.consumedAt ? new Date(challenge.consumedAt) : undefined,
+        createdAt: new Date(challenge.createdAt),
+      },
+    });
+  }
+
+  async updateAccountChallenge(challenge: AuthAccountChallengeRecord): Promise<void> {
+    await this.prisma.authAccountChallenge.update({
+      where: { id: challenge.id },
+      data: {
+        expiresAt: new Date(challenge.expiresAt),
+        consumedAt: challenge.consumedAt ? new Date(challenge.consumedAt) : null,
+      },
+    });
+  }
+
+  async markUserEmailVerified(userId: string, emailVerifiedAt: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { emailVerifiedAt: new Date(emailVerifiedAt) },
+    });
+  }
+
+  async updateUserPassword(userId: string, password: PasswordUpdateRecord): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash: password.passwordHash,
+        passwordSalt: password.passwordSalt,
+        passwordIterations: password.passwordIterations,
+      },
+    });
+  }
+
   async markUserMfaVerified(userId: string, mfaVerifiedAt: string): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
       data: { lastMfaVerifiedAt: new Date(mfaVerifiedAt) },
+    });
+  }
+
+  async revokeSessionsForUser(userId: string, revokedAt: string): Promise<void> {
+    await this.prisma.authSession.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date(revokedAt) },
     });
   }
 
@@ -225,6 +288,7 @@ export class PrismaAuthRepository implements AuthRepository {
       passwordHash: user.passwordHash,
       passwordSalt: user.passwordSalt,
       passwordIterations: user.passwordIterations,
+      emailVerifiedAt: user.emailVerifiedAt?.toISOString(),
       mfaRequired: user.mfaRequired,
       mfaVerifiedAt: user.lastMfaVerifiedAt?.toISOString(),
       createdAt: user.createdAt.toISOString(),
@@ -289,6 +353,19 @@ export class PrismaAuthRepository implements AuthRepository {
       expiresAt: challenge.expiresAt.toISOString(),
       consumedAt: challenge.consumedAt?.toISOString(),
       failedAttempts: challenge.failedAttempts,
+      createdAt: challenge.createdAt.toISOString(),
+    };
+  }
+
+  private mapAccountChallenge(challenge: AuthAccountChallenge): AuthAccountChallengeRecord {
+    return {
+      id: challenge.id,
+      userId: challenge.userId,
+      email: challenge.email,
+      purpose: challenge.purpose as AuthAccountChallengeRecord['purpose'],
+      tokenHash: challenge.tokenHash,
+      expiresAt: challenge.expiresAt.toISOString(),
+      consumedAt: challenge.consumedAt?.toISOString(),
       createdAt: challenge.createdAt.toISOString(),
     };
   }

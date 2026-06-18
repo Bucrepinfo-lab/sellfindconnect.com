@@ -2,11 +2,13 @@ import { Injectable } from '@nestjs/common';
 import type { TermsAcceptanceEvidence } from '@telpen/domain';
 
 import type {
+  AuthAccountChallengeRecord,
   AuthMfaChallengeRecord,
   AuthSessionRecord,
   AuthTenantRecord,
   AuthUserRecord,
   OwnerRegistrationRecords,
+  PasswordUpdateRecord,
   TenantMembershipRecord,
 } from './auth.records';
 import type { AuthRepository } from './auth.repository';
@@ -19,6 +21,7 @@ export class InMemoryAuthRepository implements AuthRepository {
   private readonly memberships = new Map<string, TenantMembershipRecord>();
   private readonly sessionsByTokenHash = new Map<string, AuthSessionRecord>();
   private readonly mfaChallenges = new Map<string, AuthMfaChallengeRecord>();
+  private readonly accountChallengesByTokenHash = new Map<string, AuthAccountChallengeRecord>();
   private readonly termsEvidence = new Map<string, TermsAcceptanceEvidence>();
 
   findUserByEmail(email: string): AuthUserRecord | undefined {
@@ -51,6 +54,10 @@ export class InMemoryAuthRepository implements AuthRepository {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
   }
 
+  findAccountChallengeByTokenHash(tokenHash: string): AuthAccountChallengeRecord | undefined {
+    return this.accountChallengesByTokenHash.get(tokenHash);
+  }
+
   createOwnerRegistration(records: OwnerRegistrationRecords): void {
     this.usersByEmail.set(records.user.email, records.user);
     this.usersById.set(records.user.id, records.user);
@@ -78,19 +85,56 @@ export class InMemoryAuthRepository implements AuthRepository {
     this.mfaChallenges.set(challenge.id, challenge);
   }
 
+  createAccountChallenge(challenge: AuthAccountChallengeRecord): void {
+    this.accountChallengesByTokenHash.set(challenge.tokenHash, challenge);
+  }
+
+  updateAccountChallenge(challenge: AuthAccountChallengeRecord): void {
+    this.accountChallengesByTokenHash.set(challenge.tokenHash, challenge);
+  }
+
+  markUserEmailVerified(userId: string, emailVerifiedAt: string): void {
+    const user = this.usersById.get(userId);
+    if (!user) {
+      return;
+    }
+
+    this.saveUser({ ...user, emailVerifiedAt });
+  }
+
+  updateUserPassword(userId: string, password: PasswordUpdateRecord): void {
+    const user = this.usersById.get(userId);
+    if (!user) {
+      return;
+    }
+
+    this.saveUser({ ...user, ...password });
+  }
+
   markUserMfaVerified(userId: string, mfaVerifiedAt: string): void {
     const user = this.usersById.get(userId);
     if (!user) {
       return;
     }
 
-    const updated = { ...user, mfaVerifiedAt };
-    this.usersById.set(userId, updated);
-    this.usersByEmail.set(updated.email, updated);
+    this.saveUser({ ...user, mfaVerifiedAt });
+  }
+
+  revokeSessionsForUser(userId: string, revokedAt: string): void {
+    for (const session of this.sessionsByTokenHash.values()) {
+      if (session.userId === userId && !session.revokedAt) {
+        this.sessionsByTokenHash.set(session.tokenHash, { ...session, revokedAt });
+      }
+    }
   }
 
   listTenants(): AuthTenantRecord[] {
     return Array.from(this.tenants.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  private saveUser(user: AuthUserRecord): void {
+    this.usersById.set(user.id, user);
+    this.usersByEmail.set(user.email, user);
   }
 
   private termsEvidenceKey(userId: string, tenantId: string): string {

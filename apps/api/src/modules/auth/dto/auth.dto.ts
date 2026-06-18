@@ -78,6 +78,37 @@ export class LoginDto {
   declare password: string;
 }
 
+export class RequestEmailVerificationDto {
+  @ApiProperty({ example: 'owner@example.com' })
+  @IsEmail()
+  declare email: string;
+}
+
+export class ConfirmEmailVerificationDto {
+  @ApiProperty({ example: 'email-verification-token' })
+  @IsString()
+  @Length(32, 256)
+  declare token: string;
+}
+
+export class RequestPasswordResetDto {
+  @ApiProperty({ example: 'owner@example.com' })
+  @IsEmail()
+  declare email: string;
+}
+
+export class ConfirmPasswordResetDto {
+  @ApiProperty({ example: 'password-reset-token' })
+  @IsString()
+  @Length(32, 256)
+  declare token: string;
+
+  @ApiProperty({ example: 'New-owner#2026' })
+  @IsString()
+  @Length(8, 256)
+  declare newPassword: string;
+}
+
 export class VerifyMfaDto {
   @ApiProperty({ example: 'session-token' })
   @IsString()

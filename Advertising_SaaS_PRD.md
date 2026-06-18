@@ -272,7 +272,8 @@ Implementation progress on 2026-06-18:
 - Added an auth repository boundary so the current in-memory MVP can be replaced by Prisma-backed persistence without changing public auth controller contracts.
 - Added session-token hash storage so raw bearer tokens are only shown at issuance time and are not retained as lookup keys.
 - Added generated, hashed, time-limited MFA challenges so the fixed development code is no longer accepted.
-- Added an opt-in Prisma auth repository for durable user, tenant, membership, session, MFA challenge, and policy-acceptance persistence when `AUTH_REPOSITORY=prisma` is enabled with `DATABASE_URL`.
+- Added generated, hashed, expiring email verification and password reset challenges, including password reset session revocation.
+- Added an opt-in Prisma auth repository for durable user, tenant, membership, session, MFA challenge, account challenge, and policy-acceptance persistence when `AUTH_REPOSITORY=prisma` is enabled with `DATABASE_URL`.
 - Added a reusable tenant session guard that validates `x-session-token` against `x-tenant-id` and requires MFA before protected tenant routes proceed.
 - Migrated profile draft/preview routes and advert listing/lifecycle routes to the MFA-verified tenant session guard.
 - Migrated lead conversion and conversation/chat routes to the MFA-verified tenant session guard.
@@ -909,6 +910,7 @@ Implementation progress on 2026-06-18:
 - Added database fields and models for MFA state, access assignments, and access decision audit records.
 - Added owner registration and login session groundwork so tenants can be created with an owner membership and first-month-free trial state.
 - Added generated, expiring MFA challenge records for tenant-owner sessions; provider-backed email/SMS/authenticator delivery remains a production hardening step.
+- Added hashed account challenge records for email verification and password reset; provider-backed email delivery remains a production hardening step.
 
 ## 10. Nonfunctional Requirements
 

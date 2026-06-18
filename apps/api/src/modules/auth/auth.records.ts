@@ -8,6 +8,7 @@ export type AuthUserRecord = {
   passwordHash: string;
   passwordSalt: string;
   passwordIterations: number;
+  emailVerifiedAt?: string;
   mfaRequired: boolean;
   mfaVerifiedAt?: string;
   createdAt: string;
@@ -72,6 +73,26 @@ export type PresentedMfaChallenge = Pick<
   developmentCode?: string;
 };
 
+export type AuthAccountChallengePurpose = 'EMAIL_VERIFICATION' | 'PASSWORD_RESET';
+
+export type AuthAccountChallengeRecord = {
+  id: string;
+  userId: string;
+  email: string;
+  purpose: AuthAccountChallengePurpose;
+  tokenHash: string;
+  expiresAt: string;
+  consumedAt?: string;
+  createdAt: string;
+};
+
+export type PresentedAccountChallenge = Pick<
+  AuthAccountChallengeRecord,
+  'id' | 'purpose' | 'expiresAt' | 'createdAt'
+> & {
+  developmentToken?: string;
+};
+
 export type PresentedAuthSession = Omit<AuthSessionRecord, 'tokenHash' | 'revokedAt'> & {
   token?: string;
 };
@@ -87,3 +108,8 @@ export type OwnerRegistrationRecords = {
   membership: TenantMembershipRecord;
   termsAcceptance: TermsAcceptanceEvidence;
 };
+
+export type PasswordUpdateRecord = Pick<
+  AuthUserRecord,
+  'passwordHash' | 'passwordSalt' | 'passwordIterations'
+>;
