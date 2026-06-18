@@ -1,6 +1,6 @@
 # Telpen Adverts Deployment Plan
 
-Status: Railway services deployed; Render selected as primary production target before subscriber onboarding
+Status: Deployment migration paused; Railway remains current fallback; DigitalOcean is the leading candidate to evaluate after coding completion
 Date: 2026-06-15
 Last updated: 2026-06-18
 
@@ -25,26 +25,22 @@ domains on the web service.
 
 `SellFindConnect.com` is managed through GoDaddy after purchase on 2026-06-16.
 
-## Recommended Production Hosting
+## Deployment Direction
 
-Render is now the selected primary production deployment target for Sell Find
-Connect. The platform has grown beyond a simple prototype: it needs always-on
-web/API services, managed Postgres, Key Value/Redis-style infrastructure,
-cron/background operations, transparent scaling, and strong reliability before
-paid subscribers are onboarded.
+Do not start a new deployment migration now. Finish the core product coding
+first, then activate the final production platform before onboarding paying
+subscribers.
 
-Render is preferred for the production start because it gives the product a
-clearer foundation for managed Postgres, background workers, cron jobs,
-zero-downtime deploys, rollbacks, observability, custom domains, TLS, and
-scaling. Railway remains live as a temporary fallback/staging environment until
-Render is fully verified and DNS cutover is complete.
+DigitalOcean is now the leading candidate to evaluate because the first country
+launch needs excellent Africa latency and a Cape Town/South Africa deployment
+location would be valuable if the required products are available there.
 
-Render deployment files:
+DigitalOcean planning file:
 
-- Blueprint: `render.yaml`
-- Runbook: `docs/RENDER_DEPLOYMENT.md`
+- `docs/DIGITALOCEAN_DEPLOYMENT.md`
 
-Railway was useful for the first deployment because it supports:
+Railway remains the current proven fallback/staging deployment because it
+already supports and has successfully run:
 
 - Next.js
 - NestJS
@@ -55,8 +51,8 @@ Railway was useful for the first deployment because it supports:
 - Custom domains
 - Automatically provisioned and renewed SSL certificates
 
-Keep the Railway deployment available until Render web, API, cron jobs, DNS,
-TLS, and smoke tests pass.
+Keep the Railway deployment available until the final provider is selected,
+configured, tested, and DNS cutover is complete.
 
 Official reference:
 https://docs.railway.com/networking/public-networking

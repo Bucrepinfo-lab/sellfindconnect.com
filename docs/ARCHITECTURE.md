@@ -154,15 +154,17 @@ enabled only where consent, country rules, and provider support allow them.
 
 ## Initial Deployment Shape
 
-The MVP begins as a modular monolith on Render as the primary production
-target:
+The MVP begins as a modular monolith. Deployment migration is paused while core
+coding continues; DigitalOcean is the leading production candidate to evaluate
+next because of the Africa latency requirement, while Railway remains the
+current proven fallback/staging deployment.
 
 - One NestJS API web service.
 - One Next.js web/PWA service.
 - One managed PostgreSQL database with strict tenant-aware repositories.
-- One Key Value service for queues, rate limits, realtime fan-out, and future
-  chat presence.
-- Render cron jobs for advert lifecycle and conversation SLA sweeps.
+- One Redis-compatible service for queues, rate limits, realtime fan-out, and
+  future chat presence.
+- Scheduled jobs for advert lifecycle and conversation SLA sweeps.
 - Managed object storage/CDN.
 - External provider adapters behind internal interfaces.
 

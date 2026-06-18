@@ -1056,11 +1056,13 @@ Backend:
 Infrastructure:
 
 - Cloud-hosted, containerized services.
-- Primary production deployment target: Render, using web services, managed
-  Postgres, Key Value, cron jobs, and later background workers before paid
-  subscriber onboarding.
-- Railway remains a temporary fallback/staging deployment until Render DNS,
-  TLS, health checks, cron jobs, and smoke tests pass.
+- Deployment migration is paused while core coding continues.
+- DigitalOcean is the leading production candidate to evaluate before paid
+  subscriber onboarding because the first country launch needs strong Africa
+  latency and a Cape Town/South Africa deployment location would be valuable if
+  the required managed services are available there.
+- Railway remains the current proven fallback/staging deployment until the
+  final platform is selected, verified, and cut over.
 - CI/CD with automated tests and security scans.
 - Infrastructure as code.
 - Feature flags.
