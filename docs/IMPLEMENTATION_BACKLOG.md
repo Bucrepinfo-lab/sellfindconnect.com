@@ -59,6 +59,23 @@ Exit: web onboarding can select a permitted industry and Kenya/local currency.
 
 Exit: automated tests prove users cannot read or mutate another tenant.
 
+Progress:
+
+- Added shared hierarchy and RBAC rules for global, regional, continental,
+  country, and tenant scopes.
+- Added MFA-required decisions for privileged roles.
+- Added permission checks for platform, access, analytics, finance,
+  moderation, country, tenant, listing, lead, chat, billing, and read-only
+  actions.
+- Added an access API for role matrices, access evaluation, and MVP access
+  decision audit records.
+- Added web Hierarchy Access controls for role, scope, permission, MFA, and
+  grant/block state.
+- Added database fields/models for MFA state, access assignments, and access
+  decision audit evidence.
+- Secure registration/login, session tokens, production identity provider,
+  password/SSO/OTP flows, and database-backed guards remain next.
+
 ## Epic 3: Advertiser Profile Vertical Slice
 
 - Create profile draft.

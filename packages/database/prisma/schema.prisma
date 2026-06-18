@@ -198,12 +198,16 @@ model User {
   id             String             @id @default(uuid())
   email          String             @unique @db.VarChar(320)
   displayName    String             @db.VarChar(160)
+  mfaRequired    Boolean            @default(false)
+  mfaEnrolledAt  DateTime?
+  lastMfaVerifiedAt DateTime?
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
   memberships    TenantMembership[]
   auditLogs      AuditLog[]
   financeAlerts  FinanceAlert[]     @relation("FinanceAlertAssignee")
   assignedConversations Conversation[] @relation("ConversationAssignee")
+  accessAssignments AccessAssignment[]
 }
 
 model Tenant {
@@ -231,6 +235,8 @@ model Tenant {
   conversationNotifications ConversationNotification[]
   notificationPreferences NotificationPreference[]
   notificationOutboxRecords NotificationOutboxRecord[]
+  accessAssignments AccessAssignment[]
+  accessDecisionAudits AccessDecisionAudit[]
 
   @@index([countryCode])
   @@index([status])
@@ -247,6 +253,54 @@ model TenantMembership {
 
   @@unique([tenantId, userId])
   @@index([userId])
+}
+
+model AccessAssignment {
+  id             String   @id @default(uuid())
+  userId         String
+  tenantId       String?
+  role           String   @db.VarChar(80)
+  scopeLevel     String   @db.VarChar(40)
+  regionCode     String?  @db.VarChar(40)
+  continentCode  String?  @db.VarChar(8)
+  countryCode    String?  @db.VarChar(2)
+  scopedTenantId String?
+  mfaRequired    Boolean  @default(true)
+  assignedBy     String?
+  expiresAt      DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant         Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([userId, role])
+  @@index([tenantId, role])
+  @@index([scopeLevel, regionCode, continentCode, countryCode])
+  @@index([scopedTenantId])
+  @@index([revokedAt, expiresAt])
+}
+
+model AccessDecisionAudit {
+  id                String   @id @default(uuid())
+  tenantId          String?
+  actorUserId       String   @db.VarChar(120)
+  role              String   @db.VarChar(80)
+  permission        String   @db.VarChar(80)
+  scopeLevel        String   @db.VarChar(40)
+  allowed           Boolean
+  reason            String   @db.VarChar(80)
+  targetTenantId    String?
+  targetCountryCode String?  @db.VarChar(2)
+  targetContinentCode String? @db.VarChar(8)
+  targetRegionCode  String?  @db.VarChar(40)
+  createdAt         DateTime @default(now())
+  tenant            Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([allowed, reason])
+  @@index([targetCountryCode, targetRegionCode])
 }
 
 model ProfileDraft {

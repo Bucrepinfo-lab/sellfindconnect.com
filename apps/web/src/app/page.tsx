@@ -26,6 +26,8 @@ import {
 import { useState } from 'react';
 
 import {
+  accessPermissions,
+  accessRoles,
   countries,
   advertLifecyclePolicy,
   buildSavedReplySuggestions,
@@ -36,6 +38,7 @@ import {
   calculateTaxSnapshotAmounts,
   conversationStatuses,
   defaultNotificationPreferences,
+  evaluateAccess,
   evaluateSafetyText,
   getRemittanceAlertDecision,
   getCountry,
@@ -49,6 +52,9 @@ import {
   type LeadStatus,
   type MatchFeedbackAction,
   type ConversationStatus,
+  type AccessPermission,
+  type AccessRole,
+  type AccessScopeLevel,
   type NotificationSeverity,
   type SourceFinderSearchResult,
   type SourceFinderSortOption,
@@ -134,6 +140,10 @@ export default function Home() {
   const [conversationStatus, setConversationStatus] = useState<ConversationStatus>('OPEN');
   const [conversationAssignee, setConversationAssignee] = useState('sales-desk');
   const [notificationSeverity, setNotificationSeverity] = useState<NotificationSeverity>('HIGH');
+  const [accessRole, setAccessRole] = useState<AccessRole>('COUNTRY_ADMIN');
+  const [accessScopeLevel, setAccessScopeLevel] = useState<AccessScopeLevel>('COUNTRY');
+  const [accessPermission, setAccessPermission] = useState<AccessPermission>('MANAGE_COUNTRY');
+  const [accessMfaVerified, setAccessMfaVerified] = useState(true);
   const [pushConsent, setPushConsent] = useState(false);
   const [smsConsent, setSmsConsent] = useState(false);
   const [whatsappConsent, setWhatsappConsent] = useState(false);
@@ -283,6 +293,25 @@ export default function Home() {
       locale: country.locale,
       timezone: country.timezone,
       preferences: notificationPreferences,
+    },
+  });
+  const accessDecision = evaluateAccess({
+    subject: {
+      userId: 'country-admin-1',
+      role: accessRole,
+      mfaVerified: accessMfaVerified,
+      scope: {
+        level: accessScopeLevel,
+        regionCodes: ['EMEA'],
+        continentCodes: ['AF'],
+        countryCodes: [country.code],
+        tenantIds: [tenantId],
+      },
+    },
+    permission: accessPermission,
+    resource: {
+      tenantId,
+      countryCode: country.code,
     },
   });
   const renewalQueue = filteredResults
@@ -583,6 +612,77 @@ export default function Home() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </section>
+
+            <section className="side-panel">
+              <div className="panel-heading tight">
+                <h2>Hierarchy Access</h2>
+                <span>{accessDecision.allowed ? 'Granted' : codeLabel(accessDecision.reason)}</span>
+              </div>
+              <label className="lead-select-row">
+                <span>Role</span>
+                <select
+                  value={accessRole}
+                  onChange={(event) => setAccessRole(event.target.value as AccessRole)}
+                >
+                  {accessRoles.map((roleOption) => (
+                    <option key={roleOption} value={roleOption}>
+                      {codeLabel(roleOption)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="lead-select-row">
+                <span>Scope</span>
+                <select
+                  value={accessScopeLevel}
+                  onChange={(event) => setAccessScopeLevel(event.target.value as AccessScopeLevel)}
+                >
+                  {(['GLOBAL', 'REGIONAL', 'CONTINENT', 'COUNTRY', 'TENANT'] as const).map(
+                    (scopeOption) => (
+                      <option key={scopeOption} value={scopeOption}>
+                        {codeLabel(scopeOption)}
+                      </option>
+                    ),
+                  )}
+                </select>
+              </label>
+              <label className="lead-select-row">
+                <span>Permission</span>
+                <select
+                  value={accessPermission}
+                  onChange={(event) => setAccessPermission(event.target.value as AccessPermission)}
+                >
+                  {accessPermissions.map((permission) => (
+                    <option key={permission} value={permission}>
+                      {codeLabel(permission)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="toggle-row">
+                <input
+                  type="checkbox"
+                  checked={accessMfaVerified}
+                  onChange={(event) => setAccessMfaVerified(event.target.checked)}
+                />
+                <span>MFA verified</span>
+              </label>
+              <FinanceRow label="Country" value={`${country.flag} ${country.name}`} />
+              <FinanceRow label="Continent" value="Africa" />
+              <FinanceRow label="Region" value="EMEA" />
+              <FinanceRow label="Tenant" value={tenantId.slice(0, 8)} />
+              <div className={accessDecision.allowed ? 'policy-box ok compact' : 'policy-box block compact'}>
+                {accessDecision.allowed ? <ShieldCheck size={18} /> : <CircleAlert size={18} />}
+                <div>
+                  <strong>{accessDecision.allowed ? 'Access granted' : 'Access blocked'}</strong>
+                  <span>
+                    {accessDecision.allowed
+                      ? `${codeLabel(accessRole)} can ${codeLabel(accessPermission).toLowerCase()} here.`
+                      : codeLabel(accessDecision.reason)}
+                  </span>
+                </div>
               </div>
             </section>
 

@@ -879,6 +879,15 @@ Permission requirements:
 - Prevent country admins from accessing other countries unless assigned.
 - Support audit logs for all sensitive actions.
 
+Implementation progress on 2026-06-18:
+
+- Added shared RBAC rules covering global head office, regional/multicontinental, continental, country, and tenant scopes.
+- Added role permission matrices and MFA-required checks for privileged roles.
+- Added access decision logic that blocks tenant-to-tenant horizontal access and country-admin access outside assigned countries.
+- Added API endpoints for role matrices, access evaluation, and MVP access decision audit evidence.
+- Added web Hierarchy Access controls showing role, scope, permission, MFA, and grant/block state.
+- Added database fields and models for MFA state, access assignments, and access decision audit records.
+
 ## 10. Nonfunctional Requirements
 
 Performance:

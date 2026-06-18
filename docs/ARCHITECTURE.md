@@ -130,6 +130,8 @@ workflow are approved.
 - Structured error codes suitable for web and mobile localization.
 - OpenAPI documentation generated from the API.
 - Audit logs for sensitive administration, finance, safety, and access actions.
+- Access assignments record user, role, scope level, region, continent, country,
+  tenant, MFA requirement, expiry, revocation, and assignment source.
 
 ## Notification Flow
 

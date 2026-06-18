@@ -1,3 +1,4 @@
+export * from './access-control';
 export * from './analytics';
 export * from './finance';
 export * from './geography';

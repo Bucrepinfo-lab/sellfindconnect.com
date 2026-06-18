@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 
+import { AccessModule } from './access/access.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AdvertsModule } from './adverts/adverts.module';
 import { CatalogModule } from './catalog/catalog.module';
@@ -19,6 +20,7 @@ import { SourceFinderModule } from './source-finder/source-finder.module';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
+    AccessModule,
     HealthModule,
     CatalogModule,
     SafetyModule,
