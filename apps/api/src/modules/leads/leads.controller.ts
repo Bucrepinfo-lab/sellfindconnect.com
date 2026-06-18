@@ -2,16 +2,20 @@ import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/co
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 
 import { TenantId } from '../tenant/tenant-context.decorator';
-import { TenantContextGuard } from '../tenant/tenant-context.guard';
+import { TenantSessionGuard } from '../tenant/tenant-session.guard';
 import { CreateInquiryDto, CreateMatchFeedbackDto, UpdateLeadStatusDto } from './dto/leads.dto';
 import { LeadsService } from './leads.service';
 
 @ApiTags('leads')
 @ApiHeader({
   name: 'x-tenant-id',
-  description: 'Tenant UUID. Temporary local-development tenant scope until auth is added.',
+  description: 'Tenant UUID for the authenticated owner session.',
 })
-@UseGuards(TenantContextGuard)
+@ApiHeader({
+  name: 'x-session-token',
+  description: 'Issued owner session token. MFA must be verified before lead routes are available.',
+})
+@UseGuards(TenantSessionGuard)
 @Controller('leads')
 export class LeadsController {
   constructor(private readonly leads: LeadsService) {}

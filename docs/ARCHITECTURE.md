@@ -81,7 +81,8 @@ without validating it against the authenticated user's assignments.
   financier, and certifier links.
 - Matching: rules first, then semantic and graph ranking.
 - Conversations: inquiries, chat, RFQs, quotes, assignment, saved replies,
-  response SLAs, message safety checks, and notification alerts.
+  response SLAs, message safety checks, and notification alerts. Lead and
+  conversation routes require an MFA-verified tenant session.
 - Notifications: tenant preferences, consent-aware channel planning, outbox
   records, provider delivery attempts, suppression reasons, and scheduler jobs.
 - Billing: trial, subscription, invoice, payment, refund, and chargeback.

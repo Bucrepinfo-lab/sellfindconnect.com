@@ -274,6 +274,7 @@ Implementation progress on 2026-06-18:
 - Added an opt-in Prisma auth repository for durable user, tenant, membership, session, and policy-acceptance persistence when `AUTH_REPOSITORY=prisma` is enabled with `DATABASE_URL`.
 - Added a reusable tenant session guard that validates `x-session-token` against `x-tenant-id` and requires MFA before protected tenant routes proceed.
 - Migrated profile draft/preview routes and advert listing/lifecycle routes to the MFA-verified tenant session guard.
+- Migrated lead conversion and conversation/chat routes to the MFA-verified tenant session guard.
 - Added database support for password metadata, auth sessions, tenant onboarding attributes, and policy acceptance evidence.
 - Added a checked-in baseline Prisma migration plus repeatable database seed workflow for continents, pilot country setup, and industry categories.
 - Added a web Owner Onboarding panel showing password strength, trial end date, next billing amount, current terms versions, and signup lock state.
@@ -476,6 +477,7 @@ Implementation progress on 2026-06-17:
 - Added API support for match feedback actions: accept, save, dismiss, hide, and report.
 - Added API support for safe inquiry/RFQ creation, with current terms acceptance required before a match can become a lead.
 - Added a tenant lead inbox with status transitions for new, contacted, qualified, negotiating, won, lost, and blocked leads.
+- Migrated match feedback, inquiry/RFQ, lead inbox, lead status, conversation, message, assignment, notification, and SLA endpoints to MFA-verified tenant sessions.
 - Added a web Lead Conversion panel showing selected match, confidence, SLA, feedback action, lead status, inquiry lock/unlock state, and next-best actions.
 - Added the first messaging and SLA workspace: shared conversation rules, saved replies, terms-gated tenant conversation API, safe message submission, assignment, SLA notification checks, Prisma conversation/message/notification models, and a web Conversation Workspace panel.
 - Added consent-aware notification orchestration for in-app, email, SMS, push, and WhatsApp channels, with tenant preferences, an API outbox, and a web Notification Delivery readiness panel.

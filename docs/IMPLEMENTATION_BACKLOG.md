@@ -116,6 +116,8 @@ Progress:
   blocks tenant routes until MFA is verified.
 - Migrated profile draft/preview routes and advert lifecycle/listing routes
   from temporary tenant-header trust to the MFA-verified tenant session guard.
+- Migrated lead conversion and conversation/chat routes from temporary
+  tenant-header trust to the MFA-verified tenant session guard.
 - Added web Owner Onboarding readiness controls for owner email, tenant name,
   password policy, trial dates, terms versions, and signup lock state.
 - Added database fields/models for password metadata, auth sessions, tenant
@@ -214,6 +216,9 @@ Progress:
 - Added tenant lead inbox and lead status updates.
 - Added web Lead Conversion controls for selected match, feedback action,
   status, inquiry lock/unlock, and next-best actions.
+- Migrated match feedback, inquiry/RFQ, lead inbox, lead status, conversation,
+  message, assignment, notification, and SLA routes to the MFA-verified tenant
+  session guard.
 - Added shared conversation states, participant roles, saved replies, and SLA
   decisions.
 - Added tenant-scoped conversation APIs for terms-gated thread creation, safe
