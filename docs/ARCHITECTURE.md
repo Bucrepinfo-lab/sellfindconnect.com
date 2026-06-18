@@ -154,11 +154,15 @@ enabled only where consent, country rules, and provider support allow them.
 
 ## Initial Deployment Shape
 
-The MVP begins as a modular monolith:
+The MVP begins as a modular monolith on Render as the primary production
+target:
 
-- One NestJS API deployment.
-- One Next.js web deployment.
-- One PostgreSQL database with strict tenant-aware repositories.
+- One NestJS API web service.
+- One Next.js web/PWA service.
+- One managed PostgreSQL database with strict tenant-aware repositories.
+- One Key Value service for queues, rate limits, realtime fan-out, and future
+  chat presence.
+- Render cron jobs for advert lifecycle and conversation SLA sweeps.
 - Managed object storage/CDN.
 - External provider adapters behind internal interfaces.
 

@@ -162,7 +162,7 @@ Each category must support:
 
 The platform must entirely block weapons, pornography, human trafficking/human trade, and other categories of similar severity. These categories are not "regulated industries" on Telpen; they are prohibited across signup, profiles, listings, media, search, matching, recommendations, chat, payment, links, and analytics exports.
 
-Hosting-provider acceptable-use alignment is mandatory. Because the current deployment uses Railway, Telpen must not allow users to publish, search, link, message, upload, promote, automate, or transact around activity that would violate Railway-style acceptable-use rules, including illegal activity, child exploitation, terrorism or violent extremism, human trafficking, nonconsensual intimate imagery, fraud, phishing, impersonation, malware, unauthorized access, DDoS, botnets, spam, abusive scraping, copyright piracy, crypto mining, torrenting, open proxies, anonymizers, compute resale, or other infrastructure abuse.
+Hosting-provider acceptable-use alignment is mandatory. Telpen must not allow users to publish, search, link, message, upload, promote, automate, or transact around activity that would violate strict cloud-hosting acceptable-use rules, including illegal activity, child exploitation, terrorism or violent extremism, human trafficking, nonconsensual intimate imagery, fraud, phishing, impersonation, malware, unauthorized access, DDoS, botnets, spam, abusive scraping, copyright piracy, crypto mining, torrenting, open proxies, anonymizers, compute resale, or other infrastructure abuse.
 
 Blocked categories:
 
@@ -1056,6 +1056,11 @@ Backend:
 Infrastructure:
 
 - Cloud-hosted, containerized services.
+- Primary production deployment target: Render, using web services, managed
+  Postgres, Key Value, cron jobs, and later background workers before paid
+  subscriber onboarding.
+- Railway remains a temporary fallback/staging deployment until Render DNS,
+  TLS, health checks, cron jobs, and smoke tests pass.
 - CI/CD with automated tests and security scans.
 - Infrastructure as code.
 - Feature flags.

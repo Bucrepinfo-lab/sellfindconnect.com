@@ -33,8 +33,16 @@ Last updated: 2026-06-18
 - Add environment validation, formatting, linting, type checks, and tests.
 - Add health endpoint and local development instructions.
 - Add CI workflow after the first green local build.
+- Add Render Blueprint deployment configuration and cutover runbook.
 
 Exit: clean install, type check, tests, and production builds pass.
+
+Progress:
+
+- Added `render.yaml` for Render web/API services, managed Postgres, Key Value,
+  and cron jobs.
+- Added `docs/RENDER_DEPLOYMENT.md` with the Render cutover plan, DNS steps,
+  cron secret handling, and production readiness gates.
 
 ## Epic 1: Geography and Industry Foundation
 
