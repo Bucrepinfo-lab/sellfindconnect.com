@@ -71,8 +71,10 @@ without validating it against the authenticated user's assignments.
 - Auth: tenant-owner registration, password metadata, token-hashed sessions,
   MFA state, terms acceptance evidence, in-memory and Prisma repository
   adapters, tenant session guard, and future identity-provider adapter boundary.
-- Profiles: draft, preview, publish, profile completeness, and contacts.
-- Listings: draft, preview, publish, media, lifecycle, and visibility.
+- Profiles: draft, preview, publish, profile completeness, and contacts. Profile
+  write/preview routes require an MFA-verified tenant session.
+- Listings: draft, preview, publish, media, lifecycle, and visibility. Advert
+  listing and lifecycle routes require an MFA-verified tenant session.
 - Safety: blocked categories, policy decisions, moderation cases, and reports.
 - Discovery: Source Finder, search, filters, reason codes, and saved searches.
 - Relationships: producer, supplier, consumer, distributor, installer, logistics,

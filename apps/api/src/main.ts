@@ -37,6 +37,7 @@ async function bootstrap() {
     .setDescription('Multi-tenant advertising, Source Finder, safety, finance and analytics API')
     .setVersion('0.1.0')
     .addApiKey({ type: 'apiKey', name: 'x-tenant-id', in: 'header' }, 'tenant-id')
+    .addApiKey({ type: 'apiKey', name: 'x-session-token', in: 'header' }, 'session-token')
     .build();
   const document = SwaggerModule.createDocument(app, documentConfig);
   SwaggerModule.setup('docs', app, document);
