@@ -191,6 +191,7 @@ Enforcement requirements:
 - One versioned, shared zero-tolerance catalogue must drive public policy labels, form validation, server enforcement, moderation reason codes, analytics, and audit logs so highlighted terms never disagree with executable controls.
 - Client-side detection is only an immediate user experience control. Every server-side write, search, upload, relationship-link, messaging, payment, export, recommendation, and indexing path must independently reject prohibited content before persistence or distribution.
 - Safety checking must inspect all user-controlled text and metadata recursively, including names, descriptions, contacts, URLs, tags, captions, filenames, OCR/transcripts, link previews, message attachments, and structured nested fields.
+- API request bodies must pass through shared sanitisation before validation and policy checks, including Unicode normalization, hidden control/format character removal, reasonable recursion limits, and preservation of secret fields such as passwords and tokens.
 - Normalization must resist basic evasion through casing, punctuation, spacing, Unicode variants, common character substitutions, coded terms, and country/language synonyms without silently publishing ambiguous high-risk content.
 - A blocked search must return no commercial results, suggestions, related entities, cached matches, analytics exports, or advertising inventory for the prohibited request.
 - A blocked draft must not be previewed externally, published, shared, downloaded, matched, messaged from, promoted, billed, or submitted for payment.
@@ -267,6 +268,7 @@ Implementation progress on 2026-06-18:
 - Added shared owner onboarding helpers for password policy, trial subscription windows, active policy versions, and terms acceptance evidence.
 - Added an MVP auth API for tenant-owner registration, secure password hashing, login sessions, MFA verification, tenant-session checks, and tenant listing.
 - Added zero-tolerance checks during registration so prohibited tenant names or onboarding data cannot create an account.
+- Added a global API input sanitising pipe before validation so registration, profile, listing, search, lead, chat, analytics, notification, and finance request bodies are normalized before policy checks.
 - Added an auth repository boundary so the current in-memory MVP can be replaced by Prisma-backed persistence without changing public auth controller contracts.
 - Added session-token hash storage so raw bearer tokens are only shown at issuance time and are not retained as lookup keys.
 - Added an opt-in Prisma auth repository for durable user, tenant, membership, session, and policy-acceptance persistence when `AUTH_REPOSITORY=prisma` is enabled with `DATABASE_URL`.

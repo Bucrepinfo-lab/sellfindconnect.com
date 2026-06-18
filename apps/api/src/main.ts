@@ -6,6 +6,7 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 
+import { SanitizeInputPipe } from './common/sanitize-input.pipe';
 import { AppModule } from './modules/app.module';
 
 async function bootstrap() {
@@ -20,10 +21,14 @@ async function bootstrap() {
     credentials: true,
   });
   app.useGlobalPipes(
+    new SanitizeInputPipe(),
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
+      forbidUnknownValues: true,
       transform: true,
+      transformOptions: { enableImplicitConversion: false },
+      validationError: { target: false, value: false },
     }),
   );
 

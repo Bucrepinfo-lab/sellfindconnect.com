@@ -50,7 +50,7 @@ export class CreateAdvertDto {
 
   @ApiPropertyOptional({ example: 'https://example.co.ke' })
   @IsOptional()
-  @IsUrl({ require_tld: false })
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true, require_tld: false })
   declare website?: string;
 }
 

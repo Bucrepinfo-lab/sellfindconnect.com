@@ -9,5 +9,6 @@ export * from './lifecycle';
 export * from './messaging';
 export * from './notifications';
 export * from './profiles';
+export * from './sanitization';
 export * from './safety';
 export * from './source-finder';

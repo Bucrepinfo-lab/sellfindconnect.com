@@ -47,6 +47,9 @@ Progress:
 - Added a checked-in baseline Prisma migration plus root database commands for
   validation, client generation, deployable migrations, migration status, and
   repeatable seed data.
+- Removed the local Railway CLI dependency and root deploy scripts while
+  deployment is paused, reducing normal install exposure to deploy-only
+  transitive vulnerabilities.
 
 ## Epic 1: Geography and Industry Foundation
 
@@ -64,6 +67,9 @@ Progress:
 
 - Added repeatable Prisma seed data sourced from the shared domain package for
   continents, pilot country configuration, and industry categories.
+- Added shared input sanitisation helpers for Unicode normalization, hidden
+  character removal, URL/email normalization support, recursion limits, and
+  secret-field preservation.
 
 ## Epic 2: Authentication, Tenancy, and Roles
 
@@ -302,6 +308,15 @@ Exit: web/PWA and mobile clients pass pilot acceptance tests.
 
 Exit: no publish, upload, chat, paid promotion, or payment path can proceed
 without current terms acceptance and zero-tolerance clearance.
+
+Progress:
+
+- Added a global API sanitising pipe before validation so request bodies are
+  normalized before DTO validation and zero-tolerance evaluation.
+- Hardened validation errors so raw submitted values are not echoed back to
+  clients.
+- Limited recursive safety-field traversal to avoid crashes on hostile nested
+  or cyclic payloads.
 
 ## Immediate Sprint
 

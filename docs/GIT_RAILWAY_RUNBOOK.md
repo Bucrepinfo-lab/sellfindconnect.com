@@ -4,6 +4,15 @@ Date: 2026-06-16
 Repository: `https://github.com/Bucrepinfo-lab/sellfindconnect.com.git`
 Railway project: `84794ef4-c31c-41cd-8048-089f59040f1f`
 
+Status: Archived while deployment is paused. Do not use this runbook to deploy
+until the owner reopens deployment work.
+
+On 2026-06-18, the root Railway deployment scripts and local `@railway/cli`
+dev dependency were removed to keep normal installs focused on coding and to
+avoid deploy-only transitive vulnerabilities. If Railway deployment resumes,
+install or run the Railway CLI as a transient/separate deployment tool after a
+fresh security review.
+
 ## Current Root Causes
 
 Two separate issues made push/deployment difficult:
@@ -19,9 +28,11 @@ Two separate issues made push/deployment difficult:
 
 ## Stable Operating Mode
 
-Until Railway GitHub source access is fixed, deploy directly from the local
-workspace using the Railway CLI. This bypasses the GitHub App source connection
-while still deploying the exact checked-out code.
+Deployment is currently paused while product coding continues. If Railway is
+temporarily reselected later and GitHub source access is still not fixed,
+deploy directly from the local workspace using a transient Railway CLI. This
+bypasses the GitHub App source connection while still deploying the exact
+checked-out code.
 
 Use this order:
 
@@ -48,16 +59,17 @@ Use this order:
    git push
    ```
 
-4. Deploy to Railway from the local workspace:
+4. Deploy to Railway from the local workspace only after deployment resumes:
 
    ```powershell
-   npm.cmd run deploy:railway
+   npx.cmd @railway/cli deployment up --service web --environment production --detach --yes --message "Deploy web from local workspace"
+   npx.cmd @railway/cli deployment up --service api --environment production --detach --yes --message "Deploy API from local workspace"
    ```
 
 5. Check Railway service state:
 
    ```powershell
-   npm.cmd run status:railway
+   npx.cmd @railway/cli service list --json
    ```
 
 `SLEEPING` is a successful state because Serverless/App Sleeping is enabled.
@@ -108,13 +120,13 @@ workspace build remains safe as well.
 Deploy only web:
 
 ```powershell
-npm.cmd run deploy:railway:web
+npx.cmd @railway/cli deployment up --service web --environment production --detach --yes --message "Deploy web from local workspace"
 ```
 
 Deploy only API:
 
 ```powershell
-npm.cmd run deploy:railway:api
+npx.cmd @railway/cli deployment up --service api --environment production --detach --yes --message "Deploy API from local workspace"
 ```
 
 ## When To Re-enable GitHub Autodeploys
