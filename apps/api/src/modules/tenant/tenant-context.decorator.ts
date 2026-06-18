@@ -1,6 +1,6 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 
-import type { TenantScopedRequest } from './tenant-context.guard';
+import type { TenantScopedRequest } from './tenant-request';
 
 export const TenantId = createParamDecorator((_data: unknown, ctx: ExecutionContext) => {
   const request = ctx.switchToHttp().getRequest<TenantScopedRequest>();

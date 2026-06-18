@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 
 import { AuthService } from '../auth/auth.service';
-import type { TenantScopedRequest } from './tenant-context.guard';
+import type { TenantScopedRequest } from './tenant-request';
 
 export type TenantSessionDecision = {
   allowed: boolean;

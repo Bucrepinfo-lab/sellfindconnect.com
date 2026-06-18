@@ -118,6 +118,9 @@ Progress:
   from temporary tenant-header trust to the MFA-verified tenant session guard.
 - Migrated lead conversion and conversation/chat routes from temporary
   tenant-header trust to the MFA-verified tenant session guard.
+- Migrated Source Finder, notification, analytics, and finance routes from
+  temporary tenant-header trust to the MFA-verified tenant session guard, then
+  removed the obsolete header-only tenant context guard.
 - Added web Owner Onboarding readiness controls for owner email, tenant name,
   password policy, trial dates, terms versions, and signup lock state.
 - Added database fields/models for password metadata, auth sessions, tenant
@@ -125,8 +128,7 @@ Progress:
 - Added the initial Prisma migration and seed workflow required before enabling
   production Prisma persistence against a hosted PostgreSQL database.
 - Production identity provider, email verification, password reset, real OTP or
-  authenticator MFA, invite flows, migration of the remaining tenant
-  controllers to the session guard, hosted database migration/seed execution,
+  authenticator MFA, invite flows, hosted database migration/seed execution,
   and production Prisma enablement remain next.
 
 ## Epic 3: Advertiser Profile Vertical Slice

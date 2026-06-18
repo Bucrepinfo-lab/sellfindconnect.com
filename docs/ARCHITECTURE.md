@@ -77,6 +77,7 @@ without validating it against the authenticated user's assignments.
   listing and lifecycle routes require an MFA-verified tenant session.
 - Safety: blocked categories, policy decisions, moderation cases, and reports.
 - Discovery: Source Finder, search, filters, reason codes, and saved searches.
+  Tenant-scoped discovery routes require an MFA-verified tenant session.
 - Relationships: producer, supplier, consumer, distributor, installer, logistics,
   financier, and certifier links.
 - Matching: rules first, then semantic and graph ranking.
@@ -85,10 +86,13 @@ without validating it against the authenticated user's assignments.
   conversation routes require an MFA-verified tenant session.
 - Notifications: tenant preferences, consent-aware channel planning, outbox
   records, provider delivery attempts, suppression reasons, and scheduler jobs.
+  Tenant notification routes require an MFA-verified tenant session.
 - Billing: trial, subscription, invoice, payment, refund, and chargeback.
 - Finance: country tax profiles, tax snapshots, ledger, reconciliation, returns,
-  remittances, alerts, approvals, and evidence.
-- Analytics: privacy-aware product and business events.
+  remittances, alerts, approvals, and evidence. Tenant finance routes require
+  an MFA-verified tenant session.
+- Analytics: privacy-aware product and business events. Tenant analytics routes
+  require an MFA-verified tenant session.
 
 ## Safety Interception Points
 

@@ -275,6 +275,7 @@ Implementation progress on 2026-06-18:
 - Added a reusable tenant session guard that validates `x-session-token` against `x-tenant-id` and requires MFA before protected tenant routes proceed.
 - Migrated profile draft/preview routes and advert listing/lifecycle routes to the MFA-verified tenant session guard.
 - Migrated lead conversion and conversation/chat routes to the MFA-verified tenant session guard.
+- Migrated Source Finder, notification, analytics, and finance routes to the MFA-verified tenant session guard and removed the obsolete header-only tenant context guard.
 - Added database support for password metadata, auth sessions, tenant onboarding attributes, and policy acceptance evidence.
 - Added a checked-in baseline Prisma migration plus repeatable database seed workflow for continents, pilot country setup, and industry categories.
 - Added a web Owner Onboarding panel showing password strength, trial end date, next billing amount, current terms versions, and signup lock state.

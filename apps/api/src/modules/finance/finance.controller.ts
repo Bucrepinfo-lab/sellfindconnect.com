@@ -2,7 +2,7 @@ import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 
 import { TenantId } from '../tenant/tenant-context.decorator';
-import { TenantContextGuard } from '../tenant/tenant-context.guard';
+import { TenantSessionGuard } from '../tenant/tenant-session.guard';
 import {
   CalculateTaxDto,
   ConfigureCountryTaxProfileDto,
@@ -15,9 +15,13 @@ import { FinanceService } from './finance.service';
 @ApiTags('finance')
 @ApiHeader({
   name: 'x-tenant-id',
-  description: 'Tenant UUID. Temporary local-development tenant scope until auth is added.',
+  description: 'Tenant UUID for the authenticated owner session.',
 })
-@UseGuards(TenantContextGuard)
+@ApiHeader({
+  name: 'x-session-token',
+  description: 'Issued owner session token. MFA must be verified before finance routes are available.',
+})
+@UseGuards(TenantSessionGuard)
 @Controller('finance')
 export class FinanceController {
   constructor(private readonly finance: FinanceService) {}

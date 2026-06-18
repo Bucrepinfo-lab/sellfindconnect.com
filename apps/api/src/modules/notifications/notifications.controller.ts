@@ -2,16 +2,20 @@ import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 
 import { TenantId } from '../tenant/tenant-context.decorator';
-import { TenantContextGuard } from '../tenant/tenant-context.guard';
+import { TenantSessionGuard } from '../tenant/tenant-session.guard';
 import { CreateNotificationPlanDto, UpdateNotificationPreferencesDto } from './dto/notifications.dto';
 import { NotificationsService } from './notifications.service';
 
 @ApiTags('notifications')
 @ApiHeader({
   name: 'x-tenant-id',
-  description: 'Tenant UUID. Temporary local-development tenant scope until auth is added.',
+  description: 'Tenant UUID for the authenticated owner session.',
 })
-@UseGuards(TenantContextGuard)
+@ApiHeader({
+  name: 'x-session-token',
+  description: 'Issued owner session token. MFA must be verified before notification routes are available.',
+})
+@UseGuards(TenantSessionGuard)
 @Controller('notifications')
 export class NotificationsController {
   constructor(private readonly notifications: NotificationsService) {}
