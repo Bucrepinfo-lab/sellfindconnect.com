@@ -6,9 +6,9 @@ import { AuthService } from './auth.service';
 const strongPassword = 'Strong-owner#2026';
 
 describe('AuthService', () => {
-  it('registers an owner, creates a tenant trial, and stores terms evidence', () => {
+  it('registers an owner, creates a tenant trial, and stores terms evidence', async () => {
     const service = new AuthService();
-    const result = service.registerTenantOwner({
+    const result = await service.registerTenantOwner({
       email: 'owner@example.com',
       password: strongPassword,
       displayName: 'Mary Owner',
@@ -28,10 +28,10 @@ describe('AuthService', () => {
     expect(result.session.mfaRequired).toBe(true);
   });
 
-  it('rejects weak passwords and duplicate emails', () => {
+  it('rejects weak passwords and duplicate emails', async () => {
     const service = new AuthService();
 
-    expect(() =>
+    await expect(
       service.registerTenantOwner({
         email: 'owner@example.com',
         password: 'password',
@@ -43,9 +43,9 @@ describe('AuthService', () => {
         userType: 'ADVERTISER',
         acceptedTerms: true,
       }),
-    ).toThrow();
+    ).rejects.toThrow();
 
-    service.registerTenantOwner({
+    await service.registerTenantOwner({
       email: 'owner@example.com',
       password: strongPassword,
       displayName: 'Mary Owner',
@@ -57,7 +57,7 @@ describe('AuthService', () => {
       acceptedTerms: true,
     });
 
-    expect(() =>
+    await expect(
       service.registerTenantOwner({
         email: 'OWNER@example.com',
         password: 'Another-owner#2026',
@@ -69,12 +69,12 @@ describe('AuthService', () => {
         userType: 'ADVERTISER',
         acceptedTerms: true,
       }),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 
-  it('logs in with a valid password and rejects the wrong password', () => {
+  it('logs in with a valid password and rejects the wrong password', async () => {
     const service = new AuthService();
-    service.registerTenantOwner({
+    await service.registerTenantOwner({
       email: 'owner@example.com',
       password: strongPassword,
       displayName: 'Mary Owner',
@@ -86,14 +86,16 @@ describe('AuthService', () => {
       acceptedTerms: true,
     });
 
-    expect(service.login({ email: 'owner@example.com', password: strongPassword }).session.token).toBeTruthy();
-    expect(() => service.login({ email: 'owner@example.com', password: 'Wrong-owner#2026' })).toThrow();
+    await expect(service.login({ email: 'owner@example.com', password: strongPassword })).resolves.toMatchObject({
+      session: { token: expect.any(String) },
+    });
+    await expect(service.login({ email: 'owner@example.com', password: 'Wrong-owner#2026' })).rejects.toThrow();
   });
 
-  it('stores sessions by token hash and never presents the hash to callers', () => {
+  it('stores sessions by token hash and never presents the hash to callers', async () => {
     const repository = new InMemoryAuthRepository();
     const service = new AuthService(repository);
-    const registered = service.registerTenantOwner({
+    const registered = await service.registerTenantOwner({
       email: 'owner@example.com',
       password: strongPassword,
       displayName: 'Mary Owner',
@@ -105,7 +107,7 @@ describe('AuthService', () => {
       acceptedTerms: true,
     });
 
-    const sessionLookup = service.getSession(registered.session.token);
+    const sessionLookup = await service.getSession(registered.session.token);
 
     expect(registered.session.token).toBeTruthy();
     expect('tokenHash' in registered.session).toBe(false);
@@ -114,9 +116,9 @@ describe('AuthService', () => {
     expect('tokenHash' in sessionLookup.session).toBe(false);
   });
 
-  it('verifies MFA for an owner session', () => {
+  it('verifies MFA for an owner session', async () => {
     const service = new AuthService();
-    const registered = service.registerTenantOwner({
+    const registered = await service.registerTenantOwner({
       email: 'owner@example.com',
       password: strongPassword,
       displayName: 'Mary Owner',
@@ -128,7 +130,7 @@ describe('AuthService', () => {
       acceptedTerms: true,
     });
 
-    const result = service.verifyMfa({
+    const result = await service.verifyMfa({
       sessionToken: registered.session.token,
       code: '123456',
     });
@@ -136,9 +138,9 @@ describe('AuthService', () => {
     expect(result.session.mfaVerified).toBe(true);
   });
 
-  it('proves session tenant isolation', () => {
+  it('proves session tenant isolation', async () => {
     const service = new AuthService();
-    const registered = service.registerTenantOwner({
+    const registered = await service.registerTenantOwner({
       email: 'owner@example.com',
       password: strongPassword,
       displayName: 'Mary Owner',
@@ -150,24 +152,24 @@ describe('AuthService', () => {
       acceptedTerms: true,
     });
 
-    expect(
+    await expect(
       service.checkTenantSession({
         sessionToken: registered.session.token,
         tenantId: registered.tenant.id,
-      }).allowed,
-    ).toBe(true);
-    expect(() =>
+      }),
+    ).resolves.toMatchObject({ allowed: true });
+    await expect(
       service.checkTenantSession({
         sessionToken: registered.session.token,
         tenantId: '22222222-2222-4222-8222-222222222222',
       }),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 
-  it('blocks prohibited registration text', () => {
+  it('blocks prohibited registration text', async () => {
     const service = new AuthService();
 
-    expect(() =>
+    await expect(
       service.registerTenantOwner({
         email: 'owner@example.com',
         password: strongPassword,
@@ -179,6 +181,6 @@ describe('AuthService', () => {
         userType: 'ADVERTISER',
         acceptedTerms: true,
       }),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 });

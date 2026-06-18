@@ -10,16 +10,18 @@ import type {
 
 export const AUTH_REPOSITORY = Symbol('AUTH_REPOSITORY');
 
+type RepositoryResult<T> = T | Promise<T>;
+
 export interface AuthRepository {
-  findUserByEmail(email: string): AuthUserRecord | undefined;
-  findUserById(userId: string): AuthUserRecord | undefined;
-  findFirstMembershipForUser(userId: string): TenantMembershipRecord | undefined;
-  findTenantById(tenantId: string): AuthTenantRecord | undefined;
-  findTermsAcceptance(userId: string, tenantId: string): TermsAcceptanceEvidence | undefined;
-  findSessionByTokenHash(tokenHash: string): AuthSessionRecord | undefined;
-  createOwnerRegistration(records: OwnerRegistrationRecords): void;
-  createSession(session: AuthSessionRecord): void;
-  updateSession(session: AuthSessionRecord): void;
-  markUserMfaVerified(userId: string, mfaVerifiedAt: string): void;
-  listTenants(): AuthTenantRecord[];
+  findUserByEmail(email: string): RepositoryResult<AuthUserRecord | undefined>;
+  findUserById(userId: string): RepositoryResult<AuthUserRecord | undefined>;
+  findFirstMembershipForUser(userId: string): RepositoryResult<TenantMembershipRecord | undefined>;
+  findTenantById(tenantId: string): RepositoryResult<AuthTenantRecord | undefined>;
+  findTermsAcceptance(userId: string, tenantId: string): RepositoryResult<TermsAcceptanceEvidence | undefined>;
+  findSessionByTokenHash(tokenHash: string): RepositoryResult<AuthSessionRecord | undefined>;
+  createOwnerRegistration(records: OwnerRegistrationRecords): RepositoryResult<void>;
+  createSession(session: AuthSessionRecord): RepositoryResult<void>;
+  updateSession(session: AuthSessionRecord): RepositoryResult<void>;
+  markUserMfaVerified(userId: string, mfaVerifiedAt: string): RepositoryResult<void>;
+  listTenants(): RepositoryResult<AuthTenantRecord[]>;
 }

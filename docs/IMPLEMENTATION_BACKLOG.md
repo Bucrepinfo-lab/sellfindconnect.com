@@ -84,13 +84,21 @@ Progress:
   controller contracts.
 - Changed session persistence to store token hashes instead of raw bearer
   tokens, and only present raw session tokens at issuance time.
+- Added an opt-in Prisma-backed auth repository selected with
+  `AUTH_REPOSITORY=prisma`, using `DATABASE_URL` and the generated Prisma
+  client to persist users, tenants, memberships, auth sessions, and terms
+  acceptance evidence.
+- Added a reusable tenant session guard that validates `x-session-token`
+  against `x-tenant-id`, attaches authenticated tenant session context, and
+  blocks tenant routes until MFA is verified.
 - Added web Owner Onboarding readiness controls for owner email, tenant name,
   password policy, trial dates, terms versions, and signup lock state.
 - Added database fields/models for password metadata, auth sessions, tenant
   onboarding attributes, and terms acceptance evidence.
 - Production identity provider, email verification, password reset, real OTP or
-  authenticator MFA, invite flows, session-backed route guards, and
-  Prisma-backed repository wiring remain next.
+  authenticator MFA, invite flows, migration of each tenant controller to the
+  session guard, database seeding/migrations, and production Prisma enablement
+  remain next.
 
 ## Epic 3: Advertiser Profile Vertical Slice
 

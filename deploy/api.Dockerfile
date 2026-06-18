@@ -30,5 +30,6 @@ RUN npm ci --omit=dev --ignore-scripts --workspace @telpen/api --workspace @telp
 
 COPY --from=build /app/apps/api/dist apps/api/dist
 COPY --from=build /app/packages/domain/dist packages/domain/dist
+COPY --from=build /app/node_modules/.prisma node_modules/.prisma
 
 CMD ["node", "apps/api/dist/main.js"]

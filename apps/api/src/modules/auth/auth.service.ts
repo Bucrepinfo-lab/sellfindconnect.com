@@ -41,11 +41,11 @@ export class AuthService {
     private readonly repository: AuthRepository = new InMemoryAuthRepository(),
   ) {}
 
-  registerTenantOwner(input: RegisterTenantOwnerDto) {
+  async registerTenantOwner(input: RegisterTenantOwnerDto) {
     this.assertSafe(input, 'Registration contains blocked content.');
 
     const email = input.email.trim().toLowerCase();
-    if (this.repository.findUserByEmail(email)) {
+    if (await this.repository.findUserByEmail(email)) {
       throw new ConflictException('An account with this email already exists.');
     }
 
@@ -123,7 +123,7 @@ export class AuthService {
       throw new UnprocessableEntityException('Current terms acceptance is required.');
     }
 
-    this.repository.createOwnerRegistration({
+    await this.repository.createOwnerRegistration({
       user,
       tenant,
       membership,
@@ -134,33 +134,33 @@ export class AuthService {
       user: this.presentUser(user),
       tenant,
       membership,
-      session: this.createSession(user, tenantId),
+      session: await this.createSession(user, tenantId),
       termsAcceptance,
       passwordPolicy,
     };
   }
 
-  login(input: LoginDto) {
+  async login(input: LoginDto) {
     const email = input.email.trim().toLowerCase();
-    const user = this.repository.findUserByEmail(email);
+    const user = await this.repository.findUserByEmail(email);
     if (!user || !this.verifyPassword(input.password, user)) {
       throw new UnauthorizedException('Invalid email or password.');
     }
 
-    const membership = this.repository.findFirstMembershipForUser(user.id);
+    const membership = await this.repository.findFirstMembershipForUser(user.id);
     if (!membership) {
       throw new UnauthorizedException('No tenant membership is attached to this account.');
     }
 
     return {
       user: this.presentUser(user),
-      tenant: this.repository.findTenantById(membership.tenantId),
-      session: this.createSession(user, membership.tenantId),
+      tenant: await this.repository.findTenantById(membership.tenantId),
+      session: await this.createSession(user, membership.tenantId),
     };
   }
 
-  verifyMfa(input: VerifyMfaDto) {
-    const session = this.requireSession(input.sessionToken);
+  async verifyMfa(input: VerifyMfaDto) {
+    const session = await this.requireSession(input.sessionToken);
     if (input.code !== '123456') {
       throw new UnauthorizedException('Invalid MFA code.');
     }
@@ -170,28 +170,28 @@ export class AuthService {
       ...session,
       mfaVerified: true,
     };
-    this.repository.markUserMfaVerified(session.userId, now);
+    await this.repository.markUserMfaVerified(session.userId, now);
 
-    this.repository.updateSession(updated);
+    await this.repository.updateSession(updated);
     return {
       session: this.presentSession(updated),
       mfaVerifiedAt: now,
     };
   }
 
-  getSession(sessionToken: string) {
-    const session = this.requireSession(sessionToken);
-    const user = this.repository.findUserById(session.userId);
+  async getSession(sessionToken: string) {
+    const session = await this.requireSession(sessionToken);
+    const user = await this.repository.findUserById(session.userId);
     return {
       session: this.presentSession(session),
       user: user ? this.presentUser(user) : undefined,
-      tenant: this.repository.findTenantById(session.tenantId),
-      termsAcceptance: this.repository.findTermsAcceptance(session.userId, session.tenantId),
+      tenant: await this.repository.findTenantById(session.tenantId),
+      termsAcceptance: await this.repository.findTermsAcceptance(session.userId, session.tenantId),
     };
   }
 
-  checkTenantSession(input: CheckTenantSessionDto) {
-    const session = this.requireSession(input.sessionToken);
+  async checkTenantSession(input: CheckTenantSessionDto) {
+    const session = await this.requireSession(input.sessionToken);
     const allowed = session.tenantId === input.tenantId;
 
     if (!allowed) {
@@ -206,11 +206,11 @@ export class AuthService {
     };
   }
 
-  listTenants() {
+  async listTenants() {
     return this.repository.listTenants();
   }
 
-  private createSession(user: AuthUserRecord, tenantId: string): IssuedAuthSession {
+  private async createSession(user: AuthUserRecord, tenantId: string): Promise<IssuedAuthSession> {
     const now = new Date().toISOString();
     const expiresAt = new Date(Date.parse(now) + 8 * 60 * 60 * 1000).toISOString();
     const token = randomBytes(32).toString('base64url');
@@ -226,12 +226,12 @@ export class AuthService {
       createdAt: now,
     };
 
-    this.repository.createSession(session);
+    await this.repository.createSession(session);
     return this.presentSession(session, token);
   }
 
-  private requireSession(sessionToken: string): AuthSessionRecord {
-    const session = this.repository.findSessionByTokenHash(this.hashSessionToken(sessionToken));
+  private async requireSession(sessionToken: string): Promise<AuthSessionRecord> {
+    const session = await this.repository.findSessionByTokenHash(this.hashSessionToken(sessionToken));
     if (!session || session.revokedAt || Date.parse(session.expiresAt) <= Date.now()) {
       throw new UnauthorizedException('A valid active session is required.');
     }
