@@ -1,6 +1,8 @@
 import {
   ConflictException,
+  Inject,
   Injectable,
+  Optional,
   UnauthorizedException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -11,81 +13,39 @@ import {
   evaluateSafetyFields,
   getCountry,
   industryCategories,
-  type SupplyChainRole,
-  type TermsAcceptanceEvidence,
 } from '@telpen/domain';
-import { pbkdf2Sync, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHash, pbkdf2Sync, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 
+import type {
+  AuthSessionRecord,
+  AuthTenantRecord,
+  AuthUserRecord,
+  IssuedAuthSession,
+  PresentedAuthSession,
+  TenantMembershipRecord,
+} from './auth.records';
+import { AUTH_REPOSITORY, type AuthRepository } from './auth.repository';
 import type {
   CheckTenantSessionDto,
   LoginDto,
   RegisterTenantOwnerDto,
   VerifyMfaDto,
 } from './dto/auth.dto';
-
-type AuthUserRecord = {
-  id: string;
-  email: string;
-  displayName: string;
-  phone?: string;
-  passwordHash: string;
-  passwordSalt: string;
-  passwordIterations: number;
-  mfaRequired: boolean;
-  mfaVerifiedAt?: string;
-  createdAt: string;
-};
-
-type AuthTenantRecord = {
-  id: string;
-  displayName: string;
-  countryCode: string;
-  industryCode: string;
-  primaryRole: SupplyChainRole;
-  userType: string;
-  status: string;
-  trialStartedAt: string;
-  trialEndsAt: string;
-  nextBillingAt: string;
-  monthlyAmount: number;
-  currencyCode: string;
-  createdAt: string;
-};
-
-type TenantMembershipRecord = {
-  id: string;
-  userId: string;
-  tenantId: string;
-  role: 'OWNER';
-  createdAt: string;
-};
-
-type AuthSessionRecord = {
-  id: string;
-  token: string;
-  userId: string;
-  tenantId: string;
-  role: 'OWNER';
-  mfaRequired: boolean;
-  mfaVerified: boolean;
-  expiresAt: string;
-  createdAt: string;
-};
+import { InMemoryAuthRepository } from './in-memory-auth.repository';
 
 @Injectable()
 export class AuthService {
-  private readonly usersByEmail = new Map<string, AuthUserRecord>();
-  private readonly usersById = new Map<string, AuthUserRecord>();
-  private readonly tenants = new Map<string, AuthTenantRecord>();
-  private readonly memberships = new Map<string, TenantMembershipRecord>();
-  private readonly sessions = new Map<string, AuthSessionRecord>();
-  private readonly termsEvidence = new Map<string, TermsAcceptanceEvidence>();
+  constructor(
+    @Optional()
+    @Inject(AUTH_REPOSITORY)
+    private readonly repository: AuthRepository = new InMemoryAuthRepository(),
+  ) {}
 
   registerTenantOwner(input: RegisterTenantOwnerDto) {
     this.assertSafe(input, 'Registration contains blocked content.');
 
     const email = input.email.trim().toLowerCase();
-    if (this.usersByEmail.has(email)) {
+    if (this.repository.findUserByEmail(email)) {
       throw new ConflictException('An account with this email already exists.');
     }
 
@@ -163,11 +123,12 @@ export class AuthService {
       throw new UnprocessableEntityException('Current terms acceptance is required.');
     }
 
-    this.usersByEmail.set(email, user);
-    this.usersById.set(userId, user);
-    this.tenants.set(tenantId, tenant);
-    this.memberships.set(membership.id, membership);
-    this.termsEvidence.set(`${userId}:${tenantId}`, termsAcceptance);
+    this.repository.createOwnerRegistration({
+      user,
+      tenant,
+      membership,
+      termsAcceptance,
+    });
 
     return {
       user: this.presentUser(user),
@@ -181,19 +142,19 @@ export class AuthService {
 
   login(input: LoginDto) {
     const email = input.email.trim().toLowerCase();
-    const user = this.usersByEmail.get(email);
+    const user = this.repository.findUserByEmail(email);
     if (!user || !this.verifyPassword(input.password, user)) {
       throw new UnauthorizedException('Invalid email or password.');
     }
 
-    const membership = Array.from(this.memberships.values()).find((item) => item.userId === user.id);
+    const membership = this.repository.findFirstMembershipForUser(user.id);
     if (!membership) {
       throw new UnauthorizedException('No tenant membership is attached to this account.');
     }
 
     return {
       user: this.presentUser(user),
-      tenant: this.tenants.get(membership.tenantId),
+      tenant: this.repository.findTenantById(membership.tenantId),
       session: this.createSession(user, membership.tenantId),
     };
   }
@@ -209,26 +170,23 @@ export class AuthService {
       ...session,
       mfaVerified: true,
     };
-    const user = this.usersById.get(session.userId);
-    if (user) {
-      this.usersById.set(user.id, { ...user, mfaVerifiedAt: now });
-      this.usersByEmail.set(user.email, { ...user, mfaVerifiedAt: now });
-    }
+    this.repository.markUserMfaVerified(session.userId, now);
 
-    this.sessions.set(session.token, updated);
+    this.repository.updateSession(updated);
     return {
-      session: updated,
+      session: this.presentSession(updated),
       mfaVerifiedAt: now,
     };
   }
 
   getSession(sessionToken: string) {
     const session = this.requireSession(sessionToken);
+    const user = this.repository.findUserById(session.userId);
     return {
-      session,
-      user: this.presentUser(this.usersById.get(session.userId)!),
-      tenant: this.tenants.get(session.tenantId),
-      termsAcceptance: this.termsEvidence.get(`${session.userId}:${session.tenantId}`),
+      session: this.presentSession(session),
+      user: user ? this.presentUser(user) : undefined,
+      tenant: this.repository.findTenantById(session.tenantId),
+      termsAcceptance: this.repository.findTermsAcceptance(session.userId, session.tenantId),
     };
   }
 
@@ -249,15 +207,16 @@ export class AuthService {
   }
 
   listTenants() {
-    return Array.from(this.tenants.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return this.repository.listTenants();
   }
 
-  private createSession(user: AuthUserRecord, tenantId: string): AuthSessionRecord {
+  private createSession(user: AuthUserRecord, tenantId: string): IssuedAuthSession {
     const now = new Date().toISOString();
     const expiresAt = new Date(Date.parse(now) + 8 * 60 * 60 * 1000).toISOString();
+    const token = randomBytes(32).toString('base64url');
     const session: AuthSessionRecord = {
       id: randomUUID(),
-      token: randomBytes(32).toString('base64url'),
+      tokenHash: this.hashSessionToken(token),
       userId: user.id,
       tenantId,
       role: 'OWNER',
@@ -267,13 +226,13 @@ export class AuthService {
       createdAt: now,
     };
 
-    this.sessions.set(session.token, session);
-    return session;
+    this.repository.createSession(session);
+    return this.presentSession(session, token);
   }
 
   private requireSession(sessionToken: string): AuthSessionRecord {
-    const session = this.sessions.get(sessionToken);
-    if (!session || Date.parse(session.expiresAt) <= Date.now()) {
+    const session = this.repository.findSessionByTokenHash(this.hashSessionToken(sessionToken));
+    if (!session || session.revokedAt || Date.parse(session.expiresAt) <= Date.now()) {
       throw new UnauthorizedException('A valid active session is required.');
     }
 
@@ -285,6 +244,10 @@ export class AuthService {
     const iterations = 210_000;
     const hash = pbkdf2Sync(password, salt, iterations, 32, 'sha256').toString('base64url');
     return { salt, iterations, hash };
+  }
+
+  private hashSessionToken(token: string): string {
+    return createHash('sha256').update(token).digest('base64url');
   }
 
   private verifyPassword(password: string, user: AuthUserRecord): boolean {
@@ -305,6 +268,27 @@ export class AuthService {
       mfaVerifiedAt: user.mfaVerifiedAt,
       createdAt: user.createdAt,
     };
+  }
+
+  private presentSession(session: AuthSessionRecord): PresentedAuthSession;
+  private presentSession(session: AuthSessionRecord, token: string): IssuedAuthSession;
+  private presentSession(session: AuthSessionRecord, token?: string): PresentedAuthSession {
+    const presented: PresentedAuthSession = {
+      id: session.id,
+      userId: session.userId,
+      tenantId: session.tenantId,
+      role: session.role,
+      mfaRequired: session.mfaRequired,
+      mfaVerified: session.mfaVerified,
+      expiresAt: session.expiresAt,
+      createdAt: session.createdAt,
+    };
+
+    if (token) {
+      return { ...presented, token };
+    }
+
+    return presented;
   }
 
   private assertSafe(input: object, message: string): void {

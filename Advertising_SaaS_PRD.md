@@ -1,7 +1,7 @@
 # Product Requirements Document: Multi-Tenant Advertising SaaS
 
 Date: 2026-06-15
-Last updated: 2026-06-17
+Last updated: 2026-06-18
 Owner: Telpen Adverts
 Working name: Telpen Adverts Platform
 Status: Draft for validation
@@ -267,6 +267,8 @@ Implementation progress on 2026-06-18:
 - Added shared owner onboarding helpers for password policy, trial subscription windows, active policy versions, and terms acceptance evidence.
 - Added an MVP auth API for tenant-owner registration, secure password hashing, login sessions, MFA verification, tenant-session checks, and tenant listing.
 - Added zero-tolerance checks during registration so prohibited tenant names or onboarding data cannot create an account.
+- Added an auth repository boundary so the current in-memory MVP can be replaced by Prisma-backed persistence without changing public auth controller contracts.
+- Added session-token hash storage so raw bearer tokens are only shown at issuance time and are not retained as lookup keys.
 - Added database support for password metadata, auth sessions, tenant onboarding attributes, and policy acceptance evidence.
 - Added a web Owner Onboarding panel showing password strength, trial end date, next billing amount, current terms versions, and signup lock state.
 

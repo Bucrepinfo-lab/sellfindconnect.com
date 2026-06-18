@@ -2,7 +2,7 @@
 
 Status: Execution backlog
 Date: 2026-06-15
-Last updated: 2026-06-17
+Last updated: 2026-06-18
 
 ## Delivery Principles
 
@@ -79,13 +79,18 @@ Progress:
 - Added an MVP auth API for tenant-owner registration, secure PBKDF2 password
   hashing, login, opaque sessions, MFA verification, tenant-session checks, and
   tenant listing.
+- Added an auth repository boundary with an in-memory adapter for tests/demo
+  mode, preparing the service for a Prisma-backed repository without changing
+  controller contracts.
+- Changed session persistence to store token hashes instead of raw bearer
+  tokens, and only present raw session tokens at issuance time.
 - Added web Owner Onboarding readiness controls for owner email, tenant name,
   password policy, trial dates, terms versions, and signup lock state.
 - Added database fields/models for password metadata, auth sessions, tenant
   onboarding attributes, and terms acceptance evidence.
 - Production identity provider, email verification, password reset, real OTP or
-  authenticator MFA, invite flows, session-backed route guards, and database
-  repositories remain next.
+  authenticator MFA, invite flows, session-backed route guards, and
+  Prisma-backed repository wiring remain next.
 
 ## Epic 3: Advertiser Profile Vertical Slice
 

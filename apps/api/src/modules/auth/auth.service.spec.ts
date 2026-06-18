@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { InMemoryAuthRepository } from './in-memory-auth.repository';
 import { AuthService } from './auth.service';
 
 const strongPassword = 'Strong-owner#2026';
@@ -87,6 +88,30 @@ describe('AuthService', () => {
 
     expect(service.login({ email: 'owner@example.com', password: strongPassword }).session.token).toBeTruthy();
     expect(() => service.login({ email: 'owner@example.com', password: 'Wrong-owner#2026' })).toThrow();
+  });
+
+  it('stores sessions by token hash and never presents the hash to callers', () => {
+    const repository = new InMemoryAuthRepository();
+    const service = new AuthService(repository);
+    const registered = service.registerTenantOwner({
+      email: 'owner@example.com',
+      password: strongPassword,
+      displayName: 'Mary Owner',
+      tenantDisplayName: 'Nairobi Fresh Produce Cooperative',
+      countryCode: 'KE',
+      industryCode: 'AGRICULTURE',
+      primaryRole: 'SUPPLIER',
+      userType: 'ADVERTISER',
+      acceptedTerms: true,
+    });
+
+    const sessionLookup = service.getSession(registered.session.token);
+
+    expect(registered.session.token).toBeTruthy();
+    expect('tokenHash' in registered.session).toBe(false);
+    expect('token' in sessionLookup.session).toBe(false);
+    expect(sessionLookup.session.token).toBeUndefined();
+    expect('tokenHash' in sessionLookup.session).toBe(false);
   });
 
   it('verifies MFA for an owner session', () => {
