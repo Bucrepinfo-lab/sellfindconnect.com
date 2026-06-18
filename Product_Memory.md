@@ -1,7 +1,7 @@
 # Telpen Adverts Product Memory
 
 Date started: 2026-06-15
-Last updated: 2026-06-17
+Last updated: 2026-06-18
 Purpose: Persistent decision log and strategic memory for the Telpen Adverts multi-tenant advertising SaaS.
 
 This file must be updated whenever product strategy, pricing, compliance, architecture, market positioning, or execution decisions change.
@@ -135,3 +135,4 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - 2026-06-18: Started Epic 2 access foundation. Added shared hierarchy/RBAC rules for global, regional, continental, country, and tenant scopes; MFA-required role decisions; access evaluation/audit API; web Hierarchy Access controls; and database models for MFA state, access assignments, and access decision audit evidence. Production auth/session provider and database-backed guards remain next.
 - 2026-06-18: Deployed the access hierarchy foundation through Railway GitHub autodeploy. API deployment `440f6ac0-e7ca-4a26-a8ac-c4d62023df70` and web deployment `c03183fa-b11a-40bc-b407-586b3d042eeb` both completed with `SUCCESS` on commit `fc509ce`.
 - 2026-06-18: Started the owner onboarding/auth tenancy slice. Added shared password/trial/terms evidence helpers, an MVP auth API for tenant-owner registration, PBKDF2 password hashing, login sessions, MFA verification, tenant-session checks, database auth/session/terms evidence models, and a web Owner Onboarding readiness panel. Production identity provider, email verification, password reset, real OTP/authenticator MFA, invite flows, session-backed route guards, and database repositories remain next.
+- 2026-06-18: Deployed the owner onboarding/auth tenancy slice through Railway GitHub autodeploy. API deployment `19de73b0-2c4e-4e60-b78f-66035fca8857` and web deployment `f09e31bf-e14b-4acb-9293-48e90e4969c2` both completed with `SUCCESS` on commit `79d1f55`.

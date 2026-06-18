@@ -67,8 +67,8 @@ GitHub-connected Railway project currently visible to `bucrepinfo@gmail.com`:
 - API service ID: `99fb3c7e-487c-4a77-ba08-369a83ac7e0d`
 - Web service: `@telpen/web`
 - Web service ID: `9b5a1466-f105-44e1-a16e-0b5c45f04ace`
-- Latest API deployment: `440f6ac0-e7ca-4a26-a8ac-c4d62023df70` (`SUCCESS`)
-- Latest web deployment: `c03183fa-b11a-40bc-b407-586b3d042eeb` (`SUCCESS`)
+- Latest API deployment: `19de73b0-2c4e-4e60-b78f-66035fca8857` (`SUCCESS`)
+- Latest web deployment: `f09e31bf-e14b-4acb-9293-48e90e4969c2` (`SUCCESS`)
 - Advert lifecycle deployment on 2026-06-16:
   - API deployment: `960bafd5-c445-4c6f-90b1-e68181e20162` (`SUCCESS`)
   - Web deployment: `e9b5d4ee-f2f3-4c76-a59b-f3b83065616f` (`SUCCESS`)
@@ -100,6 +100,10 @@ GitHub-connected Railway project currently visible to `bucrepinfo@gmail.com`:
   - API deployment: `440f6ac0-e7ca-4a26-a8ac-c4d62023df70` (`SUCCESS`)
   - Web deployment: `c03183fa-b11a-40bc-b407-586b3d042eeb` (`SUCCESS`)
   - Commit: `fc509ce` (`Add access hierarchy foundation`)
+- Owner onboarding/auth tenancy deployment on 2026-06-18:
+  - API deployment: `19de73b0-2c4e-4e60-b78f-66035fca8857` (`SUCCESS`)
+  - Web deployment: `f09e31bf-e14b-4acb-9293-48e90e4969c2` (`SUCCESS`)
+  - Commit: `79d1f55` (`Add owner onboarding auth slice`)
 - Next.js prerender hardening:
   - Keep `apps/web/src/app/global-error.tsx` and `apps/web/src/app/not-found.tsx`
     committed so Railway/Next does not rely on auto-generated error pages.
