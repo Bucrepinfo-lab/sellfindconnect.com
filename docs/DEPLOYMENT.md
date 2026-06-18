@@ -67,7 +67,7 @@ GitHub-connected Railway project currently visible to `bucrepinfo@gmail.com`:
 - API service ID: `99fb3c7e-487c-4a77-ba08-369a83ac7e0d`
 - Web service: `@telpen/web`
 - Web service ID: `9b5a1466-f105-44e1-a16e-0b5c45f04ace`
-- Latest API deployment: `19de73b0-2c4e-4e60-b78f-66035fca8857` (`SUCCESS`)
+- Latest API deployment: `39391f4d-9fa3-498f-9eb9-0f63974f1df4` (`SUCCESS`)
 - Latest web deployment: `f09e31bf-e14b-4acb-9293-48e90e4969c2` (`SUCCESS`)
 - Advert lifecycle deployment on 2026-06-16:
   - API deployment: `960bafd5-c445-4c6f-90b1-e68181e20162` (`SUCCESS`)
@@ -104,6 +104,10 @@ GitHub-connected Railway project currently visible to `bucrepinfo@gmail.com`:
   - API deployment: `19de73b0-2c4e-4e60-b78f-66035fca8857` (`SUCCESS`)
   - Web deployment: `f09e31bf-e14b-4acb-9293-48e90e4969c2` (`SUCCESS`)
   - Commit: `79d1f55` (`Add owner onboarding auth slice`)
+- Auth persistence boundary hardening deployment on 2026-06-18:
+  - API deployment: `39391f4d-9fa3-498f-9eb9-0f63974f1df4` (`SUCCESS`)
+  - Web deployment: skipped because no watched web files changed.
+  - Commit: `84b0a67` (`Harden auth persistence boundary`)
 - Next.js prerender hardening:
   - Keep `apps/web/src/app/global-error.tsx` and `apps/web/src/app/not-found.tsx`
     committed so Railway/Next does not rely on auto-generated error pages.
