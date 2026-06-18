@@ -44,6 +44,9 @@ Progress:
 - Added `docs/DIGITALOCEAN_DEPLOYMENT.md` as the leading candidate runbook for
   DigitalOcean evaluation, with Cape Town/South Africa latency as the main
   driver and service-availability verification as a required gate.
+- Added a checked-in baseline Prisma migration plus root database commands for
+  validation, client generation, deployable migrations, migration status, and
+  repeatable seed data.
 
 ## Epic 1: Geography and Industry Foundation
 
@@ -56,6 +59,11 @@ Progress:
 - Expose public geography and industry APIs.
 
 Exit: web onboarding can select a permitted industry and Kenya/local currency.
+
+Progress:
+
+- Added repeatable Prisma seed data sourced from the shared domain package for
+  continents, pilot country configuration, and industry categories.
 
 ## Epic 2: Authentication, Tenancy, and Roles
 
@@ -104,10 +112,12 @@ Progress:
   password policy, trial dates, terms versions, and signup lock state.
 - Added database fields/models for password metadata, auth sessions, tenant
   onboarding attributes, and terms acceptance evidence.
+- Added the initial Prisma migration and seed workflow required before enabling
+  production Prisma persistence against a hosted PostgreSQL database.
 - Production identity provider, email verification, password reset, real OTP or
   authenticator MFA, invite flows, migration of each tenant controller to the
-  session guard, database seeding/migrations, and production Prisma enablement
-  remain next.
+  session guard, hosted database migration/seed execution, and production
+  Prisma enablement remain next.
 
 ## Epic 3: Advertiser Profile Vertical Slice
 

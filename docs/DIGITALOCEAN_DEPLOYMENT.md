@@ -80,6 +80,22 @@ No paying subscriber should be onboarded until:
 - Database migrations and seed data are repeatable.
 - Railway remains available as fallback until the new platform is stable.
 
+## Database Readiness Commands
+
+Run these from the repository root after the target PostgreSQL `DATABASE_URL`
+is configured in the environment and before enabling `AUTH_REPOSITORY=prisma`
+in production:
+
+- `npm run db:validate`
+- `npm run db:generate`
+- `npm run db:migrate:status`
+- `npm run db:migrate:deploy`
+- `npm run db:seed`
+
+The seed command builds the shared domain package first, then loads baseline
+continents, country configuration, and industry categories from the same data
+used by the web and API.
+
 ## Current Deployment Posture
 
 - Railway remains the only already-proven live deployment.

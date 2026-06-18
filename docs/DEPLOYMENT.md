@@ -39,6 +39,16 @@ DigitalOcean planning file:
 
 - `docs/DIGITALOCEAN_DEPLOYMENT.md`
 
+Database release readiness now uses checked-in Prisma migrations and repeatable
+seed data. Run these root commands only against the chosen target database when
+deployment resumes:
+
+- `npm run db:validate`
+- `npm run db:generate`
+- `npm run db:migrate:status`
+- `npm run db:migrate:deploy`
+- `npm run db:seed`
+
 Railway remains the current proven fallback/staging deployment because it
 already supports and has successfully run:
 

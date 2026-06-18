@@ -272,6 +272,7 @@ Implementation progress on 2026-06-18:
 - Added an opt-in Prisma auth repository for durable user, tenant, membership, session, and policy-acceptance persistence when `AUTH_REPOSITORY=prisma` is enabled with `DATABASE_URL`.
 - Added a reusable tenant session guard that validates `x-session-token` against `x-tenant-id` and requires MFA before protected tenant routes proceed.
 - Added database support for password metadata, auth sessions, tenant onboarding attributes, and policy acceptance evidence.
+- Added a checked-in baseline Prisma migration plus repeatable database seed workflow for continents, pilot country setup, and industry categories.
 - Added a web Owner Onboarding panel showing password strength, trial end date, next billing amount, current terms versions, and signup lock state.
 
 Acceptance criteria:
@@ -1068,6 +1069,10 @@ Infrastructure:
 - Feature flags.
 - Environment separation: dev, staging, production.
 - Local executable environment: Docker Desktop/Compose for PostgreSQL, Redis, search, and local email capture; Node.js 24 LTS pinned with a version manager such as Volta.
+- Database release commands: validate Prisma schema, generate Prisma client,
+  deploy checked-in migrations, check migration status, and seed baseline
+  geography/industry data before enabling Prisma persistence in any hosted
+  environment.
 
 Tooling and vendor candidates:
 

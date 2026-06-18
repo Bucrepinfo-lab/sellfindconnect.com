@@ -4,12 +4,16 @@
   "private": true,
   "scripts": {
     "generate": "prisma generate",
+    "migrate:deploy": "prisma migrate deploy",
+    "migrate:status": "prisma migrate status",
+    "seed": "npm run build -w @telpen/domain && node prisma/seed.mjs",
     "validate": "prisma validate",
     "format": "prisma format"
   },
   "dependencies": {
-    "@prisma/client": "7.8.0",
     "@prisma/adapter-pg": "7.8.0",
+    "@prisma/client": "7.8.0",
+    "@telpen/domain": "*",
     "dotenv": "17.4.2",
     "pg": "8.21.0"
   },

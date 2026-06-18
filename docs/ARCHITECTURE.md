@@ -135,6 +135,9 @@ workflow are approved.
 - Audit logs for sensitive administration, finance, safety, and access actions.
 - Access assignments record user, role, scope level, region, continent, country,
   tenant, MFA requirement, expiry, revocation, and assignment source.
+- Prisma migrations are checked in and deployed with
+  `npm run db:migrate:deploy`; baseline domain data is loaded with
+  `npm run db:seed` before enabling hosted Prisma-backed repositories.
 
 ## Notification Flow
 
