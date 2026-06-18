@@ -480,6 +480,20 @@ textarea {
   color: var(--ink);
 }
 
+.field input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+  color: var(--ink);
+  padding: 0 10px;
+}
+
+.compact-field {
+  margin-top: 8px;
+}
+
 .policy-box {
   min-height: 58px;
   margin-top: 12px;

@@ -1,5 +1,6 @@
 export * from './access-control';
 export * from './analytics';
+export * from './auth-tenancy';
 export * from './finance';
 export * from './geography';
 export * from './industries';

@@ -28,6 +28,7 @@ import { useState } from 'react';
 import {
   accessPermissions,
   accessRoles,
+  activePolicyVersions,
   countries,
   advertLifecyclePolicy,
   buildSavedReplySuggestions,
@@ -36,9 +37,11 @@ import {
   calculateAdvertLifecycle,
   calculateConversationSlaDecision,
   calculateTaxSnapshotAmounts,
+  calculateTrialSubscription,
   conversationStatuses,
   defaultNotificationPreferences,
   evaluateAccess,
+  evaluatePasswordPolicy,
   evaluateSafetyText,
   getRemittanceAlertDecision,
   getCountry,
@@ -144,6 +147,9 @@ export default function Home() {
   const [accessScopeLevel, setAccessScopeLevel] = useState<AccessScopeLevel>('COUNTRY');
   const [accessPermission, setAccessPermission] = useState<AccessPermission>('MANAGE_COUNTRY');
   const [accessMfaVerified, setAccessMfaVerified] = useState(true);
+  const [ownerEmail, setOwnerEmail] = useState('owner@sellfindconnect.com');
+  const [ownerPassword, setOwnerPassword] = useState('Strong-owner#2026');
+  const [tenantDisplayName, setTenantDisplayName] = useState('Nairobi Fresh Produce Cooperative');
   const [pushConsent, setPushConsent] = useState(false);
   const [smsConsent, setSmsConsent] = useState(false);
   const [whatsappConsent, setWhatsappConsent] = useState(false);
@@ -314,6 +320,14 @@ export default function Home() {
       countryCode: country.code,
     },
   });
+  const ownerPasswordPolicy = evaluatePasswordPolicy(ownerPassword);
+  const ownerTrial = calculateTrialSubscription({
+    startedAt: '2026-06-18T00:00:00.000Z',
+    monthlyAmount: country.monthlySubscriptionAmount,
+    currencyCode: country.currencyCode,
+  });
+  const onboardingSafety = evaluateSafetyText(`${ownerEmail} ${tenantDisplayName}`);
+  const canCreateTenantOwner = ownerPasswordPolicy.allowed && onboardingSafety.allowed && termsAccepted;
   const renewalQueue = filteredResults
     .map((item) => ({
       ...item,
@@ -592,6 +606,71 @@ export default function Home() {
                     {canPublish
                       ? 'Draft can move to preview and publishing.'
                       : 'Accepting terms is required and prohibited content remains blocked.'}
+                  </span>
+                </div>
+              </div>
+            </section>
+
+            <section className="side-panel">
+              <div className="panel-heading tight">
+                <h2>Owner Onboarding</h2>
+                <span>{canCreateTenantOwner ? 'Ready' : 'Locked'}</span>
+              </div>
+              <label className="field compact-field">
+                <span>Owner email</span>
+                <input
+                  value={ownerEmail}
+                  onChange={(event) => setOwnerEmail(event.target.value)}
+                  type="email"
+                />
+              </label>
+              <label className="field compact-field">
+                <span>Tenant name</span>
+                <input
+                  value={tenantDisplayName}
+                  onChange={(event) => setTenantDisplayName(event.target.value)}
+                />
+              </label>
+              <label className="field compact-field">
+                <span>Password policy</span>
+                <input
+                  value={ownerPassword}
+                  onChange={(event) => setOwnerPassword(event.target.value)}
+                  type="password"
+                />
+              </label>
+              <FinanceRow
+                label="Password score"
+                value={`${ownerPasswordPolicy.score}%`}
+              />
+              <FinanceRow
+                label="Trial ends"
+                value={new Intl.DateTimeFormat(country.locale, {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                }).format(new Date(ownerTrial.trialEndsAt))}
+              />
+              <FinanceRow
+                label="Next billing"
+                value={formatMoney(ownerTrial.monthlyAmount, country.currencyCode, country.locale)}
+              />
+              <FinanceRow label="Terms version" value={activePolicyVersions.termsVersion} />
+              <FinanceRow label="Policy version" value={activePolicyVersions.prohibitedContentVersion} />
+              <div className={canCreateTenantOwner ? 'policy-box ok compact' : 'policy-box block compact'}>
+                {canCreateTenantOwner ? <ShieldCheck size={18} /> : <CircleAlert size={18} />}
+                <div>
+                  <strong>{canCreateTenantOwner ? 'Owner signup ready' : 'Owner signup locked'}</strong>
+                  <span>
+                    {canCreateTenantOwner
+                      ? 'Safe owner tenant can enter trial with MFA required.'
+                      : !termsAccepted
+                        ? 'Terms acceptance is required before signup.'
+                        : !onboardingSafety.allowed
+                          ? `Blocked - ${onboardingSafety.policyCode}`
+                          : ownerPasswordPolicy.allowed
+                            ? 'Review signup details.'
+                            : ownerPasswordPolicy.missing.join(' ')}
                   </span>
                 </div>
               </div>

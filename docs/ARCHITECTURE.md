@@ -68,6 +68,8 @@ without validating it against the authenticated user's assignments.
 - Geography: continents, countries, regions, flags, currencies, locale settings.
 - Industry taxonomy: categories, subcategories, synonyms, and supply-chain roles.
 - Tenancy: tenants, tenant users, roles, permissions, and scope.
+- Auth: tenant-owner registration, password metadata, sessions, MFA state,
+  terms acceptance evidence, and future identity-provider adapter boundary.
 - Profiles: draft, preview, publish, profile completeness, and contacts.
 - Listings: draft, preview, publish, media, lifecycle, and visibility.
 - Safety: blocked categories, policy decisions, moderation cases, and reports.

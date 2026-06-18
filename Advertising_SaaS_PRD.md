@@ -262,6 +262,14 @@ Requirements:
 - Require explicit acceptance/submission controls for terms, privacy policy, community rules, prohibited-content policy, and subscription trial terms.
 - Block account/profile setup when the selected industry, description, intended products, links, or uploaded media match a zero-tolerance category.
 
+Implementation progress on 2026-06-18:
+
+- Added shared owner onboarding helpers for password policy, trial subscription windows, active policy versions, and terms acceptance evidence.
+- Added an MVP auth API for tenant-owner registration, secure password hashing, login sessions, MFA verification, tenant-session checks, and tenant listing.
+- Added zero-tolerance checks during registration so prohibited tenant names or onboarding data cannot create an account.
+- Added database support for password metadata, auth sessions, tenant onboarding attributes, and policy acceptance evidence.
+- Added a web Owner Onboarding panel showing password strength, trial end date, next billing amount, current terms versions, and signup lock state.
+
 Acceptance criteria:
 
 - A new advertiser can create an account, select country, industry, and role within 3 minutes.
@@ -887,6 +895,7 @@ Implementation progress on 2026-06-18:
 - Added API endpoints for role matrices, access evaluation, and MVP access decision audit evidence.
 - Added web Hierarchy Access controls showing role, scope, permission, MFA, and grant/block state.
 - Added database fields and models for MFA state, access assignments, and access decision audit records.
+- Added owner registration and login session groundwork so tenants can be created with an owner membership and first-month-free trial state.
 
 ## 10. Nonfunctional Requirements
 

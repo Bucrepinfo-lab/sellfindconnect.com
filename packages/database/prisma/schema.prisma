@@ -198,6 +198,11 @@ model User {
   id             String             @id @default(uuid())
   email          String             @unique @db.VarChar(320)
   displayName    String             @db.VarChar(160)
+  phone          String?            @db.VarChar(80)
+  passwordHash   String?
+  passwordSalt   String?
+  passwordIterations Int?
+  emailVerifiedAt DateTime?
   mfaRequired    Boolean            @default(false)
   mfaEnrolledAt  DateTime?
   lastMfaVerifiedAt DateTime?
@@ -208,6 +213,8 @@ model User {
   financeAlerts  FinanceAlert[]     @relation("FinanceAlertAssignee")
   assignedConversations Conversation[] @relation("ConversationAssignee")
   accessAssignments AccessAssignment[]
+  authSessions   AuthSession[]
+  termsAcceptanceEvidence TermsAcceptanceEvidence[]
 }
 
 model Tenant {
@@ -215,6 +222,9 @@ model Tenant {
   displayName       String             @db.VarChar(160)
   legalName         String?            @db.VarChar(240)
   countryCode       String             @db.VarChar(2)
+  primaryIndustryCode String?          @db.VarChar(80)
+  primaryRole       String?            @db.VarChar(80)
+  onboardingUserType String?           @db.VarChar(80)
   status            TenantStatus       @default(TRIAL_PENDING)
   trialStartedAt    DateTime?
   trialEndsAt       DateTime?
@@ -237,6 +247,8 @@ model Tenant {
   notificationOutboxRecords NotificationOutboxRecord[]
   accessAssignments AccessAssignment[]
   accessDecisionAudits AccessDecisionAudit[]
+  authSessions      AuthSession[]
+  termsAcceptanceEvidence TermsAcceptanceEvidence[]
 
   @@index([countryCode])
   @@index([status])
@@ -253,6 +265,48 @@ model TenantMembership {
 
   @@unique([tenantId, userId])
   @@index([userId])
+}
+
+model AuthSession {
+  id          String   @id @default(uuid())
+  userId      String
+  tenantId    String
+  tokenHash   String   @unique
+  role        String   @db.VarChar(80)
+  mfaRequired Boolean  @default(true)
+  mfaVerified Boolean  @default(false)
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([userId, tenantId])
+  @@index([expiresAt, revokedAt])
+}
+
+model TermsAcceptanceEvidence {
+  id                        String   @id @default(uuid())
+  userId                    String
+  tenantId                  String
+  countryCode               String   @db.VarChar(2)
+  locale                    String   @db.VarChar(24)
+  termsVersion              String   @db.VarChar(80)
+  privacyVersion            String   @db.VarChar(80)
+  prohibitedContentVersion  String   @db.VarChar(80)
+  subscriptionTermsVersion  String   @db.VarChar(80)
+  appSurface                String   @db.VarChar(40)
+  acceptanceSource          String   @db.VarChar(80)
+  acceptedAt                DateTime
+  ipHash                    String?
+  deviceHash                String?
+  createdAt                 DateTime @default(now())
+  user                      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant                    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([userId, tenantId])
+  @@index([tenantId, acceptedAt])
+  @@index([countryCode, acceptedAt])
 }
 
 model AccessAssignment {

@@ -73,8 +73,19 @@ Progress:
   grant/block state.
 - Added database fields/models for MFA state, access assignments, and access
   decision audit evidence.
-- Secure registration/login, session tokens, production identity provider,
-  password/SSO/OTP flows, and database-backed guards remain next.
+- Added shared onboarding/auth policy helpers for password strength,
+  first-month-free trial windows, active policy versions, and terms acceptance
+  evidence.
+- Added an MVP auth API for tenant-owner registration, secure PBKDF2 password
+  hashing, login, opaque sessions, MFA verification, tenant-session checks, and
+  tenant listing.
+- Added web Owner Onboarding readiness controls for owner email, tenant name,
+  password policy, trial dates, terms versions, and signup lock state.
+- Added database fields/models for password metadata, auth sessions, tenant
+  onboarding attributes, and terms acceptance evidence.
+- Production identity provider, email verification, password reset, real OTP or
+  authenticator MFA, invite flows, session-backed route guards, and database
+  repositories remain next.
 
 ## Epic 3: Advertiser Profile Vertical Slice
 
