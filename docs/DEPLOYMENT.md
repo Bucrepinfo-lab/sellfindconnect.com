@@ -2,7 +2,7 @@
 
 Status: Services deployed; brand domain purchased; Railway custom-domain limit blocks connection
 Date: 2026-06-15
-Last updated: 2026-06-17
+Last updated: 2026-06-18
 
 ## Proposed Production Domains
 
@@ -67,8 +67,8 @@ GitHub-connected Railway project currently visible to `bucrepinfo@gmail.com`:
 - API service ID: `99fb3c7e-487c-4a77-ba08-369a83ac7e0d`
 - Web service: `@telpen/web`
 - Web service ID: `9b5a1466-f105-44e1-a16e-0b5c45f04ace`
-- Latest API deployment: `95f24983-4c69-46a0-a610-f2983e467c99` (`SUCCESS`)
-- Latest web deployment: `d8140bfc-3140-4498-8515-9a1b483a4f37` (`SUCCESS`)
+- Latest API deployment: `41529428-eb92-493d-9299-adbc44b504b4` (`SUCCESS`)
+- Latest web deployment: `07fb8e7e-d991-466f-bab5-7edfde26dece` (`SUCCESS`)
 - Advert lifecycle deployment on 2026-06-16:
   - API deployment: `960bafd5-c445-4c6f-90b1-e68181e20162` (`SUCCESS`)
   - Web deployment: `e9b5d4ee-f2f3-4c76-a59b-f3b83065616f` (`SUCCESS`)
@@ -92,6 +92,10 @@ GitHub-connected Railway project currently visible to `bucrepinfo@gmail.com`:
   - API deployment: `95f24983-4c69-46a0-a610-f2983e467c99` (`SUCCESS`)
   - Web deployment: `d8140bfc-3140-4498-8515-9a1b483a4f37` (`SUCCESS`)
   - Commit: `761ba5d` (`Add conversation SLA workspace`)
+- Notification orchestration deployment on 2026-06-18:
+  - API deployment: `41529428-eb92-493d-9299-adbc44b504b4` (`SUCCESS`)
+  - Web deployment: `07fb8e7e-d991-466f-bab5-7edfde26dece` (`SUCCESS`)
+  - Commit: `ca20996` (`Add notification orchestration`)
 - Next.js prerender hardening:
   - Keep `apps/web/src/app/global-error.tsx` and `apps/web/src/app/not-found.tsx`
     committed so Railway/Next does not rely on auto-generated error pages.
@@ -147,6 +151,10 @@ The production service settings were further optimized on 2026-06-16:
   header. Configure `INTERNAL_JOB_KEY` before enabling Railway Cron or an
   external scheduler. Run it daily to create day-35/day-39 renewal alerts and
   auto-delete day-40 adverts.
+- The API exposes a protected conversation SLA sweep endpoint for future
+  scheduling: `POST /v1/operations/conversations/sla/run` with the same
+  `x-internal-job-key` header. Run it frequently enough to create due-soon and
+  breached response-time alerts.
 - CDN caching was not enabled yet. The current app will become tenant-aware and
   authenticated, so edge caching should wait until cache-control headers clearly
   separate public static assets from tenant or user-specific pages.
