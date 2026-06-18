@@ -462,7 +462,9 @@ Implementation progress on 2026-06-17:
 - Added a tenant lead inbox with status transitions for new, contacted, qualified, negotiating, won, lost, and blocked leads.
 - Added a web Lead Conversion panel showing selected match, confidence, SLA, feedback action, lead status, inquiry lock/unlock state, and next-best actions.
 - Added the first messaging and SLA workspace: shared conversation rules, saved replies, terms-gated tenant conversation API, safe message submission, assignment, SLA notification checks, Prisma conversation/message/notification models, and a web Conversation Workspace panel.
-- Remaining hardening: live websocket delivery, read receipts, typing/presence, attachments with malware/media moderation, provider-backed email/push delivery, audit logs, and durable repository wiring.
+- Added consent-aware notification orchestration for in-app, email, SMS, push, and WhatsApp channels, with tenant preferences, an API outbox, and a web Notification Delivery readiness panel.
+- Added a protected internal conversation SLA sweep endpoint for scheduled response-time alerts: `POST /v1/operations/conversations/sla/run`.
+- Remaining hardening: live websocket delivery, read receipts, typing/presence, attachments with malware/media moderation, provider adapters, audit logs, and durable repository wiring.
 
 ### 7.7 Relationship Links
 
@@ -501,6 +503,15 @@ MVP decision:
 - Add WhatsApp/deep link contact options if locally compliant.
 - Add voice/video later only after moderation and safety review.
 
+Notification delivery requirements:
+
+- In-app notification must be available as the baseline channel for operational alerts.
+- Email, SMS, push, and WhatsApp delivery must respect channel consent, country rules, and recipient preferences.
+- High and critical alerts such as breached chat SLAs, tax due/overdue notices, payment failures, security alerts, and advert auto-delete notices must be marked for immediate attention.
+- Delivery providers must be adapters so the platform can switch vendors or use different providers per country.
+- Every outbound notification must keep an outbox record, selected channels, suppressed channels, delivery attempts, provider references, failures, and timestamps.
+- Prohibited content must not be queued into notification titles, messages, metadata, or provider payloads.
+
 Implementation progress on 2026-06-17:
 
 - Added shared conversation states, participant roles, notification types, saved reply suggestions, and response-SLA decisions.
@@ -509,6 +520,7 @@ Implementation progress on 2026-06-17:
 - Added zero-tolerance safety checks before any message, assignment metadata, or conversation starter can be persisted.
 - Added a web Conversation Workspace preview for owner assignment, SLA state, status transitions, safe reply drafting, and saved replies.
 - Added Prisma models for durable `Conversation`, `ConversationMessage`, and `ConversationNotification` records.
+- Added a tenant notification preferences API, consent-aware delivery planning API, notification outbox, and protected internal SLA sweep endpoint.
 
 ### 7.9 Analytics and Monitoring
 

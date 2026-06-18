@@ -46,6 +46,7 @@ enum NotificationChannel {
   EMAIL
   SMS
   PUSH
+  WHATSAPP
 }
 
 enum NotificationStatus {
@@ -53,6 +54,20 @@ enum NotificationStatus {
   SENT
   READ
   FAILED
+}
+
+enum NotificationDeliveryStatus {
+  QUEUED
+  SUPPRESSED
+  SENT
+  FAILED
+}
+
+enum NotificationConsentState {
+  GRANTED
+  DENIED
+  REQUIRED
+  NOT_REQUIRED
 }
 
 enum PolicyAction {
@@ -214,6 +229,8 @@ model Tenant {
   conversations     Conversation[]
   conversationMessages ConversationMessage[]
   conversationNotifications ConversationNotification[]
+  notificationPreferences NotificationPreference[]
+  notificationOutboxRecords NotificationOutboxRecord[]
 
   @@index([countryCode])
   @@index([status])
@@ -301,6 +318,60 @@ model Notification {
 
   @@index([tenantId, status, scheduledFor])
   @@index([entityType, entityId])
+}
+
+model NotificationPreference {
+  id           String                   @id @default(uuid())
+  tenantId     String
+  userId       String?
+  channel      NotificationChannel
+  enabled      Boolean                  @default(false)
+  consentState NotificationConsentState
+  locale       String?                  @db.VarChar(24)
+  timezone     String?                  @db.VarChar(80)
+  updatedAt    DateTime                 @updatedAt
+  createdAt    DateTime                 @default(now())
+  tenant       Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, channel])
+  @@index([tenantId, enabled])
+}
+
+model NotificationOutboxRecord {
+  id                    String                         @id @default(uuid())
+  tenantId              String
+  eventType             String                         @db.VarChar(100)
+  severity              String                         @db.VarChar(40)
+  title                 String                         @db.VarChar(160)
+  message               String
+  entityType            String?                        @db.VarChar(80)
+  entityId              String?                        @db.VarChar(120)
+  selectedChannels      Json
+  suppressedChannels    Json
+  requiresImmediateAttention Boolean                    @default(false)
+  createdAt             DateTime                       @default(now())
+  tenant                Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deliveryAttempts      NotificationDeliveryAttempt[]
+
+  @@index([tenantId, createdAt])
+  @@index([eventType, severity])
+  @@index([entityType, entityId])
+}
+
+model NotificationDeliveryAttempt {
+  id                         String                     @id @default(uuid())
+  notificationOutboxRecordId String
+  channel                    NotificationChannel
+  status                     NotificationDeliveryStatus
+  provider                   String?                    @db.VarChar(80)
+  providerReference          String?                    @db.VarChar(160)
+  failureReason              String?
+  attemptedAt                DateTime?
+  createdAt                  DateTime                   @default(now())
+  notificationOutboxRecord   NotificationOutboxRecord   @relation(fields: [notificationOutboxRecordId], references: [id], onDelete: Cascade)
+
+  @@index([channel, status])
+  @@index([attemptedAt])
 }
 
 model AnalyticsEvent {

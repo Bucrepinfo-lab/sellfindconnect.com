@@ -77,6 +77,8 @@ without validating it against the authenticated user's assignments.
 - Matching: rules first, then semantic and graph ranking.
 - Conversations: inquiries, chat, RFQs, quotes, assignment, saved replies,
   response SLAs, message safety checks, and notification alerts.
+- Notifications: tenant preferences, consent-aware channel planning, outbox
+  records, provider delivery attempts, suppression reasons, and scheduler jobs.
 - Billing: trial, subscription, invoice, payment, refund, and chargeback.
 - Finance: country tax profiles, tax snapshots, ledger, reconciliation, returns,
   remittances, alerts, approvals, and evidence.
@@ -128,6 +130,22 @@ workflow are approved.
 - Structured error codes suitable for web and mobile localization.
 - OpenAPI documentation generated from the API.
 - Audit logs for sensitive administration, finance, safety, and access actions.
+
+## Notification Flow
+
+```mermaid
+flowchart TD
+  Event["Product event"] --> Safety["Zero-tolerance content check"]
+  Safety --> Preference["Resolve tenant/user channel preferences"]
+  Preference --> Plan["Build delivery plan"]
+  Plan --> Outbox["Persist outbox record"]
+  Outbox --> Attempt["Create provider delivery attempts"]
+  Attempt --> Provider["Email, SMS, push, WhatsApp, or in-app adapter"]
+  Provider --> Receipt["Provider receipt, failure, or suppression reason"]
+```
+
+In-app delivery is the baseline channel. Email, SMS, push, and WhatsApp must be
+enabled only where consent, country rules, and provider support allow them.
 
 ## Initial Deployment Shape
 

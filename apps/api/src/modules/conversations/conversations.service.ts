@@ -230,6 +230,20 @@ export class ConversationsService {
     };
   }
 
+  runAllSlaChecks(input: RunConversationSlaDto = {}) {
+    const checkedAt = input.now ?? new Date().toISOString();
+    const tenantIds = [...new Set(Array.from(this.conversations.values()).map((item) => item.tenantId))];
+
+    return {
+      checkedAt,
+      tenantsChecked: tenantIds.length,
+      results: tenantIds.map((tenantId) => ({
+        tenantId,
+        ...this.runSlaChecks(tenantId, { ...input, now: checkedAt }),
+      })),
+    };
+  }
+
   private presentConversation(conversation: ConversationRecord) {
     const sla = calculateConversationSlaDecision({
       openedAt: conversation.openedAt,

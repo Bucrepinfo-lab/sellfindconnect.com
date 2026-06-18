@@ -111,4 +111,34 @@ describe('ConversationsService', () => {
     expect(result.notificationsCreated).toHaveLength(1);
     expect(result.notificationsCreated[0]?.type).toBe('SLA_BREACHED');
   });
+
+  it('runs SLA checks across all tenants for scheduler jobs', () => {
+    const service = new ConversationsService();
+    const otherTenantId = '22222222-2222-4222-8222-222222222222';
+    const firstConversation = service.createConversation(tenantId, {
+      sourceRecordId: 'r1',
+      query: 'fresh produce',
+      inquiryType: 'RFQ',
+      message: 'Please confirm weekly supply availability.',
+      acceptedTerms: true,
+    });
+    const secondConversation = service.createConversation(otherTenantId, {
+      sourceRecordId: 'r2',
+      query: 'cold transport',
+      inquiryType: 'GENERAL',
+      message: 'Please confirm refrigerated transport availability.',
+      acceptedTerms: true,
+    });
+    const checkedAt = new Date(
+      Math.max(
+        Date.parse(firstConversation.firstResponseDueAt),
+        Date.parse(secondConversation.firstResponseDueAt),
+      ) + 60_000,
+    ).toISOString();
+
+    const result = service.runAllSlaChecks({ now: checkedAt });
+
+    expect(result.tenantsChecked).toBe(2);
+    expect(result.results.every((item) => item.notificationsCreated.length === 1)).toBe(true);
+  });
 });

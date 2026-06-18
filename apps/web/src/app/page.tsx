@@ -30,10 +30,12 @@ import {
   advertLifecyclePolicy,
   buildSavedReplySuggestions,
   buildLeadConversionIntelligence,
+  buildNotificationDeliveryPlan,
   calculateAdvertLifecycle,
   calculateConversationSlaDecision,
   calculateTaxSnapshotAmounts,
   conversationStatuses,
+  defaultNotificationPreferences,
   evaluateSafetyText,
   getRemittanceAlertDecision,
   getCountry,
@@ -47,6 +49,7 @@ import {
   type LeadStatus,
   type MatchFeedbackAction,
   type ConversationStatus,
+  type NotificationSeverity,
   type SourceFinderSearchResult,
   type SourceFinderSortOption,
   supplyChainRoles,
@@ -130,6 +133,10 @@ export default function Home() {
   const [leadStatus, setLeadStatus] = useState<LeadStatus>('NEW');
   const [conversationStatus, setConversationStatus] = useState<ConversationStatus>('OPEN');
   const [conversationAssignee, setConversationAssignee] = useState('sales-desk');
+  const [notificationSeverity, setNotificationSeverity] = useState<NotificationSeverity>('HIGH');
+  const [pushConsent, setPushConsent] = useState(false);
+  const [smsConsent, setSmsConsent] = useState(false);
+  const [whatsappConsent, setWhatsappConsent] = useState(false);
   const [chatMessage, setChatMessage] = useState(
     'Please share price terms, availability, delivery coverage and minimum order.',
   );
@@ -235,6 +242,49 @@ export default function Home() {
       conversationStatus !== 'BLOCKED' &&
       conversationStatus !== 'RESOLVED',
   );
+  const notificationPreferences = defaultNotificationPreferences.map((preference) => {
+    if (preference.channel === 'PUSH') {
+      return {
+        ...preference,
+        enabled: pushConsent,
+        consentState: pushConsent ? ('GRANTED' as const) : preference.consentState,
+      };
+    }
+    if (preference.channel === 'SMS') {
+      return {
+        ...preference,
+        enabled: smsConsent,
+        consentState: smsConsent ? ('GRANTED' as const) : preference.consentState,
+      };
+    }
+    if (preference.channel === 'WHATSAPP') {
+      return {
+        ...preference,
+        enabled: whatsappConsent,
+        consentState: whatsappConsent ? ('GRANTED' as const) : preference.consentState,
+      };
+    }
+    return preference;
+  });
+  const notificationPlan = buildNotificationDeliveryPlan({
+    eventType:
+      conversationSla?.alertType === 'SLA_BREACHED'
+        ? 'CONVERSATION_SLA_BREACHED'
+        : conversationSla?.alertType === 'SLA_DUE_SOON'
+          ? 'CONVERSATION_SLA_DUE_SOON'
+          : 'CONVERSATION_MESSAGE',
+    severity: notificationSeverity,
+    title: conversationSla?.alertType
+      ? `${codeLabel(conversationSla.alertType)}: ${selectedMatch?.name ?? 'conversation'}`
+      : `Message update: ${selectedMatch?.name ?? 'conversation'}`,
+    message: conversationSla?.message ?? 'A conversation event is ready for delivery.',
+    recipient: {
+      countryCode: country.code,
+      locale: country.locale,
+      timezone: country.timezone,
+      preferences: notificationPreferences,
+    },
+  });
   const renewalQueue = filteredResults
     .map((item) => ({
       ...item,
@@ -744,6 +794,93 @@ export default function Home() {
                         ? 'Accepted terms and an open safe match are required.'
                         : `Message blocked - ${chatSafetyDecision.policyCode}`}
                   </span>
+                </div>
+              </div>
+            </section>
+
+            <section className="side-panel">
+              <div className="panel-heading tight">
+                <h2>Notification Delivery</h2>
+                <span>{codeLabel(notificationSeverity)}</span>
+              </div>
+              <label className="lead-select-row">
+                <span>Urgency</span>
+                <select
+                  value={notificationSeverity}
+                  onChange={(event) => setNotificationSeverity(event.target.value as NotificationSeverity)}
+                >
+                  {(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const).map((severity) => (
+                    <option key={severity} value={severity}>
+                      {codeLabel(severity)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="toggle-row">
+                <input
+                  type="checkbox"
+                  checked={pushConsent}
+                  onChange={(event) => setPushConsent(event.target.checked)}
+                />
+                <span>Push consent</span>
+              </label>
+              <label className="toggle-row">
+                <input
+                  type="checkbox"
+                  checked={smsConsent}
+                  onChange={(event) => setSmsConsent(event.target.checked)}
+                />
+                <span>SMS consent</span>
+              </label>
+              <label className="toggle-row">
+                <input
+                  type="checkbox"
+                  checked={whatsappConsent}
+                  onChange={(event) => setWhatsappConsent(event.target.checked)}
+                />
+                <span>WhatsApp consent</span>
+              </label>
+              <div className="channel-block">
+                <span>Queued</span>
+                <div className="channel-list">
+                  {notificationPlan.selectedChannels.map((channel) => (
+                    <span className="channel-pill ok" key={channel}>
+                      {codeLabel(channel)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className="channel-block">
+                <span>Suppressed</span>
+                <div className="channel-list">
+                  {notificationPlan.suppressedChannels.length > 0 ? (
+                    notificationPlan.suppressedChannels.map((item) => (
+                      <span className="channel-pill muted" key={`${item.channel}-${item.reason}`}>
+                        {codeLabel(item.channel)}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="channel-pill ok">None</span>
+                  )}
+                </div>
+              </div>
+              <div
+                className={
+                  notificationPlan.requiresImmediateAttention
+                    ? 'policy-box block compact'
+                    : 'policy-box ok compact'
+                }
+              >
+                {notificationPlan.requiresImmediateAttention ? (
+                  <CircleAlert size={18} />
+                ) : (
+                  <ShieldCheck size={18} />
+                )}
+                <div>
+                  <strong>
+                    {notificationPlan.requiresImmediateAttention ? 'Immediate alert' : 'Standard alert'}
+                  </strong>
+                  <span>{notificationPlan.title}</span>
                 </div>
               </div>
             </section>

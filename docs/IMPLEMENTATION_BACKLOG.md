@@ -155,9 +155,14 @@ Progress:
   drafting, saved replies, and status updates.
 - Added Prisma conversation, message, and notification models for durable
   persistence wiring.
-- Live websocket delivery, read receipts, typing/presence, attachments,
-  provider-backed email/push delivery, audit logs, and repository persistence
-  remain next.
+- Added consent-aware notification orchestration for in-app, email, SMS, push,
+  and WhatsApp channels, including tenant preferences, an outbox API, channel
+  suppression reasons, and a web Notification Delivery readiness panel.
+- Added a protected internal scheduler endpoint for all-tenant conversation SLA
+  sweeps: `POST /v1/operations/conversations/sla/run`.
+- Added notification preference, outbox, and delivery-attempt database models.
+- Live websocket delivery, read receipts, typing/presence, attachments, actual
+  provider adapters, audit logs, and repository persistence remain next.
 
 ## Epic 7: Analytics
 
