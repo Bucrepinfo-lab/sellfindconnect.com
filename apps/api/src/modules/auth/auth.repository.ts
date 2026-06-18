@@ -1,6 +1,7 @@
 import type { TermsAcceptanceEvidence } from '@telpen/domain';
 
 import type {
+  AuthMfaChallengeRecord,
   AuthSessionRecord,
   AuthTenantRecord,
   AuthUserRecord,
@@ -19,9 +20,12 @@ export interface AuthRepository {
   findTenantById(tenantId: string): RepositoryResult<AuthTenantRecord | undefined>;
   findTermsAcceptance(userId: string, tenantId: string): RepositoryResult<TermsAcceptanceEvidence | undefined>;
   findSessionByTokenHash(tokenHash: string): RepositoryResult<AuthSessionRecord | undefined>;
+  findMfaChallengeBySessionId(sessionId: string): RepositoryResult<AuthMfaChallengeRecord | undefined>;
   createOwnerRegistration(records: OwnerRegistrationRecords): RepositoryResult<void>;
   createSession(session: AuthSessionRecord): RepositoryResult<void>;
   updateSession(session: AuthSessionRecord): RepositoryResult<void>;
+  createMfaChallenge(challenge: AuthMfaChallengeRecord): RepositoryResult<void>;
+  updateMfaChallenge(challenge: AuthMfaChallengeRecord): RepositoryResult<void>;
   markUserMfaVerified(userId: string, mfaVerifiedAt: string): RepositoryResult<void>;
   listTenants(): RepositoryResult<AuthTenantRecord[]>;
 }

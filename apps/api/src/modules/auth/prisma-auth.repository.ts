@@ -3,6 +3,7 @@ import {
   PrismaClient,
   TenantRole,
   TenantStatus,
+  type AuthMfaChallenge,
   type AuthSession,
   type Country,
   type Tenant,
@@ -13,6 +14,7 @@ import {
 import type { TermsAcceptanceEvidence } from '@telpen/domain';
 
 import type {
+  AuthMfaChallengeRecord,
   AuthSessionRecord,
   AuthTenantRecord,
   AuthUserRecord,
@@ -69,6 +71,14 @@ export class PrismaAuthRepository implements AuthRepository {
   async findSessionByTokenHash(tokenHash: string): Promise<AuthSessionRecord | undefined> {
     const session = await this.prisma.authSession.findUnique({ where: { tokenHash } });
     return session ? this.mapSession(session) : undefined;
+  }
+
+  async findMfaChallengeBySessionId(sessionId: string): Promise<AuthMfaChallengeRecord | undefined> {
+    const challenge = await this.prisma.authMfaChallenge.findFirst({
+      where: { sessionId, consumedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+    return challenge ? this.mapMfaChallenge(challenge) : undefined;
   }
 
   async createOwnerRegistration(records: OwnerRegistrationRecords): Promise<void> {
@@ -157,6 +167,36 @@ export class PrismaAuthRepository implements AuthRepository {
     });
   }
 
+  async createMfaChallenge(challenge: AuthMfaChallengeRecord): Promise<void> {
+    await this.prisma.authMfaChallenge.create({
+      data: {
+        id: challenge.id,
+        sessionId: challenge.sessionId,
+        userId: challenge.userId,
+        tenantId: challenge.tenantId,
+        codeHash: challenge.codeHash,
+        deliveryChannel: challenge.deliveryChannel,
+        expiresAt: new Date(challenge.expiresAt),
+        consumedAt: challenge.consumedAt ? new Date(challenge.consumedAt) : undefined,
+        failedAttempts: challenge.failedAttempts,
+        createdAt: new Date(challenge.createdAt),
+      },
+    });
+  }
+
+  async updateMfaChallenge(challenge: AuthMfaChallengeRecord): Promise<void> {
+    await this.prisma.authMfaChallenge.update({
+      where: { id: challenge.id },
+      data: {
+        codeHash: challenge.codeHash,
+        deliveryChannel: challenge.deliveryChannel,
+        expiresAt: new Date(challenge.expiresAt),
+        consumedAt: challenge.consumedAt ? new Date(challenge.consumedAt) : null,
+        failedAttempts: challenge.failedAttempts,
+      },
+    });
+  }
+
   async markUserMfaVerified(userId: string, mfaVerifiedAt: string): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
@@ -235,6 +275,21 @@ export class PrismaAuthRepository implements AuthRepository {
       expiresAt: session.expiresAt.toISOString(),
       createdAt: session.createdAt.toISOString(),
       revokedAt: session.revokedAt?.toISOString(),
+    };
+  }
+
+  private mapMfaChallenge(challenge: AuthMfaChallenge): AuthMfaChallengeRecord {
+    return {
+      id: challenge.id,
+      sessionId: challenge.sessionId,
+      userId: challenge.userId,
+      tenantId: challenge.tenantId,
+      codeHash: challenge.codeHash,
+      deliveryChannel: challenge.deliveryChannel as AuthMfaChallengeRecord['deliveryChannel'],
+      expiresAt: challenge.expiresAt.toISOString(),
+      consumedAt: challenge.consumedAt?.toISOString(),
+      failedAttempts: challenge.failedAttempts,
+      createdAt: challenge.createdAt.toISOString(),
     };
   }
 

@@ -195,60 +195,62 @@ model IndustryCategory {
 }
 
 model User {
-  id             String             @id @default(uuid())
-  email          String             @unique @db.VarChar(320)
-  displayName    String             @db.VarChar(160)
-  phone          String?            @db.VarChar(80)
-  passwordHash   String?
-  passwordSalt   String?
-  passwordIterations Int?
-  emailVerifiedAt DateTime?
-  mfaRequired    Boolean            @default(false)
-  mfaEnrolledAt  DateTime?
-  lastMfaVerifiedAt DateTime?
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  memberships    TenantMembership[]
-  auditLogs      AuditLog[]
-  financeAlerts  FinanceAlert[]     @relation("FinanceAlertAssignee")
-  assignedConversations Conversation[] @relation("ConversationAssignee")
-  accessAssignments AccessAssignment[]
-  authSessions   AuthSession[]
+  id                      String                    @id @default(uuid())
+  email                   String                    @unique @db.VarChar(320)
+  displayName             String                    @db.VarChar(160)
+  phone                   String?                   @db.VarChar(80)
+  passwordHash            String?
+  passwordSalt            String?
+  passwordIterations      Int?
+  emailVerifiedAt         DateTime?
+  mfaRequired             Boolean                   @default(false)
+  mfaEnrolledAt           DateTime?
+  lastMfaVerifiedAt       DateTime?
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  memberships             TenantMembership[]
+  auditLogs               AuditLog[]
+  financeAlerts           FinanceAlert[]            @relation("FinanceAlertAssignee")
+  assignedConversations   Conversation[]            @relation("ConversationAssignee")
+  accessAssignments       AccessAssignment[]
+  authSessions            AuthSession[]
+  authMfaChallenges       AuthMfaChallenge[]
   termsAcceptanceEvidence TermsAcceptanceEvidence[]
 }
 
 model Tenant {
-  id                String             @id @default(uuid())
-  displayName       String             @db.VarChar(160)
-  legalName         String?            @db.VarChar(240)
-  countryCode       String             @db.VarChar(2)
-  primaryIndustryCode String?          @db.VarChar(80)
-  primaryRole       String?            @db.VarChar(80)
-  onboardingUserType String?           @db.VarChar(80)
-  status            TenantStatus       @default(TRIAL_PENDING)
-  trialStartedAt    DateTime?
-  trialEndsAt       DateTime?
-  paidStartedAt     DateTime?
-  renewalDate       DateTime?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  country           Country            @relation(fields: [countryCode], references: [code])
-  memberships       TenantMembership[]
-  profileDrafts     ProfileDraft[]
-  publishedProfiles PublishedProfile[]
-  taxSnapshots      TaxCalculationSnapshot[]
-  analyticsEvents   AnalyticsEvent[]
-  auditLogs         AuditLog[]
-  notifications     Notification[]
-  conversations     Conversation[]
-  conversationMessages ConversationMessage[]
+  id                        String                     @id @default(uuid())
+  displayName               String                     @db.VarChar(160)
+  legalName                 String?                    @db.VarChar(240)
+  countryCode               String                     @db.VarChar(2)
+  primaryIndustryCode       String?                    @db.VarChar(80)
+  primaryRole               String?                    @db.VarChar(80)
+  onboardingUserType        String?                    @db.VarChar(80)
+  status                    TenantStatus               @default(TRIAL_PENDING)
+  trialStartedAt            DateTime?
+  trialEndsAt               DateTime?
+  paidStartedAt             DateTime?
+  renewalDate               DateTime?
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+  country                   Country                    @relation(fields: [countryCode], references: [code])
+  memberships               TenantMembership[]
+  profileDrafts             ProfileDraft[]
+  publishedProfiles         PublishedProfile[]
+  taxSnapshots              TaxCalculationSnapshot[]
+  analyticsEvents           AnalyticsEvent[]
+  auditLogs                 AuditLog[]
+  notifications             Notification[]
+  conversations             Conversation[]
+  conversationMessages      ConversationMessage[]
   conversationNotifications ConversationNotification[]
-  notificationPreferences NotificationPreference[]
+  notificationPreferences   NotificationPreference[]
   notificationOutboxRecords NotificationOutboxRecord[]
-  accessAssignments AccessAssignment[]
-  accessDecisionAudits AccessDecisionAudit[]
-  authSessions      AuthSession[]
-  termsAcceptanceEvidence TermsAcceptanceEvidence[]
+  accessAssignments         AccessAssignment[]
+  accessDecisionAudits      AccessDecisionAudit[]
+  authSessions              AuthSession[]
+  authMfaChallenges         AuthMfaChallenge[]
+  termsAcceptanceEvidence   TermsAcceptanceEvidence[]
 
   @@index([countryCode])
   @@index([status])
@@ -268,41 +270,62 @@ model TenantMembership {
 }
 
 model AuthSession {
-  id          String   @id @default(uuid())
-  userId      String
-  tenantId    String
-  tokenHash   String   @unique
-  role        String   @db.VarChar(80)
-  mfaRequired Boolean  @default(true)
-  mfaVerified Boolean  @default(false)
-  expiresAt   DateTime
-  revokedAt   DateTime?
-  createdAt   DateTime @default(now())
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id            String             @id @default(uuid())
+  userId        String
+  tenantId      String
+  tokenHash     String             @unique
+  role          String             @db.VarChar(80)
+  mfaRequired   Boolean            @default(true)
+  mfaVerified   Boolean            @default(false)
+  expiresAt     DateTime
+  revokedAt     DateTime?
+  createdAt     DateTime           @default(now())
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  mfaChallenges AuthMfaChallenge[]
 
   @@index([userId, tenantId])
   @@index([expiresAt, revokedAt])
 }
 
+model AuthMfaChallenge {
+  id              String      @id @default(uuid())
+  sessionId       String
+  userId          String
+  tenantId        String
+  codeHash        String
+  deliveryChannel String      @db.VarChar(40)
+  expiresAt       DateTime
+  consumedAt      DateTime?
+  failedAttempts  Int         @default(0)
+  createdAt       DateTime    @default(now())
+  session         AuthSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant          Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, consumedAt, expiresAt])
+  @@index([userId, createdAt])
+  @@index([tenantId, createdAt])
+}
+
 model TermsAcceptanceEvidence {
-  id                        String   @id @default(uuid())
-  userId                    String
-  tenantId                  String
-  countryCode               String   @db.VarChar(2)
-  locale                    String   @db.VarChar(24)
-  termsVersion              String   @db.VarChar(80)
-  privacyVersion            String   @db.VarChar(80)
-  prohibitedContentVersion  String   @db.VarChar(80)
-  subscriptionTermsVersion  String   @db.VarChar(80)
-  appSurface                String   @db.VarChar(40)
-  acceptanceSource          String   @db.VarChar(80)
-  acceptedAt                DateTime
-  ipHash                    String?
-  deviceHash                String?
-  createdAt                 DateTime @default(now())
-  user                      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tenant                    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id                       String   @id @default(uuid())
+  userId                   String
+  tenantId                 String
+  countryCode              String   @db.VarChar(2)
+  locale                   String   @db.VarChar(24)
+  termsVersion             String   @db.VarChar(80)
+  privacyVersion           String   @db.VarChar(80)
+  prohibitedContentVersion String   @db.VarChar(80)
+  subscriptionTermsVersion String   @db.VarChar(80)
+  appSurface               String   @db.VarChar(40)
+  acceptanceSource         String   @db.VarChar(80)
+  acceptedAt               DateTime
+  ipHash                   String?
+  deviceHash               String?
+  createdAt                DateTime @default(now())
+  user                     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant                   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([userId, tenantId])
   @@index([tenantId, acceptedAt])
@@ -310,23 +333,23 @@ model TermsAcceptanceEvidence {
 }
 
 model AccessAssignment {
-  id             String   @id @default(uuid())
+  id             String    @id @default(uuid())
   userId         String
   tenantId       String?
-  role           String   @db.VarChar(80)
-  scopeLevel     String   @db.VarChar(40)
-  regionCode     String?  @db.VarChar(40)
-  continentCode  String?  @db.VarChar(8)
-  countryCode    String?  @db.VarChar(2)
+  role           String    @db.VarChar(80)
+  scopeLevel     String    @db.VarChar(40)
+  regionCode     String?   @db.VarChar(40)
+  continentCode  String?   @db.VarChar(8)
+  countryCode    String?   @db.VarChar(2)
   scopedTenantId String?
-  mfaRequired    Boolean  @default(true)
+  mfaRequired    Boolean   @default(true)
   assignedBy     String?
   expiresAt      DateTime?
   revokedAt      DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tenant         Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant         Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([userId, role])
   @@index([tenantId, role])
@@ -336,20 +359,20 @@ model AccessAssignment {
 }
 
 model AccessDecisionAudit {
-  id                String   @id @default(uuid())
-  tenantId          String?
-  actorUserId       String   @db.VarChar(120)
-  role              String   @db.VarChar(80)
-  permission        String   @db.VarChar(80)
-  scopeLevel        String   @db.VarChar(40)
-  allowed           Boolean
-  reason            String   @db.VarChar(80)
-  targetTenantId    String?
-  targetCountryCode String?  @db.VarChar(2)
-  targetContinentCode String? @db.VarChar(8)
-  targetRegionCode  String?  @db.VarChar(40)
-  createdAt         DateTime @default(now())
-  tenant            Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id                  String   @id @default(uuid())
+  tenantId            String?
+  actorUserId         String   @db.VarChar(120)
+  role                String   @db.VarChar(80)
+  permission          String   @db.VarChar(80)
+  scopeLevel          String   @db.VarChar(40)
+  allowed             Boolean
+  reason              String   @db.VarChar(80)
+  targetTenantId      String?
+  targetCountryCode   String?  @db.VarChar(2)
+  targetContinentCode String?  @db.VarChar(8)
+  targetRegionCode    String?  @db.VarChar(40)
+  createdAt           DateTime @default(now())
+  tenant              Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, createdAt])
   @@index([actorUserId, createdAt])
@@ -380,28 +403,28 @@ model ProfileDraft {
 }
 
 model PublishedProfile {
-  id           String        @id @default(uuid())
-  tenantId     String
-  countryCode  String        @db.VarChar(2)
-  industryCode String        @db.VarChar(80)
-  role         String        @db.VarChar(80)
-  displayName  String        @db.VarChar(160)
-  description  String
-  phone        String?       @db.VarChar(80)
-  email        String?       @db.VarChar(320)
-  website      String?       @db.VarChar(500)
-  status       ProfileStatus @default(LIVE)
-  version      Int
-  publishedAt  DateTime      @default(now())
-  expiresAt    DateTime?
+  id               String        @id @default(uuid())
+  tenantId         String
+  countryCode      String        @db.VarChar(2)
+  industryCode     String        @db.VarChar(80)
+  role             String        @db.VarChar(80)
+  displayName      String        @db.VarChar(160)
+  description      String
+  phone            String?       @db.VarChar(80)
+  email            String?       @db.VarChar(320)
+  website          String?       @db.VarChar(500)
+  status           ProfileStatus @default(LIVE)
+  version          Int
+  publishedAt      DateTime      @default(now())
+  expiresAt        DateTime?
   renewalAlert35At DateTime?
   renewalAlert39At DateTime?
-  archivedAt   DateTime?
-  deletedAt    DateTime?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  country      Country       @relation(fields: [countryCode], references: [code])
+  archivedAt       DateTime?
+  deletedAt        DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  tenant           Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  country          Country       @relation(fields: [countryCode], references: [code])
 
   @@index([tenantId, status])
   @@index([status, expiresAt])
@@ -409,20 +432,20 @@ model PublishedProfile {
 }
 
 model Notification {
-  id          String             @id @default(uuid())
-  tenantId    String
-  userId      String?
-  channel     NotificationChannel @default(IN_APP)
-  status      NotificationStatus  @default(PENDING)
-  title       String             @db.VarChar(160)
-  message     String
-  entityType  String             @db.VarChar(80)
-  entityId    String             @db.VarChar(120)
+  id           String              @id @default(uuid())
+  tenantId     String
+  userId       String?
+  channel      NotificationChannel @default(IN_APP)
+  status       NotificationStatus  @default(PENDING)
+  title        String              @db.VarChar(160)
+  message      String
+  entityType   String              @db.VarChar(80)
+  entityId     String              @db.VarChar(120)
   scheduledFor DateTime
-  sentAt      DateTime?
-  readAt      DateTime?
-  createdAt   DateTime           @default(now())
-  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sentAt       DateTime?
+  readAt       DateTime?
+  createdAt    DateTime            @default(now())
+  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, status, scheduledFor])
   @@index([entityType, entityId])
@@ -446,20 +469,20 @@ model NotificationPreference {
 }
 
 model NotificationOutboxRecord {
-  id                    String                         @id @default(uuid())
-  tenantId              String
-  eventType             String                         @db.VarChar(100)
-  severity              String                         @db.VarChar(40)
-  title                 String                         @db.VarChar(160)
-  message               String
-  entityType            String?                        @db.VarChar(80)
-  entityId              String?                        @db.VarChar(120)
-  selectedChannels      Json
-  suppressedChannels    Json
-  requiresImmediateAttention Boolean                    @default(false)
-  createdAt             DateTime                       @default(now())
-  tenant                Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  deliveryAttempts      NotificationDeliveryAttempt[]
+  id                         String                        @id @default(uuid())
+  tenantId                   String
+  eventType                  String                        @db.VarChar(100)
+  severity                   String                        @db.VarChar(40)
+  title                      String                        @db.VarChar(160)
+  message                    String
+  entityType                 String?                       @db.VarChar(80)
+  entityId                   String?                       @db.VarChar(120)
+  selectedChannels           Json
+  suppressedChannels         Json
+  requiresImmediateAttention Boolean                       @default(false)
+  createdAt                  DateTime                      @default(now())
+  tenant                     Tenant                        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deliveryAttempts           NotificationDeliveryAttempt[]
 
   @@index([tenantId, createdAt])
   @@index([eventType, severity])
@@ -503,31 +526,31 @@ model AnalyticsEvent {
 }
 
 model Conversation {
-  id                    String             @id @default(uuid())
-  tenantId              String
-  sourceRecordId        String             @db.VarChar(120)
-  sourceName            String             @db.VarChar(200)
-  sourceRole            String             @db.VarChar(80)
-  inquiryType           String             @db.VarChar(80)
-  status                ConversationStatus @default(OPEN)
-  priority              String             @db.VarChar(40)
-  matchConfidence       Int
-  responseSlaHours      Int
-  assigneeUserId        String?
-  assigneeDisplayName   String?            @db.VarChar(160)
-  openedAt              DateTime
-  firstResponseDueAt    DateTime
-  firstResponseAt       DateTime?
-  lastInboundMessageAt  DateTime
-  lastMessageAt         DateTime
-  resolvedAt            DateTime?
-  blockedAt             DateTime?
-  createdAt             DateTime           @default(now())
-  updatedAt             DateTime           @updatedAt
-  tenant                Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  assignee              User?              @relation("ConversationAssignee", fields: [assigneeUserId], references: [id])
-  messages              ConversationMessage[]
-  notifications         ConversationNotification[]
+  id                   String                     @id @default(uuid())
+  tenantId             String
+  sourceRecordId       String                     @db.VarChar(120)
+  sourceName           String                     @db.VarChar(200)
+  sourceRole           String                     @db.VarChar(80)
+  inquiryType          String                     @db.VarChar(80)
+  status               ConversationStatus         @default(OPEN)
+  priority             String                     @db.VarChar(40)
+  matchConfidence      Int
+  responseSlaHours     Int
+  assigneeUserId       String?
+  assigneeDisplayName  String?                    @db.VarChar(160)
+  openedAt             DateTime
+  firstResponseDueAt   DateTime
+  firstResponseAt      DateTime?
+  lastInboundMessageAt DateTime
+  lastMessageAt        DateTime
+  resolvedAt           DateTime?
+  blockedAt            DateTime?
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime                   @updatedAt
+  tenant               Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignee             User?                      @relation("ConversationAssignee", fields: [assigneeUserId], references: [id])
+  messages             ConversationMessage[]
+  notifications        ConversationNotification[]
 
   @@index([tenantId, status, updatedAt])
   @@index([tenantId, assigneeUserId, status])
@@ -568,16 +591,16 @@ model ConversationNotification {
 }
 
 model SafetyPolicyDecision {
-  id             String       @id @default(uuid())
-  tenantId        String?
-  sourceSurface   String       @db.VarChar(80)
-  action          PolicyAction
-  category        String?      @db.VarChar(80)
-  policyCode      String?      @db.VarChar(80)
-  matchedTerm     String?      @db.VarChar(240)
-  reviewedBy      String?
-  evidence        Json?
-  createdAt       DateTime     @default(now())
+  id            String       @id @default(uuid())
+  tenantId      String?
+  sourceSurface String       @db.VarChar(80)
+  action        PolicyAction
+  category      String?      @db.VarChar(80)
+  policyCode    String?      @db.VarChar(80)
+  matchedTerm   String?      @db.VarChar(240)
+  reviewedBy    String?
+  evidence      Json?
+  createdAt     DateTime     @default(now())
 
   @@index([tenantId, action])
   @@index([category])
@@ -585,103 +608,103 @@ model SafetyPolicyDecision {
 }
 
 model CountryTaxProfile {
-  id                    String            @id @default(uuid())
-  countryCode            String            @db.VarChar(2)
-  taxAuthorityName       String            @db.VarChar(200)
-  taxRegistrationStatus  String            @db.VarChar(80)
-  filingPortalUrl        String?           @db.VarChar(500)
-  localFinanceOwner      String            @db.VarChar(160)
-  filingFrequency        String            @db.VarChar(80)
-  recordRetentionYears   Int
-  taxInclusivePricing    Boolean           @default(true)
-  approvedAt             DateTime?
-  approvedBy             String?
-  createdAt              DateTime          @default(now())
-  updatedAt              DateTime          @updatedAt
-  country                Country           @relation(fields: [countryCode], references: [code])
-  ruleVersions           TaxRuleVersion[]
-  returns                TaxReturn[]
-  financeAlerts          FinanceAlert[]
+  id                    String           @id @default(uuid())
+  countryCode           String           @db.VarChar(2)
+  taxAuthorityName      String           @db.VarChar(200)
+  taxRegistrationStatus String           @db.VarChar(80)
+  filingPortalUrl       String?          @db.VarChar(500)
+  localFinanceOwner     String           @db.VarChar(160)
+  filingFrequency       String           @db.VarChar(80)
+  recordRetentionYears  Int
+  taxInclusivePricing   Boolean          @default(true)
+  approvedAt            DateTime?
+  approvedBy            String?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  country               Country          @relation(fields: [countryCode], references: [code])
+  ruleVersions          TaxRuleVersion[]
+  returns               TaxReturn[]
+  financeAlerts         FinanceAlert[]
 
   @@index([countryCode])
 }
 
 model TaxRuleVersion {
-  id                  String            @id @default(uuid())
-  countryTaxProfileId String
-  taxType             String            @db.VarChar(80)
-  taxRate             Decimal           @db.Decimal(9, 6)
-  productTaxCode      String            @db.VarChar(120)
-  registrationThreshold Decimal?        @db.Decimal(18, 4)
-  effectiveFrom       DateTime
-  effectiveTo         DateTime?
-  notes               String?
-  createdAt           DateTime          @default(now())
-  countryTaxProfile   CountryTaxProfile @relation(fields: [countryTaxProfileId], references: [id], onDelete: Cascade)
-  snapshots           TaxCalculationSnapshot[]
+  id                    String                   @id @default(uuid())
+  countryTaxProfileId   String
+  taxType               String                   @db.VarChar(80)
+  taxRate               Decimal                  @db.Decimal(9, 6)
+  productTaxCode        String                   @db.VarChar(120)
+  registrationThreshold Decimal?                 @db.Decimal(18, 4)
+  effectiveFrom         DateTime
+  effectiveTo           DateTime?
+  notes                 String?
+  createdAt             DateTime                 @default(now())
+  countryTaxProfile     CountryTaxProfile        @relation(fields: [countryTaxProfileId], references: [id], onDelete: Cascade)
+  snapshots             TaxCalculationSnapshot[]
 
   @@index([countryTaxProfileId, taxType])
   @@index([effectiveFrom, effectiveTo])
 }
 
 model TaxCalculationSnapshot {
-  id                String          @id @default(uuid())
-  tenantId          String
-  countryCode       String          @db.VarChar(2)
-  taxRuleVersionId  String?
-  provider          String          @db.VarChar(80)
-  providerReference String?         @db.VarChar(160)
-  grossAmount       Decimal         @db.Decimal(18, 4)
-  taxableAmount     Decimal         @db.Decimal(18, 4)
-  taxAmount         Decimal         @db.Decimal(18, 4)
-  netRevenueAmount  Decimal         @db.Decimal(18, 4)
-  presentmentCurrency String        @db.VarChar(3)
-  filingCurrency    String          @db.VarChar(3)
-  exchangeRate      Decimal?        @db.Decimal(18, 8)
-  customerEvidence  Json
-  calculationReason String          @db.VarChar(240)
-  transactionAt     DateTime
-  createdAt         DateTime        @default(now())
-  tenant            Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  taxRuleVersion    TaxRuleVersion? @relation(fields: [taxRuleVersionId], references: [id])
-  ledgerEntries     TaxLedgerEntry[]
+  id                  String           @id @default(uuid())
+  tenantId            String
+  countryCode         String           @db.VarChar(2)
+  taxRuleVersionId    String?
+  provider            String           @db.VarChar(80)
+  providerReference   String?          @db.VarChar(160)
+  grossAmount         Decimal          @db.Decimal(18, 4)
+  taxableAmount       Decimal          @db.Decimal(18, 4)
+  taxAmount           Decimal          @db.Decimal(18, 4)
+  netRevenueAmount    Decimal          @db.Decimal(18, 4)
+  presentmentCurrency String           @db.VarChar(3)
+  filingCurrency      String           @db.VarChar(3)
+  exchangeRate        Decimal?         @db.Decimal(18, 8)
+  customerEvidence    Json
+  calculationReason   String           @db.VarChar(240)
+  transactionAt       DateTime
+  createdAt           DateTime         @default(now())
+  tenant              Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  taxRuleVersion      TaxRuleVersion?  @relation(fields: [taxRuleVersionId], references: [id])
+  ledgerEntries       TaxLedgerEntry[]
 
   @@index([tenantId, transactionAt])
   @@index([countryCode, transactionAt])
 }
 
 model TaxLedgerEntry {
-  id                    String                 @id @default(uuid())
+  id                       String                 @id @default(uuid())
   taxCalculationSnapshotId String
-  entryType             String                 @db.VarChar(80)
-  amount                Decimal                @db.Decimal(18, 4)
-  currencyCode          String                 @db.VarChar(3)
-  occurredAt            DateTime
-  createdAt             DateTime               @default(now())
-  taxCalculationSnapshot TaxCalculationSnapshot @relation(fields: [taxCalculationSnapshotId], references: [id], onDelete: Cascade)
+  entryType                String                 @db.VarChar(80)
+  amount                   Decimal                @db.Decimal(18, 4)
+  currencyCode             String                 @db.VarChar(3)
+  occurredAt               DateTime
+  createdAt                DateTime               @default(now())
+  taxCalculationSnapshot   TaxCalculationSnapshot @relation(fields: [taxCalculationSnapshotId], references: [id], onDelete: Cascade)
 
   @@index([entryType, occurredAt])
 }
 
 model TaxReturn {
-  id                  String              @id @default(uuid())
+  id                  String            @id @default(uuid())
   countryTaxProfileId String
   periodStart         DateTime
   periodEnd           DateTime
   filingDeadline      DateTime
   paymentDeadline     DateTime
-  taxType             String              @db.VarChar(80)
-  filingCurrency      String              @db.VarChar(3)
-  computedTaxDue      Decimal             @db.Decimal(18, 4)
-  status              TaxReturnStatus     @default(DRAFT)
+  taxType             String            @db.VarChar(80)
+  filingCurrency      String            @db.VarChar(3)
+  computedTaxDue      Decimal           @db.Decimal(18, 4)
+  status              TaxReturnStatus   @default(DRAFT)
   approvedAt          DateTime?
   approvedBy          String?
   filedAt             DateTime?
-  authorityReference  String?             @db.VarChar(200)
-  evidenceUrl         String?             @db.VarChar(500)
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
-  countryTaxProfile   CountryTaxProfile   @relation(fields: [countryTaxProfileId], references: [id], onDelete: Cascade)
+  authorityReference  String?           @db.VarChar(200)
+  evidenceUrl         String?           @db.VarChar(500)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  countryTaxProfile   CountryTaxProfile @relation(fields: [countryTaxProfileId], references: [id], onDelete: Cascade)
   remittances         TaxRemittance[]
 
   @@index([countryTaxProfileId, periodStart, periodEnd])
@@ -689,18 +712,18 @@ model TaxReturn {
 }
 
 model TaxRemittance {
-  id                 String              @id @default(uuid())
-  taxReturnId         String
-  amount              Decimal             @db.Decimal(18, 4)
-  currencyCode        String              @db.VarChar(3)
-  status              TaxRemittanceStatus @default(PENDING)
-  paymentReference    String?             @db.VarChar(200)
-  submittedAt         DateTime?
-  paidAt              DateTime?
-  evidenceUrl         String?             @db.VarChar(500)
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
-  taxReturn           TaxReturn           @relation(fields: [taxReturnId], references: [id], onDelete: Cascade)
+  id               String              @id @default(uuid())
+  taxReturnId      String
+  amount           Decimal             @db.Decimal(18, 4)
+  currencyCode     String              @db.VarChar(3)
+  status           TaxRemittanceStatus @default(PENDING)
+  paymentReference String?             @db.VarChar(200)
+  submittedAt      DateTime?
+  paidAt           DateTime?
+  evidenceUrl      String?             @db.VarChar(500)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  taxReturn        TaxReturn           @relation(fields: [taxReturnId], references: [id], onDelete: Cascade)
 
   @@index([status])
 }

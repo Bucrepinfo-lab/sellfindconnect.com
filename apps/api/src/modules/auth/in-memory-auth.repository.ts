@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { TermsAcceptanceEvidence } from '@telpen/domain';
 
 import type {
+  AuthMfaChallengeRecord,
   AuthSessionRecord,
   AuthTenantRecord,
   AuthUserRecord,
@@ -17,6 +18,7 @@ export class InMemoryAuthRepository implements AuthRepository {
   private readonly tenants = new Map<string, AuthTenantRecord>();
   private readonly memberships = new Map<string, TenantMembershipRecord>();
   private readonly sessionsByTokenHash = new Map<string, AuthSessionRecord>();
+  private readonly mfaChallenges = new Map<string, AuthMfaChallengeRecord>();
   private readonly termsEvidence = new Map<string, TermsAcceptanceEvidence>();
 
   findUserByEmail(email: string): AuthUserRecord | undefined {
@@ -43,6 +45,12 @@ export class InMemoryAuthRepository implements AuthRepository {
     return this.sessionsByTokenHash.get(tokenHash);
   }
 
+  findMfaChallengeBySessionId(sessionId: string): AuthMfaChallengeRecord | undefined {
+    return Array.from(this.mfaChallenges.values())
+      .filter((challenge) => challenge.sessionId === sessionId && !challenge.consumedAt)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  }
+
   createOwnerRegistration(records: OwnerRegistrationRecords): void {
     this.usersByEmail.set(records.user.email, records.user);
     this.usersById.set(records.user.id, records.user);
@@ -60,6 +68,14 @@ export class InMemoryAuthRepository implements AuthRepository {
 
   updateSession(session: AuthSessionRecord): void {
     this.sessionsByTokenHash.set(session.tokenHash, session);
+  }
+
+  createMfaChallenge(challenge: AuthMfaChallengeRecord): void {
+    this.mfaChallenges.set(challenge.id, challenge);
+  }
+
+  updateMfaChallenge(challenge: AuthMfaChallengeRecord): void {
+    this.mfaChallenges.set(challenge.id, challenge);
   }
 
   markUserMfaVerified(userId: string, mfaVerifiedAt: string): void {

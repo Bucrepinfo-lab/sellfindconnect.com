@@ -50,12 +50,35 @@ export type AuthSessionRecord = {
   revokedAt?: string;
 };
 
+export type AuthMfaDeliveryChannel = 'DEVELOPMENT' | 'EMAIL' | 'SMS' | 'AUTHENTICATOR';
+
+export type AuthMfaChallengeRecord = {
+  id: string;
+  sessionId: string;
+  userId: string;
+  tenantId: string;
+  codeHash: string;
+  deliveryChannel: AuthMfaDeliveryChannel;
+  expiresAt: string;
+  consumedAt?: string;
+  failedAttempts: number;
+  createdAt: string;
+};
+
+export type PresentedMfaChallenge = Pick<
+  AuthMfaChallengeRecord,
+  'id' | 'deliveryChannel' | 'expiresAt' | 'createdAt'
+> & {
+  developmentCode?: string;
+};
+
 export type PresentedAuthSession = Omit<AuthSessionRecord, 'tokenHash' | 'revokedAt'> & {
   token?: string;
 };
 
 export type IssuedAuthSession = PresentedAuthSession & {
   token: string;
+  mfaChallenge?: PresentedMfaChallenge;
 };
 
 export type OwnerRegistrationRecords = {

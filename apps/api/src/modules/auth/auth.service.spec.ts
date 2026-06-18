@@ -26,6 +26,7 @@ describe('AuthService', () => {
     expect(result.membership.role).toBe('OWNER');
     expect(result.termsAcceptance.termsVersion).toContain('terms-');
     expect(result.session.mfaRequired).toBe(true);
+    expect(result.session.mfaChallenge?.developmentCode).toMatch(/^\d{6}$/);
   });
 
   it('rejects weak passwords and duplicate emails', async () => {
@@ -130,12 +131,49 @@ describe('AuthService', () => {
       acceptedTerms: true,
     });
 
+    const issuedCode = registered.session.mfaChallenge?.developmentCode ?? '';
+    expect(issuedCode).toMatch(/^\d{6}$/);
+
     const result = await service.verifyMfa({
       sessionToken: registered.session.token,
-      code: '123456',
+      code: issuedCode,
     });
 
     expect(result.session.mfaVerified).toBe(true);
+  });
+
+  it('rejects an invalid MFA challenge code before accepting the issued code', async () => {
+    const service = new AuthService();
+    const registered = await service.registerTenantOwner({
+      email: 'owner@example.com',
+      password: strongPassword,
+      displayName: 'Mary Owner',
+      tenantDisplayName: 'Nairobi Fresh Produce Cooperative',
+      countryCode: 'KE',
+      industryCode: 'AGRICULTURE',
+      primaryRole: 'SUPPLIER',
+      userType: 'ADVERTISER',
+      acceptedTerms: true,
+    });
+
+    const issuedCode = registered.session.mfaChallenge?.developmentCode ?? '';
+    const invalidCode = issuedCode === '000000' ? '000001' : '000000';
+
+    await expect(
+      service.verifyMfa({
+        sessionToken: registered.session.token,
+        code: invalidCode,
+      }),
+    ).rejects.toThrow();
+
+    await expect(
+      service.verifyMfa({
+        sessionToken: registered.session.token,
+        code: issuedCode,
+      }),
+    ).resolves.toMatchObject({
+      session: { mfaVerified: true },
+    });
   });
 
   it('proves session tenant isolation', async () => {

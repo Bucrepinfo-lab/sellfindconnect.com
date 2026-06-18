@@ -14,13 +14,15 @@ import {
   getCountry,
   industryCategories,
 } from '@telpen/domain';
-import { createHash, pbkdf2Sync, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHash, pbkdf2Sync, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 
 import type {
+  AuthMfaChallengeRecord,
   AuthSessionRecord,
   AuthTenantRecord,
   AuthUserRecord,
   IssuedAuthSession,
+  PresentedMfaChallenge,
   PresentedAuthSession,
   TenantMembershipRecord,
 } from './auth.records';
@@ -32,6 +34,9 @@ import type {
   VerifyMfaDto,
 } from './dto/auth.dto';
 import { InMemoryAuthRepository } from './in-memory-auth.repository';
+
+const MFA_CHALLENGE_TTL_MS = 10 * 60 * 1000;
+const MFA_MAX_FAILED_ATTEMPTS = 5;
 
 @Injectable()
 export class AuthService {
@@ -161,7 +166,26 @@ export class AuthService {
 
   async verifyMfa(input: VerifyMfaDto) {
     const session = await this.requireSession(input.sessionToken);
-    if (input.code !== '123456') {
+    if (!session.mfaRequired || session.mfaVerified) {
+      return {
+        session: this.presentSession(session),
+      };
+    }
+
+    const challenge = await this.repository.findMfaChallengeBySessionId(session.id);
+    if (!challenge || challenge.consumedAt || Date.parse(challenge.expiresAt) <= Date.now()) {
+      throw new UnauthorizedException('MFA challenge expired or unavailable.');
+    }
+
+    if (challenge.failedAttempts >= MFA_MAX_FAILED_ATTEMPTS) {
+      throw new UnauthorizedException('MFA challenge locked after too many attempts.');
+    }
+
+    if (!this.verifyMfaCode(session.id, input.code, challenge.codeHash)) {
+      await this.repository.updateMfaChallenge({
+        ...challenge,
+        failedAttempts: challenge.failedAttempts + 1,
+      });
       throw new UnauthorizedException('Invalid MFA code.');
     }
 
@@ -170,6 +194,10 @@ export class AuthService {
       ...session,
       mfaVerified: true,
     };
+    await this.repository.updateMfaChallenge({
+      ...challenge,
+      consumedAt: now,
+    });
     await this.repository.markUserMfaVerified(session.userId, now);
 
     await this.repository.updateSession(updated);
@@ -227,7 +255,7 @@ export class AuthService {
     };
 
     await this.repository.createSession(session);
-    return this.presentSession(session, token);
+    return this.presentSession(session, token, await this.createMfaChallenge(session));
   }
 
   private async requireSession(sessionToken: string): Promise<AuthSessionRecord> {
@@ -250,6 +278,16 @@ export class AuthService {
     return createHash('sha256').update(token).digest('base64url');
   }
 
+  private hashMfaCode(sessionId: string, code: string): string {
+    return createHash('sha256').update(`${sessionId}:${code}`).digest('base64url');
+  }
+
+  private verifyMfaCode(sessionId: string, code: string, expectedHash: string): boolean {
+    const actual = Buffer.from(this.hashMfaCode(sessionId, code));
+    const expected = Buffer.from(expectedHash);
+    return actual.length === expected.length && timingSafeEqual(actual, expected);
+  }
+
   private verifyPassword(password: string, user: AuthUserRecord): boolean {
     const actual = Buffer.from(
       pbkdf2Sync(password, user.passwordSalt, user.passwordIterations, 32, 'sha256').toString('base64url'),
@@ -270,9 +308,42 @@ export class AuthService {
     };
   }
 
+  private async createMfaChallenge(
+    session: AuthSessionRecord,
+  ): Promise<PresentedMfaChallenge | undefined> {
+    if (!session.mfaRequired || session.mfaVerified) {
+      return undefined;
+    }
+
+    const now = new Date().toISOString();
+    const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
+    const challenge: AuthMfaChallengeRecord = {
+      id: randomUUID(),
+      sessionId: session.id,
+      userId: session.userId,
+      tenantId: session.tenantId,
+      codeHash: this.hashMfaCode(session.id, code),
+      deliveryChannel: this.isProductionRuntime() ? 'EMAIL' : 'DEVELOPMENT',
+      expiresAt: new Date(Date.parse(now) + MFA_CHALLENGE_TTL_MS).toISOString(),
+      failedAttempts: 0,
+      createdAt: now,
+    };
+
+    await this.repository.createMfaChallenge(challenge);
+    return this.presentMfaChallenge(challenge, code);
+  }
+
   private presentSession(session: AuthSessionRecord): PresentedAuthSession;
-  private presentSession(session: AuthSessionRecord, token: string): IssuedAuthSession;
-  private presentSession(session: AuthSessionRecord, token?: string): PresentedAuthSession {
+  private presentSession(
+    session: AuthSessionRecord,
+    token: string,
+    mfaChallenge?: PresentedMfaChallenge,
+  ): IssuedAuthSession;
+  private presentSession(
+    session: AuthSessionRecord,
+    token?: string,
+    mfaChallenge?: PresentedMfaChallenge,
+  ): PresentedAuthSession | IssuedAuthSession {
     const presented: PresentedAuthSession = {
       id: session.id,
       userId: session.userId,
@@ -285,10 +356,32 @@ export class AuthService {
     };
 
     if (token) {
-      return { ...presented, token };
+      return { ...presented, token, mfaChallenge };
     }
 
     return presented;
+  }
+
+  private presentMfaChallenge(
+    challenge: AuthMfaChallengeRecord,
+    developmentCode?: string,
+  ): PresentedMfaChallenge {
+    const presented: PresentedMfaChallenge = {
+      id: challenge.id,
+      deliveryChannel: challenge.deliveryChannel,
+      expiresAt: challenge.expiresAt,
+      createdAt: challenge.createdAt,
+    };
+
+    if (challenge.deliveryChannel === 'DEVELOPMENT' && !this.isProductionRuntime()) {
+      return { ...presented, developmentCode };
+    }
+
+    return presented;
+  }
+
+  private isProductionRuntime(): boolean {
+    return process.env.NODE_ENV === 'production';
   }
 
   private assertSafe(input: object, message: string): void {

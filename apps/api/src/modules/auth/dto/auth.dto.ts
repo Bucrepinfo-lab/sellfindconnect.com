@@ -13,6 +13,7 @@ import {
   IsOptional,
   IsString,
   Length,
+  Matches,
   MaxLength,
 } from 'class-validator';
 
@@ -83,9 +84,10 @@ export class VerifyMfaDto {
   @Length(16, 256)
   declare sessionToken: string;
 
-  @ApiProperty({ example: '123456' })
+  @ApiProperty({ example: '492817' })
   @IsString()
-  @Length(6, 12)
+  @Length(6, 6)
+  @Matches(/^\d{6}$/)
   declare code: string;
 }
 
