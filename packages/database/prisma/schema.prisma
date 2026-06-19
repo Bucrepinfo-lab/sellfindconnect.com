@@ -442,6 +442,7 @@ model ProfileDraft {
 model PublishedProfile {
   id               String        @id @default(uuid())
   tenantId         String
+  sourceDraftId    String?
   countryCode      String        @db.VarChar(2)
   industryCode     String        @db.VarChar(80)
   role             String        @db.VarChar(80)
@@ -464,6 +465,7 @@ model PublishedProfile {
   country          Country       @relation(fields: [countryCode], references: [code])
 
   @@index([tenantId, status])
+  @@index([sourceDraftId])
   @@index([status, expiresAt])
   @@index([countryCode, industryCode])
 }

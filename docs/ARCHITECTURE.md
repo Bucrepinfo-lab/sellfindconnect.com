@@ -75,8 +75,9 @@ without validating it against the authenticated user's assignments.
   guard, and future identity-provider adapter boundary.
 - Profiles: draft, preview, publish, profile completeness, contacts, live
   version preservation, and publish audit evidence. Profile write/preview/publish
-  routes require an MFA-verified tenant session; durable Prisma profile
-  repositories remain the next persistence step.
+  routes require an MFA-verified tenant session. Profile storage uses an
+  in-memory repository by default and can switch to Prisma with
+  `PROFILE_REPOSITORY=prisma` after migrations and seed data are ready.
 - Listings: draft, preview, publish, media, lifecycle, and visibility. Advert
   listing and lifecycle routes require an MFA-verified tenant session.
 - Safety: blocked categories, policy decisions, moderation cases, and reports.
@@ -155,7 +156,8 @@ workflow are approved.
   session tokens.
 - Prisma migrations are checked in and deployed with
   `npm run db:migrate:deploy`; baseline domain data is loaded with
-  `npm run db:seed` before enabling hosted Prisma-backed repositories.
+  `npm run db:seed` before enabling hosted Prisma-backed repositories such as
+  `AUTH_REPOSITORY=prisma` and `PROFILE_REPOSITORY=prisma`.
 
 ## Notification Flow
 

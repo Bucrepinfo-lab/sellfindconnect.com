@@ -168,9 +168,11 @@ Progress:
   publish audit evidence.
 - Added tenant-session protected routes for publishing a draft, reading the
   current live profile, and listing published profile history.
-- Durable Prisma profile repository wiring, profile edit/update endpoints,
-  terms re-acceptance enforcement at publish, moderation review gates, and
-  media/contact enrichment remain next.
+- Added a profile repository boundary with in-memory default storage and
+  opt-in Prisma-backed persistence through `PROFILE_REPOSITORY=prisma`,
+  including persisted source-draft linkage for published profiles.
+- Profile edit/update endpoints, terms re-acceptance enforcement at publish,
+  moderation review gates, and media/contact enrichment remain next.
 
 ## Epic 4: Listing and Media Vertical Slice
 

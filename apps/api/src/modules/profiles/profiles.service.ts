@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, Optional, UnprocessableEntityException } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  NotFoundException,
+  Optional,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import {
   evaluateSafetyFields,
   getCountry,
@@ -10,16 +16,19 @@ import { randomUUID } from 'node:crypto';
 
 import { AuthService } from '../auth/auth.service';
 import type { CreateProfileDraftDto } from './dto/create-profile-draft.dto';
+import { InMemoryProfilesRepository } from './in-memory-profiles.repository';
+import { PROFILES_REPOSITORY, type ProfilesRepository } from './profiles.repository';
 
 @Injectable()
 export class ProfilesService {
-  constructor(@Optional() private readonly auth?: AuthService) {}
+  constructor(
+    @Optional()
+    @Inject(PROFILES_REPOSITORY)
+    private readonly repository: ProfilesRepository = new InMemoryProfilesRepository(),
+    @Optional() private readonly auth?: AuthService,
+  ) {}
 
-  private readonly drafts = new Map<string, ProfileDraft>();
-  private readonly publishedProfiles = new Map<string, PublishedProfile>();
-  private readonly liveProfileByTenant = new Map<string, string>();
-
-  createDraft(tenantId: string, input: CreateProfileDraftDto): ProfileDraft {
+  async createDraft(tenantId: string, input: CreateProfileDraftDto): Promise<ProfileDraft> {
     const country = getCountry(input.countryCode);
     const industry = industryCategories.find((item) => item.code === input.industryCode);
 
@@ -49,12 +58,12 @@ export class ProfilesService {
       updatedAt: now,
     };
 
-    this.drafts.set(this.key(tenantId, draft.id), draft);
+    await this.repository.createDraft(draft);
     return draft;
   }
 
-  getDraft(tenantId: string, id: string): ProfileDraft {
-    const draft = this.drafts.get(this.key(tenantId, id));
+  async getDraft(tenantId: string, id: string): Promise<ProfileDraft> {
+    const draft = await this.repository.findDraft(tenantId, id);
     if (!draft) {
       throw new NotFoundException('Profile draft not found.');
     }
@@ -62,8 +71,8 @@ export class ProfilesService {
     return draft;
   }
 
-  previewDraft(tenantId: string, id: string) {
-    const draft = this.getDraft(tenantId, id);
+  async previewDraft(tenantId: string, id: string) {
+    const draft = await this.getDraft(tenantId, id);
     const country = getCountry(draft.countryCode);
     const industry = industryCategories.find((item) => item.code === draft.industryCode);
 
@@ -87,7 +96,7 @@ export class ProfilesService {
     id: string,
     actorUserId?: string,
   ): Promise<PublishedProfile> {
-    const draft = this.getDraft(tenantId, id);
+    const draft = await this.getDraft(tenantId, id);
     const safety = evaluateSafetyFields(draft);
     if (!safety.allowed) {
       throw new UnprocessableEntityException({
@@ -97,19 +106,16 @@ export class ProfilesService {
     }
 
     const now = new Date().toISOString();
-    const previousLiveId = this.liveProfileByTenant.get(tenantId);
-    if (previousLiveId) {
-      const previous = this.publishedProfiles.get(this.key(tenantId, previousLiveId));
-      if (previous && previous.status === 'LIVE') {
-        this.publishedProfiles.set(this.key(tenantId, previous.id), {
-          ...previous,
-          status: 'ARCHIVED',
+    const previousLiveProfile = await this.repository.findLiveProfile(tenantId);
+    const archivedPreviousProfile = previousLiveProfile
+      ? {
+          ...previousLiveProfile,
+          status: 'ARCHIVED' as const,
           archivedAt: now,
           updatedAt: now,
-          daysLive: this.daysBetween(previous.publishedAt, now),
-        });
-      }
-    }
+          daysLive: this.daysBetween(previousLiveProfile.publishedAt, now),
+        }
+      : undefined;
 
     const published: PublishedProfile = {
       id: randomUUID(),
@@ -124,19 +130,23 @@ export class ProfilesService {
       email: draft.email,
       website: draft.website,
       status: 'LIVE',
-      version: this.nextVersion(tenantId),
+      version: await this.nextVersion(tenantId),
       publishedAt: now,
       daysLive: 0,
       createdAt: now,
       updatedAt: now,
     };
-
-    this.publishedProfiles.set(this.key(tenantId, published.id), published);
-    this.liveProfileByTenant.set(tenantId, published.id);
-    this.drafts.set(this.key(tenantId, draft.id), {
+    const publishedDraft: ProfileDraft = {
       ...draft,
       status: 'PUBLISHED',
       updatedAt: now,
+    };
+
+    await this.repository.publishProfile({
+      tenantId,
+      draft: publishedDraft,
+      published,
+      previousLiveProfile: archivedPreviousProfile,
     });
 
     await this.auth?.recordTenantAudit({
@@ -148,7 +158,7 @@ export class ProfilesService {
       metadata: {
         sourceDraftId: draft.id,
         version: published.version,
-        previousLiveProfileId: previousLiveId ?? null,
+        previousLiveProfileId: previousLiveProfile?.id ?? null,
         countryCode: published.countryCode,
         industryCode: published.industryCode,
       },
@@ -157,13 +167,8 @@ export class ProfilesService {
     return published;
   }
 
-  getLiveProfile(tenantId: string): PublishedProfile {
-    const liveProfileId = this.liveProfileByTenant.get(tenantId);
-    if (!liveProfileId) {
-      throw new NotFoundException('Published profile not found.');
-    }
-
-    const profile = this.publishedProfiles.get(this.key(tenantId, liveProfileId));
+  async getLiveProfile(tenantId: string): Promise<PublishedProfile> {
+    const profile = await this.repository.findLiveProfile(tenantId);
     if (!profile) {
       throw new NotFoundException('Published profile not found.');
     }
@@ -174,9 +179,9 @@ export class ProfilesService {
     };
   }
 
-  listPublishedProfiles(tenantId: string): PublishedProfile[] {
-    return Array.from(this.publishedProfiles.values())
-      .filter((profile) => profile.tenantId === tenantId)
+  async listPublishedProfiles(tenantId: string): Promise<PublishedProfile[]> {
+    const profiles = await this.repository.listPublishedProfiles(tenantId);
+    return profiles
       .map((profile) => ({
         ...profile,
         daysLive: this.daysBetween(
@@ -185,10 +190,6 @@ export class ProfilesService {
         ),
       }))
       .sort((a, b) => b.version - a.version);
-  }
-
-  private key(tenantId: string, id: string): string {
-    return `${tenantId}:${id}`;
   }
 
   private completenessScore(draft: ProfileDraft): number {
@@ -206,10 +207,10 @@ export class ProfilesService {
     return Math.round((completed / fields.length) * 100);
   }
 
-  private nextVersion(tenantId: string): number {
-    const versions = Array.from(this.publishedProfiles.values())
-      .filter((profile) => profile.tenantId === tenantId)
-      .map((profile) => profile.version);
+  private async nextVersion(tenantId: string): Promise<number> {
+    const versions = (await this.repository.listPublishedProfiles(tenantId)).map(
+      (profile) => profile.version,
+    );
 
     return versions.length === 0 ? 1 : Math.max(...versions) + 1;
   }

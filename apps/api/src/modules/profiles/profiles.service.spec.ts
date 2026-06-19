@@ -2,16 +2,17 @@ import { describe, expect, it } from 'vitest';
 
 import type { AuthAuditRecord } from '../auth/auth.records';
 import type { AuthService } from '../auth/auth.service';
+import { InMemoryProfilesRepository } from './in-memory-profiles.repository';
 import { ProfilesService } from './profiles.service';
 
 const tenantId = '11111111-1111-4111-8111-111111111111';
 type TenantAuditInput = Omit<AuthAuditRecord, 'id' | 'createdAt'>;
 
 describe('ProfilesService', () => {
-  it('creates a safe tenant-scoped profile draft', () => {
+  it('creates a safe tenant-scoped profile draft', async () => {
     const service = new ProfilesService();
 
-    const draft = service.createDraft(tenantId, {
+    const draft = await service.createDraft(tenantId, {
       displayName: 'Nairobi Fresh Produce',
       industryCode: 'AGRICULTURE',
       role: 'SUPPLIER',
@@ -22,13 +23,14 @@ describe('ProfilesService', () => {
 
     expect(draft.tenantId).toBe(tenantId);
     expect(draft.status).toBe('DRAFT');
-    expect(service.previewDraft(tenantId, draft.id).preview.completenessScore).toBeGreaterThan(70);
+    const preview = await service.previewDraft(tenantId, draft.id);
+    expect(preview.preview.completenessScore).toBeGreaterThan(70);
   });
 
-  it('blocks zero-tolerance profile content', () => {
+  it('blocks zero-tolerance profile content', async () => {
     const service = new ProfilesService();
 
-    expect(() =>
+    await expect(
       service.createDraft(tenantId, {
         displayName: 'Bad Actor',
         industryCode: 'TRADE',
@@ -36,13 +38,13 @@ describe('ProfilesService', () => {
         description: 'Ammunition available for delivery.',
         countryCode: 'KE',
       }),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 
-  it('blocks prohibited content in contact and website fields', () => {
+  it('blocks prohibited content in contact and website fields', async () => {
     const service = new ProfilesService();
 
-    expect(() =>
+    await expect(
       service.createDraft(tenantId, {
         displayName: 'General Trading',
         industryCode: 'TRADE',
@@ -51,18 +53,18 @@ describe('ProfilesService', () => {
         countryCode: 'KE',
         website: 'https://counterfeit-goods.example',
       }),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 
   it('publishes a draft as the tenant live profile with audit evidence', async () => {
     const auditLogs: TenantAuditInput[] = [];
-    const service = new ProfilesService({
+    const service = new ProfilesService(undefined, {
       recordTenantAudit: async (record: TenantAuditInput) => {
         auditLogs.push(record);
       },
     } as Pick<AuthService, 'recordTenantAudit'> as AuthService);
 
-    const draft = service.createDraft(tenantId, {
+    const draft = await service.createDraft(tenantId, {
       displayName: 'Nairobi Fresh Produce',
       industryCode: 'AGRICULTURE',
       role: 'SUPPLIER',
@@ -80,8 +82,8 @@ describe('ProfilesService', () => {
       status: 'LIVE',
       version: 1,
     });
-    expect(service.getLiveProfile(tenantId).id).toBe(published.id);
-    expect(service.getDraft(tenantId, draft.id).status).toBe('PUBLISHED');
+    expect((await service.getLiveProfile(tenantId)).id).toBe(published.id);
+    expect((await service.getDraft(tenantId, draft.id)).status).toBe('PUBLISHED');
     expect(auditLogs).toHaveLength(1);
     expect(auditLogs[0]).toMatchObject({
       tenantId,
@@ -94,14 +96,14 @@ describe('ProfilesService', () => {
 
   it('archives the previous live profile when a newer draft is published', async () => {
     const service = new ProfilesService();
-    const firstDraft = service.createDraft(tenantId, {
+    const firstDraft = await service.createDraft(tenantId, {
       displayName: 'Nairobi Fresh Produce',
       industryCode: 'AGRICULTURE',
       role: 'SUPPLIER',
       description: 'We supply fresh vegetables to hotels and shops in Nairobi.',
       countryCode: 'KE',
     });
-    const secondDraft = service.createDraft(tenantId, {
+    const secondDraft = await service.createDraft(tenantId, {
       displayName: 'Nairobi Fresh Produce Export Desk',
       industryCode: 'AGRICULTURE',
       role: 'PRODUCER',
@@ -111,10 +113,10 @@ describe('ProfilesService', () => {
 
     const first = await service.publishDraft(tenantId, firstDraft.id, 'user-1');
     const second = await service.publishDraft(tenantId, secondDraft.id, 'user-1');
-    const history = service.listPublishedProfiles(tenantId);
+    const history = await service.listPublishedProfiles(tenantId);
 
     expect(second.version).toBe(2);
-    expect(service.getLiveProfile(tenantId).id).toBe(second.id);
+    expect((await service.getLiveProfile(tenantId)).id).toBe(second.id);
     expect(history.find((profile) => profile.id === first.id)).toMatchObject({
       status: 'ARCHIVED',
       version: 1,
@@ -122,6 +124,24 @@ describe('ProfilesService', () => {
     expect(history.find((profile) => profile.id === second.id)).toMatchObject({
       status: 'LIVE',
       version: 2,
+    });
+  });
+
+  it('uses an injected profile repository boundary', async () => {
+    const repository = new InMemoryProfilesRepository();
+    const service = new ProfilesService(repository);
+
+    const draft = await service.createDraft(tenantId, {
+      displayName: 'Repository Backed Profile',
+      industryCode: 'TRADE',
+      role: 'RETAILER',
+      description: 'We connect safe retail buyers with verified compliant suppliers.',
+      countryCode: 'KE',
+    });
+
+    expect(await repository.findDraft(tenantId, draft.id)).toMatchObject({
+      id: draft.id,
+      status: 'DRAFT',
     });
   });
 });

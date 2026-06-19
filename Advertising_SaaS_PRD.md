@@ -338,9 +338,12 @@ Implementation progress on 2026-06-19:
   history.
 - Added profile publish audit evidence so sensitive publication events can be
   reviewed from the tenant audit trail.
-- Remaining hardening: Prisma-backed profile repository, profile edit/update
-  endpoints, terms re-acceptance checks at publish, moderation review gates for
-  high-risk edits, and media/contact enrichment.
+- Added a profile repository boundary with in-memory default storage and
+  opt-in Prisma persistence for profile drafts, live profile publishing,
+  previous-live archiving, and source-draft linkage.
+- Remaining hardening: profile edit/update endpoints, terms re-acceptance
+  checks at publish, moderation review gates for high-risk edits, and
+  media/contact enrichment.
 
 ### 7.3 Media Display Area
 

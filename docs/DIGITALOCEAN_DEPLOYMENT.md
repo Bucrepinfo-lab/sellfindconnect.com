@@ -84,7 +84,7 @@ No paying subscriber should be onboarded until:
 
 Run these from the repository root after the target PostgreSQL `DATABASE_URL`
 is configured in the environment and before enabling `AUTH_REPOSITORY=prisma`
-in production:
+and `PROFILE_REPOSITORY=prisma` in production:
 
 - `npm run db:validate`
 - `npm run db:generate`

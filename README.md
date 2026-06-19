@@ -58,6 +58,7 @@ API: `http://localhost:4000/v1`
 
 OpenAPI: `http://localhost:4000/docs`
 
-The current vertical slice uses an in-memory profile-draft repository. PostgreSQL
-persistence is introduced after the initial schema and tenant boundary are
-validated.
+Auth and profile repositories use in-memory storage by default for local demo
+work. After migrations and seed data are ready, set `AUTH_REPOSITORY=prisma`
+and `PROFILE_REPOSITORY=prisma` with `DATABASE_URL` to use PostgreSQL-backed
+persistence.
