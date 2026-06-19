@@ -23,7 +23,9 @@ import type { AuthService } from '../auth/auth.service';
 import {
   MEDIA_ADAPTERS,
   createDefaultMediaAdapters,
+  enqueueMediaProcessingJobs,
   type MediaAdapters,
+  type MediaProcessingJob,
 } from '../media/media.adapters';
 import type {
   CreateAdvertDto,
@@ -191,7 +193,7 @@ export class AdvertsService {
     id: string,
     input: CreateAdvertMediaDto,
     actorUserId?: string,
-  ): Promise<{ media: MediaAsset; mediaSlots: MediaSlots }> {
+  ): Promise<{ media: MediaAsset; mediaSlots: MediaSlots; processingJobs: MediaProcessingJob[] }> {
     await this.requireStoredTermsAcceptance(
       tenantId,
       actorUserId,
@@ -278,6 +280,7 @@ export class AdvertsService {
 
     this.mediaAssets.set(this.key(tenantId, media.id), media);
     this.adverts.set(this.key(tenantId, advert.id), { ...advert, updatedAt: now });
+    const processingJobs = await enqueueMediaProcessingJobs(this.mediaAdapters, media);
     await this.auth?.recordTenantAudit({
       tenantId,
       actorUserId,
@@ -290,12 +293,14 @@ export class AdvertsService {
         mimeType: media.mimeType,
         displayOrder: media.displayOrder,
         mediaCount: existingMedia.length + 1,
+        processingJobTypes: processingJobs.map((job) => job.type).join(','),
       },
     });
 
     return {
       media,
       mediaSlots: this.mediaSlots([...existingMedia, media]),
+      processingJobs,
     };
   }
 

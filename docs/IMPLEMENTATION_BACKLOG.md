@@ -193,9 +193,11 @@ Progress:
 - Added provider-neutral profile media upload preparation plus storage,
   moderation, and CDN/transform adapter hooks, with persisted storage keys,
   CDN URLs, transform status, and variant metadata.
-- Real object-storage credentials/signed URLs, provider-backed malware and media
-  scanning, background image/video workers, and richer review case management
-  remain next.
+- Added S3-compatible presigned PUT upload support through env-configured
+  Signature V4 signing, plus scan/transform processing job interfaces.
+- Real object-storage credentials, provider-backed malware and media scanning,
+  durable worker queues, background image/video workers, and richer review case
+  management remain next.
 
 ## Epic 4: Listing and Media Vertical Slice
 
@@ -225,8 +227,10 @@ Progress:
   moderation, and CDN/transform adapter hooks; advert media uses the ten-item
   cap, safety checks, moderation status, transform metadata, display slots, and
   auto-archives when an advert auto-deletes.
-- A durable scheduler/queue, persisted advert repository, and provider-backed
-  media workers remain next.
+- Added S3-compatible presigned upload readiness and media processing job
+  queue contracts shared with profile media.
+- A durable scheduler/queue, persisted advert repository, live storage
+  credentials, and provider-backed media workers remain next.
 
 ## Epic 5: Source Finder and Relationship Graph
 

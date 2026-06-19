@@ -363,8 +363,10 @@ Implementation progress on 2026-06-19:
 - Added provider-neutral profile media upload preparation plus storage,
   moderation, and CDN/transform adapter hooks, with persisted storage keys,
   CDN URLs, transform status, and variant metadata.
-- Remaining hardening: real object-storage credentials/signed URLs,
-  provider-backed malware and media scanning, background image/video workers,
+- Added S3-compatible presigned PUT upload support through env-configured
+  Signature V4 signing, plus scan/transform processing job interfaces.
+- Remaining hardening: live object-storage credentials, provider-backed malware
+  and media scanning, durable worker queues, background image/video workers,
   richer review case management, and user-facing review status in web/mobile
   clients.
 
@@ -433,8 +435,11 @@ Implementation progress:
   transform adapter hooks. Advert media enforces the ten-item cap, safety
   checks, moderation status, transform metadata, display slots, and media
   auto-archive when the advert auto-deletes.
-- Durable advert drafts, persisted advert repository, provider-backed media
-  workers, pause/archive/renew controls, and public listing preview remain next.
+- Added S3-compatible presigned upload readiness and media processing job
+  queue contracts shared with profile media.
+- Durable advert drafts, persisted advert repository, live storage credentials,
+  provider-backed media workers, pause/archive/renew controls, and public
+  listing preview remain next.
 
 ### 7.5 Search and Discovery
 

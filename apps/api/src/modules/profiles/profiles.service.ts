@@ -34,7 +34,9 @@ import { InMemoryProfilesRepository } from './in-memory-profiles.repository';
 import {
   MEDIA_ADAPTERS,
   createDefaultMediaAdapters,
+  enqueueMediaProcessingJobs,
   type MediaAdapters,
+  type MediaProcessingJob,
 } from '../media/media.adapters';
 import { PROFILES_REPOSITORY, type ProfilesRepository } from './profiles.repository';
 
@@ -381,7 +383,7 @@ export class ProfilesService {
     id: string,
     input: CreateProfileMediaDto,
     actorUserId?: string,
-  ): Promise<{ media: MediaAsset; mediaSlots: MediaSlots }> {
+  ): Promise<{ media: MediaAsset; mediaSlots: MediaSlots; processingJobs: MediaProcessingJob[] }> {
     await this.requireStoredTermsAcceptance(
       tenantId,
       actorUserId,
@@ -468,6 +470,7 @@ export class ProfilesService {
 
     await this.repository.createMediaAsset(media);
     await this.repository.updateDraft(updatedDraft);
+    const processingJobs = await enqueueMediaProcessingJobs(this.mediaAdapters, media);
     await this.auth?.recordTenantAudit({
       tenantId,
       actorUserId,
@@ -480,12 +483,14 @@ export class ProfilesService {
         mimeType: media.mimeType,
         displayOrder: media.displayOrder,
         mediaCount: existingMedia.length + 1,
+        processingJobTypes: processingJobs.map((job) => job.type).join(','),
       },
     });
 
     return {
       media,
       mediaSlots: this.mediaSlots([...existingMedia, media]),
+      processingJobs,
     };
   }
 
