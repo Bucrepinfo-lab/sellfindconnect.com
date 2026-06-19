@@ -5,7 +5,9 @@ import type {
   AuthMfaChallengeRecord,
   AuthSessionRecord,
   AuthTenantRecord,
+  AuthTenantInviteRecord,
   AuthUserRecord,
+  InvitedTenantUserRecords,
   OwnerRegistrationRecords,
   PasswordUpdateRecord,
   TenantMembershipRecord,
@@ -24,13 +26,17 @@ export interface AuthRepository {
   findSessionByTokenHash(tokenHash: string): RepositoryResult<AuthSessionRecord | undefined>;
   findMfaChallengeBySessionId(sessionId: string): RepositoryResult<AuthMfaChallengeRecord | undefined>;
   findAccountChallengeByTokenHash(tokenHash: string): RepositoryResult<AuthAccountChallengeRecord | undefined>;
+  findTenantInviteByTokenHash(tokenHash: string): RepositoryResult<AuthTenantInviteRecord | undefined>;
   createOwnerRegistration(records: OwnerRegistrationRecords): RepositoryResult<void>;
+  createInvitedTenantUser(records: InvitedTenantUserRecords): RepositoryResult<void>;
   createSession(session: AuthSessionRecord): RepositoryResult<void>;
   updateSession(session: AuthSessionRecord): RepositoryResult<void>;
   createMfaChallenge(challenge: AuthMfaChallengeRecord): RepositoryResult<void>;
   updateMfaChallenge(challenge: AuthMfaChallengeRecord): RepositoryResult<void>;
   createAccountChallenge(challenge: AuthAccountChallengeRecord): RepositoryResult<void>;
   updateAccountChallenge(challenge: AuthAccountChallengeRecord): RepositoryResult<void>;
+  createTenantInvite(invite: AuthTenantInviteRecord): RepositoryResult<void>;
+  updateTenantInvite(invite: AuthTenantInviteRecord): RepositoryResult<void>;
   markUserEmailVerified(userId: string, emailVerifiedAt: string): RepositoryResult<void>;
   updateUserPassword(userId: string, password: PasswordUpdateRecord): RepositoryResult<void>;
   markUserMfaVerified(userId: string, mfaVerifiedAt: string): RepositoryResult<void>;

@@ -32,6 +32,7 @@ describe('TenantSessionGuard', () => {
         allowed: true as const,
         tenantId,
         userId: 'user-1',
+        role: 'OWNER',
         mfaVerified: true,
       }),
     };
@@ -44,7 +45,7 @@ describe('TenantSessionGuard', () => {
     await expect(guard.canActivate(context)).resolves.toBe(true);
     expect(request).toMatchObject({
       tenantId,
-      authSession: { tenantId, userId: 'user-1', mfaVerified: true },
+      authSession: { tenantId, userId: 'user-1', role: 'OWNER', mfaVerified: true },
     });
   });
 
@@ -61,6 +62,7 @@ describe('TenantSessionGuard', () => {
         allowed: true as const,
         tenantId,
         userId: 'user-1',
+        role: 'OWNER',
         mfaVerified: false,
       }),
     };

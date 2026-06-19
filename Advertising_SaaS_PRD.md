@@ -273,7 +273,8 @@ Implementation progress on 2026-06-18:
 - Added session-token hash storage so raw bearer tokens are only shown at issuance time and are not retained as lookup keys.
 - Added generated, hashed, time-limited MFA challenges so the fixed development code is no longer accepted.
 - Added generated, hashed, expiring email verification and password reset challenges, including password reset session revocation.
-- Added an opt-in Prisma auth repository for durable user, tenant, membership, session, MFA challenge, account challenge, and policy-acceptance persistence when `AUTH_REPOSITORY=prisma` is enabled with `DATABASE_URL`.
+- Added MVP tenant invites so verified owners can invite non-owner tenant roles and invited users can accept with current terms, verified email, role-aware membership, and a fresh session.
+- Added an opt-in Prisma auth repository for durable user, tenant, membership, session, MFA challenge, account challenge, tenant invite, and policy-acceptance persistence when `AUTH_REPOSITORY=prisma` is enabled with `DATABASE_URL`.
 - Added a reusable tenant session guard that validates `x-session-token` against `x-tenant-id` and requires MFA before protected tenant routes proceed.
 - Migrated profile draft/preview routes and advert listing/lifecycle routes to the MFA-verified tenant session guard.
 - Migrated lead conversion and conversation/chat routes to the MFA-verified tenant session guard.
@@ -911,6 +912,7 @@ Implementation progress on 2026-06-18:
 - Added owner registration and login session groundwork so tenants can be created with an owner membership and first-month-free trial state.
 - Added generated, expiring MFA challenge records for tenant-owner sessions; provider-backed email/SMS/authenticator delivery remains a production hardening step.
 - Added hashed account challenge records for email verification and password reset; provider-backed email delivery remains a production hardening step.
+- Added tenant invite tokens for non-owner tenant roles; existing-account invite linking remains a future hardening step.
 
 ## 10. Nonfunctional Requirements
 

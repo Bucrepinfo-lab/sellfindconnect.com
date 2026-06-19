@@ -112,10 +112,13 @@ Progress:
 - Added generated, hashed, expiring account challenge records for email
   verification and password reset, with password reset revoking active user
   sessions after completion.
+- Added MVP tenant invite flows so an MFA-verified owner can invite non-owner
+  tenant roles, and invited users can accept with current terms acceptance,
+  verified email, role-aware membership, and a fresh session.
 - Added an opt-in Prisma-backed auth repository selected with
   `AUTH_REPOSITORY=prisma`, using `DATABASE_URL` and the generated Prisma
   client to persist users, tenants, memberships, auth sessions, MFA
-  challenges, account challenges, and terms acceptance evidence.
+  challenges, account challenges, tenant invites, and terms acceptance evidence.
 - Added a reusable tenant session guard that validates `x-session-token`
   against `x-tenant-id`, attaches authenticated tenant session context, and
   blocks tenant routes until MFA is verified.
@@ -133,9 +136,9 @@ Progress:
 - Added the initial Prisma migration and seed workflow required before enabling
   production Prisma persistence against a hosted PostgreSQL database.
 - Production identity provider, provider-backed email delivery,
-  provider-backed email/SMS/authenticator MFA delivery, invite flows, hosted
-  database migration/seed execution, and production Prisma enablement remain
-  next.
+  provider-backed email/SMS/authenticator MFA delivery, existing-user invite
+  acceptance, hosted database migration/seed execution, and production Prisma
+  enablement remain next.
 
 ## Epic 3: Advertiser Profile Vertical Slice
 

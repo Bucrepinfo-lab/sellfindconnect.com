@@ -216,6 +216,7 @@ model User {
   authSessions            AuthSession[]
   authMfaChallenges       AuthMfaChallenge[]
   authAccountChallenges   AuthAccountChallenge[]
+  sentTenantInvites       TenantInvite[]            @relation("TenantInviteInviter")
   termsAcceptanceEvidence TermsAcceptanceEvidence[]
 }
 
@@ -251,6 +252,7 @@ model Tenant {
   accessDecisionAudits      AccessDecisionAudit[]
   authSessions              AuthSession[]
   authMfaChallenges         AuthMfaChallenge[]
+  tenantInvites             TenantInvite[]
   termsAcceptanceEvidence   TermsAcceptanceEvidence[]
 
   @@index([countryCode])
@@ -268,6 +270,25 @@ model TenantMembership {
 
   @@unique([tenantId, userId])
   @@index([userId])
+}
+
+model TenantInvite {
+  id              String    @id @default(uuid())
+  tenantId        String
+  email           String    @db.VarChar(320)
+  role            String    @db.VarChar(80)
+  tokenHash       String    @unique
+  invitedByUserId String
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invitedBy       User      @relation("TenantInviteInviter", fields: [invitedByUserId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([email, tenantId])
+  @@index([expiresAt, acceptedAt, revokedAt])
 }
 
 model AuthSession {

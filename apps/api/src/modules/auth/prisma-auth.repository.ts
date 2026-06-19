@@ -8,6 +8,7 @@ import {
   type AuthSession,
   type Country,
   type Tenant,
+  type TenantInvite,
   type TenantMembership,
   type TermsAcceptanceEvidence as PrismaTermsAcceptanceEvidence,
   type User,
@@ -19,7 +20,9 @@ import type {
   AuthMfaChallengeRecord,
   AuthSessionRecord,
   AuthTenantRecord,
+  AuthTenantInviteRecord,
   AuthUserRecord,
+  InvitedTenantUserRecords,
   OwnerRegistrationRecords,
   PasswordUpdateRecord,
   TenantMembershipRecord,
@@ -46,7 +49,7 @@ export class PrismaAuthRepository implements AuthRepository {
 
   async findFirstMembershipForUser(userId: string): Promise<TenantMembershipRecord | undefined> {
     const membership = await this.prisma.tenantMembership.findFirst({
-      where: { userId, role: TenantRole.OWNER },
+      where: { userId },
       orderBy: { createdAt: 'asc' },
     });
     return membership ? this.mapMembership(membership) : undefined;
@@ -91,6 +94,11 @@ export class PrismaAuthRepository implements AuthRepository {
     return challenge ? this.mapAccountChallenge(challenge) : undefined;
   }
 
+  async findTenantInviteByTokenHash(tokenHash: string): Promise<AuthTenantInviteRecord | undefined> {
+    const invite = await this.prisma.tenantInvite.findUnique({ where: { tokenHash } });
+    return invite ? this.mapTenantInvite(invite) : undefined;
+  }
+
   async createOwnerRegistration(records: OwnerRegistrationRecords): Promise<void> {
     await this.prisma.$transaction([
       this.prisma.user.create({
@@ -130,6 +138,51 @@ export class PrismaAuthRepository implements AuthRepository {
           userId: records.membership.userId,
           tenantId: records.membership.tenantId,
           role: TenantRole.OWNER,
+          createdAt: new Date(records.membership.createdAt),
+        },
+      }),
+      this.prisma.termsAcceptanceEvidence.create({
+        data: {
+          userId: records.termsAcceptance.userId,
+          tenantId: records.termsAcceptance.tenantId,
+          countryCode: records.termsAcceptance.countryCode,
+          locale: records.termsAcceptance.locale,
+          termsVersion: records.termsAcceptance.termsVersion,
+          privacyVersion: records.termsAcceptance.privacyVersion,
+          prohibitedContentVersion: records.termsAcceptance.prohibitedContentVersion,
+          subscriptionTermsVersion: records.termsAcceptance.subscriptionTermsVersion,
+          appSurface: records.termsAcceptance.appSurface,
+          acceptanceSource: records.termsAcceptance.acceptanceSource,
+          acceptedAt: new Date(records.termsAcceptance.acceptedAt),
+        },
+      }),
+    ]);
+  }
+
+  async createInvitedTenantUser(records: InvitedTenantUserRecords): Promise<void> {
+    await this.prisma.$transaction([
+      this.prisma.user.create({
+        data: {
+          id: records.user.id,
+          email: records.user.email,
+          displayName: records.user.displayName,
+          phone: records.user.phone,
+          passwordHash: records.user.passwordHash,
+          passwordSalt: records.user.passwordSalt,
+          passwordIterations: records.user.passwordIterations,
+          emailVerifiedAt: records.user.emailVerifiedAt
+            ? new Date(records.user.emailVerifiedAt)
+            : undefined,
+          mfaRequired: records.user.mfaRequired,
+          createdAt: new Date(records.user.createdAt),
+        },
+      }),
+      this.prisma.tenantMembership.create({
+        data: {
+          id: records.membership.id,
+          userId: records.membership.userId,
+          tenantId: records.membership.tenantId,
+          role: records.membership.role as TenantRole,
           createdAt: new Date(records.membership.createdAt),
         },
       }),
@@ -235,6 +288,34 @@ export class PrismaAuthRepository implements AuthRepository {
     });
   }
 
+  async createTenantInvite(invite: AuthTenantInviteRecord): Promise<void> {
+    await this.prisma.tenantInvite.create({
+      data: {
+        id: invite.id,
+        tenantId: invite.tenantId,
+        email: invite.email,
+        role: invite.role,
+        tokenHash: invite.tokenHash,
+        invitedByUserId: invite.invitedByUserId,
+        expiresAt: new Date(invite.expiresAt),
+        acceptedAt: invite.acceptedAt ? new Date(invite.acceptedAt) : undefined,
+        revokedAt: invite.revokedAt ? new Date(invite.revokedAt) : undefined,
+        createdAt: new Date(invite.createdAt),
+      },
+    });
+  }
+
+  async updateTenantInvite(invite: AuthTenantInviteRecord): Promise<void> {
+    await this.prisma.tenantInvite.update({
+      where: { id: invite.id },
+      data: {
+        acceptedAt: invite.acceptedAt ? new Date(invite.acceptedAt) : null,
+        revokedAt: invite.revokedAt ? new Date(invite.revokedAt) : null,
+        expiresAt: new Date(invite.expiresAt),
+      },
+    });
+  }
+
   async markUserEmailVerified(userId: string, emailVerifiedAt: string): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
@@ -322,7 +403,7 @@ export class PrismaAuthRepository implements AuthRepository {
       id: membership.id,
       userId: membership.userId,
       tenantId: membership.tenantId,
-      role: 'OWNER',
+      role: membership.role,
       createdAt: membership.createdAt.toISOString(),
     };
   }
@@ -333,12 +414,27 @@ export class PrismaAuthRepository implements AuthRepository {
       tokenHash: session.tokenHash,
       userId: session.userId,
       tenantId: session.tenantId,
-      role: 'OWNER',
+      role: session.role as AuthSessionRecord['role'],
       mfaRequired: session.mfaRequired,
       mfaVerified: session.mfaVerified,
       expiresAt: session.expiresAt.toISOString(),
       createdAt: session.createdAt.toISOString(),
       revokedAt: session.revokedAt?.toISOString(),
+    };
+  }
+
+  private mapTenantInvite(invite: TenantInvite): AuthTenantInviteRecord {
+    return {
+      id: invite.id,
+      tenantId: invite.tenantId,
+      email: invite.email,
+      role: invite.role as AuthTenantInviteRecord['role'],
+      tokenHash: invite.tokenHash,
+      invitedByUserId: invite.invitedByUserId,
+      expiresAt: invite.expiresAt.toISOString(),
+      acceptedAt: invite.acceptedAt?.toISOString(),
+      revokedAt: invite.revokedAt?.toISOString(),
+      createdAt: invite.createdAt.toISOString(),
     };
   }
 

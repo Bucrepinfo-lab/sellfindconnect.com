@@ -1,4 +1,5 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import type { TenantAccessRole } from '@telpen/domain';
 
 import { AuthService } from '../auth/auth.service';
 import type { TenantScopedRequest } from './tenant-request';
@@ -7,6 +8,7 @@ export type TenantSessionDecision = {
   allowed: boolean;
   tenantId: string;
   userId: string;
+  role: TenantAccessRole;
   mfaVerified: boolean;
 };
 

@@ -2,8 +2,10 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   onboardingUserTypes,
   supplyChainRoles,
+  tenantAccessRoles,
   type OnboardingUserType,
   type SupplyChainRole,
+  type TenantAccessRole,
 } from '@telpen/domain';
 import {
   Equals,
@@ -16,6 +18,10 @@ import {
   Matches,
   MaxLength,
 } from 'class-validator';
+
+export const tenantInviteRoles = tenantAccessRoles.filter(
+  (role): role is Exclude<TenantAccessRole, 'OWNER'> => role !== 'OWNER',
+);
 
 export class RegisterTenantOwnerDto {
   @ApiProperty({ example: 'owner@example.com' })
@@ -107,6 +113,54 @@ export class ConfirmPasswordResetDto {
   @IsString()
   @Length(8, 256)
   declare newPassword: string;
+}
+
+export class CreateTenantInviteDto {
+  @ApiProperty({ example: 'session-token' })
+  @IsString()
+  @Length(16, 256)
+  declare sessionToken: string;
+
+  @ApiProperty({ example: '11111111-1111-4111-8111-111111111111' })
+  @IsString()
+  @Length(8, 120)
+  declare tenantId: string;
+
+  @ApiProperty({ example: 'agent@example.com' })
+  @IsEmail()
+  declare email: string;
+
+  @ApiProperty({ enum: tenantInviteRoles, example: 'SALES_CHAT_AGENT' })
+  @IsIn(tenantInviteRoles)
+  declare role: Exclude<TenantAccessRole, 'OWNER'>;
+}
+
+export class AcceptTenantInviteDto {
+  @ApiProperty({ example: 'tenant-invite-token' })
+  @IsString()
+  @Length(32, 256)
+  declare token: string;
+
+  @ApiProperty({ example: 'Grace Agent' })
+  @IsString()
+  @Length(2, 160)
+  declare displayName: string;
+
+  @ApiProperty({ example: 'Invited-agent#2026' })
+  @IsString()
+  @Length(8, 256)
+  declare password: string;
+
+  @ApiPropertyOptional({ example: '+254700000001' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  declare phone?: string;
+
+  @ApiProperty({ example: true })
+  @IsBoolean()
+  @Equals(true)
+  declare acceptedTerms: true;
 }
 
 export class VerifyMfaDto {

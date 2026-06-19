@@ -3,9 +3,11 @@ import { ApiHeader, ApiTags } from '@nestjs/swagger';
 
 import { AuthService } from './auth.service';
 import {
+  AcceptTenantInviteDto,
   CheckTenantSessionDto,
   ConfirmEmailVerificationDto,
   ConfirmPasswordResetDto,
+  CreateTenantInviteDto,
   LoginDto,
   RegisterTenantOwnerDto,
   RequestEmailVerificationDto,
@@ -46,6 +48,16 @@ export class AuthController {
   @Post('password-reset/confirm')
   confirmPasswordReset(@Body() body: ConfirmPasswordResetDto) {
     return this.auth.confirmPasswordReset(body);
+  }
+
+  @Post('tenant-invites/create')
+  createTenantInvite(@Body() body: CreateTenantInviteDto) {
+    return this.auth.createTenantInvite(body);
+  }
+
+  @Post('tenant-invites/accept')
+  acceptTenantInvite(@Body() body: AcceptTenantInviteDto) {
+    return this.auth.acceptTenantInvite(body);
   }
 
   @Post('mfa/verify')

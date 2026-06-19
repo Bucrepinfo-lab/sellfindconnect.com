@@ -234,6 +234,66 @@ describe('AuthService', () => {
     });
   });
 
+  it('lets an MFA-verified owner invite and onboard a tenant user', async () => {
+    const service = new AuthService();
+    const registered = await service.registerTenantOwner({
+      email: 'owner@example.com',
+      password: strongPassword,
+      displayName: 'Mary Owner',
+      tenantDisplayName: 'Nairobi Fresh Produce Cooperative',
+      countryCode: 'KE',
+      industryCode: 'AGRICULTURE',
+      primaryRole: 'SUPPLIER',
+      userType: 'ADVERTISER',
+      acceptedTerms: true,
+    });
+
+    await expect(
+      service.createTenantInvite({
+        sessionToken: registered.session.token,
+        tenantId: registered.tenant.id,
+        email: 'agent@example.com',
+        role: 'SALES_CHAT_AGENT',
+      }),
+    ).rejects.toThrow();
+
+    await service.verifyMfa({
+      sessionToken: registered.session.token,
+      code: registered.session.mfaChallenge?.developmentCode ?? '',
+    });
+
+    const invite = await service.createTenantInvite({
+      sessionToken: registered.session.token,
+      tenantId: registered.tenant.id,
+      email: 'agent@example.com',
+      role: 'SALES_CHAT_AGENT',
+    });
+    const accepted = await service.acceptTenantInvite({
+      token: invite.invite.developmentToken ?? '',
+      displayName: 'Grace Agent',
+      password: 'Invited-agent#2026',
+      acceptedTerms: true,
+    });
+
+    expect(accepted.user.email).toBe('agent@example.com');
+    expect(accepted.user.emailVerifiedAt).toBeTruthy();
+    expect(accepted.membership.role).toBe('SALES_CHAT_AGENT');
+    expect(accepted.session.role).toBe('SALES_CHAT_AGENT');
+    await expect(
+      service.login({ email: 'agent@example.com', password: 'Invited-agent#2026' }),
+    ).resolves.toMatchObject({
+      session: { role: 'SALES_CHAT_AGENT', token: expect.any(String) },
+    });
+    await expect(
+      service.acceptTenantInvite({
+        token: invite.invite.developmentToken ?? '',
+        displayName: 'Second Agent',
+        password: 'Invited-agent#2027',
+        acceptedTerms: true,
+      }),
+    ).rejects.toThrow();
+  });
+
   it('proves session tenant isolation', async () => {
     const service = new AuthService();
     const registered = await service.registerTenantOwner({

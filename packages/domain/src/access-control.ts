@@ -27,6 +27,8 @@ export const tenantAccessRoles = [
   'READ_ONLY_VIEWER',
 ] as const;
 
+export type TenantAccessRole = (typeof tenantAccessRoles)[number];
+
 export const accessRoles = [
   ...globalAccessRoles,
   ...regionalAccessRoles,

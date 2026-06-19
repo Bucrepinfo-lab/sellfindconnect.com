@@ -6,7 +6,9 @@ import type {
   AuthMfaChallengeRecord,
   AuthSessionRecord,
   AuthTenantRecord,
+  AuthTenantInviteRecord,
   AuthUserRecord,
+  InvitedTenantUserRecords,
   OwnerRegistrationRecords,
   PasswordUpdateRecord,
   TenantMembershipRecord,
@@ -22,6 +24,7 @@ export class InMemoryAuthRepository implements AuthRepository {
   private readonly sessionsByTokenHash = new Map<string, AuthSessionRecord>();
   private readonly mfaChallenges = new Map<string, AuthMfaChallengeRecord>();
   private readonly accountChallengesByTokenHash = new Map<string, AuthAccountChallengeRecord>();
+  private readonly tenantInvitesByTokenHash = new Map<string, AuthTenantInviteRecord>();
   private readonly termsEvidence = new Map<string, TermsAcceptanceEvidence>();
 
   findUserByEmail(email: string): AuthUserRecord | undefined {
@@ -58,6 +61,10 @@ export class InMemoryAuthRepository implements AuthRepository {
     return this.accountChallengesByTokenHash.get(tokenHash);
   }
 
+  findTenantInviteByTokenHash(tokenHash: string): AuthTenantInviteRecord | undefined {
+    return this.tenantInvitesByTokenHash.get(tokenHash);
+  }
+
   createOwnerRegistration(records: OwnerRegistrationRecords): void {
     this.usersByEmail.set(records.user.email, records.user);
     this.usersById.set(records.user.id, records.user);
@@ -65,6 +72,15 @@ export class InMemoryAuthRepository implements AuthRepository {
     this.memberships.set(records.membership.id, records.membership);
     this.termsEvidence.set(
       this.termsEvidenceKey(records.user.id, records.tenant.id),
+      records.termsAcceptance,
+    );
+  }
+
+  createInvitedTenantUser(records: InvitedTenantUserRecords): void {
+    this.saveUser(records.user);
+    this.memberships.set(records.membership.id, records.membership);
+    this.termsEvidence.set(
+      this.termsEvidenceKey(records.user.id, records.membership.tenantId),
       records.termsAcceptance,
     );
   }
@@ -91,6 +107,14 @@ export class InMemoryAuthRepository implements AuthRepository {
 
   updateAccountChallenge(challenge: AuthAccountChallengeRecord): void {
     this.accountChallengesByTokenHash.set(challenge.tokenHash, challenge);
+  }
+
+  createTenantInvite(invite: AuthTenantInviteRecord): void {
+    this.tenantInvitesByTokenHash.set(invite.tokenHash, invite);
+  }
+
+  updateTenantInvite(invite: AuthTenantInviteRecord): void {
+    this.tenantInvitesByTokenHash.set(invite.tokenHash, invite);
   }
 
   markUserEmailVerified(userId: string, emailVerifiedAt: string): void {

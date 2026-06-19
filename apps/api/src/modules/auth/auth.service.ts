@@ -13,6 +13,7 @@ import {
   evaluateSafetyFields,
   getCountry,
   industryCategories,
+  type TenantAccessRole,
 } from '@telpen/domain';
 import { createHash, pbkdf2Sync, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 
@@ -22,18 +23,23 @@ import type {
   AuthMfaChallengeRecord,
   AuthSessionRecord,
   AuthTenantRecord,
+  AuthTenantInviteRecord,
   AuthUserRecord,
   IssuedAuthSession,
   PresentedAccountChallenge,
   PresentedMfaChallenge,
   PresentedAuthSession,
+  PresentedTenantInvite,
   TenantMembershipRecord,
 } from './auth.records';
 import { AUTH_REPOSITORY, type AuthRepository } from './auth.repository';
+import { tenantInviteRoles } from './dto/auth.dto';
 import type {
+  AcceptTenantInviteDto,
   CheckTenantSessionDto,
   ConfirmEmailVerificationDto,
   ConfirmPasswordResetDto,
+  CreateTenantInviteDto,
   LoginDto,
   RegisterTenantOwnerDto,
   RequestEmailVerificationDto,
@@ -46,6 +52,7 @@ const MFA_CHALLENGE_TTL_MS = 10 * 60 * 1000;
 const MFA_MAX_FAILED_ATTEMPTS = 5;
 const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 const PASSWORD_RESET_TTL_MS = 30 * 60 * 1000;
+const TENANT_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class AuthService {
@@ -148,7 +155,7 @@ export class AuthService {
       user: this.presentUser(user),
       tenant,
       membership,
-      session: await this.createSession(user, tenantId),
+      session: await this.createSession(user, tenantId, 'OWNER'),
       emailVerificationChallenge: await this.createAccountChallenge(
         user,
         'EMAIL_VERIFICATION',
@@ -174,7 +181,7 @@ export class AuthService {
     return {
       user: this.presentUser(user),
       tenant: await this.repository.findTenantById(membership.tenantId),
-      session: await this.createSession(user, membership.tenantId),
+      session: await this.createSession(user, membership.tenantId, membership.role),
     };
   }
 
@@ -252,6 +259,122 @@ export class AuthService {
     };
   }
 
+  async createTenantInvite(input: CreateTenantInviteDto) {
+    const session = await this.requireSession(input.sessionToken);
+    if (session.tenantId !== input.tenantId || session.role !== 'OWNER') {
+      throw new UnauthorizedException('Only a tenant owner can create invites for this tenant.');
+    }
+
+    if (!session.mfaVerified) {
+      throw new UnauthorizedException('MFA verification is required before creating tenant invites.');
+    }
+
+    if (!tenantInviteRoles.includes(input.role)) {
+      throw new UnprocessableEntityException('Unsupported tenant invite role.');
+    }
+
+    const tenant = await this.repository.findTenantById(input.tenantId);
+    if (!tenant) {
+      throw new UnprocessableEntityException('Unsupported tenant.');
+    }
+
+    const email = input.email.trim().toLowerCase();
+    if (await this.repository.findUserByEmail(email)) {
+      throw new ConflictException('An account with this email already exists.');
+    }
+
+    return {
+      invite: await this.createTenantInviteRecord({
+        tenantId: tenant.id,
+        email,
+        role: input.role,
+        invitedByUserId: session.userId,
+      }),
+    };
+  }
+
+  async acceptTenantInvite(input: AcceptTenantInviteDto) {
+    this.assertSafe(
+      {
+        displayName: input.displayName,
+        phone: input.phone,
+      },
+      'Invite acceptance contains blocked content.',
+    );
+
+    const invite = await this.requireTenantInvite(input.token);
+    if (await this.repository.findUserByEmail(invite.email)) {
+      throw new ConflictException('An account with this email already exists.');
+    }
+
+    const tenant = await this.repository.findTenantById(invite.tenantId);
+    const country = tenant ? getCountry(tenant.countryCode) : undefined;
+    if (!tenant || !country) {
+      throw new UnprocessableEntityException('Unsupported tenant.');
+    }
+
+    const passwordPolicy = evaluatePasswordPolicy(input.password);
+    if (!passwordPolicy.allowed) {
+      throw new UnprocessableEntityException({
+        message: 'Password does not meet the security policy.',
+        passwordPolicy,
+      });
+    }
+
+    const now = new Date().toISOString();
+    const userId = randomUUID();
+    const password = this.hashPassword(input.password);
+    const user: AuthUserRecord = {
+      id: userId,
+      email: invite.email,
+      displayName: input.displayName,
+      phone: input.phone,
+      passwordHash: password.hash,
+      passwordSalt: password.salt,
+      passwordIterations: password.iterations,
+      emailVerifiedAt: now,
+      mfaRequired: true,
+      createdAt: now,
+    };
+    const membership: TenantMembershipRecord = {
+      id: randomUUID(),
+      userId,
+      tenantId: invite.tenantId,
+      role: invite.role,
+      createdAt: now,
+    };
+    const termsAcceptance = buildTermsAcceptanceEvidence({
+      accepted: input.acceptedTerms,
+      userId,
+      tenantId: invite.tenantId,
+      countryCode: country.code,
+      locale: country.locale,
+      appSurface: 'WEB',
+      acceptanceSource: 'ADMIN_INVITE',
+      acceptedAt: now,
+    });
+
+    if (!termsAcceptance) {
+      throw new UnprocessableEntityException('Current terms acceptance is required.');
+    }
+
+    await this.repository.updateTenantInvite({ ...invite, acceptedAt: now });
+    await this.repository.createInvitedTenantUser({
+      user,
+      membership,
+      termsAcceptance,
+    });
+
+    return {
+      user: this.presentUser(user),
+      tenant,
+      membership,
+      session: await this.createSession(user, invite.tenantId, invite.role),
+      termsAcceptance,
+      passwordPolicy,
+    };
+  }
+
   async verifyMfa(input: VerifyMfaDto) {
     const session = await this.requireSession(input.sessionToken);
     if (!session.mfaRequired || session.mfaVerified) {
@@ -318,6 +441,7 @@ export class AuthService {
       allowed: true,
       tenantId: session.tenantId,
       userId: session.userId,
+      role: session.role,
       mfaVerified: session.mfaVerified,
     };
   }
@@ -326,7 +450,11 @@ export class AuthService {
     return this.repository.listTenants();
   }
 
-  private async createSession(user: AuthUserRecord, tenantId: string): Promise<IssuedAuthSession> {
+  private async createSession(
+    user: AuthUserRecord,
+    tenantId: string,
+    role: TenantAccessRole,
+  ): Promise<IssuedAuthSession> {
     const now = new Date().toISOString();
     const expiresAt = new Date(Date.parse(now) + 8 * 60 * 60 * 1000).toISOString();
     const token = randomBytes(32).toString('base64url');
@@ -335,7 +463,7 @@ export class AuthService {
       tokenHash: this.hashSessionToken(token),
       userId: user.id,
       tenantId,
-      role: 'OWNER',
+      role,
       mfaRequired: user.mfaRequired,
       mfaVerified: !user.mfaRequired,
       expiresAt,
@@ -375,6 +503,21 @@ export class AuthService {
     return challenge;
   }
 
+  private async requireTenantInvite(token: string): Promise<AuthTenantInviteRecord> {
+    const invite = await this.repository.findTenantInviteByTokenHash(this.hashTenantInviteToken(token));
+
+    if (
+      !invite ||
+      invite.acceptedAt ||
+      invite.revokedAt ||
+      Date.parse(invite.expiresAt) <= Date.now()
+    ) {
+      throw new UnauthorizedException('Invalid or expired tenant invite.');
+    }
+
+    return invite;
+  }
+
   private hashPassword(password: string) {
     const salt = randomBytes(16).toString('base64url');
     const iterations = 210_000;
@@ -388,6 +531,10 @@ export class AuthService {
 
   private hashAccountChallengeToken(purpose: AuthAccountChallengePurpose, token: string): string {
     return createHash('sha256').update(`${purpose}:${token}`).digest('base64url');
+  }
+
+  private hashTenantInviteToken(token: string): string {
+    return createHash('sha256').update(`TENANT_INVITE:${token}`).digest('base64url');
   }
 
   private hashMfaCode(sessionId: string, code: string): string {
@@ -467,6 +614,29 @@ export class AuthService {
     return this.presentAccountChallenge(challenge, token);
   }
 
+  private async createTenantInviteRecord(input: {
+    tenantId: string;
+    email: string;
+    role: Exclude<TenantAccessRole, 'OWNER'>;
+    invitedByUserId: string;
+  }): Promise<PresentedTenantInvite> {
+    const now = new Date().toISOString();
+    const token = randomBytes(32).toString('base64url');
+    const invite: AuthTenantInviteRecord = {
+      id: randomUUID(),
+      tenantId: input.tenantId,
+      email: input.email,
+      role: input.role,
+      tokenHash: this.hashTenantInviteToken(token),
+      invitedByUserId: input.invitedByUserId,
+      expiresAt: new Date(Date.parse(now) + TENANT_INVITE_TTL_MS).toISOString(),
+      createdAt: now,
+    };
+
+    await this.repository.createTenantInvite(invite);
+    return this.presentTenantInvite(invite, token);
+  }
+
   private presentSession(session: AuthSessionRecord): PresentedAuthSession;
   private presentSession(
     session: AuthSessionRecord,
@@ -523,6 +693,26 @@ export class AuthService {
       purpose: challenge.purpose,
       expiresAt: challenge.expiresAt,
       createdAt: challenge.createdAt,
+    };
+
+    if (!this.isProductionRuntime()) {
+      return { ...presented, developmentToken };
+    }
+
+    return presented;
+  }
+
+  private presentTenantInvite(
+    invite: AuthTenantInviteRecord,
+    developmentToken?: string,
+  ): PresentedTenantInvite {
+    const presented: PresentedTenantInvite = {
+      id: invite.id,
+      tenantId: invite.tenantId,
+      email: invite.email,
+      role: invite.role,
+      expiresAt: invite.expiresAt,
+      createdAt: invite.createdAt,
     };
 
     if (!this.isProductionRuntime()) {

@@ -1,4 +1,4 @@
-import type { SupplyChainRole, TermsAcceptanceEvidence } from '@telpen/domain';
+import type { SupplyChainRole, TenantAccessRole, TermsAcceptanceEvidence } from '@telpen/domain';
 
 export type AuthUserRecord = {
   id: string;
@@ -34,7 +34,7 @@ export type TenantMembershipRecord = {
   id: string;
   userId: string;
   tenantId: string;
-  role: 'OWNER';
+  role: TenantAccessRole;
   createdAt: string;
 };
 
@@ -43,7 +43,7 @@ export type AuthSessionRecord = {
   tokenHash: string;
   userId: string;
   tenantId: string;
-  role: 'OWNER';
+  role: TenantAccessRole;
   mfaRequired: boolean;
   mfaVerified: boolean;
   expiresAt: string;
@@ -93,6 +93,26 @@ export type PresentedAccountChallenge = Pick<
   developmentToken?: string;
 };
 
+export type AuthTenantInviteRecord = {
+  id: string;
+  tenantId: string;
+  email: string;
+  role: Exclude<TenantAccessRole, 'OWNER'>;
+  tokenHash: string;
+  invitedByUserId: string;
+  expiresAt: string;
+  acceptedAt?: string;
+  revokedAt?: string;
+  createdAt: string;
+};
+
+export type PresentedTenantInvite = Pick<
+  AuthTenantInviteRecord,
+  'id' | 'tenantId' | 'email' | 'role' | 'expiresAt' | 'createdAt'
+> & {
+  developmentToken?: string;
+};
+
 export type PresentedAuthSession = Omit<AuthSessionRecord, 'tokenHash' | 'revokedAt'> & {
   token?: string;
 };
@@ -105,6 +125,12 @@ export type IssuedAuthSession = PresentedAuthSession & {
 export type OwnerRegistrationRecords = {
   user: AuthUserRecord;
   tenant: AuthTenantRecord;
+  membership: TenantMembershipRecord;
+  termsAcceptance: TermsAcceptanceEvidence;
+};
+
+export type InvitedTenantUserRecords = {
+  user: AuthUserRecord;
   membership: TenantMembershipRecord;
   termsAcceptance: TermsAcceptanceEvidence;
 };
