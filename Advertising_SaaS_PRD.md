@@ -355,8 +355,14 @@ Implementation progress on 2026-06-19:
   `MODERATE_CONTENT` assignments, scoped pending-review queue filtering,
   country/tenant access checks, platform review endpoints, and access-decision
   audit persistence.
-- Remaining hardening: media uploads/display, richer review case management, and
-  user-facing review status in web/mobile clients.
+- Added the profile media display foundation: shared media policy, ten-item
+  display cap, supported image/video metadata, recursive safety checks for media
+  captions/URLs/filenames, tenant-session protected draft media routes, preview
+  media slots, Prisma `MediaAsset` persistence, and publish-time media carry-over
+  into the live profile.
+- Remaining hardening: provider-backed upload URLs, malware scanning, CDN
+  transforms, video transcoding, listing media, richer review case management,
+  and user-facing review status in web/mobile clients.
 
 ### 7.3 Media Display Area
 

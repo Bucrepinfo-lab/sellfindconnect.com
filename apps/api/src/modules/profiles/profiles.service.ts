@@ -7,9 +7,12 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import {
+  evaluateMediaAssetInput,
   evaluateSafetyFields,
   getCountry,
   industryCategories,
+  mediaPolicy,
+  type MediaAsset,
   type ProfileDraft,
   type ProfileReviewReason,
   type PublishedProfile,
@@ -25,6 +28,7 @@ import type {
   ReviewProfileDraftDto,
   UpdateProfileDraftDto,
 } from './dto/create-profile-draft.dto';
+import type { CreateProfileMediaDto } from './dto/profile-media.dto';
 import { InMemoryProfilesRepository } from './in-memory-profiles.repository';
 import { PROFILES_REPOSITORY, type ProfilesRepository } from './profiles.repository';
 
@@ -32,6 +36,11 @@ const highRiskProfileIndustryCodes = new Set(['EXTRACTIVES', 'FINANCE', 'HEALTH'
 const highReviewRoles = new Set<string>(['FINANCIER', 'CERTIFIER', 'LOGISTICS_PROVIDER']);
 
 type ProfileReviewComparable = Pick<ProfileDraft, 'countryCode' | 'industryCode' | 'role'>;
+type MediaSlots = { used: number; max: number; remaining: number };
+type PublishedProfileWithMedia = PublishedProfile & {
+  media: MediaAsset[];
+  mediaSlots: MediaSlots;
+};
 
 @Injectable()
 export class ProfilesService {
@@ -248,6 +257,7 @@ export class ProfilesService {
 
   async previewDraft(tenantId: string, id: string) {
     const draft = await this.getDraft(tenantId, id);
+    const media = await this.repository.listMediaAssets(tenantId, 'PROFILE_DRAFT', draft.id);
     const country = getCountry(draft.countryCode);
     const industry = industryCategories.find((item) => item.code === draft.industryCode);
 
@@ -263,6 +273,8 @@ export class ProfilesService {
         reviewDecision: draft.reviewDecision ?? null,
         reviewedAt: draft.reviewedAt ?? null,
         reviewNote: draft.reviewNote ?? null,
+        media,
+        mediaSlots: this.mediaSlots(media),
         publicContacts: {
           phone: draft.phone ?? null,
           whatsapp: draft.whatsapp ?? null,
@@ -280,6 +292,103 @@ export class ProfilesService {
           operatingCountries: draft.serviceArea?.operatingCountries ?? [draft.countryCode],
         },
       },
+    };
+  }
+
+  async listDraftMedia(tenantId: string, id: string): Promise<MediaAsset[]> {
+    const draft = await this.getDraft(tenantId, id);
+    return this.repository.listMediaAssets(tenantId, 'PROFILE_DRAFT', draft.id);
+  }
+
+  async addDraftMedia(
+    tenantId: string,
+    id: string,
+    input: CreateProfileMediaDto,
+    actorUserId?: string,
+  ): Promise<{ media: MediaAsset; mediaSlots: MediaSlots }> {
+    await this.requireStoredTermsAcceptance(
+      tenantId,
+      actorUserId,
+      'Current stored terms acceptance is required before uploading profile media.',
+    );
+    const draft = await this.getDraft(tenantId, id);
+    const existingMedia = await this.repository.listMediaAssets(tenantId, 'PROFILE_DRAFT', draft.id);
+
+    if (existingMedia.length >= mediaPolicy.maxItemsPerOwner) {
+      throw new UnprocessableEntityException(
+        `A profile can display a maximum of ${mediaPolicy.maxItemsPerOwner} media items.`,
+      );
+    }
+
+    const displayOrder = input.displayOrder ?? this.nextMediaDisplayOrder(existingMedia);
+    if (existingMedia.some((asset) => asset.displayOrder === displayOrder)) {
+      throw new UnprocessableEntityException('This profile media display position is already used.');
+    }
+
+    const visibility = input.visibility ?? 'PUBLIC';
+    const mediaInput = {
+      ...input,
+      sourceUrl: input.sourceUrl.trim(),
+      thumbnailUrl: input.thumbnailUrl?.trim(),
+      fileName: input.fileName.trim(),
+      mimeType: input.mimeType.trim().toLowerCase(),
+      caption: input.caption?.trim(),
+      altText: input.altText?.trim(),
+      displayOrder,
+      visibility,
+    };
+    const mediaDecision = evaluateMediaAssetInput(mediaInput);
+    if (!mediaDecision.allowed) {
+      throw new UnprocessableEntityException({
+        message: 'Profile media metadata violates media policy.',
+        mediaPolicy: mediaDecision,
+      });
+    }
+
+    const safety = evaluateSafetyFields(mediaInput);
+    if (!safety.allowed) {
+      throw new UnprocessableEntityException({
+        message: 'Profile media metadata matches a zero-tolerance blocked category.',
+        safety,
+      });
+    }
+
+    const now = new Date().toISOString();
+    const media: MediaAsset = {
+      ...mediaInput,
+      id: randomUUID(),
+      tenantId,
+      ownerType: 'PROFILE_DRAFT',
+      ownerId: draft.id,
+      kind: mediaDecision.kind,
+      status: 'READY_FOR_PREVIEW',
+      moderationStatus: 'PASSED',
+      uploadedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const updatedDraft = this.mediaEditedDraft(draft, now);
+
+    await this.repository.createMediaAsset(media);
+    await this.repository.updateDraft(updatedDraft);
+    await this.auth?.recordTenantAudit({
+      tenantId,
+      actorUserId,
+      action: 'PROFILE_MEDIA_ADDED',
+      entityType: 'PROFILE_DRAFT',
+      entityId: draft.id,
+      metadata: {
+        mediaId: media.id,
+        kind: media.kind,
+        mimeType: media.mimeType,
+        displayOrder: media.displayOrder,
+        mediaCount: existingMedia.length + 1,
+      },
+    });
+
+    return {
+      media,
+      mediaSlots: this.mediaSlots([...existingMedia, media]),
     };
   }
 
@@ -309,6 +418,14 @@ export class ProfilesService {
       throw new UnprocessableEntityException({
         message: 'This profile draft matches a zero-tolerance blocked category.',
         safety,
+      });
+    }
+    const draftMedia = await this.repository.listMediaAssets(tenantId, 'PROFILE_DRAFT', draft.id);
+    const mediaSafety = evaluateSafetyFields(draftMedia);
+    if (!mediaSafety.allowed) {
+      throw new UnprocessableEntityException({
+        message: 'Profile media metadata matches a zero-tolerance blocked category.',
+        safety: mediaSafety,
       });
     }
 
@@ -353,11 +470,21 @@ export class ProfilesService {
       status: 'PUBLISHED',
       updatedAt: now,
     };
+    const publishedMediaAssets = draftMedia.map((asset): MediaAsset => ({
+      ...asset,
+      id: randomUUID(),
+      ownerType: 'PUBLISHED_PROFILE',
+      ownerId: published.id,
+      status: 'LIVE',
+      createdAt: now,
+      updatedAt: now,
+    }));
 
     await this.repository.publishProfile({
       tenantId,
       draft: publishedDraft,
       published,
+      publishedMediaAssets,
       previousLiveProfile: archivedPreviousProfile,
     });
 
@@ -379,15 +506,18 @@ export class ProfilesService {
     return published;
   }
 
-  async getLiveProfile(tenantId: string): Promise<PublishedProfile> {
+  async getLiveProfile(tenantId: string): Promise<PublishedProfileWithMedia> {
     const profile = await this.repository.findLiveProfile(tenantId);
     if (!profile) {
       throw new NotFoundException('Published profile not found.');
     }
 
+    const media = await this.repository.listMediaAssets(tenantId, 'PUBLISHED_PROFILE', profile.id);
     return {
       ...profile,
       daysLive: this.daysBetween(profile.publishedAt, new Date().toISOString()),
+      media,
+      mediaSlots: this.mediaSlots(media),
     };
   }
 
@@ -475,10 +605,24 @@ export class ProfilesService {
       return;
     }
 
+    await this.requireStoredTermsAcceptance(
+      tenantId,
+      actorUserId,
+      'Current stored terms acceptance is required before publishing.',
+    );
+  }
+
+  private async requireStoredTermsAcceptance(
+    tenantId: string,
+    actorUserId: string | undefined,
+    message: string,
+  ): Promise<void> {
+    if (!this.auth || !actorUserId) {
+      return;
+    }
+
     if (!(await this.auth.hasCurrentTermsAcceptance(actorUserId, tenantId))) {
-      throw new UnprocessableEntityException(
-        'Current stored terms acceptance is required before publishing.',
-      );
+      throw new UnprocessableEntityException(message);
     }
   }
 
@@ -530,6 +674,43 @@ export class ProfilesService {
       tenantId: draft.tenantId,
       countryCode: draft.countryCode,
       continentCode: country?.continentCode,
+    };
+  }
+
+  private mediaSlots(media: MediaAsset[]): MediaSlots {
+    return {
+      used: media.length,
+      max: mediaPolicy.maxItemsPerOwner,
+      remaining: Math.max(0, mediaPolicy.maxItemsPerOwner - media.length),
+    };
+  }
+
+  private nextMediaDisplayOrder(media: MediaAsset[]): number {
+    const usedOrders = new Set(media.map((asset) => asset.displayOrder));
+    for (let index = 0; index < mediaPolicy.maxItemsPerOwner; index += 1) {
+      if (!usedOrders.has(index)) {
+        return index;
+      }
+    }
+
+    return media.length;
+  }
+
+  private mediaEditedDraft(draft: ProfileDraft, now: string): ProfileDraft {
+    if (draft.status === 'PENDING_REVIEW') {
+      return { ...draft, updatedAt: now };
+    }
+
+    return {
+      ...draft,
+      status: 'DRAFT',
+      reviewReasons: [],
+      reviewRequestedAt: undefined,
+      reviewDecision: undefined,
+      reviewedAt: undefined,
+      reviewedBy: undefined,
+      reviewNote: undefined,
+      updatedAt: now,
     };
   }
 

@@ -7,6 +7,7 @@ export * from './industries';
 export * from './lead-conversion';
 export * from './lifecycle';
 export * from './messaging';
+export * from './media';
 export * from './notifications';
 export * from './profiles';
 export * from './sanitization';

@@ -185,7 +185,13 @@ Progress:
   `MODERATE_CONTENT` assignments, scoped pending-review queue filtering,
   country/tenant access checks, platform review endpoints, and access-decision
   audit persistence.
-- Media uploads/display and richer review case management remain next.
+- Added the profile media display foundation: shared media policy, ten-item
+  display cap, supported image/video metadata, recursive safety checks for media
+  captions/URLs/filenames, tenant-session protected draft media routes,
+  preview media slots, Prisma `MediaAsset` persistence, and publish-time media
+  carry-over into the live profile.
+- Provider-backed upload URLs, malware scanning, CDN transforms, video
+  transcoding, listing media, and richer review case management remain next.
 
 ## Epic 4: Listing and Media Vertical Slice
 

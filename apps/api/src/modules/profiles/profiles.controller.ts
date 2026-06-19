@@ -9,6 +9,7 @@ import {
   ReviewProfileDraftDto,
   UpdateProfileDraftDto,
 } from './dto/create-profile-draft.dto';
+import { CreateProfileMediaDto } from './dto/profile-media.dto';
 import { ProfilesService } from './profiles.service';
 
 @ApiTags('profiles')
@@ -48,6 +49,21 @@ export class ProfilesController {
   @Post('drafts/:id/preview')
   previewDraft(@TenantId() tenantId: string, @Param('id') id: string) {
     return this.profiles.previewDraft(tenantId, id);
+  }
+
+  @Get('drafts/:id/media')
+  listDraftMedia(@TenantId() tenantId: string, @Param('id') id: string) {
+    return this.profiles.listDraftMedia(tenantId, id);
+  }
+
+  @Post('drafts/:id/media')
+  addDraftMedia(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Param('id') id: string,
+    @Body() body: CreateProfileMediaDto,
+  ) {
+    return this.profiles.addDraftMedia(tenantId, id, body, session.userId);
   }
 
   @Get('reviews/pending')

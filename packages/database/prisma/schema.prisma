@@ -239,6 +239,7 @@ model Tenant {
   memberships               TenantMembership[]
   profileDrafts             ProfileDraft[]
   publishedProfiles         PublishedProfile[]
+  mediaAssets               MediaAsset[]
   taxSnapshots              TaxCalculationSnapshot[]
   analyticsEvents           AnalyticsEvent[]
   auditLogs                 AuditLog[]
@@ -485,6 +486,37 @@ model PublishedProfile {
   @@index([sourceDraftId])
   @@index([status, expiresAt])
   @@index([countryCode, industryCode])
+}
+
+model MediaAsset {
+  id               String   @id @default(uuid())
+  tenantId         String
+  ownerType        String   @db.VarChar(40)
+  ownerId          String   @db.VarChar(120)
+  kind             String   @db.VarChar(20)
+  status           String   @db.VarChar(40)
+  sourceUrl        String   @db.VarChar(1000)
+  thumbnailUrl     String?  @db.VarChar(1000)
+  mimeType         String   @db.VarChar(120)
+  fileName         String   @db.VarChar(240)
+  fileSizeBytes    Int
+  width            Int?
+  height           Int?
+  durationSeconds  Int?
+  caption          String?  @db.VarChar(500)
+  altText          String?  @db.VarChar(500)
+  displayOrder     Int
+  visibility       String   @db.VarChar(40)
+  moderationStatus String   @db.VarChar(40)
+  moderationReason String?  @db.VarChar(120)
+  uploadedAt       DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, ownerType, ownerId, displayOrder])
+  @@index([tenantId, status])
+  @@index([ownerType, ownerId])
 }
 
 model Notification {

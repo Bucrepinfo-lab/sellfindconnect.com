@@ -3,12 +3,24 @@ import {
   Prisma,
   PrismaClient,
   ProfileStatus,
+  type MediaAsset as PrismaMediaAsset,
   type ProfileDraft as PrismaProfileDraft,
   type PublishedProfile as PrismaPublishedProfile,
 } from '@prisma/client';
 import {
+  mediaAssetKinds,
+  mediaAssetStatuses,
+  mediaModerationStatuses,
+  mediaOwnerTypes,
+  mediaVisibilityStates,
   profileReviewDecisions,
   profileReviewReasons,
+  type MediaAsset,
+  type MediaAssetKind,
+  type MediaAssetStatus,
+  type MediaModerationStatus,
+  type MediaOwnerType,
+  type MediaVisibility,
   type ProfileDraft,
   type ProfileReviewDecision,
   type ProfileReviewReason,
@@ -111,6 +123,29 @@ export class PrismaProfilesRepository implements ProfilesRepository {
     return drafts.map((draft) => this.mapDraft(draft));
   }
 
+  async createMediaAsset(asset: MediaAsset): Promise<void> {
+    await this.prisma.mediaAsset.create({
+      data: this.mapMediaAssetToPrisma(asset),
+    });
+  }
+
+  async listMediaAssets(
+    tenantId: string,
+    ownerType: MediaOwnerType,
+    ownerId: string,
+  ): Promise<MediaAsset[]> {
+    const assets = await this.prisma.mediaAsset.findMany({
+      where: {
+        tenantId,
+        ownerType,
+        ownerId,
+        status: { not: 'BLOCKED' },
+      },
+      orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
+    });
+    return assets.map((asset) => this.mapMediaAsset(asset));
+  }
+
   async publishProfile(records: ProfilePublishRecords): Promise<void> {
     await this.prisma.$transaction([
       ...(records.previousLiveProfile
@@ -170,6 +205,13 @@ export class PrismaProfilesRepository implements ProfilesRepository {
           updatedAt: new Date(records.draft.updatedAt),
         },
       }),
+      ...(records.publishedMediaAssets?.length
+        ? [
+            this.prisma.mediaAsset.createMany({
+              data: records.publishedMediaAssets.map((asset) => this.mapMediaAssetToPrisma(asset)),
+            }),
+          ]
+        : []),
     ]);
   }
 
@@ -246,6 +288,62 @@ export class PrismaProfilesRepository implements ProfilesRepository {
       ),
       createdAt: profile.createdAt.toISOString(),
       updatedAt: profile.updatedAt.toISOString(),
+    };
+  }
+
+  private mapMediaAsset(asset: PrismaMediaAsset): MediaAsset {
+    return {
+      id: asset.id,
+      tenantId: asset.tenantId,
+      ownerType: this.mapMediaOwnerType(asset.ownerType),
+      ownerId: asset.ownerId,
+      kind: this.mapMediaKind(asset.kind),
+      status: this.mapMediaStatus(asset.status),
+      sourceUrl: asset.sourceUrl,
+      thumbnailUrl: asset.thumbnailUrl ?? undefined,
+      mimeType: asset.mimeType,
+      fileName: asset.fileName,
+      fileSizeBytes: asset.fileSizeBytes,
+      width: asset.width ?? undefined,
+      height: asset.height ?? undefined,
+      durationSeconds: asset.durationSeconds ?? undefined,
+      caption: asset.caption ?? undefined,
+      altText: asset.altText ?? undefined,
+      displayOrder: asset.displayOrder,
+      visibility: this.mapMediaVisibility(asset.visibility),
+      moderationStatus: this.mapMediaModerationStatus(asset.moderationStatus),
+      moderationReason: asset.moderationReason ?? undefined,
+      uploadedAt: asset.uploadedAt.toISOString(),
+      createdAt: asset.createdAt.toISOString(),
+      updatedAt: asset.updatedAt.toISOString(),
+    };
+  }
+
+  private mapMediaAssetToPrisma(asset: MediaAsset): Prisma.MediaAssetUncheckedCreateInput {
+    return {
+      id: asset.id,
+      tenantId: asset.tenantId,
+      ownerType: asset.ownerType,
+      ownerId: asset.ownerId,
+      kind: asset.kind,
+      status: asset.status,
+      sourceUrl: asset.sourceUrl,
+      thumbnailUrl: asset.thumbnailUrl,
+      mimeType: asset.mimeType,
+      fileName: asset.fileName,
+      fileSizeBytes: asset.fileSizeBytes,
+      width: asset.width,
+      height: asset.height,
+      durationSeconds: asset.durationSeconds,
+      caption: asset.caption,
+      altText: asset.altText,
+      displayOrder: asset.displayOrder,
+      visibility: asset.visibility,
+      moderationStatus: asset.moderationStatus,
+      moderationReason: asset.moderationReason,
+      uploadedAt: new Date(asset.uploadedAt),
+      createdAt: new Date(asset.createdAt),
+      updatedAt: new Date(asset.updatedAt),
     };
   }
 
@@ -350,6 +448,34 @@ export class PrismaProfilesRepository implements ProfilesRepository {
 
   private isRecord(value: unknown): value is Record<string, unknown> {
     return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  private mapMediaOwnerType(value: string): MediaOwnerType {
+    return mediaOwnerTypes.includes(value as MediaOwnerType)
+      ? (value as MediaOwnerType)
+      : 'PROFILE_DRAFT';
+  }
+
+  private mapMediaKind(value: string): MediaAssetKind {
+    return mediaAssetKinds.includes(value as MediaAssetKind) ? (value as MediaAssetKind) : 'IMAGE';
+  }
+
+  private mapMediaStatus(value: string): MediaAssetStatus {
+    return mediaAssetStatuses.includes(value as MediaAssetStatus)
+      ? (value as MediaAssetStatus)
+      : 'BLOCKED';
+  }
+
+  private mapMediaVisibility(value: string): MediaVisibility {
+    return mediaVisibilityStates.includes(value as MediaVisibility)
+      ? (value as MediaVisibility)
+      : 'PUBLIC';
+  }
+
+  private mapMediaModerationStatus(value: string): MediaModerationStatus {
+    return mediaModerationStatuses.includes(value as MediaModerationStatus)
+      ? (value as MediaModerationStatus)
+      : 'PENDING';
   }
 
   private daysBetween(start: string, end: string): number {

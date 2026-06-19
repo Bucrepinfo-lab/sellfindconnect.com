@@ -74,8 +74,9 @@ without validating it against the authenticated user's assignments.
   acceptance evidence, in-memory and Prisma repository adapters, tenant session
   guard, and future identity-provider adapter boundary.
 - Profiles: draft, preview, publish, profile completeness, enriched contacts,
-  service-area coverage, live version preservation, and publish audit evidence.
-  Profile write/preview/publish routes require an MFA-verified tenant session.
+  service-area coverage, profile media display metadata, live version
+  preservation, and publish audit evidence. Profile write/preview/publish/media
+  routes require an MFA-verified tenant session.
   Profile storage uses an in-memory repository by default and can switch to
   Prisma with `PROFILE_REPOSITORY=prisma` after migrations and seed data are
   ready. Profile publish requires request-level terms acceptance plus current
@@ -84,7 +85,11 @@ without validating it against the authenticated user's assignments.
   MVP owner/admin review workflow or a scoped platform moderator approves them.
   Platform profile moderation uses MFA-required `MODERATE_CONTENT` access
   assignments, target country/tenant checks, and access-decision audit records.
-  Rejected drafts remain blocked until edited.
+  Rejected drafts remain blocked until edited. Profile media uses tenant-owned
+  `MediaAsset` records attached to draft/live owners, a ten-item display cap,
+  recursive metadata safety checks, and publish-time media carry-over; provider
+  upload URLs, malware scanning, CDN transforms, and transcoding remain adapter
+  work.
 - Listings: draft, preview, publish, media, lifecycle, and visibility. Advert
   listing and lifecycle routes require an MFA-verified tenant session.
 - Safety: blocked categories, policy decisions, moderation cases, and reports.

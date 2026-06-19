@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { ProfileDraft, PublishedProfile } from '@telpen/domain';
+import type { MediaAsset, MediaOwnerType, ProfileDraft, PublishedProfile } from '@telpen/domain';
 
 import type { ProfilePublishRecords, ProfilesRepository } from './profiles.repository';
 
@@ -7,6 +7,7 @@ import type { ProfilePublishRecords, ProfilesRepository } from './profiles.repos
 export class InMemoryProfilesRepository implements ProfilesRepository {
   private readonly drafts = new Map<string, ProfileDraft>();
   private readonly publishedProfiles = new Map<string, PublishedProfile>();
+  private readonly mediaAssets = new Map<string, MediaAsset>();
   private readonly liveProfileByTenant = new Map<string, string>();
 
   createDraft(draft: ProfileDraft): void {
@@ -33,6 +34,22 @@ export class InMemoryProfilesRepository implements ProfilesRepository {
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
+  createMediaAsset(asset: MediaAsset): void {
+    this.mediaAssets.set(this.key(asset.tenantId, asset.id), asset);
+  }
+
+  listMediaAssets(tenantId: string, ownerType: MediaOwnerType, ownerId: string): MediaAsset[] {
+    return Array.from(this.mediaAssets.values())
+      .filter(
+        (asset) =>
+          asset.tenantId === tenantId &&
+          asset.ownerType === ownerType &&
+          asset.ownerId === ownerId &&
+          asset.status !== 'BLOCKED',
+      )
+      .sort((a, b) => a.displayOrder - b.displayOrder || a.createdAt.localeCompare(b.createdAt));
+  }
+
   publishProfile(records: ProfilePublishRecords): void {
     if (records.previousLiveProfile) {
       this.publishedProfiles.set(
@@ -42,6 +59,9 @@ export class InMemoryProfilesRepository implements ProfilesRepository {
     }
 
     this.publishedProfiles.set(this.key(records.tenantId, records.published.id), records.published);
+    for (const asset of records.publishedMediaAssets ?? []) {
+      this.mediaAssets.set(this.key(records.tenantId, asset.id), asset);
+    }
     this.liveProfileByTenant.set(records.tenantId, records.published.id);
     this.drafts.set(this.key(records.tenantId, records.draft.id), records.draft);
   }
