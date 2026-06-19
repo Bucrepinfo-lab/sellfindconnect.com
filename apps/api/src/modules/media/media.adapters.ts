@@ -39,13 +39,13 @@ export interface MediaTransformAdapter {
   plan(input: MediaAsset): Promise<MediaTransformResult> | MediaTransformResult;
 }
 
-export type ProfileMediaAdapters = {
+export type MediaAdapters = {
   storage: MediaStorageAdapter;
   moderation: MediaModerationAdapter;
   transforms: MediaTransformAdapter;
 };
 
-export const PROFILE_MEDIA_ADAPTERS = Symbol('PROFILE_MEDIA_ADAPTERS');
+export const MEDIA_ADAPTERS = Symbol('MEDIA_ADAPTERS');
 
 const defaultMediaBaseUrl = 'https://media.local.sellfindconnect.test';
 
@@ -120,7 +120,7 @@ export class DevelopmentMediaTransformAdapter implements MediaTransformAdapter {
   }
 }
 
-export function createDefaultProfileMediaAdapters(): ProfileMediaAdapters {
+export function createDefaultMediaAdapters(): MediaAdapters {
   return {
     storage: new DevelopmentMediaStorageAdapter(),
     moderation: new MetadataOnlyMediaModerationAdapter(),

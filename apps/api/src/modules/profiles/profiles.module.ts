@@ -3,11 +3,11 @@ import { ConfigService } from '@nestjs/config';
 
 import { AccessModule } from '../access/access.module';
 import { AuthModule } from '../auth/auth.module';
-import { InMemoryProfilesRepository } from './in-memory-profiles.repository';
 import {
-  PROFILE_MEDIA_ADAPTERS,
-  createDefaultProfileMediaAdapters,
-} from './profile-media.adapters';
+  MEDIA_ADAPTERS,
+  createDefaultMediaAdapters,
+} from '../media/media.adapters';
+import { InMemoryProfilesRepository } from './in-memory-profiles.repository';
 import { ProfileModerationController } from './profile-moderation.controller';
 import { ProfilesController } from './profiles.controller';
 import { PROFILES_REPOSITORY } from './profiles.repository';
@@ -45,8 +45,8 @@ import { ProfilesService } from './profiles.service';
       },
     },
     {
-      provide: PROFILE_MEDIA_ADAPTERS,
-      useFactory: createDefaultProfileMediaAdapters,
+      provide: MEDIA_ADAPTERS,
+      useFactory: createDefaultMediaAdapters,
     },
     ProfilesService,
   ],

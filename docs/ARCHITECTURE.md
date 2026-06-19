@@ -93,7 +93,11 @@ without validating it against the authenticated user's assignments.
   background image transforms, and video transcoding workers remain adapter
   implementations.
 - Listings: draft, preview, publish, media, lifecycle, and visibility. Advert
-  listing and lifecycle routes require an MFA-verified tenant session.
+  listing, lifecycle, and media routes require an MFA-verified tenant session.
+  Advert media uses shared `MediaAsset` metadata, the ten-item display cap,
+  recursive safety checks, upload preparation, and the same
+  storage/moderation/CDN transform adapter hooks as profile media. The MVP
+  advert store remains in memory until the persisted advert repository lands.
 - Safety: blocked categories, policy decisions, moderation cases, and reports.
 - Discovery: Source Finder, search, filters, reason codes, and saved searches.
   Tenant-scoped discovery routes require an MFA-verified tenant session.

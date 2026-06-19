@@ -365,8 +365,8 @@ Implementation progress on 2026-06-19:
   CDN URLs, transform status, and variant metadata.
 - Remaining hardening: real object-storage credentials/signed URLs,
   provider-backed malware and media scanning, background image/video workers,
-  listing media, richer review case management, and user-facing review status
-  in web/mobile clients.
+  richer review case management, and user-facing review status in web/mobile
+  clients.
 
 ### 7.3 Media Display Area
 
@@ -423,6 +423,18 @@ Requirements:
 - Renewal notification alerts must be sent on day 35 and day 39 before automatic deletion.
 - Regulated categories require extra verification and moderator approval.
 - Listings must support country, continent, and global visibility controls.
+
+Implementation progress:
+
+- Added the advert lifecycle foundation for 40-day expiry, day-35/day-39 renewal
+  alerts, and day-40 auto-deletion.
+- Added tenant-session protected advert media upload preparation, attach, and
+  listing routes using the shared media policy and storage/moderation/CDN
+  transform adapter hooks. Advert media enforces the ten-item cap, safety
+  checks, moderation status, transform metadata, display slots, and media
+  auto-archive when the advert auto-deletes.
+- Durable advert drafts, persisted advert repository, provider-backed media
+  workers, pause/archive/renew controls, and public listing preview remain next.
 
 ### 7.5 Search and Discovery
 

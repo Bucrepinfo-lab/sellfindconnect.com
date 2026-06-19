@@ -4,8 +4,8 @@ import { mediaPolicy } from '@telpen/domain';
 import type { AuthAuditRecord } from '../auth/auth.records';
 import type { PlatformAccessSession } from '../auth/auth.records';
 import type { AuthService } from '../auth/auth.service';
+import type { MediaAdapters } from '../media/media.adapters';
 import { InMemoryProfilesRepository } from './in-memory-profiles.repository';
-import type { ProfileMediaAdapters } from './profile-media.adapters';
 import { ProfilesService } from './profiles.service';
 
 const tenantId = '11111111-1111-4111-8111-111111111111';
@@ -194,7 +194,7 @@ describe('ProfilesService', () => {
   });
 
   it('applies moderation and transform adapters when adding profile media', async () => {
-    const adapters: ProfileMediaAdapters = {
+    const adapters: MediaAdapters = {
       storage: {
         prepareUpload: () => {
           throw new Error('storage adapter should not be used');
@@ -259,7 +259,7 @@ describe('ProfilesService', () => {
   });
 
   it('blocks profile media when the moderation adapter rejects it', async () => {
-    const adapters: ProfileMediaAdapters = {
+    const adapters: MediaAdapters = {
       storage: {
         prepareUpload: () => {
           throw new Error('storage adapter should not be used');

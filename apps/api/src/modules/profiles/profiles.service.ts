@@ -32,10 +32,10 @@ import type {
 import type { CreateProfileMediaDto, PrepareProfileMediaUploadDto } from './dto/profile-media.dto';
 import { InMemoryProfilesRepository } from './in-memory-profiles.repository';
 import {
-  PROFILE_MEDIA_ADAPTERS,
-  createDefaultProfileMediaAdapters,
-  type ProfileMediaAdapters,
-} from './profile-media.adapters';
+  MEDIA_ADAPTERS,
+  createDefaultMediaAdapters,
+  type MediaAdapters,
+} from '../media/media.adapters';
 import { PROFILES_REPOSITORY, type ProfilesRepository } from './profiles.repository';
 
 const highRiskProfileIndustryCodes = new Set(['EXTRACTIVES', 'FINANCE', 'HEALTH', 'LOGISTICS']);
@@ -56,8 +56,8 @@ export class ProfilesService {
     private readonly repository: ProfilesRepository = new InMemoryProfilesRepository(),
     @Optional() private readonly auth?: AuthService,
     @Optional()
-    @Inject(PROFILE_MEDIA_ADAPTERS)
-    private readonly mediaAdapters: ProfileMediaAdapters = createDefaultProfileMediaAdapters(),
+    @Inject(MEDIA_ADAPTERS)
+    private readonly mediaAdapters: MediaAdapters = createDefaultMediaAdapters(),
   ) {}
 
   async createDraft(tenantId: string, input: CreateProfileDraftDto): Promise<ProfileDraft> {

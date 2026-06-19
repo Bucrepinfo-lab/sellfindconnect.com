@@ -1,10 +1,15 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 
-import { TenantId } from '../tenant/tenant-context.decorator';
-import { TenantSessionGuard } from '../tenant/tenant-session.guard';
+import { TenantAuthSession, TenantId } from '../tenant/tenant-context.decorator';
+import { TenantSessionGuard, type TenantSessionDecision } from '../tenant/tenant-session.guard';
 import { AdvertsService } from './adverts.service';
-import { CreateAdvertDto, RunAdvertLifecycleDto } from './dto/create-advert.dto';
+import {
+  CreateAdvertDto,
+  CreateAdvertMediaDto,
+  PrepareAdvertMediaUploadDto,
+  RunAdvertLifecycleDto,
+} from './dto/create-advert.dto';
 
 @ApiTags('adverts')
 @ApiHeader({
@@ -33,6 +38,31 @@ export class AdvertsController {
   @Get('notifications')
   listNotifications(@TenantId() tenantId: string) {
     return this.adverts.listNotifications(tenantId);
+  }
+
+  @Get(':id/media')
+  listAdvertMedia(@TenantId() tenantId: string, @Param('id') id: string) {
+    return this.adverts.listAdvertMedia(tenantId, id);
+  }
+
+  @Post(':id/media/uploads/prepare')
+  prepareAdvertMediaUpload(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Param('id') id: string,
+    @Body() body: PrepareAdvertMediaUploadDto,
+  ) {
+    return this.adverts.prepareAdvertMediaUpload(tenantId, id, body, session.userId);
+  }
+
+  @Post(':id/media')
+  addAdvertMedia(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Param('id') id: string,
+    @Body() body: CreateAdvertMediaDto,
+  ) {
+    return this.adverts.addAdvertMedia(tenantId, id, body, session.userId);
   }
 
   @Post('lifecycle/run')
