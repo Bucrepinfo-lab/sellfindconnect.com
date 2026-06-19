@@ -81,8 +81,10 @@ without validating it against the authenticated user's assignments.
   ready. Profile publish requires request-level terms acceptance plus current
   stored terms evidence when auth is attached; high-risk profile edits enter
   `PENDING_REVIEW` with persisted review reasons and cannot publish until the
-  MVP owner/admin review workflow approves them. Rejected drafts remain blocked
-  until edited.
+  MVP owner/admin review workflow or a scoped platform moderator approves them.
+  Platform profile moderation uses MFA-required `MODERATE_CONTENT` access
+  assignments, target country/tenant checks, and access-decision audit records.
+  Rejected drafts remain blocked until edited.
 - Listings: draft, preview, publish, media, lifecycle, and visibility. Advert
   listing and lifecycle routes require an MFA-verified tenant session.
 - Safety: blocked categories, policy decisions, moderation cases, and reports.

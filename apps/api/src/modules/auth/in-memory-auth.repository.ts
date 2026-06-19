@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import type { TermsAcceptanceEvidence } from '@telpen/domain';
 
 import type {
+  AccessAssignmentRecord,
+  AccessDecisionAuditRecord,
   AuthAuditRecord,
   AuthAccountChallengeRecord,
   AuthMfaChallengeRecord,
@@ -27,6 +29,8 @@ export class InMemoryAuthRepository implements AuthRepository {
   private readonly mfaChallenges = new Map<string, AuthMfaChallengeRecord>();
   private readonly accountChallengesByTokenHash = new Map<string, AuthAccountChallengeRecord>();
   private readonly tenantInvitesByTokenHash = new Map<string, AuthTenantInviteRecord>();
+  private readonly accessAssignments = new Map<string, AccessAssignmentRecord>();
+  private readonly accessDecisionAudits = new Map<string, AccessDecisionAuditRecord>();
   private readonly termsEvidence = new Map<string, TermsAcceptanceEvidence>();
   private readonly auditLogs = new Map<string, AuthAuditRecord>();
 
@@ -74,6 +78,12 @@ export class InMemoryAuthRepository implements AuthRepository {
     return this.tenantInvitesByTokenHash.get(tokenHash);
   }
 
+  listAccessAssignmentsForUser(userId: string): AccessAssignmentRecord[] {
+    return Array.from(this.accessAssignments.values())
+      .filter((assignment) => assignment.userId === userId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
   createOwnerRegistration(records: OwnerRegistrationRecords): void {
     this.usersByEmail.set(records.user.email, records.user);
     this.usersById.set(records.user.id, records.user);
@@ -100,6 +110,10 @@ export class InMemoryAuthRepository implements AuthRepository {
       this.termsEvidenceKey(records.membership.userId, records.membership.tenantId),
       records.termsAcceptance,
     );
+  }
+
+  createAccessAssignment(record: AccessAssignmentRecord): void {
+    this.accessAssignments.set(record.id, record);
   }
 
   createSession(session: AuthSessionRecord): void {
@@ -171,6 +185,10 @@ export class InMemoryAuthRepository implements AuthRepository {
 
   createAuditLog(record: AuthAuditRecord): void {
     this.auditLogs.set(record.id, record);
+  }
+
+  createAccessDecisionAudit(record: AccessDecisionAuditRecord): void {
+    this.accessDecisionAudits.set(record.id, record);
   }
 
   listAuditLogsForTenant(tenantId: string): AuthAuditRecord[] {

@@ -411,6 +411,58 @@ describe('AuthService', () => {
     ).rejects.toThrow();
   });
 
+  it('authorizes platform moderation through active scoped access assignments', async () => {
+    const repository = new InMemoryAuthRepository();
+    const service = new AuthService(repository);
+    const registered = await service.registerTenantOwner({
+      email: 'moderator@example.com',
+      password: strongPassword,
+      displayName: 'Mary Moderator',
+      tenantDisplayName: 'Moderator Home Tenant',
+      countryCode: 'KE',
+      industryCode: 'AGRICULTURE',
+      primaryRole: 'SUPPLIER',
+      userType: 'ADVERTISER',
+      acceptedTerms: true,
+    });
+    await service.verifyMfa({
+      sessionToken: registered.session.token,
+      code: registered.session.mfaChallenge?.developmentCode ?? '',
+    });
+    const now = new Date().toISOString();
+
+    repository.createAccessAssignment({
+      id: 'assignment-1',
+      userId: registered.user.id,
+      role: 'COUNTRY_MODERATOR',
+      scopeLevel: 'COUNTRY',
+      countryCode: 'KE',
+      mfaRequired: true,
+      assignedBy: 'global-admin',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const session = await service.checkPlatformSession({
+      sessionToken: registered.session.token,
+      permission: 'MODERATE_CONTENT',
+    });
+
+    expect(session.assignments).toHaveLength(1);
+    await expect(
+      service.requirePlatformAccess(session, 'MODERATE_CONTENT', {
+        tenantId: registered.tenant.id,
+        countryCode: 'KE',
+      }),
+    ).resolves.toMatchObject({ allowed: true, role: 'COUNTRY_MODERATOR' });
+    await expect(
+      service.requirePlatformAccess(session, 'MODERATE_CONTENT', {
+        tenantId: '22222222-2222-4222-8222-222222222222',
+        countryCode: 'UG',
+      }),
+    ).rejects.toThrow('scope');
+  });
+
   it('blocks prohibited registration text', async () => {
     const service = new AuthService();
 

@@ -181,8 +181,11 @@ Progress:
   physical address, map URL, social/contact links, primary city, regions,
   radius, remote availability, and operating countries, with preview and live
   publish carry-over.
-- Platform-level moderator access, media uploads/display, and richer review case
-  management remain next.
+- Added platform-level profile moderation access with MFA-required
+  `MODERATE_CONTENT` assignments, scoped pending-review queue filtering,
+  country/tenant access checks, platform review endpoints, and access-decision
+  audit persistence.
+- Media uploads/display and richer review case management remain next.
 
 ## Epic 4: Listing and Media Vertical Slice
 

@@ -27,6 +27,12 @@ export class InMemoryProfilesRepository implements ProfilesRepository {
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
+  listAllDraftsPendingReview(): ProfileDraft[] {
+    return Array.from(this.drafts.values())
+      .filter((draft) => draft.status === 'PENDING_REVIEW')
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+
   publishProfile(records: ProfilePublishRecords): void {
     if (records.previousLiveProfile) {
       this.publishedProfiles.set(

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { AuthAuditRecord } from '../auth/auth.records';
+import type { PlatformAccessSession } from '../auth/auth.records';
 import type { AuthService } from '../auth/auth.service';
 import { InMemoryProfilesRepository } from './in-memory-profiles.repository';
 import { ProfilesService } from './profiles.service';
@@ -362,6 +363,97 @@ describe('ProfilesService', () => {
       service.publishDraft(tenantId, draft.id, { acceptedTerms: true }, 'owner-1'),
     ).resolves.toMatchObject({ status: 'LIVE' });
     expect(auditLogs.some((record) => record.action === 'PROFILE_DRAFT_REVIEWED')).toBe(true);
+  });
+
+  it('lets scoped platform moderators list and review only matching drafts', async () => {
+    const resources: Array<{ tenantId?: string; countryCode?: string }> = [];
+    const platformSession: PlatformAccessSession = {
+      sessionId: 'session-1',
+      sessionTenantId: 'platform-home-tenant',
+      userId: 'country-mod-1',
+      mfaVerified: true,
+      assignments: [
+        {
+          id: 'assignment-1',
+          userId: 'country-mod-1',
+          role: 'COUNTRY_MODERATOR',
+          scopeLevel: 'COUNTRY',
+          countryCode: 'KE',
+          mfaRequired: true,
+          assignedBy: 'global-admin',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ],
+    };
+    const service = new ProfilesService(undefined, {
+      canPlatformAccess: (_session, _permission, resource) => resource.tenantId === tenantId,
+      requirePlatformAccess: async (_session, _permission, resource) => {
+        resources.push(resource);
+        if (resource.tenantId !== tenantId) {
+          throw new Error('scope denied');
+        }
+
+        return {
+          allowed: true,
+          permission: 'MODERATE_CONTENT',
+          role: 'COUNTRY_MODERATOR',
+          scopeLevel: 'COUNTRY',
+          reason: 'ACCESS_GRANTED',
+        };
+      },
+      recordTenantAudit: async () => undefined,
+    } as Pick<
+      AuthService,
+      'canPlatformAccess' | 'requirePlatformAccess' | 'recordTenantAudit'
+    > as AuthService);
+    const kenyaDraft = await service.createDraft(tenantId, {
+      displayName: 'Nairobi Fresh Produce',
+      industryCode: 'AGRICULTURE',
+      role: 'SUPPLIER',
+      description: 'We supply fresh vegetables to hotels and shops in Nairobi.',
+      countryCode: 'KE',
+    });
+    const otherTenantId = '22222222-2222-4222-8222-222222222222';
+    const otherDraft = await service.createDraft(otherTenantId, {
+      displayName: 'Mombasa Fresh Produce',
+      industryCode: 'AGRICULTURE',
+      role: 'SUPPLIER',
+      description: 'We supply fresh vegetables to hotels and shops in Mombasa.',
+      countryCode: 'KE',
+    });
+    await service.updateDraft(tenantId, kenyaDraft.id, {
+      industryCode: 'HEALTH',
+      description: 'We coordinate compliant wellness supply introductions for licensed clinics.',
+    });
+    await service.updateDraft(otherTenantId, otherDraft.id, {
+      industryCode: 'HEALTH',
+      description: 'We coordinate compliant wellness supply introductions for licensed clinics.',
+    });
+
+    const pending = await service.listPlatformPendingReviews(platformSession);
+    const reviewed = await service.platformReviewDraft(
+      tenantId,
+      kenyaDraft.id,
+      { decision: 'APPROVED', note: 'Country moderation scope checked.' },
+      platformSession,
+    );
+
+    expect(pending.map((draft) => draft.id)).toEqual([kenyaDraft.id]);
+    expect(resources[0]).toMatchObject({ tenantId, countryCode: 'KE' });
+    expect(reviewed).toMatchObject({
+      status: 'DRAFT',
+      reviewDecision: 'APPROVED',
+      reviewedBy: 'country-mod-1',
+    });
+    await expect(
+      service.platformReviewDraft(
+        otherTenantId,
+        otherDraft.id,
+        { decision: 'APPROVED' },
+        platformSession,
+      ),
+    ).rejects.toThrow('scope denied');
   });
 
   it('rejects a pending profile draft and requires an edit before publishing', async () => {

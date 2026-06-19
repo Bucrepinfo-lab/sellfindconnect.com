@@ -4,6 +4,7 @@ import {
   PrismaClient,
   TenantRole,
   TenantStatus,
+  type AccessAssignment,
   type AuditLog,
   type AuthAccountChallenge,
   type AuthMfaChallenge,
@@ -18,6 +19,8 @@ import {
 import type { TermsAcceptanceEvidence } from '@telpen/domain';
 
 import type {
+  AccessAssignmentRecord,
+  AccessDecisionAuditRecord,
   AuthAuditRecord,
   AuthAccountChallengeRecord,
   AuthMfaChallengeRecord,
@@ -111,6 +114,19 @@ export class PrismaAuthRepository implements AuthRepository {
   async findTenantInviteByTokenHash(tokenHash: string): Promise<AuthTenantInviteRecord | undefined> {
     const invite = await this.prisma.tenantInvite.findUnique({ where: { tokenHash } });
     return invite ? this.mapTenantInvite(invite) : undefined;
+  }
+
+  async listAccessAssignmentsForUser(userId: string): Promise<AccessAssignmentRecord[]> {
+    const now = new Date();
+    const assignments = await this.prisma.accessAssignment.findMany({
+      where: {
+        userId,
+        revokedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return assignments.map((assignment) => this.mapAccessAssignment(assignment));
   }
 
   async createOwnerRegistration(records: OwnerRegistrationRecords): Promise<void> {
@@ -245,6 +261,28 @@ export class PrismaAuthRepository implements AuthRepository {
         },
       }),
     ]);
+  }
+
+  async createAccessAssignment(record: AccessAssignmentRecord): Promise<void> {
+    await this.prisma.accessAssignment.create({
+      data: {
+        id: record.id,
+        userId: record.userId,
+        tenantId: record.tenantId,
+        role: record.role,
+        scopeLevel: record.scopeLevel,
+        regionCode: record.regionCode,
+        continentCode: record.continentCode,
+        countryCode: record.countryCode,
+        scopedTenantId: record.scopedTenantId,
+        mfaRequired: record.mfaRequired,
+        assignedBy: record.assignedBy,
+        expiresAt: record.expiresAt ? new Date(record.expiresAt) : undefined,
+        revokedAt: record.revokedAt ? new Date(record.revokedAt) : undefined,
+        createdAt: new Date(record.createdAt),
+        updatedAt: new Date(record.updatedAt),
+      },
+    });
   }
 
   async createSession(session: AuthSessionRecord): Promise<void> {
@@ -406,6 +444,26 @@ export class PrismaAuthRepository implements AuthRepository {
     });
   }
 
+  async createAccessDecisionAudit(record: AccessDecisionAuditRecord): Promise<void> {
+    await this.prisma.accessDecisionAudit.create({
+      data: {
+        id: record.id,
+        tenantId: record.tenantId,
+        actorUserId: record.actorUserId,
+        role: record.role,
+        permission: record.permission,
+        scopeLevel: record.scopeLevel,
+        allowed: record.allowed,
+        reason: record.reason,
+        targetTenantId: record.targetTenantId,
+        targetCountryCode: record.targetCountryCode,
+        targetContinentCode: record.targetContinentCode,
+        targetRegionCode: record.targetRegionCode,
+        createdAt: new Date(record.createdAt),
+      },
+    });
+  }
+
   async listAuditLogsForTenant(tenantId: string): Promise<AuthAuditRecord[]> {
     const records = await this.prisma.auditLog.findMany({
       where: { tenantId },
@@ -486,6 +544,26 @@ export class PrismaAuthRepository implements AuthRepository {
       expiresAt: session.expiresAt.toISOString(),
       createdAt: session.createdAt.toISOString(),
       revokedAt: session.revokedAt?.toISOString(),
+    };
+  }
+
+  private mapAccessAssignment(assignment: AccessAssignment): AccessAssignmentRecord {
+    return {
+      id: assignment.id,
+      userId: assignment.userId,
+      tenantId: assignment.tenantId ?? undefined,
+      role: assignment.role as AccessAssignmentRecord['role'],
+      scopeLevel: assignment.scopeLevel as AccessAssignmentRecord['scopeLevel'],
+      regionCode: assignment.regionCode ?? undefined,
+      continentCode: assignment.continentCode ?? undefined,
+      countryCode: assignment.countryCode ?? undefined,
+      scopedTenantId: assignment.scopedTenantId ?? undefined,
+      mfaRequired: assignment.mfaRequired,
+      assignedBy: assignment.assignedBy ?? undefined,
+      expiresAt: assignment.expiresAt?.toISOString(),
+      revokedAt: assignment.revokedAt?.toISOString(),
+      createdAt: assignment.createdAt.toISOString(),
+      updatedAt: assignment.updatedAt.toISOString(),
     };
   }
 

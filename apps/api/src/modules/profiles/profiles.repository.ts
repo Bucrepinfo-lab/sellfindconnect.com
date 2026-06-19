@@ -16,6 +16,7 @@ export interface ProfilesRepository {
   findDraft(tenantId: string, id: string): RepositoryResult<ProfileDraft | undefined>;
   updateDraft(draft: ProfileDraft): RepositoryResult<void>;
   listDraftsPendingReview(tenantId: string): RepositoryResult<ProfileDraft[]>;
+  listAllDraftsPendingReview(): RepositoryResult<ProfileDraft[]>;
   publishProfile(records: ProfilePublishRecords): RepositoryResult<void>;
   findLiveProfile(tenantId: string): RepositoryResult<PublishedProfile | undefined>;
   listPublishedProfiles(tenantId: string): RepositoryResult<PublishedProfile[]>;

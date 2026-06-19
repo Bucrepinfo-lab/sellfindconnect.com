@@ -351,9 +351,12 @@ Implementation progress on 2026-06-19:
   physical address, map URL, social/contact links, primary city, regions,
   radius, remote availability, and operating countries, including preview and
   live publish carry-over.
-- Remaining hardening: platform-level moderator access, media uploads/display,
-  richer review case management, and user-facing review status in web/mobile
-  clients.
+- Added platform-level profile moderation access with MFA-required
+  `MODERATE_CONTENT` assignments, scoped pending-review queue filtering,
+  country/tenant access checks, platform review endpoints, and access-decision
+  audit persistence.
+- Remaining hardening: media uploads/display, richer review case management, and
+  user-facing review status in web/mobile clients.
 
 ### 7.3 Media Display Area
 

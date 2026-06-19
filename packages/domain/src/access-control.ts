@@ -222,6 +222,7 @@ export function requiresMfa(role: AccessRole): boolean {
     role === 'REGIONAL_ADMIN' ||
     role === 'CONTINENTAL_ADMIN' ||
     role === 'COUNTRY_ADMIN' ||
+    role === 'COUNTRY_MODERATOR' ||
     role === 'OWNER' ||
     role === 'ADMIN' ||
     role === 'BILLING_MANAGER'

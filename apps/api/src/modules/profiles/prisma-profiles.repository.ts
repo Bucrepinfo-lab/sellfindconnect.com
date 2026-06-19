@@ -103,6 +103,14 @@ export class PrismaProfilesRepository implements ProfilesRepository {
     return drafts.map((draft) => this.mapDraft(draft));
   }
 
+  async listAllDraftsPendingReview(): Promise<ProfileDraft[]> {
+    const drafts = await this.prisma.profileDraft.findMany({
+      where: { status: ProfileStatus.PENDING_REVIEW },
+      orderBy: { updatedAt: 'desc' },
+    });
+    return drafts.map((draft) => this.mapDraft(draft));
+  }
+
   async publishProfile(records: ProfilePublishRecords): Promise<void> {
     await this.prisma.$transaction([
       ...(records.previousLiveProfile

@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   Optional,
@@ -10,15 +11,23 @@ import {
   activePolicyVersions,
   buildTermsAcceptanceEvidence,
   calculateTrialSubscription,
+  evaluateAccess,
   evaluatePasswordPolicy,
   evaluateSafetyFields,
   getCountry,
   industryCategories,
+  normalizeResourceScope,
+  requiresMfa,
+  roleHasPermission,
+  type AccessDecision,
+  type AccessPermission,
+  type AccessResourceScope,
   type TenantAccessRole,
 } from '@telpen/domain';
 import { createHash, pbkdf2Sync, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 
 import type {
+  AccessAssignmentRecord,
   AuthAuditRecord,
   AuthAccountChallengePurpose,
   AuthAccountChallengeRecord,
@@ -32,6 +41,7 @@ import type {
   PresentedMfaChallenge,
   PresentedAuthSession,
   PresentedTenantInvite,
+  PlatformAccessSession,
   TenantMembershipRecord,
 } from './auth.records';
 import { AUTH_REPOSITORY, type AuthRepository } from './auth.repository';
@@ -671,6 +681,60 @@ export class AuthService {
     };
   }
 
+  async checkPlatformSession(input: {
+    sessionToken: string;
+    permission: AccessPermission;
+  }): Promise<PlatformAccessSession> {
+    const session = await this.requireSession(input.sessionToken);
+    const assignments = (await this.repository.listAccessAssignmentsForUser(session.userId))
+      .filter((assignment) => this.isActiveAccessAssignment(assignment))
+      .filter((assignment) => roleHasPermission(assignment.role, input.permission));
+
+    if (assignments.length === 0) {
+      throw new UnauthorizedException(
+        'An active platform access assignment is required for this operation.',
+      );
+    }
+
+    if (
+      !session.mfaVerified &&
+      assignments.some((assignment) => assignment.mfaRequired || requiresMfa(assignment.role))
+    ) {
+      throw new UnauthorizedException('MFA verification is required for platform access.');
+    }
+
+    return {
+      sessionId: session.id,
+      sessionTenantId: session.tenantId,
+      userId: session.userId,
+      mfaVerified: session.mfaVerified,
+      assignments,
+    };
+  }
+
+  canPlatformAccess(
+    session: PlatformAccessSession,
+    permission: AccessPermission,
+    resource: AccessResourceScope,
+  ): boolean {
+    return this.evaluatePlatformAccess(session, permission, resource).allowed;
+  }
+
+  async requirePlatformAccess(
+    session: PlatformAccessSession,
+    permission: AccessPermission,
+    resource: AccessResourceScope,
+  ): Promise<AccessDecision> {
+    const decision = this.evaluatePlatformAccess(session, permission, resource);
+    await this.recordAccessDecision(session, decision, resource);
+
+    if (!decision.allowed) {
+      throw new ForbiddenException('Platform access scope does not allow this action.');
+    }
+
+    return decision;
+  }
+
   async listTenants() {
     return this.repository.listTenants();
   }
@@ -737,6 +801,87 @@ export class AuthService {
     }
 
     return session;
+  }
+
+  private evaluatePlatformAccess(
+    session: PlatformAccessSession,
+    permission: AccessPermission,
+    resource: AccessResourceScope,
+  ): AccessDecision {
+    let fallback: AccessDecision | undefined;
+
+    for (const assignment of session.assignments) {
+      const decision = evaluateAccess({
+        subject: {
+          userId: session.userId,
+          role: assignment.role,
+          mfaVerified: session.mfaVerified,
+          scope: {
+            level: assignment.scopeLevel,
+            regionCodes: assignment.regionCode ? [assignment.regionCode] : undefined,
+            continentCodes: assignment.continentCode ? [assignment.continentCode] : undefined,
+            countryCodes: assignment.countryCode ? [assignment.countryCode] : undefined,
+            tenantIds: this.assignmentTenantIds(assignment),
+          },
+        },
+        permission,
+        resource,
+      });
+
+      if (decision.allowed) {
+        return decision;
+      }
+
+      fallback ??= decision;
+    }
+
+    return (
+      fallback ?? {
+        allowed: false,
+        permission,
+        role: 'READ_ONLY_VIEWER',
+        scopeLevel: 'TENANT',
+        reason: 'ROLE_PERMISSION_DENIED',
+      }
+    );
+  }
+
+  private async recordAccessDecision(
+    session: PlatformAccessSession,
+    decision: AccessDecision,
+    resource: AccessResourceScope,
+  ): Promise<void> {
+    const normalizedResource = normalizeResourceScope(resource);
+    await this.repository.createAccessDecisionAudit({
+      id: randomUUID(),
+      tenantId: normalizedResource.tenantId,
+      actorUserId: session.userId,
+      role: decision.role,
+      permission: decision.permission,
+      scopeLevel: decision.scopeLevel,
+      allowed: decision.allowed,
+      reason: decision.reason,
+      targetTenantId: normalizedResource.tenantId,
+      targetCountryCode: normalizedResource.countryCode,
+      targetContinentCode: normalizedResource.continentCode,
+      targetRegionCode: normalizedResource.regionCode,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  private isActiveAccessAssignment(assignment: AccessAssignmentRecord): boolean {
+    return (
+      !assignment.revokedAt &&
+      (!assignment.expiresAt || Date.parse(assignment.expiresAt) > Date.now())
+    );
+  }
+
+  private assignmentTenantIds(assignment: AccessAssignmentRecord): string[] | undefined {
+    if (assignment.scopedTenantId) {
+      return [assignment.scopedTenantId];
+    }
+
+    return assignment.tenantId ? [assignment.tenantId] : undefined;
   }
 
   private async requireAccountChallenge(

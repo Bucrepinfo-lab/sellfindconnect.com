@@ -1,4 +1,11 @@
-import type { SupplyChainRole, TenantAccessRole, TermsAcceptanceEvidence } from '@telpen/domain';
+import type {
+  AccessPermission,
+  AccessRole,
+  AccessScopeLevel,
+  SupplyChainRole,
+  TenantAccessRole,
+  TermsAcceptanceEvidence,
+} from '@telpen/domain';
 
 export type AuthUserRecord = {
   id: string;
@@ -122,6 +129,48 @@ export type AuthAuditRecord = {
   entityId?: string;
   metadata?: Record<string, string | number | boolean | null>;
   createdAt: string;
+};
+
+export type AccessAssignmentRecord = {
+  id: string;
+  userId: string;
+  tenantId?: string;
+  role: AccessRole;
+  scopeLevel: AccessScopeLevel;
+  regionCode?: string;
+  continentCode?: string;
+  countryCode?: string;
+  scopedTenantId?: string;
+  mfaRequired: boolean;
+  assignedBy?: string;
+  expiresAt?: string;
+  revokedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AccessDecisionAuditRecord = {
+  id: string;
+  tenantId?: string;
+  actorUserId: string;
+  role: AccessRole;
+  permission: AccessPermission;
+  scopeLevel: AccessScopeLevel;
+  allowed: boolean;
+  reason: string;
+  targetTenantId?: string;
+  targetCountryCode?: string;
+  targetContinentCode?: string;
+  targetRegionCode?: string;
+  createdAt: string;
+};
+
+export type PlatformAccessSession = {
+  sessionId: string;
+  sessionTenantId: string;
+  userId: string;
+  mfaVerified: boolean;
+  assignments: AccessAssignmentRecord[];
 };
 
 export type PresentedAuthSession = Omit<AuthSessionRecord, 'tokenHash' | 'revokedAt'> & {

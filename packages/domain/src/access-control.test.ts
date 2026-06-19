@@ -71,6 +71,44 @@ describe('access control policy', () => {
     expect(getRolePermissions('GLOBAL_FINANCE_ADMIN')).not.toContain('MODERATE_CONTENT');
   });
 
+  it('allows country moderators to moderate only their country after MFA', () => {
+    const allowed = evaluateAccess({
+      subject: {
+        userId: 'moderator-1',
+        role: 'COUNTRY_MODERATOR',
+        mfaVerified: true,
+        scope: { level: 'COUNTRY', countryCodes: ['KE'] },
+      },
+      permission: 'MODERATE_CONTENT',
+      resource: { countryCode: 'KE' },
+    });
+    const deniedWithoutMfa = evaluateAccess({
+      subject: {
+        userId: 'moderator-1',
+        role: 'COUNTRY_MODERATOR',
+        mfaVerified: false,
+        scope: { level: 'COUNTRY', countryCodes: ['KE'] },
+      },
+      permission: 'MODERATE_CONTENT',
+      resource: { countryCode: 'KE' },
+    });
+    const deniedOtherCountry = evaluateAccess({
+      subject: {
+        userId: 'moderator-1',
+        role: 'COUNTRY_MODERATOR',
+        mfaVerified: true,
+        scope: { level: 'COUNTRY', countryCodes: ['UG'] },
+      },
+      permission: 'MODERATE_CONTENT',
+      resource: { countryCode: 'KE' },
+    });
+
+    expect(requiresMfa('COUNTRY_MODERATOR')).toBe(true);
+    expect(allowed.allowed).toBe(true);
+    expect(deniedWithoutMfa.reason).toBe('MFA_REQUIRED');
+    expect(deniedOtherCountry.reason).toBe('SCOPE_MISMATCH');
+  });
+
   it('normalizes country resources into continent and operational region scope', () => {
     const resource = normalizeResourceScope({ countryCode: 'KE' });
 

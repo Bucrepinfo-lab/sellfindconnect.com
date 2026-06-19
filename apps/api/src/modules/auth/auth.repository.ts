@@ -1,6 +1,8 @@
 import type { TermsAcceptanceEvidence } from '@telpen/domain';
 
 import type {
+  AccessAssignmentRecord,
+  AccessDecisionAuditRecord,
   AuthAuditRecord,
   AuthAccountChallengeRecord,
   AuthMfaChallengeRecord,
@@ -33,9 +35,11 @@ export interface AuthRepository {
   findMfaChallengeBySessionId(sessionId: string): RepositoryResult<AuthMfaChallengeRecord | undefined>;
   findAccountChallengeByTokenHash(tokenHash: string): RepositoryResult<AuthAccountChallengeRecord | undefined>;
   findTenantInviteByTokenHash(tokenHash: string): RepositoryResult<AuthTenantInviteRecord | undefined>;
+  listAccessAssignmentsForUser(userId: string): RepositoryResult<AccessAssignmentRecord[]>;
   createOwnerRegistration(records: OwnerRegistrationRecords): RepositoryResult<void>;
   createInvitedTenantUser(records: InvitedTenantUserRecords): RepositoryResult<void>;
   createTenantMembershipWithTerms(records: TenantMembershipWithTermsRecords): RepositoryResult<void>;
+  createAccessAssignment(record: AccessAssignmentRecord): RepositoryResult<void>;
   createSession(session: AuthSessionRecord): RepositoryResult<void>;
   updateSession(session: AuthSessionRecord): RepositoryResult<void>;
   createMfaChallenge(challenge: AuthMfaChallengeRecord): RepositoryResult<void>;
@@ -49,6 +53,7 @@ export interface AuthRepository {
   markUserMfaVerified(userId: string, mfaVerifiedAt: string): RepositoryResult<void>;
   revokeSessionsForUser(userId: string, revokedAt: string): RepositoryResult<void>;
   createAuditLog(record: AuthAuditRecord): RepositoryResult<void>;
+  createAccessDecisionAudit(record: AccessDecisionAuditRecord): RepositoryResult<void>;
   listAuditLogsForTenant(tenantId: string): RepositoryResult<AuthAuditRecord[]>;
   listTenants(): RepositoryResult<AuthTenantRecord[]>;
 }

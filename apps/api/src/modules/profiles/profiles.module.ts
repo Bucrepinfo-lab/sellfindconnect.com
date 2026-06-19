@@ -1,15 +1,17 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import { AccessModule } from '../access/access.module';
 import { AuthModule } from '../auth/auth.module';
 import { InMemoryProfilesRepository } from './in-memory-profiles.repository';
+import { ProfileModerationController } from './profile-moderation.controller';
 import { ProfilesController } from './profiles.controller';
 import { PROFILES_REPOSITORY } from './profiles.repository';
 import { ProfilesService } from './profiles.service';
 
 @Module({
-  imports: [AuthModule],
-  controllers: [ProfilesController],
+  imports: [AuthModule, AccessModule],
+  controllers: [ProfilesController, ProfileModerationController],
   providers: [
     InMemoryProfilesRepository,
     {

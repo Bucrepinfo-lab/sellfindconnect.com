@@ -18,6 +18,7 @@ import {
 import { randomUUID } from 'node:crypto';
 
 import { AuthService } from '../auth/auth.service';
+import type { PlatformAccessSession } from '../auth/auth.records';
 import type {
   CreateProfileDraftDto,
   PublishProfileDraftDto,
@@ -147,12 +148,58 @@ export class ProfilesService {
   ): Promise<ProfileDraft> {
     this.assertCanReviewProfile(role);
     const draft = await this.getDraft(tenantId, id);
+    return this.completeReview({
+      tenantId,
+      draft,
+      input,
+      actorUserId,
+      reviewerRole: role,
+    });
+  }
+
+  async listPlatformPendingReviews(session: PlatformAccessSession): Promise<ProfileDraft[]> {
+    const drafts = await this.repository.listAllDraftsPendingReview();
+    return drafts.filter((draft) =>
+      this.auth?.canPlatformAccess(session, 'MODERATE_CONTENT', this.profileAccessResource(draft)),
+    );
+  }
+
+  async platformReviewDraft(
+    tenantId: string,
+    id: string,
+    input: ReviewProfileDraftDto,
+    session: PlatformAccessSession,
+  ): Promise<ProfileDraft> {
+    const draft = await this.getDraft(tenantId, id);
+    const decision = await this.auth?.requirePlatformAccess(
+      session,
+      'MODERATE_CONTENT',
+      this.profileAccessResource(draft),
+    );
+
+    return this.completeReview({
+      tenantId,
+      draft,
+      input,
+      actorUserId: session.userId,
+      reviewerRole: decision?.role ?? 'GLOBAL_MODERATOR_LEAD',
+    });
+  }
+
+  private async completeReview(input: {
+    tenantId: string;
+    draft: ProfileDraft;
+    input: ReviewProfileDraftDto;
+    actorUserId: string | undefined;
+    reviewerRole: string;
+  }): Promise<ProfileDraft> {
+    const { tenantId, draft, actorUserId, reviewerRole } = input;
     if (draft.status !== 'PENDING_REVIEW') {
       throw new UnprocessableEntityException('Profile draft is not pending review.');
     }
 
-    if (input.note) {
-      const safety = evaluateSafetyFields({ note: input.note });
+    if (input.input.note) {
+      const safety = evaluateSafetyFields({ note: input.input.note });
       if (!safety.allowed) {
         throw new UnprocessableEntityException({
           message: 'Review note matches a zero-tolerance blocked category.',
@@ -164,11 +211,11 @@ export class ProfilesService {
     const now = new Date().toISOString();
     const reviewed: ProfileDraft = {
       ...draft,
-      status: input.decision === 'APPROVED' ? 'DRAFT' : 'REJECTED',
-      reviewDecision: input.decision,
+      status: input.input.decision === 'APPROVED' ? 'DRAFT' : 'REJECTED',
+      reviewDecision: input.input.decision,
       reviewedAt: now,
       reviewedBy: actorUserId,
-      reviewNote: input.note,
+      reviewNote: input.input.note,
       updatedAt: now,
     };
 
@@ -180,10 +227,10 @@ export class ProfilesService {
       entityType: 'PROFILE_DRAFT',
       entityId: reviewed.id,
       metadata: {
-        decision: input.decision,
-        role,
+        decision: input.input.decision,
+        role: reviewerRole,
         reviewReasons: (reviewed.reviewReasons ?? []).join(','),
-        noteProvided: Boolean(input.note),
+        noteProvided: Boolean(input.input.note),
       },
     });
 
@@ -475,6 +522,15 @@ export class ProfilesService {
     if (!['OWNER', 'ADMIN'].includes(role)) {
       throw new ForbiddenException('Only tenant owners or admins can review profile changes.');
     }
+  }
+
+  private profileAccessResource(draft: ProfileDraft) {
+    const country = getCountry(draft.countryCode);
+    return {
+      tenantId: draft.tenantId,
+      countryCode: draft.countryCode,
+      continentCode: country?.continentCode,
+    };
   }
 
   private changedFields(previous: ProfileDraft, next: ProfileDraft): string[] {
