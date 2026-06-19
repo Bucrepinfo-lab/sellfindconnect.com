@@ -44,6 +44,24 @@ export class PrismaProfilesRepository implements ProfilesRepository {
     return draft ? this.mapDraft(draft) : undefined;
   }
 
+  async updateDraft(draft: ProfileDraft): Promise<void> {
+    await this.prisma.profileDraft.update({
+      where: { id: draft.id },
+      data: {
+        countryCode: draft.countryCode,
+        industryCode: draft.industryCode,
+        role: draft.role,
+        displayName: draft.displayName,
+        description: draft.description,
+        phone: draft.phone,
+        email: draft.email,
+        website: draft.website,
+        status: this.mapDraftStatusToPrisma(draft.status),
+        updatedAt: new Date(draft.updatedAt),
+      },
+    });
+  }
+
   async publishProfile(records: ProfilePublishRecords): Promise<void> {
     await this.prisma.$transaction([
       ...(records.previousLiveProfile
@@ -121,7 +139,7 @@ export class PrismaProfilesRepository implements ProfilesRepository {
       phone: draft.phone ?? undefined,
       email: draft.email ?? undefined,
       website: draft.website ?? undefined,
-      status: draft.status === ProfileStatus.DRAFT ? 'DRAFT' : 'PUBLISHED',
+      status: this.mapPrismaDraftStatus(draft.status),
       createdAt: draft.createdAt.toISOString(),
       updatedAt: draft.updatedAt.toISOString(),
     };
@@ -154,7 +172,27 @@ export class PrismaProfilesRepository implements ProfilesRepository {
   }
 
   private mapDraftStatusToPrisma(status: ProfileDraft['status']): ProfileStatus {
-    return status === 'DRAFT' ? ProfileStatus.DRAFT : ProfileStatus.LIVE;
+    if (status === 'DRAFT') {
+      return ProfileStatus.DRAFT;
+    }
+
+    if (status === 'PENDING_REVIEW') {
+      return ProfileStatus.PENDING_REVIEW;
+    }
+
+    return ProfileStatus.LIVE;
+  }
+
+  private mapPrismaDraftStatus(status: ProfileStatus): ProfileDraft['status'] {
+    if (status === ProfileStatus.DRAFT) {
+      return 'DRAFT';
+    }
+
+    if (status === ProfileStatus.PENDING_REVIEW) {
+      return 'PENDING_REVIEW';
+    }
+
+    return 'PUBLISHED';
   }
 
   private daysBetween(start: string, end: string): number {

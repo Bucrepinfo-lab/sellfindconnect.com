@@ -59,10 +59,11 @@ describe('ProfilesService', () => {
   it('publishes a draft as the tenant live profile with audit evidence', async () => {
     const auditLogs: TenantAuditInput[] = [];
     const service = new ProfilesService(undefined, {
+      hasCurrentTermsAcceptance: async () => true,
       recordTenantAudit: async (record: TenantAuditInput) => {
         auditLogs.push(record);
       },
-    } as Pick<AuthService, 'recordTenantAudit'> as AuthService);
+    } as Pick<AuthService, 'hasCurrentTermsAcceptance' | 'recordTenantAudit'> as AuthService);
 
     const draft = await service.createDraft(tenantId, {
       displayName: 'Nairobi Fresh Produce',
@@ -74,7 +75,12 @@ describe('ProfilesService', () => {
       email: 'hello@example.com',
     });
 
-    const published = await service.publishDraft(tenantId, draft.id, 'user-1');
+    const published = await service.publishDraft(
+      tenantId,
+      draft.id,
+      { acceptedTerms: true },
+      'user-1',
+    );
 
     expect(published).toMatchObject({
       tenantId,
@@ -111,8 +117,18 @@ describe('ProfilesService', () => {
       countryCode: 'KE',
     });
 
-    const first = await service.publishDraft(tenantId, firstDraft.id, 'user-1');
-    const second = await service.publishDraft(tenantId, secondDraft.id, 'user-1');
+    const first = await service.publishDraft(
+      tenantId,
+      firstDraft.id,
+      { acceptedTerms: true },
+      'user-1',
+    );
+    const second = await service.publishDraft(
+      tenantId,
+      secondDraft.id,
+      { acceptedTerms: true },
+      'user-1',
+    );
     const history = await service.listPublishedProfiles(tenantId);
 
     expect(second.version).toBe(2);
@@ -143,5 +159,82 @@ describe('ProfilesService', () => {
       id: draft.id,
       status: 'DRAFT',
     });
+  });
+
+  it('updates a published draft without changing the live profile until republish', async () => {
+    const service = new ProfilesService();
+    const draft = await service.createDraft(tenantId, {
+      displayName: 'Nairobi Fresh Produce',
+      industryCode: 'AGRICULTURE',
+      role: 'SUPPLIER',
+      description: 'We supply fresh vegetables to hotels and shops in Nairobi.',
+      countryCode: 'KE',
+    });
+    const first = await service.publishDraft(
+      tenantId,
+      draft.id,
+      { acceptedTerms: true },
+      'user-1',
+    );
+
+    const edited = await service.updateDraft(tenantId, draft.id, {
+      description: 'We supply fresh vegetables, herbs, and compliant grocery stock in Nairobi.',
+    });
+
+    expect(edited.status).toBe('DRAFT');
+    expect((await service.getLiveProfile(tenantId)).id).toBe(first.id);
+
+    const second = await service.publishDraft(
+      tenantId,
+      draft.id,
+      { acceptedTerms: true },
+      'user-1',
+    );
+    expect(second.version).toBe(2);
+    expect(second.description).toContain('herbs');
+  });
+
+  it('marks high-risk profile changes as pending review and blocks publishing', async () => {
+    const service = new ProfilesService();
+    const draft = await service.createDraft(tenantId, {
+      displayName: 'Nairobi Fresh Produce',
+      industryCode: 'AGRICULTURE',
+      role: 'SUPPLIER',
+      description: 'We supply fresh vegetables to hotels and shops in Nairobi.',
+      countryCode: 'KE',
+    });
+
+    const updated = await service.updateDraft(tenantId, draft.id, {
+      industryCode: 'HEALTH',
+      description: 'We coordinate compliant wellness supply introductions for licensed clinics.',
+    });
+    const preview = await service.previewDraft(tenantId, draft.id);
+
+    expect(updated.status).toBe('PENDING_REVIEW');
+    expect(preview.preview.reviewRequired).toBe(true);
+    await expect(
+      service.publishDraft(tenantId, draft.id, { acceptedTerms: true }, 'user-1'),
+    ).rejects.toThrow('moderation review');
+  });
+
+  it('requires request and stored current terms before publishing with auth attached', async () => {
+    const service = new ProfilesService(undefined, {
+      hasCurrentTermsAcceptance: async () => false,
+      recordTenantAudit: async () => undefined,
+    } as Pick<AuthService, 'hasCurrentTermsAcceptance' | 'recordTenantAudit'> as AuthService);
+    const draft = await service.createDraft(tenantId, {
+      displayName: 'Nairobi Fresh Produce',
+      industryCode: 'AGRICULTURE',
+      role: 'SUPPLIER',
+      description: 'We supply fresh vegetables to hotels and shops in Nairobi.',
+      countryCode: 'KE',
+    });
+
+    await expect(
+      service.publishDraft(tenantId, draft.id, { acceptedTerms: false as true }, 'user-1'),
+    ).rejects.toThrow('Current terms acceptance');
+    await expect(
+      service.publishDraft(tenantId, draft.id, { acceptedTerms: true }, 'user-1'),
+    ).rejects.toThrow('stored terms acceptance');
   });
 });

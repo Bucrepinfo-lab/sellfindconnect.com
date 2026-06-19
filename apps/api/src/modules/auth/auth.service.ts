@@ -7,6 +7,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import {
+  activePolicyVersions,
   buildTermsAcceptanceEvidence,
   calculateTrialSubscription,
   evaluatePasswordPolicy,
@@ -692,6 +693,17 @@ export class AuthService {
 
   async recordTenantAudit(input: Omit<AuthAuditRecord, 'id' | 'createdAt'>): Promise<void> {
     await this.recordAudit(input);
+  }
+
+  async hasCurrentTermsAcceptance(userId: string, tenantId: string): Promise<boolean> {
+    const evidence = await this.repository.findTermsAcceptance(userId, tenantId);
+    return Boolean(
+      evidence?.accepted &&
+        evidence.termsVersion === activePolicyVersions.termsVersion &&
+        evidence.privacyVersion === activePolicyVersions.privacyVersion &&
+        evidence.prohibitedContentVersion === activePolicyVersions.prohibitedContentVersion &&
+        evidence.subscriptionTermsVersion === activePolicyVersions.subscriptionTermsVersion,
+    );
   }
 
   private async createSession(

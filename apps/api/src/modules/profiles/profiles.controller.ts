@@ -1,9 +1,13 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 
 import { TenantAuthSession, TenantId } from '../tenant/tenant-context.decorator';
 import { TenantSessionGuard, type TenantSessionDecision } from '../tenant/tenant-session.guard';
-import { CreateProfileDraftDto } from './dto/create-profile-draft.dto';
+import {
+  CreateProfileDraftDto,
+  PublishProfileDraftDto,
+  UpdateProfileDraftDto,
+} from './dto/create-profile-draft.dto';
 import { ProfilesService } from './profiles.service';
 
 @ApiTags('profiles')
@@ -30,6 +34,16 @@ export class ProfilesController {
     return this.profiles.getDraft(tenantId, id);
   }
 
+  @Patch('drafts/:id')
+  updateDraft(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Param('id') id: string,
+    @Body() body: UpdateProfileDraftDto,
+  ) {
+    return this.profiles.updateDraft(tenantId, id, body, session.userId);
+  }
+
   @Post('drafts/:id/preview')
   previewDraft(@TenantId() tenantId: string, @Param('id') id: string) {
     return this.profiles.previewDraft(tenantId, id);
@@ -40,8 +54,9 @@ export class ProfilesController {
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,
     @Param('id') id: string,
+    @Body() body: PublishProfileDraftDto,
   ) {
-    return this.profiles.publishDraft(tenantId, id, session.userId);
+    return this.profiles.publishDraft(tenantId, id, body, session.userId);
   }
 
   @Get('published/live')

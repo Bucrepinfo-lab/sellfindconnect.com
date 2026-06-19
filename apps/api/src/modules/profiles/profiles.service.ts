@@ -15,9 +15,16 @@ import {
 import { randomUUID } from 'node:crypto';
 
 import { AuthService } from '../auth/auth.service';
-import type { CreateProfileDraftDto } from './dto/create-profile-draft.dto';
+import type {
+  CreateProfileDraftDto,
+  PublishProfileDraftDto,
+  UpdateProfileDraftDto,
+} from './dto/create-profile-draft.dto';
 import { InMemoryProfilesRepository } from './in-memory-profiles.repository';
 import { PROFILES_REPOSITORY, type ProfilesRepository } from './profiles.repository';
+
+const highRiskProfileIndustryCodes = new Set(['EXTRACTIVES', 'FINANCE', 'HEALTH', 'LOGISTICS']);
+const highReviewRoles = new Set(['FINANCIER', 'CERTIFIER', 'LOGISTICS_PROVIDER']);
 
 @Injectable()
 export class ProfilesService {
@@ -62,6 +69,45 @@ export class ProfilesService {
     return draft;
   }
 
+  async updateDraft(
+    tenantId: string,
+    id: string,
+    input: UpdateProfileDraftDto,
+    actorUserId?: string,
+  ): Promise<ProfileDraft> {
+    const existing = await this.getDraft(tenantId, id);
+    const updatedCandidate: ProfileDraft = {
+      ...existing,
+      ...this.onlyDefined(input),
+      updatedAt: new Date().toISOString(),
+      status: 'DRAFT',
+    };
+
+    this.assertValidProfile(updatedCandidate);
+    const reviewReasons = this.reviewReasons(existing, updatedCandidate);
+    const updated: ProfileDraft = {
+      ...updatedCandidate,
+      status: reviewReasons.length > 0 ? 'PENDING_REVIEW' : 'DRAFT',
+    };
+
+    await this.repository.updateDraft(updated);
+    await this.auth?.recordTenantAudit({
+      tenantId,
+      actorUserId,
+      action: 'PROFILE_DRAFT_UPDATED',
+      entityType: 'PROFILE_DRAFT',
+      entityId: updated.id,
+      metadata: {
+        status: updated.status,
+        changedFields: this.changedFields(existing, updated).join(','),
+        reviewRequired: updated.status === 'PENDING_REVIEW',
+        reviewReasons: reviewReasons.join(','),
+      },
+    });
+
+    return updated;
+  }
+
   async getDraft(tenantId: string, id: string): Promise<ProfileDraft> {
     const draft = await this.repository.findDraft(tenantId, id);
     if (!draft) {
@@ -82,6 +128,7 @@ export class ProfilesService {
         country,
         industry,
         completenessScore: this.completenessScore(draft),
+        reviewRequired: draft.status === 'PENDING_REVIEW',
         publicContacts: {
           phone: draft.phone ?? null,
           email: draft.email ?? null,
@@ -94,9 +141,18 @@ export class ProfilesService {
   async publishDraft(
     tenantId: string,
     id: string,
+    input: PublishProfileDraftDto,
     actorUserId?: string,
   ): Promise<PublishedProfile> {
     const draft = await this.getDraft(tenantId, id);
+    await this.requireCurrentTermsAcceptance(tenantId, actorUserId, input.acceptedTerms);
+
+    if (draft.status === 'PENDING_REVIEW') {
+      throw new UnprocessableEntityException(
+        'Profile draft requires moderation review before publishing.',
+      );
+    }
+
     const safety = evaluateSafetyFields(draft);
     if (!safety.allowed) {
       throw new UnprocessableEntityException({
@@ -218,5 +274,87 @@ export class ProfilesService {
   private daysBetween(start: string, end: string): number {
     const diffMs = Math.max(0, Date.parse(end) - Date.parse(start));
     return Math.floor(diffMs / (24 * 60 * 60 * 1000));
+  }
+
+  private assertValidProfile(input: CreateProfileDraftDto | ProfileDraft): void {
+    const country = getCountry(input.countryCode);
+    const industry = industryCategories.find((item) => item.code === input.industryCode);
+
+    if (!country) {
+      throw new UnprocessableEntityException('Unsupported country.');
+    }
+
+    if (!industry) {
+      throw new UnprocessableEntityException('Unsupported industry.');
+    }
+
+    const safety = evaluateSafetyFields(input);
+    if (!safety.allowed) {
+      throw new UnprocessableEntityException({
+        message: 'This profile draft matches a zero-tolerance blocked category.',
+        safety,
+      });
+    }
+  }
+
+  private async requireCurrentTermsAcceptance(
+    tenantId: string,
+    actorUserId: string | undefined,
+    acceptedTerms: boolean,
+  ): Promise<void> {
+    if (!acceptedTerms) {
+      throw new UnprocessableEntityException('Current terms acceptance is required before publishing.');
+    }
+
+    if (!this.auth || !actorUserId) {
+      return;
+    }
+
+    if (!(await this.auth.hasCurrentTermsAcceptance(actorUserId, tenantId))) {
+      throw new UnprocessableEntityException(
+        'Current stored terms acceptance is required before publishing.',
+      );
+    }
+  }
+
+  private reviewReasons(previous: ProfileDraft, next: ProfileDraft): string[] {
+    const reasons: string[] = [];
+
+    if (
+      previous.industryCode !== next.industryCode &&
+      highRiskProfileIndustryCodes.has(next.industryCode)
+    ) {
+      reasons.push('HIGH_RISK_INDUSTRY_CHANGE');
+    }
+
+    if (previous.role !== next.role && highReviewRoles.has(next.role)) {
+      reasons.push('HIGH_REVIEW_ROLE_CHANGE');
+    }
+
+    if (previous.countryCode !== next.countryCode) {
+      reasons.push('COUNTRY_SCOPE_CHANGE');
+    }
+
+    return reasons;
+  }
+
+  private changedFields(previous: ProfileDraft, next: ProfileDraft): string[] {
+    const fields: Array<keyof CreateProfileDraftDto> = [
+      'displayName',
+      'industryCode',
+      'role',
+      'description',
+      'countryCode',
+      'phone',
+      'email',
+      'website',
+    ];
+    return fields.filter((field) => previous[field] !== next[field]);
+  }
+
+  private onlyDefined(input: UpdateProfileDraftDto): Partial<CreateProfileDraftDto> {
+    return Object.fromEntries(
+      Object.entries(input).filter(([, value]) => value !== undefined),
+    ) as Partial<CreateProfileDraftDto>;
   }
 }

@@ -171,8 +171,11 @@ Progress:
 - Added a profile repository boundary with in-memory default storage and
   opt-in Prisma-backed persistence through `PROFILE_REPOSITORY=prisma`,
   including persisted source-draft linkage for published profiles.
-- Profile edit/update endpoints, terms re-acceptance enforcement at publish,
-  moderation review gates, and media/contact enrichment remain next.
+- Added tenant-session protected profile draft editing, edit audit evidence,
+  publish-time request and stored current-terms checks, and a review-pending
+  gate for high-risk industry, role, or country changes.
+- Moderator approval workflow, media/contact enrichment, service-area fields,
+  and richer review reason persistence remain next.
 
 ## Epic 4: Listing and Media Vertical Slice
 

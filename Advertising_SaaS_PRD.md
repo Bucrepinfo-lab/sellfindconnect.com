@@ -341,9 +341,12 @@ Implementation progress on 2026-06-19:
 - Added a profile repository boundary with in-memory default storage and
   opt-in Prisma persistence for profile drafts, live profile publishing,
   previous-live archiving, and source-draft linkage.
-- Remaining hardening: profile edit/update endpoints, terms re-acceptance
-  checks at publish, moderation review gates for high-risk edits, and
-  media/contact enrichment.
+- Added profile draft editing with audit evidence, publish-time request and
+  stored current-terms checks, and review-pending gates for high-risk industry,
+  role, or country changes.
+- Remaining hardening: moderator approval workflow, media/contact enrichment,
+  service-area fields, richer review reason persistence, and user-facing review
+  status in web/mobile clients.
 
 ### 7.3 Media Display Area
 

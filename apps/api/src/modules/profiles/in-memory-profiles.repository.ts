@@ -17,6 +17,10 @@ export class InMemoryProfilesRepository implements ProfilesRepository {
     return this.drafts.get(this.key(tenantId, id));
   }
 
+  updateDraft(draft: ProfileDraft): void {
+    this.drafts.set(this.key(draft.tenantId, draft.id), draft);
+  }
+
   publishProfile(records: ProfilePublishRecords): void {
     if (records.previousLiveProfile) {
       this.publishedProfiles.set(
