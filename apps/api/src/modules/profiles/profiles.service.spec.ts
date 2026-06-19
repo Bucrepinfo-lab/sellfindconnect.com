@@ -211,10 +211,94 @@ describe('ProfilesService', () => {
     const preview = await service.previewDraft(tenantId, draft.id);
 
     expect(updated.status).toBe('PENDING_REVIEW');
+    expect(updated.reviewReasons).toContain('HIGH_RISK_INDUSTRY_CHANGE');
+    expect(updated.reviewRequestedAt).toBeDefined();
     expect(preview.preview.reviewRequired).toBe(true);
+    expect(preview.preview.reviewReasons).toContain('HIGH_RISK_INDUSTRY_CHANGE');
     await expect(
       service.publishDraft(tenantId, draft.id, { acceptedTerms: true }, 'user-1'),
     ).rejects.toThrow('moderation review');
+  });
+
+  it('lists pending reviews and approves a reviewed profile draft for publishing', async () => {
+    const auditLogs: TenantAuditInput[] = [];
+    const service = new ProfilesService(undefined, {
+      hasCurrentTermsAcceptance: async () => true,
+      recordTenantAudit: async (record: TenantAuditInput) => {
+        auditLogs.push(record);
+      },
+    } as Pick<AuthService, 'hasCurrentTermsAcceptance' | 'recordTenantAudit'> as AuthService);
+    const draft = await service.createDraft(tenantId, {
+      displayName: 'Nairobi Fresh Produce',
+      industryCode: 'AGRICULTURE',
+      role: 'SUPPLIER',
+      description: 'We supply fresh vegetables to hotels and shops in Nairobi.',
+      countryCode: 'KE',
+    });
+    await service.updateDraft(tenantId, draft.id, {
+      industryCode: 'HEALTH',
+      description: 'We coordinate compliant wellness supply introductions for licensed clinics.',
+    });
+
+    await expect(service.listPendingReviews(tenantId, 'editor-1', 'EDITOR')).rejects.toThrow();
+    const pending = await service.listPendingReviews(tenantId, 'owner-1', 'OWNER');
+    expect(pending).toHaveLength(1);
+    expect(pending[0]?.reviewReasons).toContain('HIGH_RISK_INDUSTRY_CHANGE');
+
+    const approved = await service.reviewDraft(
+      tenantId,
+      draft.id,
+      { decision: 'APPROVED', note: 'Licensed category language checked.' },
+      'owner-1',
+      'OWNER',
+    );
+
+    expect(approved).toMatchObject({
+      status: 'DRAFT',
+      reviewDecision: 'APPROVED',
+      reviewedBy: 'owner-1',
+    });
+    expect(await service.listPendingReviews(tenantId, 'owner-1', 'OWNER')).toHaveLength(0);
+    await expect(
+      service.publishDraft(tenantId, draft.id, { acceptedTerms: true }, 'owner-1'),
+    ).resolves.toMatchObject({ status: 'LIVE' });
+    expect(auditLogs.some((record) => record.action === 'PROFILE_DRAFT_REVIEWED')).toBe(true);
+  });
+
+  it('rejects a pending profile draft and requires an edit before publishing', async () => {
+    const service = new ProfilesService();
+    const draft = await service.createDraft(tenantId, {
+      displayName: 'Nairobi Fresh Produce',
+      industryCode: 'AGRICULTURE',
+      role: 'SUPPLIER',
+      description: 'We supply fresh vegetables to hotels and shops in Nairobi.',
+      countryCode: 'KE',
+    });
+    await service.updateDraft(tenantId, draft.id, {
+      role: 'FINANCIER',
+      description: 'We coordinate compliant trade finance introductions for licensed buyers.',
+    });
+
+    const rejected = await service.reviewDraft(
+      tenantId,
+      draft.id,
+      { decision: 'REJECTED', note: 'Finance wording needs stronger licensing evidence.' },
+      'admin-1',
+      'ADMIN',
+    );
+
+    expect(rejected.status).toBe('REJECTED');
+    await expect(
+      service.publishDraft(tenantId, draft.id, { acceptedTerms: true }, 'admin-1'),
+    ).rejects.toThrow('rejected');
+
+    const edited = await service.updateDraft(tenantId, draft.id, {
+      role: 'SUPPLIER',
+      description: 'We coordinate compliant supplier introductions for verified buyers.',
+    });
+    expect(edited.status).toBe('DRAFT');
+    expect(edited.reviewDecision).toBeUndefined();
+    expect(edited.reviewReasons).toEqual([]);
   });
 
   it('requires request and stored current terms before publishing with auth attached', async () => {

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { supplyChainRoles } from '@telpen/domain';
+import { profileReviewDecisions, supplyChainRoles } from '@telpen/domain';
 import {
   Equals,
   IsBoolean,
@@ -106,4 +106,16 @@ export class PublishProfileDraftDto {
   @IsBoolean()
   @Equals(true)
   declare acceptedTerms: true;
+}
+
+export class ReviewProfileDraftDto {
+  @ApiProperty({ enum: profileReviewDecisions, example: 'APPROVED' })
+  @IsIn(profileReviewDecisions)
+  declare decision: (typeof profileReviewDecisions)[number];
+
+  @ApiPropertyOptional({ example: 'Approved after checking licensed category language.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  declare note?: string;
 }

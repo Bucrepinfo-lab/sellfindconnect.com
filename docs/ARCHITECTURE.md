@@ -80,7 +80,8 @@ without validating it against the authenticated user's assignments.
   `PROFILE_REPOSITORY=prisma` after migrations and seed data are ready. Profile
   publish requires request-level terms acceptance plus current stored terms
   evidence when auth is attached; high-risk profile edits enter `PENDING_REVIEW`
-  and cannot publish until the future moderation approval workflow clears them.
+  with persisted review reasons and cannot publish until the MVP owner/admin
+  review workflow approves them. Rejected drafts remain blocked until edited.
 - Listings: draft, preview, publish, media, lifecycle, and visibility. Advert
   listing and lifecycle routes require an MFA-verified tenant session.
 - Safety: blocked categories, policy decisions, moderation cases, and reports.

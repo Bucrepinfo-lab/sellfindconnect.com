@@ -1,11 +1,20 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import {
+  Prisma,
   PrismaClient,
   ProfileStatus,
   type ProfileDraft as PrismaProfileDraft,
   type PublishedProfile as PrismaPublishedProfile,
 } from '@prisma/client';
-import type { ProfileDraft, PublishedProfile, SupplyChainRole } from '@telpen/domain';
+import {
+  profileReviewDecisions,
+  profileReviewReasons,
+  type ProfileDraft,
+  type ProfileReviewDecision,
+  type ProfileReviewReason,
+  type PublishedProfile,
+  type SupplyChainRole,
+} from '@telpen/domain';
 
 import type { ProfilePublishRecords, ProfilesRepository } from './profiles.repository';
 
@@ -31,6 +40,12 @@ export class PrismaProfilesRepository implements ProfilesRepository {
         email: draft.email,
         website: draft.website,
         status: this.mapDraftStatusToPrisma(draft.status),
+        reviewReasons: this.mapReviewReasonsToPrisma(draft.reviewReasons),
+        reviewRequestedAt: draft.reviewRequestedAt ? new Date(draft.reviewRequestedAt) : undefined,
+        reviewDecision: draft.reviewDecision,
+        reviewedAt: draft.reviewedAt ? new Date(draft.reviewedAt) : undefined,
+        reviewedBy: draft.reviewedBy,
+        reviewNote: draft.reviewNote,
         createdAt: new Date(draft.createdAt),
         updatedAt: new Date(draft.updatedAt),
       },
@@ -57,9 +72,23 @@ export class PrismaProfilesRepository implements ProfilesRepository {
         email: draft.email,
         website: draft.website,
         status: this.mapDraftStatusToPrisma(draft.status),
+        reviewReasons: this.mapReviewReasonsToPrisma(draft.reviewReasons),
+        reviewRequestedAt: draft.reviewRequestedAt ? new Date(draft.reviewRequestedAt) : null,
+        reviewDecision: draft.reviewDecision ?? null,
+        reviewedAt: draft.reviewedAt ? new Date(draft.reviewedAt) : null,
+        reviewedBy: draft.reviewedBy ?? null,
+        reviewNote: draft.reviewNote ?? null,
         updatedAt: new Date(draft.updatedAt),
       },
     });
+  }
+
+  async listDraftsPendingReview(tenantId: string): Promise<ProfileDraft[]> {
+    const drafts = await this.prisma.profileDraft.findMany({
+      where: { tenantId, status: ProfileStatus.PENDING_REVIEW },
+      orderBy: { updatedAt: 'desc' },
+    });
+    return drafts.map((draft) => this.mapDraft(draft));
   }
 
   async publishProfile(records: ProfilePublishRecords): Promise<void> {
@@ -105,6 +134,14 @@ export class PrismaProfilesRepository implements ProfilesRepository {
         where: { id: records.draft.id },
         data: {
           status: this.mapDraftStatusToPrisma(records.draft.status),
+          reviewReasons: this.mapReviewReasonsToPrisma(records.draft.reviewReasons),
+          reviewRequestedAt: records.draft.reviewRequestedAt
+            ? new Date(records.draft.reviewRequestedAt)
+            : null,
+          reviewDecision: records.draft.reviewDecision ?? null,
+          reviewedAt: records.draft.reviewedAt ? new Date(records.draft.reviewedAt) : null,
+          reviewedBy: records.draft.reviewedBy ?? null,
+          reviewNote: records.draft.reviewNote ?? null,
           updatedAt: new Date(records.draft.updatedAt),
         },
       }),
@@ -140,6 +177,12 @@ export class PrismaProfilesRepository implements ProfilesRepository {
       email: draft.email ?? undefined,
       website: draft.website ?? undefined,
       status: this.mapPrismaDraftStatus(draft.status),
+      reviewReasons: this.mapReviewReasonsFromPrisma(draft.reviewReasons),
+      reviewRequestedAt: draft.reviewRequestedAt?.toISOString(),
+      reviewDecision: this.mapReviewDecisionFromPrisma(draft.reviewDecision),
+      reviewedAt: draft.reviewedAt?.toISOString(),
+      reviewedBy: draft.reviewedBy ?? undefined,
+      reviewNote: draft.reviewNote ?? undefined,
       createdAt: draft.createdAt.toISOString(),
       updatedAt: draft.updatedAt.toISOString(),
     };
@@ -180,6 +223,10 @@ export class PrismaProfilesRepository implements ProfilesRepository {
       return ProfileStatus.PENDING_REVIEW;
     }
 
+    if (status === 'REJECTED') {
+      return ProfileStatus.REJECTED;
+    }
+
     return ProfileStatus.LIVE;
   }
 
@@ -192,7 +239,33 @@ export class PrismaProfilesRepository implements ProfilesRepository {
       return 'PENDING_REVIEW';
     }
 
+    if (status === ProfileStatus.REJECTED) {
+      return 'REJECTED';
+    }
+
     return 'PUBLISHED';
+  }
+
+  private mapReviewReasonsToPrisma(
+    reasons: ProfileDraft['reviewReasons'],
+  ): Prisma.InputJsonArray | typeof Prisma.JsonNull {
+    return reasons?.length ? (reasons as Prisma.InputJsonArray) : Prisma.JsonNull;
+  }
+
+  private mapReviewReasonsFromPrisma(value: unknown): ProfileReviewReason[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value.filter((item): item is ProfileReviewReason =>
+      profileReviewReasons.includes(item as ProfileReviewReason),
+    );
+  }
+
+  private mapReviewDecisionFromPrisma(value: string | null): ProfileReviewDecision | undefined {
+    return profileReviewDecisions.includes(value as ProfileReviewDecision)
+      ? (value as ProfileReviewDecision)
+      : undefined;
   }
 
   private daysBetween(start: string, end: string): number {

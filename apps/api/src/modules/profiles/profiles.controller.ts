@@ -6,6 +6,7 @@ import { TenantSessionGuard, type TenantSessionDecision } from '../tenant/tenant
 import {
   CreateProfileDraftDto,
   PublishProfileDraftDto,
+  ReviewProfileDraftDto,
   UpdateProfileDraftDto,
 } from './dto/create-profile-draft.dto';
 import { ProfilesService } from './profiles.service';
@@ -47,6 +48,24 @@ export class ProfilesController {
   @Post('drafts/:id/preview')
   previewDraft(@TenantId() tenantId: string, @Param('id') id: string) {
     return this.profiles.previewDraft(tenantId, id);
+  }
+
+  @Get('reviews/pending')
+  listPendingReviews(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+  ) {
+    return this.profiles.listPendingReviews(tenantId, session.userId, session.role);
+  }
+
+  @Post('drafts/:id/review')
+  reviewDraft(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Param('id') id: string,
+    @Body() body: ReviewProfileDraftDto,
+  ) {
+    return this.profiles.reviewDraft(tenantId, id, body, session.userId, session.role);
   }
 
   @Post('drafts/:id/publish')

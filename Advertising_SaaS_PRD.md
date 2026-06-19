@@ -344,9 +344,12 @@ Implementation progress on 2026-06-19:
 - Added profile draft editing with audit evidence, publish-time request and
   stored current-terms checks, and review-pending gates for high-risk industry,
   role, or country changes.
-- Remaining hardening: moderator approval workflow, media/contact enrichment,
-  service-area fields, richer review reason persistence, and user-facing review
-  status in web/mobile clients.
+- Added persisted review reasons and an MVP owner/admin review workflow for
+  pending profile drafts, including review queue listing, approve/reject
+  decisions, review notes, and publish blocking for rejected drafts.
+- Remaining hardening: platform-level moderator access, media/contact
+  enrichment, service-area fields, richer review case management, and
+  user-facing review status in web/mobile clients.
 
 ### 7.3 Media Display Area
 

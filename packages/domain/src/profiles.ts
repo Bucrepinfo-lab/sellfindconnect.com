@@ -1,5 +1,17 @@
 import type { SupplyChainRole } from './industries';
 
+export const profileReviewReasons = [
+  'HIGH_RISK_INDUSTRY_CHANGE',
+  'HIGH_REVIEW_ROLE_CHANGE',
+  'COUNTRY_SCOPE_CHANGE',
+] as const;
+
+export type ProfileReviewReason = (typeof profileReviewReasons)[number];
+
+export const profileReviewDecisions = ['APPROVED', 'REJECTED'] as const;
+
+export type ProfileReviewDecision = (typeof profileReviewDecisions)[number];
+
 export type ProfileDraftInput = {
   displayName: string;
   industryCode: string;
@@ -14,7 +26,13 @@ export type ProfileDraftInput = {
 export type ProfileDraft = ProfileDraftInput & {
   id: string;
   tenantId: string;
-  status: 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED';
+  status: 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED';
+  reviewReasons?: ProfileReviewReason[];
+  reviewRequestedAt?: string;
+  reviewDecision?: ProfileReviewDecision;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  reviewNote?: string;
   createdAt: string;
   updatedAt: string;
 };

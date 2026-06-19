@@ -174,8 +174,11 @@ Progress:
 - Added tenant-session protected profile draft editing, edit audit evidence,
   publish-time request and stored current-terms checks, and a review-pending
   gate for high-risk industry, role, or country changes.
-- Moderator approval workflow, media/contact enrichment, service-area fields,
-  and richer review reason persistence remain next.
+- Added persisted review reasons and MVP owner/admin profile review workflow:
+  pending-review queue, approve/reject decisions, review notes, reviewed-by
+  metadata, and publish blocking for rejected drafts.
+- Platform-level moderator access, media/contact enrichment, service-area
+  fields, and richer review case management remain next.
 
 ## Epic 4: Listing and Media Vertical Slice
 

@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -10,7 +11,9 @@ import {
   getCountry,
   industryCategories,
   type ProfileDraft,
+  type ProfileReviewReason,
   type PublishedProfile,
+  type TenantAccessRole,
 } from '@telpen/domain';
 import { randomUUID } from 'node:crypto';
 
@@ -18,13 +21,16 @@ import { AuthService } from '../auth/auth.service';
 import type {
   CreateProfileDraftDto,
   PublishProfileDraftDto,
+  ReviewProfileDraftDto,
   UpdateProfileDraftDto,
 } from './dto/create-profile-draft.dto';
 import { InMemoryProfilesRepository } from './in-memory-profiles.repository';
 import { PROFILES_REPOSITORY, type ProfilesRepository } from './profiles.repository';
 
 const highRiskProfileIndustryCodes = new Set(['EXTRACTIVES', 'FINANCE', 'HEALTH', 'LOGISTICS']);
-const highReviewRoles = new Set(['FINANCIER', 'CERTIFIER', 'LOGISTICS_PROVIDER']);
+const highReviewRoles = new Set<string>(['FINANCIER', 'CERTIFIER', 'LOGISTICS_PROVIDER']);
+
+type ProfileReviewComparable = Pick<ProfileDraft, 'countryCode' | 'industryCode' | 'role'>;
 
 @Injectable()
 export class ProfilesService {
@@ -76,18 +82,26 @@ export class ProfilesService {
     actorUserId?: string,
   ): Promise<ProfileDraft> {
     const existing = await this.getDraft(tenantId, id);
+    const now = new Date().toISOString();
+    const reviewBaseline = await this.reviewBaseline(tenantId, existing);
     const updatedCandidate: ProfileDraft = {
       ...existing,
       ...this.onlyDefined(input),
-      updatedAt: new Date().toISOString(),
+      updatedAt: now,
       status: 'DRAFT',
     };
 
     this.assertValidProfile(updatedCandidate);
-    const reviewReasons = this.reviewReasons(existing, updatedCandidate);
+    const reviewReasons = this.reviewReasons(reviewBaseline, updatedCandidate);
     const updated: ProfileDraft = {
       ...updatedCandidate,
       status: reviewReasons.length > 0 ? 'PENDING_REVIEW' : 'DRAFT',
+      reviewReasons,
+      reviewRequestedAt: reviewReasons.length > 0 ? now : undefined,
+      reviewDecision: undefined,
+      reviewedAt: undefined,
+      reviewedBy: undefined,
+      reviewNote: undefined,
     };
 
     await this.repository.updateDraft(updated);
@@ -106,6 +120,74 @@ export class ProfilesService {
     });
 
     return updated;
+  }
+
+  async listPendingReviews(
+    tenantId: string,
+    actorUserId: string | undefined,
+    role: TenantAccessRole,
+  ): Promise<ProfileDraft[]> {
+    this.assertCanReviewProfile(role);
+    await this.auth?.recordTenantAudit({
+      tenantId,
+      actorUserId,
+      action: 'PROFILE_REVIEW_QUEUE_VIEWED',
+      entityType: 'PROFILE_DRAFT',
+      metadata: { role },
+    });
+    return this.repository.listDraftsPendingReview(tenantId);
+  }
+
+  async reviewDraft(
+    tenantId: string,
+    id: string,
+    input: ReviewProfileDraftDto,
+    actorUserId: string | undefined,
+    role: TenantAccessRole,
+  ): Promise<ProfileDraft> {
+    this.assertCanReviewProfile(role);
+    const draft = await this.getDraft(tenantId, id);
+    if (draft.status !== 'PENDING_REVIEW') {
+      throw new UnprocessableEntityException('Profile draft is not pending review.');
+    }
+
+    if (input.note) {
+      const safety = evaluateSafetyFields({ note: input.note });
+      if (!safety.allowed) {
+        throw new UnprocessableEntityException({
+          message: 'Review note matches a zero-tolerance blocked category.',
+          safety,
+        });
+      }
+    }
+
+    const now = new Date().toISOString();
+    const reviewed: ProfileDraft = {
+      ...draft,
+      status: input.decision === 'APPROVED' ? 'DRAFT' : 'REJECTED',
+      reviewDecision: input.decision,
+      reviewedAt: now,
+      reviewedBy: actorUserId,
+      reviewNote: input.note,
+      updatedAt: now,
+    };
+
+    await this.repository.updateDraft(reviewed);
+    await this.auth?.recordTenantAudit({
+      tenantId,
+      actorUserId,
+      action: 'PROFILE_DRAFT_REVIEWED',
+      entityType: 'PROFILE_DRAFT',
+      entityId: reviewed.id,
+      metadata: {
+        decision: input.decision,
+        role,
+        reviewReasons: (reviewed.reviewReasons ?? []).join(','),
+        noteProvided: Boolean(input.note),
+      },
+    });
+
+    return reviewed;
   }
 
   async getDraft(tenantId: string, id: string): Promise<ProfileDraft> {
@@ -129,6 +211,11 @@ export class ProfilesService {
         industry,
         completenessScore: this.completenessScore(draft),
         reviewRequired: draft.status === 'PENDING_REVIEW',
+        reviewReasons: draft.reviewReasons ?? [],
+        reviewRequestedAt: draft.reviewRequestedAt ?? null,
+        reviewDecision: draft.reviewDecision ?? null,
+        reviewedAt: draft.reviewedAt ?? null,
+        reviewNote: draft.reviewNote ?? null,
         publicContacts: {
           phone: draft.phone ?? null,
           email: draft.email ?? null,
@@ -150,6 +237,12 @@ export class ProfilesService {
     if (draft.status === 'PENDING_REVIEW') {
       throw new UnprocessableEntityException(
         'Profile draft requires moderation review before publishing.',
+      );
+    }
+
+    if (draft.status === 'REJECTED') {
+      throw new UnprocessableEntityException(
+        'Profile draft was rejected and must be edited before publishing.',
       );
     }
 
@@ -317,8 +410,11 @@ export class ProfilesService {
     }
   }
 
-  private reviewReasons(previous: ProfileDraft, next: ProfileDraft): string[] {
-    const reasons: string[] = [];
+  private reviewReasons(
+    previous: ProfileReviewComparable,
+    next: ProfileReviewComparable,
+  ): ProfileReviewReason[] {
+    const reasons: ProfileReviewReason[] = [];
 
     if (
       previous.industryCode !== next.industryCode &&
@@ -336,6 +432,24 @@ export class ProfilesService {
     }
 
     return reasons;
+  }
+
+  private async reviewBaseline(
+    tenantId: string,
+    existing: ProfileDraft,
+  ): Promise<ProfileReviewComparable> {
+    if (existing.status === 'DRAFT' && existing.reviewDecision === 'APPROVED') {
+      return existing;
+    }
+
+    const live = await this.repository.findLiveProfile(tenantId);
+    return live?.sourceDraftId === existing.id ? live : existing;
+  }
+
+  private assertCanReviewProfile(role: TenantAccessRole): void {
+    if (!['OWNER', 'ADMIN'].includes(role)) {
+      throw new ForbiddenException('Only tenant owners or admins can review profile changes.');
+    }
   }
 
   private changedFields(previous: ProfileDraft, next: ProfileDraft): string[] {
