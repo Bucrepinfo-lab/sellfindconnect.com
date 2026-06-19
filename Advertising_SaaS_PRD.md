@@ -365,10 +365,11 @@ Implementation progress on 2026-06-19:
   CDN URLs, transform status, and variant metadata.
 - Added S3-compatible presigned PUT upload support through env-configured
   Signature V4 signing, plus scan/transform processing job interfaces.
+- Added durable Prisma/PostgreSQL media processing job outbox persistence with
+  worker claim, completion, retry, and final-failure support.
 - Remaining hardening: live object-storage credentials, provider-backed malware
-  and media scanning, durable worker queues, background image/video workers,
-  richer review case management, and user-facing review status in web/mobile
-  clients.
+  and media scanning, executable background image/video workers, richer review
+  case management, and user-facing review status in web/mobile clients.
 
 ### 7.3 Media Display Area
 
@@ -437,6 +438,8 @@ Implementation progress:
   auto-archive when the advert auto-deletes.
 - Added S3-compatible presigned upload readiness and media processing job
   queue contracts shared with profile media.
+- Added durable media processing job outbox support so advert scan/transform
+  jobs survive API restarts and can be processed by workers.
 - Durable advert drafts, persisted advert repository, live storage credentials,
   provider-backed media workers, pause/archive/renew controls, and public
   listing preview remain next.

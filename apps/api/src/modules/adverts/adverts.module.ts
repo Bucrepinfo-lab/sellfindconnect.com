@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { AuthModule } from '../auth/auth.module';
 import {
   MEDIA_ADAPTERS,
-  createConfiguredMediaAdapters,
+  createConfiguredMediaAdaptersAsync,
 } from '../media/media.adapters';
 import { AdvertsController } from './adverts.controller';
 import { AdvertsService } from './adverts.service';
@@ -16,7 +16,7 @@ import { AdvertsService } from './adverts.service';
     {
       provide: MEDIA_ADAPTERS,
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => createConfiguredMediaAdapters(config),
+      useFactory: (config: ConfigService) => createConfiguredMediaAdaptersAsync(config),
     },
     AdvertsService,
   ],

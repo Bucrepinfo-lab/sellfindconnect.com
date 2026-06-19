@@ -45,6 +45,10 @@ export type MediaProcessingJobType =
   | 'IMAGE_TRANSFORM'
   | 'VIDEO_TRANSCODE';
 
+export type MediaProcessingJobStatus = 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED';
+
+export type MediaProcessingJobMetadata = Record<string, string | number | boolean>;
+
 export type MediaProcessingJob = {
   id: string;
   type: MediaProcessingJobType;
@@ -54,14 +58,50 @@ export type MediaProcessingJob = {
   ownerId: string;
   objectKey?: string;
   sourceUrl: string;
-  status: 'QUEUED';
+  status: MediaProcessingJobStatus;
+  attempts: number;
+  maxAttempts: number;
+  availableAt: string;
+  lockedAt?: string;
+  lockedBy?: string;
+  completedAt?: string;
+  failedAt?: string;
+  lastError?: string;
   requestedAt: string;
-  metadata?: Record<string, string | number | boolean>;
+  metadata?: MediaProcessingJobMetadata;
+  result?: MediaProcessingJobMetadata;
+};
+
+export type ClaimMediaProcessingJobsInput = {
+  workerId: string;
+  limit: number;
+  now?: string;
+  lockSeconds?: number;
+  jobTypes?: MediaProcessingJobType[];
+};
+
+export type CompleteMediaProcessingJobInput = {
+  jobId: string;
+  workerId: string;
+  completedAt?: string;
+  result?: MediaProcessingJobMetadata;
+};
+
+export type FailMediaProcessingJobInput = {
+  jobId: string;
+  workerId: string;
+  reason: string;
+  failedAt?: string;
+  retryable?: boolean;
+  retryAfterSeconds?: number;
 };
 
 export interface MediaProcessingQueueAdapter {
   enqueueScanJobs(input: MediaAsset): Promise<MediaProcessingJob[]> | MediaProcessingJob[];
   enqueueTransformJobs(input: MediaAsset): Promise<MediaProcessingJob[]> | MediaProcessingJob[];
+  claimQueuedJobs(input: ClaimMediaProcessingJobsInput): Promise<MediaProcessingJob[]> | MediaProcessingJob[];
+  completeJob(input: CompleteMediaProcessingJobInput): Promise<MediaProcessingJob | undefined> | MediaProcessingJob | undefined;
+  failJob(input: FailMediaProcessingJobInput): Promise<MediaProcessingJob | undefined> | MediaProcessingJob | undefined;
 }
 
 export type MediaAdapters = {
@@ -281,7 +321,77 @@ export class InMemoryMediaProcessingQueueAdapter implements MediaProcessingQueue
     return [...this.jobs];
   }
 
+  claimQueuedJobs(input: ClaimMediaProcessingJobsInput): MediaProcessingJob[] {
+    const now = input.now ?? new Date().toISOString();
+    const limit = Math.max(1, input.limit);
+    const jobTypes = input.jobTypes ? new Set(input.jobTypes) : undefined;
+    const selected = this.jobs
+      .filter(
+        (job) =>
+          job.status === 'QUEUED' &&
+          job.availableAt <= now &&
+          (!jobTypes || jobTypes.has(job.type)),
+      )
+      .sort((a, b) => a.availableAt.localeCompare(b.availableAt))
+      .slice(0, limit);
+
+    for (const job of selected) {
+      this.replaceJob(job.id, {
+        ...job,
+        status: 'RUNNING',
+        attempts: job.attempts + 1,
+        lockedAt: now,
+        lockedBy: input.workerId,
+      });
+    }
+
+    return selected.map((job) => this.findJob(job.id)!);
+  }
+
+  completeJob(input: CompleteMediaProcessingJobInput): MediaProcessingJob | undefined {
+    const completedAt = input.completedAt ?? new Date().toISOString();
+    const job = this.findJob(input.jobId);
+    if (!job || job.status !== 'RUNNING' || job.lockedBy !== input.workerId) {
+      return undefined;
+    }
+
+    const completed: MediaProcessingJob = {
+      ...job,
+      status: 'SUCCEEDED',
+      completedAt,
+      lockedAt: undefined,
+      lockedBy: undefined,
+      result: input.result,
+    };
+    this.replaceJob(job.id, completed);
+    return completed;
+  }
+
+  failJob(input: FailMediaProcessingJobInput): MediaProcessingJob | undefined {
+    const failedAt = input.failedAt ?? new Date().toISOString();
+    const job = this.findJob(input.jobId);
+    if (!job || job.status !== 'RUNNING' || job.lockedBy !== input.workerId) {
+      return undefined;
+    }
+
+    const shouldRetry = Boolean(input.retryable) && job.attempts < job.maxAttempts;
+    const failed: MediaProcessingJob = {
+      ...job,
+      status: shouldRetry ? 'QUEUED' : 'FAILED',
+      availableAt: shouldRetry
+        ? new Date(Date.parse(failedAt) + (input.retryAfterSeconds ?? 300) * 1000).toISOString()
+        : job.availableAt,
+      lockedAt: undefined,
+      lockedBy: undefined,
+      failedAt: shouldRetry ? undefined : failedAt,
+      lastError: input.reason,
+    };
+    this.replaceJob(job.id, failed);
+    return failed;
+  }
+
   private enqueue(input: MediaAsset, type: MediaProcessingJobType): MediaProcessingJob {
+    const now = new Date().toISOString();
     const job: MediaProcessingJob = {
       id: randomUUID(),
       type,
@@ -292,7 +402,10 @@ export class InMemoryMediaProcessingQueueAdapter implements MediaProcessingQueue
       objectKey: input.objectKey,
       sourceUrl: input.cdnUrl ?? input.sourceUrl,
       status: 'QUEUED',
-      requestedAt: new Date().toISOString(),
+      attempts: 0,
+      maxAttempts: 3,
+      availableAt: now,
+      requestedAt: now,
       metadata: {
         kind: input.kind,
         mimeType: input.mimeType,
@@ -300,6 +413,17 @@ export class InMemoryMediaProcessingQueueAdapter implements MediaProcessingQueue
     };
     this.jobs.push(job);
     return job;
+  }
+
+  private findJob(jobId: string): MediaProcessingJob | undefined {
+    return this.jobs.find((job) => job.id === jobId);
+  }
+
+  private replaceJob(jobId: string, next: MediaProcessingJob): void {
+    const index = this.jobs.findIndex((job) => job.id === jobId);
+    if (index >= 0) {
+      this.jobs[index] = next;
+    }
   }
 }
 
@@ -324,6 +448,33 @@ export function createConfiguredMediaAdapters(config?: MediaAdapterConfigReader)
     moderation: new MetadataOnlyMediaModerationAdapter(),
     transforms: new DevelopmentMediaTransformAdapter(),
     jobs: new InMemoryMediaProcessingQueueAdapter(),
+  };
+}
+
+export async function createConfiguredMediaAdaptersAsync(
+  config?: MediaAdapterConfigReader,
+): Promise<MediaAdapters> {
+  const adapters = createConfiguredMediaAdapters(config);
+  const queueDriver = normalizeConfigString(
+    config?.get('MEDIA_JOB_QUEUE_DRIVER') ?? config?.get('MEDIA_PROCESSING_QUEUE_DRIVER'),
+  );
+
+  if (!['prisma', 'postgres', 'database'].includes(queueDriver)) {
+    return adapters;
+  }
+
+  const databaseUrl = normalizeOptionalConfigString(config?.get('DATABASE_URL'));
+  if (!databaseUrl) {
+    throw new Error('DATABASE_URL is required when MEDIA_JOB_QUEUE_DRIVER=prisma.');
+  }
+
+  const { PrismaMediaProcessingQueueAdapter, createMediaProcessingPrismaClient } = await import(
+    './prisma-media-processing-queue.adapter.js'
+  );
+
+  return {
+    ...adapters,
+    jobs: new PrismaMediaProcessingQueueAdapter(createMediaProcessingPrismaClient(databaseUrl)),
   };
 }
 

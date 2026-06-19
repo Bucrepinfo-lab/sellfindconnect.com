@@ -4,6 +4,7 @@ import {
   InMemoryMediaProcessingQueueAdapter,
   S3CompatibleMediaStorageAdapter,
   createConfiguredMediaAdapters,
+  createConfiguredMediaAdaptersAsync,
   enqueueMediaProcessingJobs,
   type MediaAdapters,
 } from './media.adapters';
@@ -73,6 +74,17 @@ describe('media adapters', () => {
     expect(development.storage).not.toBeInstanceOf(S3CompatibleMediaStorageAdapter);
   });
 
+  it('requires a database URL when durable Prisma queueing is enabled', async () => {
+    await expect(
+      createConfiguredMediaAdaptersAsync({
+        get: (key: string) =>
+          ({
+            MEDIA_JOB_QUEUE_DRIVER: 'prisma',
+          })[key],
+      }),
+    ).rejects.toThrow('DATABASE_URL is required when MEDIA_JOB_QUEUE_DRIVER=prisma.');
+  });
+
   it('queues scan and transform jobs through the media processing interface', async () => {
     const queue = new InMemoryMediaProcessingQueueAdapter();
     const media = mediaAsset({ kind: 'IMAGE' });
@@ -100,6 +112,67 @@ describe('media adapters', () => {
     ]);
     expect(queue.listQueuedJobs()).toHaveLength(3);
     expect(jobs.every((job) => job.mediaId === media.id && job.status === 'QUEUED')).toBe(true);
+  });
+
+  it('claims, completes, and retries processing jobs for worker execution', async () => {
+    const queue = new InMemoryMediaProcessingQueueAdapter();
+    const media = mediaAsset({ kind: 'IMAGE' });
+    const jobs = [...queue.enqueueScanJobs(media), ...queue.enqueueTransformJobs(media)];
+    const claimAt = new Date(Date.parse(jobs[0]!.availableAt) + 1000).toISOString();
+
+    const claimed = queue.claimQueuedJobs({
+      workerId: 'media-worker-1',
+      limit: 2,
+      now: claimAt,
+    });
+
+    expect(claimed).toHaveLength(2);
+    expect(claimed.every((job) => job.status === 'RUNNING')).toBe(true);
+    expect(claimed.every((job) => job.lockedBy === 'media-worker-1')).toBe(true);
+    expect(claimed.map((job) => job.attempts)).toEqual([1, 1]);
+
+    const completed = queue.completeJob({
+      jobId: claimed[0]!.id,
+      workerId: 'media-worker-1',
+      completedAt: '2026-06-19T12:05:00.000Z',
+      result: { thumbnailGenerated: true },
+    });
+    const retried = queue.failJob({
+      jobId: claimed[1]!.id,
+      workerId: 'media-worker-1',
+      reason: 'scanner timeout',
+      failedAt: '2026-06-19T12:05:00.000Z',
+      retryable: true,
+      retryAfterSeconds: 60,
+    });
+
+    expect(completed).toMatchObject({
+      status: 'SUCCEEDED',
+      completedAt: '2026-06-19T12:05:00.000Z',
+      result: { thumbnailGenerated: true },
+    });
+    expect(completed?.lockedBy).toBeUndefined();
+    expect(retried).toMatchObject({
+      status: 'QUEUED',
+      availableAt: '2026-06-19T12:06:00.000Z',
+      lastError: 'scanner timeout',
+    });
+    expect(retried?.lockedBy).toBeUndefined();
+    expect(retried?.failedAt).toBeUndefined();
+
+    const earlyClaim = queue.claimQueuedJobs({
+      workerId: 'media-worker-2',
+      limit: 10,
+      now: '2026-06-19T12:05:30.000Z',
+    });
+    const retryClaim = queue.claimQueuedJobs({
+      workerId: 'media-worker-3',
+      limit: 10,
+      now: '2026-06-19T12:06:00.000Z',
+    });
+
+    expect(earlyClaim.some((job) => job.id === retried?.id)).toBe(false);
+    expect(retryClaim.some((job) => job.id === retried?.id)).toBe(true);
   });
 });
 

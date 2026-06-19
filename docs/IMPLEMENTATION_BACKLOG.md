@@ -195,9 +195,12 @@ Progress:
   CDN URLs, transform status, and variant metadata.
 - Added S3-compatible presigned PUT upload support through env-configured
   Signature V4 signing, plus scan/transform processing job interfaces.
+- Added durable Prisma/PostgreSQL media processing job outbox persistence,
+  including worker claim, complete, retry, and final-failure lifecycle support
+  selected with `MEDIA_JOB_QUEUE_DRIVER=prisma`.
 - Real object-storage credentials, provider-backed malware and media scanning,
-  durable worker queues, background image/video workers, and richer review case
-  management remain next.
+  executable background image/video workers, and richer review case management
+  remain next.
 
 ## Epic 4: Listing and Media Vertical Slice
 
@@ -229,8 +232,11 @@ Progress:
   auto-archives when an advert auto-deletes.
 - Added S3-compatible presigned upload readiness and media processing job
   queue contracts shared with profile media.
-- A durable scheduler/queue, persisted advert repository, live storage
-  credentials, and provider-backed media workers remain next.
+- Added durable media job outbox support shared by advert and profile media so
+  queued scan/transform work survives API restarts and can be processed by
+  workers.
+- A durable advert lifecycle scheduler, persisted advert repository, live
+  storage credentials, and provider-backed media workers remain next.
 
 ## Epic 5: Source Finder and Relationship Graph
 

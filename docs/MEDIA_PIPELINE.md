@@ -12,8 +12,11 @@ Last updated: 2026-06-19
   using Node.js crypto, without adding an SDK dependency.
 - Media attach flows queue processing jobs through a worker-facing interface for
   malware scan, content moderation, image transform, and video transcode work.
-- Current processing queue is in memory only; production still needs durable
-  queue/outbox persistence and worker execution.
+- Processing jobs use an in-memory development queue by default and can switch
+  to a durable Prisma/PostgreSQL outbox so scan/transform jobs survive API
+  restarts and can be claimed by background workers.
+- Production still needs provider-backed malware scanning, content moderation,
+  image/video execution workers, and CDN publication.
 
 ## Storage Modes
 
@@ -43,6 +46,26 @@ MEDIA_UPLOAD_URL_TTL_SECONDS=900
 S3-compatible services. Access keys and secrets must be stored only in platform
 secret management, never in source control.
 
+## Processing Queue Modes
+
+Development fallback:
+
+```text
+MEDIA_JOB_QUEUE_DRIVER=memory
+```
+
+Durable Prisma/PostgreSQL outbox:
+
+```text
+MEDIA_JOB_QUEUE_DRIVER=prisma
+DATABASE_URL=postgresql://...
+```
+
+`MEDIA_PROCESSING_QUEUE_DRIVER` is accepted as a compatibility alias for
+`MEDIA_JOB_QUEUE_DRIVER`. The durable adapter stores each scan/transform job in
+the `MediaProcessingJob` table with status, attempts, retry availability,
+worker lock metadata, completion/failure timestamps, and result metadata.
+
 ## Upload Contract
 
 The API returns:
@@ -66,6 +89,16 @@ Media attach queues:
 - `IMAGE_TRANSFORM`
 - `VIDEO_TRANSCODE`
 
-The next hardening step is a durable queue/outbox table or Redis-backed worker
-queue, then provider adapters for malware scanning, image resizing, CDN cache
-publication, and video transcoding.
+Workers should:
+
+1. Claim available queued jobs with a stable `workerId` and optional job-type
+   filter.
+2. Process the referenced media from `objectKey` or `sourceUrl`.
+3. Mark successful work as `SUCCEEDED` with result metadata.
+4. Mark failed work as retryable to return it to `QUEUED` after backoff, or
+   final to move it to `FAILED`.
+
+Job states are `QUEUED`, `RUNNING`, `SUCCEEDED`, and `FAILED`. The next
+hardening step is to add executable worker entrypoints plus provider adapters
+for malware scanning, image resizing, CDN cache publication, video transcoding,
+and unsafe-media escalation.

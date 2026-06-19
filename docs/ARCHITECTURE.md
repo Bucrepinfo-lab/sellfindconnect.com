@@ -90,9 +90,11 @@ without validating it against the authenticated user's assignments.
   recursive metadata safety checks, publish-time media carry-over, provider
   upload preparation, and storage/moderation/CDN transform adapter hooks.
   S3-compatible presigned PUT uploads are supported through env-configured
-  Signature V4 signing; malware/media scanning providers, durable worker
-  queues, background image transforms, and video transcoding workers remain
-  production adapter implementations.
+  Signature V4 signing. Media scan/transform jobs can use a Prisma/PostgreSQL
+  outbox selected with `MEDIA_JOB_QUEUE_DRIVER=prisma`, including worker claim,
+  retry, completion, and failure state. Malware/media scanning providers,
+  background image transforms, and video transcoding workers remain production
+  adapter implementations.
 - Listings: draft, preview, publish, media, lifecycle, and visibility. Advert
   listing, lifecycle, and media routes require an MFA-verified tenant session.
   Advert media uses shared `MediaAsset` metadata, the ten-item display cap,
@@ -178,6 +180,10 @@ workflow are approved.
   `npm run db:migrate:deploy`; baseline domain data is loaded with
   `npm run db:seed` before enabling hosted Prisma-backed repositories such as
   `AUTH_REPOSITORY=prisma` and `PROFILE_REPOSITORY=prisma`.
+- Media processing queue persistence is enabled with
+  `MEDIA_JOB_QUEUE_DRIVER=prisma` after applying the database migrations and
+  setting `DATABASE_URL`; development and tests use the in-memory queue by
+  default.
 
 ## Notification Flow
 

@@ -249,6 +249,7 @@ model Tenant {
   conversationNotifications ConversationNotification[]
   notificationPreferences   NotificationPreference[]
   notificationOutboxRecords NotificationOutboxRecord[]
+  mediaProcessingJobs       MediaProcessingJob[]
   accessAssignments         AccessAssignment[]
   accessDecisionAudits      AccessDecisionAudit[]
   authSessions              AuthSession[]
@@ -523,6 +524,38 @@ model MediaAsset {
   @@index([tenantId, status])
   @@index([ownerType, ownerId])
   @@index([storageProvider, objectKey])
+}
+
+model MediaProcessingJob {
+  id          String   @id @default(uuid())
+  tenantId    String
+  mediaId     String   @db.VarChar(120)
+  ownerType   String   @db.VarChar(40)
+  ownerId     String   @db.VarChar(120)
+  type        String   @db.VarChar(40)
+  status      String   @db.VarChar(40) @default("QUEUED")
+  objectKey   String?  @db.VarChar(500)
+  sourceUrl   String   @db.VarChar(1000)
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(3)
+  availableAt DateTime @default(now())
+  lockedAt    DateTime?
+  lockedBy    String?  @db.VarChar(160)
+  completedAt DateTime?
+  failedAt    DateTime?
+  lastError   String?
+  metadata    Json?
+  result      Json?
+  requestedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([status, availableAt])
+  @@index([tenantId, status, availableAt])
+  @@index([type, status, availableAt])
+  @@index([mediaId, type, status])
+  @@index([lockedBy, status])
 }
 
 model Notification {

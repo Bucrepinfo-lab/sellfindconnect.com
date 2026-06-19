@@ -5,7 +5,7 @@ import { AccessModule } from '../access/access.module';
 import { AuthModule } from '../auth/auth.module';
 import {
   MEDIA_ADAPTERS,
-  createConfiguredMediaAdapters,
+  createConfiguredMediaAdaptersAsync,
 } from '../media/media.adapters';
 import { InMemoryProfilesRepository } from './in-memory-profiles.repository';
 import { ProfileModerationController } from './profile-moderation.controller';
@@ -47,7 +47,7 @@ import { ProfilesService } from './profiles.service';
     {
       provide: MEDIA_ADAPTERS,
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => createConfiguredMediaAdapters(config),
+      useFactory: (config: ConfigService) => createConfiguredMediaAdaptersAsync(config),
     },
     ProfilesService,
   ],
