@@ -690,6 +690,10 @@ export class AuthService {
     };
   }
 
+  async recordTenantAudit(input: Omit<AuthAuditRecord, 'id' | 'createdAt'>): Promise<void> {
+    await this.recordAudit(input);
+  }
+
   private async createSession(
     user: AuthUserRecord,
     tenantId: string,

@@ -1,8 +1,8 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 
-import { TenantId } from '../tenant/tenant-context.decorator';
-import { TenantSessionGuard } from '../tenant/tenant-session.guard';
+import { TenantAuthSession, TenantId } from '../tenant/tenant-context.decorator';
+import { TenantSessionGuard, type TenantSessionDecision } from '../tenant/tenant-session.guard';
 import { CreateProfileDraftDto } from './dto/create-profile-draft.dto';
 import { ProfilesService } from './profiles.service';
 
@@ -33,5 +33,24 @@ export class ProfilesController {
   @Post('drafts/:id/preview')
   previewDraft(@TenantId() tenantId: string, @Param('id') id: string) {
     return this.profiles.previewDraft(tenantId, id);
+  }
+
+  @Post('drafts/:id/publish')
+  publishDraft(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Param('id') id: string,
+  ) {
+    return this.profiles.publishDraft(tenantId, id, session.userId);
+  }
+
+  @Get('published/live')
+  getLiveProfile(@TenantId() tenantId: string) {
+    return this.profiles.getLiveProfile(tenantId);
+  }
+
+  @Get('published')
+  listPublishedProfiles(@TenantId() tenantId: string) {
+    return this.profiles.listPublishedProfiles(tenantId);
   }
 }

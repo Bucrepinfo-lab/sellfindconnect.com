@@ -73,8 +73,10 @@ without validating it against the authenticated user's assignments.
   reset challenges, tenant invite tokens, tenant auth audit lookup, terms
   acceptance evidence, in-memory and Prisma repository adapters, tenant session
   guard, and future identity-provider adapter boundary.
-- Profiles: draft, preview, publish, profile completeness, and contacts. Profile
-  write/preview routes require an MFA-verified tenant session.
+- Profiles: draft, preview, publish, profile completeness, contacts, live
+  version preservation, and publish audit evidence. Profile write/preview/publish
+  routes require an MFA-verified tenant session; durable Prisma profile
+  repositories remain the next persistence step.
 - Listings: draft, preview, publish, media, lifecycle, and visibility. Advert
   listing and lifecycle routes require an MFA-verified tenant session.
 - Safety: blocked categories, policy decisions, moderation cases, and reports.

@@ -160,6 +160,18 @@ Progress:
 Exit: a Kenya pilot advertiser can onboard, accept the current terms, preview,
 and publish a safe profile.
 
+Progress:
+
+- Added an MVP profile publish workflow that converts a safe draft into the
+  tenant's live profile, marks the draft published, increments profile version,
+  archives the previous live profile, tracks days live, and records profile
+  publish audit evidence.
+- Added tenant-session protected routes for publishing a draft, reading the
+  current live profile, and listing published profile history.
+- Durable Prisma profile repository wiring, profile edit/update endpoints,
+  terms re-acceptance enforcement at publish, moderation review gates, and
+  media/contact enrichment remain next.
+
 ## Epic 4: Listing and Media Vertical Slice
 
 - Create listing draft.

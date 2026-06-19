@@ -14,7 +14,20 @@ export type ProfileDraftInput = {
 export type ProfileDraft = ProfileDraftInput & {
   id: string;
   tenantId: string;
-  status: 'DRAFT';
+  status: 'DRAFT' | 'PUBLISHED';
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PublishedProfile = ProfileDraftInput & {
+  id: string;
+  tenantId: string;
+  sourceDraftId: string;
+  status: 'LIVE' | 'ARCHIVED';
+  version: number;
+  publishedAt: string;
+  archivedAt?: string;
+  daysLive: number;
   createdAt: string;
   updatedAt: string;
 };

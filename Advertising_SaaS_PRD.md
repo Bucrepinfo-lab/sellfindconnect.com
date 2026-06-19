@@ -329,6 +329,19 @@ Requirements:
 - Admin/moderator can require review for high-risk category changes.
 - Profile must show created date, updated date, and how long the profile has been active.
 
+Implementation progress on 2026-06-19:
+
+- Added the first tenant-session protected profile publish workflow: a safe draft
+  can become the tenant's live profile, the prior live profile is archived, and
+  profile versions plus days-live metadata are tracked.
+- Added API support for reading the current live profile and published profile
+  history.
+- Added profile publish audit evidence so sensitive publication events can be
+  reviewed from the tenant audit trail.
+- Remaining hardening: Prisma-backed profile repository, profile edit/update
+  endpoints, terms re-acceptance checks at publish, moderation review gates for
+  high-risk edits, and media/contact enrichment.
+
 ### 7.3 Media Display Area
 
 Requirements:
