@@ -1,16 +1,71 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { profileReviewDecisions, supplyChainRoles } from '@telpen/domain';
+import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   Equals,
+  IsArray,
   IsBoolean,
   IsEmail,
   IsIn,
+  IsNumber,
   IsOptional,
   IsString,
   IsUrl,
   Length,
+  Max,
   MaxLength,
+  Min,
+  ValidateNested,
 } from 'class-validator';
+
+export class ProfileSocialLinkDto {
+  @ApiProperty({ example: 'LinkedIn' })
+  @IsString()
+  @Length(2, 40)
+  declare label: string;
+
+  @ApiProperty({ example: 'https://www.linkedin.com/company/example' })
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true, require_tld: false })
+  declare url: string;
+}
+
+export class ProfileServiceAreaDto {
+  @ApiPropertyOptional({ example: 'Nairobi' })
+  @IsOptional()
+  @IsString()
+  @Length(2, 80)
+  declare primaryCity?: string;
+
+  @ApiPropertyOptional({ example: ['Nairobi County', 'Kiambu County'] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  @Length(2, 80, { each: true })
+  declare regions?: string[];
+
+  @ApiPropertyOptional({ example: 120 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  @Max(1000)
+  declare radiusKm?: number;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  declare remoteAvailable?: boolean;
+
+  @ApiPropertyOptional({ example: ['KE', 'TZ', 'UG'] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(30)
+  @IsString({ each: true })
+  @Length(2, 2, { each: true })
+  declare operatingCountries?: string[];
+}
 
 export class CreateProfileDraftDto {
   @ApiProperty({ example: 'Nairobi Fresh Produce Cooperative' })
@@ -43,6 +98,12 @@ export class CreateProfileDraftDto {
   @MaxLength(40)
   declare phone?: string;
 
+  @ApiPropertyOptional({ example: '+254711000000' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  declare whatsapp?: string;
+
   @ApiPropertyOptional({ example: 'sales@example.co.ke' })
   @IsOptional()
   @IsEmail()
@@ -52,6 +113,31 @@ export class CreateProfileDraftDto {
   @IsOptional()
   @IsUrl({ protocols: ['http', 'https'], require_protocol: true, require_tld: false })
   declare website?: string;
+
+  @ApiPropertyOptional({ example: 'Industrial Area, Nairobi, Kenya' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  declare physicalAddress?: string;
+
+  @ApiPropertyOptional({ example: 'https://maps.google.com/?q=Nairobi' })
+  @IsOptional()
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true, require_tld: false })
+  declare mapsUrl?: string;
+
+  @ApiPropertyOptional({ type: () => [ProfileSocialLinkDto] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(6)
+  @ValidateNested({ each: true })
+  @Type(() => ProfileSocialLinkDto)
+  declare socialLinks?: ProfileSocialLinkDto[];
+
+  @ApiPropertyOptional({ type: () => ProfileServiceAreaDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ProfileServiceAreaDto)
+  declare serviceArea?: ProfileServiceAreaDto;
 }
 
 export class UpdateProfileDraftDto {
@@ -90,6 +176,12 @@ export class UpdateProfileDraftDto {
   @MaxLength(40)
   declare phone?: string;
 
+  @ApiPropertyOptional({ example: '+254711000000' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  declare whatsapp?: string;
+
   @ApiPropertyOptional({ example: 'sales@example.co.ke' })
   @IsOptional()
   @IsEmail()
@@ -99,6 +191,31 @@ export class UpdateProfileDraftDto {
   @IsOptional()
   @IsUrl({ protocols: ['http', 'https'], require_protocol: true, require_tld: false })
   declare website?: string;
+
+  @ApiPropertyOptional({ example: 'Industrial Area, Nairobi, Kenya' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  declare physicalAddress?: string;
+
+  @ApiPropertyOptional({ example: 'https://maps.google.com/?q=Nairobi' })
+  @IsOptional()
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true, require_tld: false })
+  declare mapsUrl?: string;
+
+  @ApiPropertyOptional({ type: () => [ProfileSocialLinkDto] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(6)
+  @ValidateNested({ each: true })
+  @Type(() => ProfileSocialLinkDto)
+  declare socialLinks?: ProfileSocialLinkDto[];
+
+  @ApiPropertyOptional({ type: () => ProfileServiceAreaDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ProfileServiceAreaDto)
+  declare serviceArea?: ProfileServiceAreaDto;
 }
 
 export class PublishProfileDraftDto {

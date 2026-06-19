@@ -418,28 +418,33 @@ model AccessDecisionAudit {
 }
 
 model ProfileDraft {
-  id           String        @id @default(uuid())
-  tenantId     String
-  countryCode  String        @db.VarChar(2)
-  industryCode String        @db.VarChar(80)
-  role         String        @db.VarChar(80)
-  displayName  String        @db.VarChar(160)
-  description  String
-  phone        String?       @db.VarChar(80)
-  email        String?       @db.VarChar(320)
-  website      String?       @db.VarChar(500)
-  status       ProfileStatus @default(DRAFT)
+  id                String        @id @default(uuid())
+  tenantId          String
+  countryCode       String        @db.VarChar(2)
+  industryCode      String        @db.VarChar(80)
+  role              String        @db.VarChar(80)
+  displayName       String        @db.VarChar(160)
+  description       String
+  phone             String?       @db.VarChar(80)
+  whatsapp          String?       @db.VarChar(80)
+  email             String?       @db.VarChar(320)
+  website           String?       @db.VarChar(500)
+  physicalAddress   String?       @db.VarChar(500)
+  mapsUrl           String?       @db.VarChar(500)
+  socialLinks       Json?
+  serviceArea       Json?
+  status            ProfileStatus @default(DRAFT)
   reviewReasons     Json?
   reviewRequestedAt DateTime?
   reviewDecision    String?       @db.VarChar(40)
   reviewedAt        DateTime?
   reviewedBy        String?       @db.VarChar(120)
   reviewNote        String?       @db.VarChar(1000)
-  version      Int           @default(1)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  country      Country       @relation(fields: [countryCode], references: [code])
+  version           Int           @default(1)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  country           Country       @relation(fields: [countryCode], references: [code])
 
   @@index([tenantId, status])
   @@index([reviewDecision])
@@ -456,8 +461,13 @@ model PublishedProfile {
   displayName      String        @db.VarChar(160)
   description      String
   phone            String?       @db.VarChar(80)
+  whatsapp         String?       @db.VarChar(80)
   email            String?       @db.VarChar(320)
   website          String?       @db.VarChar(500)
+  physicalAddress  String?       @db.VarChar(500)
+  mapsUrl          String?       @db.VarChar(500)
+  socialLinks      Json?
+  serviceArea      Json?
   status           ProfileStatus @default(LIVE)
   version          Int
   publishedAt      DateTime      @default(now())

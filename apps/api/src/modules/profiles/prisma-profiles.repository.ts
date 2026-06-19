@@ -12,6 +12,8 @@ import {
   type ProfileDraft,
   type ProfileReviewDecision,
   type ProfileReviewReason,
+  type ProfileServiceArea,
+  type ProfileSocialLink,
   type PublishedProfile,
   type SupplyChainRole,
 } from '@telpen/domain';
@@ -37,8 +39,13 @@ export class PrismaProfilesRepository implements ProfilesRepository {
         displayName: draft.displayName,
         description: draft.description,
         phone: draft.phone,
+        whatsapp: draft.whatsapp,
         email: draft.email,
         website: draft.website,
+        physicalAddress: draft.physicalAddress,
+        mapsUrl: draft.mapsUrl,
+        socialLinks: this.mapOptionalJsonToPrisma(draft.socialLinks),
+        serviceArea: this.mapOptionalJsonToPrisma(draft.serviceArea),
         status: this.mapDraftStatusToPrisma(draft.status),
         reviewReasons: this.mapReviewReasonsToPrisma(draft.reviewReasons),
         reviewRequestedAt: draft.reviewRequestedAt ? new Date(draft.reviewRequestedAt) : undefined,
@@ -69,8 +76,13 @@ export class PrismaProfilesRepository implements ProfilesRepository {
         displayName: draft.displayName,
         description: draft.description,
         phone: draft.phone,
+        whatsapp: draft.whatsapp,
         email: draft.email,
         website: draft.website,
+        physicalAddress: draft.physicalAddress ?? null,
+        mapsUrl: draft.mapsUrl ?? null,
+        socialLinks: this.mapOptionalJsonToPrisma(draft.socialLinks),
+        serviceArea: this.mapOptionalJsonToPrisma(draft.serviceArea),
         status: this.mapDraftStatusToPrisma(draft.status),
         reviewReasons: this.mapReviewReasonsToPrisma(draft.reviewReasons),
         reviewRequestedAt: draft.reviewRequestedAt ? new Date(draft.reviewRequestedAt) : null,
@@ -118,8 +130,13 @@ export class PrismaProfilesRepository implements ProfilesRepository {
           displayName: records.published.displayName,
           description: records.published.description,
           phone: records.published.phone,
+          whatsapp: records.published.whatsapp,
           email: records.published.email,
           website: records.published.website,
+          physicalAddress: records.published.physicalAddress,
+          mapsUrl: records.published.mapsUrl,
+          socialLinks: this.mapOptionalJsonToPrisma(records.published.socialLinks),
+          serviceArea: this.mapOptionalJsonToPrisma(records.published.serviceArea),
           status: ProfileStatus.LIVE,
           version: records.published.version,
           publishedAt: new Date(records.published.publishedAt),
@@ -174,8 +191,13 @@ export class PrismaProfilesRepository implements ProfilesRepository {
       description: draft.description,
       countryCode: draft.countryCode,
       phone: draft.phone ?? undefined,
+      whatsapp: draft.whatsapp ?? undefined,
       email: draft.email ?? undefined,
       website: draft.website ?? undefined,
+      physicalAddress: draft.physicalAddress ?? undefined,
+      mapsUrl: draft.mapsUrl ?? undefined,
+      socialLinks: this.mapSocialLinksFromPrisma(draft.socialLinks),
+      serviceArea: this.mapServiceAreaFromPrisma(draft.serviceArea),
       status: this.mapPrismaDraftStatus(draft.status),
       reviewReasons: this.mapReviewReasonsFromPrisma(draft.reviewReasons),
       reviewRequestedAt: draft.reviewRequestedAt?.toISOString(),
@@ -199,8 +221,13 @@ export class PrismaProfilesRepository implements ProfilesRepository {
       description: profile.description,
       countryCode: profile.countryCode,
       phone: profile.phone ?? undefined,
+      whatsapp: profile.whatsapp ?? undefined,
       email: profile.email ?? undefined,
       website: profile.website ?? undefined,
+      physicalAddress: profile.physicalAddress ?? undefined,
+      mapsUrl: profile.mapsUrl ?? undefined,
+      socialLinks: this.mapSocialLinksFromPrisma(profile.socialLinks),
+      serviceArea: this.mapServiceAreaFromPrisma(profile.serviceArea),
       status: profile.status === ProfileStatus.ARCHIVED ? 'ARCHIVED' : 'LIVE',
       version: profile.version,
       publishedAt: profile.publishedAt.toISOString(),
@@ -266,6 +293,55 @@ export class PrismaProfilesRepository implements ProfilesRepository {
     return profileReviewDecisions.includes(value as ProfileReviewDecision)
       ? (value as ProfileReviewDecision)
       : undefined;
+  }
+
+  private mapOptionalJsonToPrisma(
+    value: unknown,
+  ): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+    return value == null ? Prisma.JsonNull : (value as Prisma.InputJsonValue);
+  }
+
+  private mapSocialLinksFromPrisma(value: unknown): ProfileSocialLink[] | undefined {
+    if (!Array.isArray(value)) {
+      return undefined;
+    }
+
+    const links = value.filter(
+      (item): item is ProfileSocialLink =>
+        this.isRecord(item) &&
+        typeof item.label === 'string' &&
+        typeof item.url === 'string',
+    );
+
+    return links.length > 0 ? links : undefined;
+  }
+
+  private mapServiceAreaFromPrisma(value: unknown): ProfileServiceArea | undefined {
+    if (!this.isRecord(value)) {
+      return undefined;
+    }
+
+    return {
+      primaryCity: typeof value.primaryCity === 'string' ? value.primaryCity : undefined,
+      regions: this.mapStringArray(value.regions),
+      radiusKm: typeof value.radiusKm === 'number' ? value.radiusKm : undefined,
+      remoteAvailable:
+        typeof value.remoteAvailable === 'boolean' ? value.remoteAvailable : undefined,
+      operatingCountries: this.mapStringArray(value.operatingCountries),
+    };
+  }
+
+  private mapStringArray(value: unknown): string[] | undefined {
+    if (!Array.isArray(value)) {
+      return undefined;
+    }
+
+    const strings = value.filter((item): item is string => typeof item === 'string');
+    return strings.length > 0 ? strings : undefined;
+  }
+
+  private isRecord(value: unknown): value is Record<string, unknown> {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
   }
 
   private daysBetween(start: string, end: string): number {

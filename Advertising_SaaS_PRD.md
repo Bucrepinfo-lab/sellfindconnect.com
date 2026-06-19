@@ -347,9 +347,13 @@ Implementation progress on 2026-06-19:
 - Added persisted review reasons and an MVP owner/admin review workflow for
   pending profile drafts, including review queue listing, approve/reject
   decisions, review notes, and publish blocking for rejected drafts.
-- Remaining hardening: platform-level moderator access, media/contact
-  enrichment, service-area fields, richer review case management, and
-  user-facing review status in web/mobile clients.
+- Added profile contact enrichment and service-area coverage for WhatsApp,
+  physical address, map URL, social/contact links, primary city, regions,
+  radius, remote availability, and operating countries, including preview and
+  live publish carry-over.
+- Remaining hardening: platform-level moderator access, media uploads/display,
+  richer review case management, and user-facing review status in web/mobile
+  clients.
 
 ### 7.3 Media Display Area
 
@@ -848,6 +852,8 @@ Core entities:
 - Subcategory
 - Profile
 - ProfileDraft
+- ProfileServiceArea
+- ProfileSocialLink
 - Listing
 - ListingDraft
 - MediaAsset

@@ -177,8 +177,12 @@ Progress:
 - Added persisted review reasons and MVP owner/admin profile review workflow:
   pending-review queue, approve/reject decisions, review notes, reviewed-by
   metadata, and publish blocking for rejected drafts.
-- Platform-level moderator access, media/contact enrichment, service-area
-  fields, and richer review case management remain next.
+- Added profile contact enrichment and service-area fields for WhatsApp,
+  physical address, map URL, social/contact links, primary city, regions,
+  radius, remote availability, and operating countries, with preview and live
+  publish carry-over.
+- Platform-level moderator access, media uploads/display, and richer review case
+  management remain next.
 
 ## Epic 4: Listing and Media Vertical Slice
 

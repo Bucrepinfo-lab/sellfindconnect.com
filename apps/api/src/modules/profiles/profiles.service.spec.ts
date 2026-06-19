@@ -19,12 +19,34 @@ describe('ProfilesService', () => {
       description: 'We supply fresh vegetables to hotels and shops in Nairobi.',
       countryCode: 'KE',
       phone: '+254700000000',
+      whatsapp: '+254711000000',
+      email: 'hello@example.co.ke',
+      website: 'https://fresh.example.co.ke',
+      physicalAddress: 'Industrial Area, Nairobi, Kenya',
+      mapsUrl: 'https://maps.google.com/?q=Nairobi',
+      socialLinks: [{ label: 'LinkedIn', url: 'https://www.linkedin.com/company/example' }],
+      serviceArea: {
+        primaryCity: 'Nairobi',
+        regions: ['Nairobi County', 'Kiambu County'],
+        radiusKm: 120,
+        remoteAvailable: true,
+        operatingCountries: ['KE', 'UG'],
+      },
     });
 
     expect(draft.tenantId).toBe(tenantId);
     expect(draft.status).toBe('DRAFT');
     const preview = await service.previewDraft(tenantId, draft.id);
     expect(preview.preview.completenessScore).toBeGreaterThan(70);
+    expect(preview.preview.publicContacts).toMatchObject({
+      whatsapp: '+254711000000',
+      mapsUrl: 'https://maps.google.com/?q=Nairobi',
+    });
+    expect(preview.preview.serviceArea).toMatchObject({
+      primaryCity: 'Nairobi',
+      regions: ['Nairobi County', 'Kiambu County'],
+      operatingCountries: ['KE', 'UG'],
+    });
   });
 
   it('blocks zero-tolerance profile content', async () => {
@@ -56,6 +78,27 @@ describe('ProfilesService', () => {
     ).rejects.toThrow();
   });
 
+  it('blocks prohibited content in nested contact enrichment fields', async () => {
+    const service = new ProfilesService();
+
+    await expect(
+      service.createDraft(tenantId, {
+        displayName: 'Regional Trading Desk',
+        industryCode: 'TRADE',
+        role: 'SUPPLIER',
+        description: 'We connect verified businesses with compliant commercial suppliers.',
+        countryCode: 'KE',
+        socialLinks: [
+          { label: 'Catalog', url: 'https://counterfeit-goods.example/catalog' },
+        ],
+        serviceArea: {
+          primaryCity: 'Nairobi',
+          regions: ['Nairobi County'],
+        },
+      }),
+    ).rejects.toThrow();
+  });
+
   it('publishes a draft as the tenant live profile with audit evidence', async () => {
     const auditLogs: TenantAuditInput[] = [];
     const service = new ProfilesService(undefined, {
@@ -73,6 +116,13 @@ describe('ProfilesService', () => {
       countryCode: 'KE',
       phone: '+254700000000',
       email: 'hello@example.com',
+      whatsapp: '+254711000000',
+      physicalAddress: 'Industrial Area, Nairobi, Kenya',
+      serviceArea: {
+        primaryCity: 'Nairobi',
+        regions: ['Nairobi County'],
+        radiusKm: 100,
+      },
     });
 
     const published = await service.publishDraft(
@@ -87,6 +137,11 @@ describe('ProfilesService', () => {
       sourceDraftId: draft.id,
       status: 'LIVE',
       version: 1,
+      whatsapp: '+254711000000',
+      physicalAddress: 'Industrial Area, Nairobi, Kenya',
+      serviceArea: {
+        primaryCity: 'Nairobi',
+      },
     });
     expect((await service.getLiveProfile(tenantId)).id).toBe(published.id);
     expect((await service.getDraft(tenantId, draft.id)).status).toBe('PUBLISHED');
@@ -192,6 +247,50 @@ describe('ProfilesService', () => {
     );
     expect(second.version).toBe(2);
     expect(second.description).toContain('herbs');
+  });
+
+  it('updates profile contact enrichment and service area without moderation review', async () => {
+    const auditLogs: TenantAuditInput[] = [];
+    const service = new ProfilesService(undefined, {
+      recordTenantAudit: async (record: TenantAuditInput) => {
+        auditLogs.push(record);
+      },
+    } as Pick<AuthService, 'recordTenantAudit'> as AuthService);
+    const draft = await service.createDraft(tenantId, {
+      displayName: 'Nairobi Fresh Produce',
+      industryCode: 'AGRICULTURE',
+      role: 'SUPPLIER',
+      description: 'We supply fresh vegetables to hotels and shops in Nairobi.',
+      countryCode: 'KE',
+    });
+
+    const updated = await service.updateDraft(tenantId, draft.id, {
+      whatsapp: '+254711000000',
+      physicalAddress: 'Industrial Area, Nairobi, Kenya',
+      mapsUrl: 'https://maps.google.com/?q=Nairobi',
+      socialLinks: [{ label: 'LinkedIn', url: 'https://www.linkedin.com/company/example' }],
+      serviceArea: {
+        primaryCity: 'Nairobi',
+        regions: ['Nairobi County', 'Kiambu County'],
+        radiusKm: 120,
+        remoteAvailable: true,
+        operatingCountries: ['KE', 'UG'],
+      },
+    });
+    const preview = await service.previewDraft(tenantId, draft.id);
+
+    expect(updated.status).toBe('DRAFT');
+    expect(updated.reviewReasons).toEqual([]);
+    expect(preview.preview.publicContacts.socialLinks).toHaveLength(1);
+    expect(preview.preview.serviceArea).toMatchObject({
+      primaryCity: 'Nairobi',
+      radiusKm: 120,
+      remoteAvailable: true,
+    });
+    expect(auditLogs[0]?.metadata).toMatchObject({
+      reviewRequired: false,
+    });
+    expect(String(auditLogs[0]?.metadata?.changedFields)).toContain('serviceArea');
   });
 
   it('marks high-risk profile changes as pending review and blocks publishing', async () => {

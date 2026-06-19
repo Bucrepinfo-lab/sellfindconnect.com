@@ -218,8 +218,19 @@ export class ProfilesService {
         reviewNote: draft.reviewNote ?? null,
         publicContacts: {
           phone: draft.phone ?? null,
+          whatsapp: draft.whatsapp ?? null,
           email: draft.email ?? null,
           website: draft.website ?? null,
+          physicalAddress: draft.physicalAddress ?? null,
+          mapsUrl: draft.mapsUrl ?? null,
+          socialLinks: draft.socialLinks ?? [],
+        },
+        serviceArea: {
+          primaryCity: draft.serviceArea?.primaryCity ?? null,
+          regions: draft.serviceArea?.regions ?? [],
+          radiusKm: draft.serviceArea?.radiusKm ?? null,
+          remoteAvailable: draft.serviceArea?.remoteAvailable ?? false,
+          operatingCountries: draft.serviceArea?.operatingCountries ?? [draft.countryCode],
         },
       },
     };
@@ -276,8 +287,13 @@ export class ProfilesService {
       description: draft.description,
       countryCode: draft.countryCode,
       phone: draft.phone,
+      whatsapp: draft.whatsapp,
       email: draft.email,
       website: draft.website,
+      physicalAddress: draft.physicalAddress,
+      mapsUrl: draft.mapsUrl,
+      socialLinks: draft.socialLinks,
+      serviceArea: draft.serviceArea,
       status: 'LIVE',
       version: await this.nextVersion(tenantId),
       publishedAt: now,
@@ -349,8 +365,17 @@ export class ProfilesService {
       draft.description,
       draft.countryCode,
       draft.phone,
+      draft.whatsapp,
       draft.email,
       draft.website,
+      draft.physicalAddress,
+      draft.mapsUrl,
+      draft.socialLinks?.length ? draft.socialLinks : undefined,
+      draft.serviceArea?.primaryCity,
+      draft.serviceArea?.regions?.length ? draft.serviceArea.regions : undefined,
+      draft.serviceArea?.radiusKm,
+      draft.serviceArea?.remoteAvailable,
+      draft.serviceArea?.operatingCountries?.length ? draft.serviceArea.operatingCountries : undefined,
     ];
     const completed = fields.filter(Boolean).length;
     return Math.round((completed / fields.length) * 100);
@@ -460,10 +485,32 @@ export class ProfilesService {
       'description',
       'countryCode',
       'phone',
+      'whatsapp',
       'email',
       'website',
+      'physicalAddress',
+      'mapsUrl',
+      'socialLinks',
+      'serviceArea',
     ];
-    return fields.filter((field) => previous[field] !== next[field]);
+    return fields.filter((field) => this.fieldChanged(previous[field], next[field]));
+  }
+
+  private fieldChanged(previous: unknown, next: unknown): boolean {
+    if (
+      Array.isArray(previous) ||
+      Array.isArray(next) ||
+      this.isPlainObject(previous) ||
+      this.isPlainObject(next)
+    ) {
+      return JSON.stringify(previous ?? null) !== JSON.stringify(next ?? null);
+    }
+
+    return previous !== next;
+  }
+
+  private isPlainObject(value: unknown): value is Record<string, unknown> {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
   }
 
   private onlyDefined(input: UpdateProfileDraftDto): Partial<CreateProfileDraftDto> {

@@ -73,15 +73,16 @@ without validating it against the authenticated user's assignments.
   reset challenges, tenant invite tokens, tenant auth audit lookup, terms
   acceptance evidence, in-memory and Prisma repository adapters, tenant session
   guard, and future identity-provider adapter boundary.
-- Profiles: draft, preview, publish, profile completeness, contacts, live
-  version preservation, and publish audit evidence. Profile write/preview/publish
-  routes require an MFA-verified tenant session. Profile storage uses an
-  in-memory repository by default and can switch to Prisma with
-  `PROFILE_REPOSITORY=prisma` after migrations and seed data are ready. Profile
-  publish requires request-level terms acceptance plus current stored terms
-  evidence when auth is attached; high-risk profile edits enter `PENDING_REVIEW`
-  with persisted review reasons and cannot publish until the MVP owner/admin
-  review workflow approves them. Rejected drafts remain blocked until edited.
+- Profiles: draft, preview, publish, profile completeness, enriched contacts,
+  service-area coverage, live version preservation, and publish audit evidence.
+  Profile write/preview/publish routes require an MFA-verified tenant session.
+  Profile storage uses an in-memory repository by default and can switch to
+  Prisma with `PROFILE_REPOSITORY=prisma` after migrations and seed data are
+  ready. Profile publish requires request-level terms acceptance plus current
+  stored terms evidence when auth is attached; high-risk profile edits enter
+  `PENDING_REVIEW` with persisted review reasons and cannot publish until the
+  MVP owner/admin review workflow approves them. Rejected drafts remain blocked
+  until edited.
 - Listings: draft, preview, publish, media, lifecycle, and visibility. Advert
   listing and lifecycle routes require an MFA-verified tenant session.
 - Safety: blocked categories, policy decisions, moderation cases, and reports.

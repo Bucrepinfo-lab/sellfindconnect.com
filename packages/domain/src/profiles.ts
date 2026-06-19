@@ -12,6 +12,19 @@ export const profileReviewDecisions = ['APPROVED', 'REJECTED'] as const;
 
 export type ProfileReviewDecision = (typeof profileReviewDecisions)[number];
 
+export type ProfileSocialLink = {
+  label: string;
+  url: string;
+};
+
+export type ProfileServiceArea = {
+  primaryCity?: string;
+  regions?: string[];
+  radiusKm?: number;
+  remoteAvailable?: boolean;
+  operatingCountries?: string[];
+};
+
 export type ProfileDraftInput = {
   displayName: string;
   industryCode: string;
@@ -19,8 +32,13 @@ export type ProfileDraftInput = {
   description: string;
   countryCode: string;
   phone?: string;
+  whatsapp?: string;
   email?: string;
   website?: string;
+  physicalAddress?: string;
+  mapsUrl?: string;
+  socialLinks?: ProfileSocialLink[];
+  serviceArea?: ProfileServiceArea;
 };
 
 export type ProfileDraft = ProfileDraftInput & {
