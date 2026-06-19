@@ -1,8 +1,10 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import {
+  Prisma,
   PrismaClient,
   TenantRole,
   TenantStatus,
+  type AuditLog,
   type AuthAccountChallenge,
   type AuthMfaChallenge,
   type AuthSession,
@@ -16,6 +18,7 @@ import {
 import type { TermsAcceptanceEvidence } from '@telpen/domain';
 
 import type {
+  AuthAuditRecord,
   AuthAccountChallengeRecord,
   AuthMfaChallengeRecord,
   AuthSessionRecord,
@@ -348,6 +351,29 @@ export class PrismaAuthRepository implements AuthRepository {
     });
   }
 
+  async createAuditLog(record: AuthAuditRecord): Promise<void> {
+    await this.prisma.auditLog.create({
+      data: {
+        id: record.id,
+        tenantId: record.tenantId,
+        actorUserId: record.actorUserId,
+        action: record.action,
+        entityType: record.entityType,
+        entityId: record.entityId,
+        metadata: record.metadata as Prisma.InputJsonObject | undefined,
+        createdAt: new Date(record.createdAt),
+      },
+    });
+  }
+
+  async listAuditLogsForTenant(tenantId: string): Promise<AuthAuditRecord[]> {
+    const records = await this.prisma.auditLog.findMany({
+      where: { tenantId },
+      orderBy: { createdAt: 'desc' },
+    });
+    return records.map((record) => this.mapAuditLog(record));
+  }
+
   async listTenants(): Promise<AuthTenantRecord[]> {
     const tenants = await this.prisma.tenant.findMany({
       include: { country: true },
@@ -450,6 +476,19 @@ export class PrismaAuthRepository implements AuthRepository {
       consumedAt: challenge.consumedAt?.toISOString(),
       failedAttempts: challenge.failedAttempts,
       createdAt: challenge.createdAt.toISOString(),
+    };
+  }
+
+  private mapAuditLog(record: AuditLog): AuthAuditRecord {
+    return {
+      id: record.id,
+      tenantId: record.tenantId ?? undefined,
+      actorUserId: record.actorUserId ?? undefined,
+      action: record.action,
+      entityType: record.entityType,
+      entityId: record.entityId ?? undefined,
+      metadata: record.metadata as AuthAuditRecord['metadata'],
+      createdAt: record.createdAt.toISOString(),
     };
   }
 

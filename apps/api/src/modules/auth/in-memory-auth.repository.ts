@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { TermsAcceptanceEvidence } from '@telpen/domain';
 
 import type {
+  AuthAuditRecord,
   AuthAccountChallengeRecord,
   AuthMfaChallengeRecord,
   AuthSessionRecord,
@@ -26,6 +27,7 @@ export class InMemoryAuthRepository implements AuthRepository {
   private readonly accountChallengesByTokenHash = new Map<string, AuthAccountChallengeRecord>();
   private readonly tenantInvitesByTokenHash = new Map<string, AuthTenantInviteRecord>();
   private readonly termsEvidence = new Map<string, TermsAcceptanceEvidence>();
+  private readonly auditLogs = new Map<string, AuthAuditRecord>();
 
   findUserByEmail(email: string): AuthUserRecord | undefined {
     return this.usersByEmail.get(email);
@@ -150,6 +152,16 @@ export class InMemoryAuthRepository implements AuthRepository {
         this.sessionsByTokenHash.set(session.tokenHash, { ...session, revokedAt });
       }
     }
+  }
+
+  createAuditLog(record: AuthAuditRecord): void {
+    this.auditLogs.set(record.id, record);
+  }
+
+  listAuditLogsForTenant(tenantId: string): AuthAuditRecord[] {
+    return Array.from(this.auditLogs.values())
+      .filter((record) => record.tenantId === tenantId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
   listTenants(): AuthTenantRecord[] {

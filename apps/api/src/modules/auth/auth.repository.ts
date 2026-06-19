@@ -1,6 +1,7 @@
 import type { TermsAcceptanceEvidence } from '@telpen/domain';
 
 import type {
+  AuthAuditRecord,
   AuthAccountChallengeRecord,
   AuthMfaChallengeRecord,
   AuthSessionRecord,
@@ -41,5 +42,7 @@ export interface AuthRepository {
   updateUserPassword(userId: string, password: PasswordUpdateRecord): RepositoryResult<void>;
   markUserMfaVerified(userId: string, mfaVerifiedAt: string): RepositoryResult<void>;
   revokeSessionsForUser(userId: string, revokedAt: string): RepositoryResult<void>;
+  createAuditLog(record: AuthAuditRecord): RepositoryResult<void>;
+  listAuditLogsForTenant(tenantId: string): RepositoryResult<AuthAuditRecord[]>;
   listTenants(): RepositoryResult<AuthTenantRecord[]>;
 }

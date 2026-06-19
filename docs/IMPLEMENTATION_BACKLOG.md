@@ -2,7 +2,7 @@
 
 Status: Execution backlog
 Date: 2026-06-15
-Last updated: 2026-06-18
+Last updated: 2026-06-19
 
 ## Delivery Principles
 
@@ -115,6 +115,9 @@ Progress:
 - Added MVP tenant invite flows so an MFA-verified owner can invite non-owner
   tenant roles, and invited users can accept with current terms acceptance,
   verified email, role-aware membership, and a fresh session.
+- Added auth audit logging for owner registration, login, email verification,
+  password reset, MFA, tenant invite creation, and tenant invite acceptance,
+  plus an owner/MFA-protected tenant audit lookup endpoint.
 - Added an opt-in Prisma-backed auth repository selected with
   `AUTH_REPOSITORY=prisma`, using `DATABASE_URL` and the generated Prisma
   client to persist users, tenants, memberships, auth sessions, MFA
@@ -137,8 +140,8 @@ Progress:
   production Prisma persistence against a hosted PostgreSQL database.
 - Production identity provider, provider-backed email delivery,
   provider-backed email/SMS/authenticator MFA delivery, existing-user invite
-  acceptance, hosted database migration/seed execution, and production Prisma
-  enablement remain next.
+  acceptance, broader non-auth product audit coverage, hosted database
+  migration/seed execution, and production Prisma enablement remain next.
 
 ## Epic 3: Advertiser Profile Vertical Slice
 

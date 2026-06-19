@@ -70,9 +70,9 @@ without validating it against the authenticated user's assignments.
 - Tenancy: tenants, tenant users, roles, permissions, and scope.
 - Auth: tenant-owner registration, password metadata, token-hashed sessions,
   generated time-limited MFA challenges, hashed email verification and password
-  reset challenges, tenant invite tokens, terms acceptance evidence, in-memory
-  and Prisma repository adapters, tenant session guard, and future
-  identity-provider adapter boundary.
+  reset challenges, tenant invite tokens, tenant auth audit lookup, terms
+  acceptance evidence, in-memory and Prisma repository adapters, tenant session
+  guard, and future identity-provider adapter boundary.
 - Profiles: draft, preview, publish, profile completeness, and contacts. Profile
   write/preview routes require an MFA-verified tenant session.
 - Listings: draft, preview, publish, media, lifecycle, and visibility. Advert
@@ -142,6 +142,9 @@ workflow are approved.
 - Structured error codes suitable for web and mobile localization.
 - OpenAPI documentation generated from the API.
 - Audit logs for sensitive administration, finance, safety, and access actions.
+- Auth audit metadata must avoid raw secrets, raw tokens, MFA codes, invite
+  links, and raw email addresses; hash identifiers where evidence needs
+  correlation without exposing the submitted value.
 - Access assignments record user, role, scope level, region, continent, country,
   tenant, MFA requirement, expiry, revocation, and assignment source.
 - Request body sanitisation runs before DTO validation and safety checks. It

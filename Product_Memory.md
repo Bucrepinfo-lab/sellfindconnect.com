@@ -1,7 +1,7 @@
 # Telpen Adverts Product Memory
 
 Date started: 2026-06-15
-Last updated: 2026-06-18
+Last updated: 2026-06-19
 Purpose: Persistent decision log and strategic memory for the Telpen Adverts multi-tenant advertising SaaS.
 
 This file must be updated whenever product strategy, pricing, compliance, architecture, market positioning, or execution decisions change.
@@ -149,3 +149,4 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - 2026-06-18: Continued auth hardening without deployment. Replaced the fixed MFA verification code with generated six-digit challenge codes that are stored only as session-scoped hashes, expire after 10 minutes, lock after repeated failures, and can be persisted through the Prisma auth repository. Non-production can display the development code for local testing; production provider-backed email/SMS/authenticator delivery remains future work.
 - 2026-06-18: Continued account security hardening without deployment. Added hashed, expiring account challenges for email verification and password reset, exposed request/confirm auth endpoints, and made completed password resets revoke active user sessions. Non-production can display development tokens for local testing; production email delivery remains future work.
 - 2026-06-18: Continued tenant access hardening without deployment. Added MVP tenant invite tokens so MFA-verified owners can invite non-owner tenant roles, invite acceptance creates a verified invited user with terms evidence and role-aware membership, and invited users receive role-aware sessions. Existing-account invite linking and production email delivery remain future work.
+- 2026-06-19: Continued auth audit hardening without deployment. Added repository-backed audit logs for owner registration, login success/failure, email verification, password reset, MFA success/failure, tenant invite creation, and tenant invite acceptance, with an owner/MFA-protected tenant audit lookup endpoint. Audit metadata avoids raw secrets, tokens, MFA codes, invite links, and raw email addresses.

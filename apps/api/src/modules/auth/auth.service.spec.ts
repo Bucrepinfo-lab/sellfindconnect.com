@@ -200,6 +200,37 @@ describe('AuthService', () => {
     expect(result.session.mfaVerified).toBe(true);
   });
 
+  it('records owner auth events in tenant audit logs', async () => {
+    const repository = new InMemoryAuthRepository();
+    const service = new AuthService(repository);
+    const registered = await service.registerTenantOwner({
+      email: 'owner@example.com',
+      password: strongPassword,
+      displayName: 'Mary Owner',
+      tenantDisplayName: 'Nairobi Fresh Produce Cooperative',
+      countryCode: 'KE',
+      industryCode: 'AGRICULTURE',
+      primaryRole: 'SUPPLIER',
+      userType: 'ADVERTISER',
+      acceptedTerms: true,
+    });
+
+    await service.verifyMfa({
+      sessionToken: registered.session.token,
+      code: registered.session.mfaChallenge?.developmentCode ?? '',
+    });
+
+    const result = await service.listTenantAuditLogs({
+      sessionToken: registered.session.token,
+      tenantId: registered.tenant.id,
+    });
+    const actions = result.auditLogs.map((record) => record.action);
+
+    expect(actions).toContain('AUTH_TENANT_OWNER_REGISTERED');
+    expect(actions).toContain('AUTH_MFA_VERIFIED');
+    expect(result.auditLogs.some((record) => JSON.stringify(record).includes('developmentToken'))).toBe(false);
+  });
+
   it('rejects an invalid MFA challenge code before accepting the issued code', async () => {
     const service = new AuthService();
     const registered = await service.registerTenantOwner({

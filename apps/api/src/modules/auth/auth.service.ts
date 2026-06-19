@@ -18,6 +18,7 @@ import {
 import { createHash, pbkdf2Sync, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 
 import type {
+  AuthAuditRecord,
   AuthAccountChallengePurpose,
   AuthAccountChallengeRecord,
   AuthMfaChallengeRecord,
@@ -151,16 +152,33 @@ export class AuthService {
       termsAcceptance,
     });
 
+    const session = await this.createSession(user, tenantId, 'OWNER');
+    const emailVerificationChallenge = await this.createAccountChallenge(
+      user,
+      'EMAIL_VERIFICATION',
+      EMAIL_VERIFICATION_TTL_MS,
+    );
+
+    await this.recordAudit({
+      tenantId,
+      actorUserId: user.id,
+      action: 'AUTH_TENANT_OWNER_REGISTERED',
+      entityType: 'TENANT',
+      entityId: tenantId,
+      metadata: {
+        countryCode: country.code,
+        industryCode: input.industryCode,
+        role: 'OWNER',
+        termsVersion: termsAcceptance.termsVersion,
+      },
+    });
+
     return {
       user: this.presentUser(user),
       tenant,
       membership,
-      session: await this.createSession(user, tenantId, 'OWNER'),
-      emailVerificationChallenge: await this.createAccountChallenge(
-        user,
-        'EMAIL_VERIFICATION',
-        EMAIL_VERIFICATION_TTL_MS,
-      ),
+      session,
+      emailVerificationChallenge,
       termsAcceptance,
       passwordPolicy,
     };
@@ -170,18 +188,46 @@ export class AuthService {
     const email = input.email.trim().toLowerCase();
     const user = await this.repository.findUserByEmail(email);
     if (!user || !this.verifyPassword(input.password, user)) {
+      await this.recordAudit({
+        action: 'AUTH_LOGIN_FAILED',
+        entityType: 'AUTH',
+        metadata: {
+          reason: 'INVALID_CREDENTIALS',
+          emailHash: this.hashAuditIdentifier(email),
+        },
+      });
       throw new UnauthorizedException('Invalid email or password.');
     }
 
     const membership = await this.repository.findFirstMembershipForUser(user.id);
     if (!membership) {
+      await this.recordAudit({
+        actorUserId: user.id,
+        action: 'AUTH_LOGIN_FAILED',
+        entityType: 'USER',
+        entityId: user.id,
+        metadata: { reason: 'NO_TENANT_MEMBERSHIP' },
+      });
       throw new UnauthorizedException('No tenant membership is attached to this account.');
     }
+
+    const session = await this.createSession(user, membership.tenantId, membership.role);
+    await this.recordAudit({
+      tenantId: membership.tenantId,
+      actorUserId: user.id,
+      action: 'AUTH_LOGIN_SUCCEEDED',
+      entityType: 'AUTH_SESSION',
+      entityId: session.id,
+      metadata: {
+        role: membership.role,
+        mfaRequired: session.mfaRequired,
+      },
+    });
 
     return {
       user: this.presentUser(user),
       tenant: await this.repository.findTenantById(membership.tenantId),
-      session: await this.createSession(user, membership.tenantId, membership.role),
+      session,
     };
   }
 
@@ -191,6 +237,18 @@ export class AuthService {
       user && !user.emailVerifiedAt
         ? await this.createAccountChallenge(user, 'EMAIL_VERIFICATION', EMAIL_VERIFICATION_TTL_MS)
         : undefined;
+
+    if (user && emailVerificationChallenge) {
+      const membership = await this.repository.findFirstMembershipForUser(user.id);
+      await this.recordAudit({
+        tenantId: membership?.tenantId,
+        actorUserId: user.id,
+        action: 'AUTH_EMAIL_VERIFICATION_REQUESTED',
+        entityType: 'USER',
+        entityId: user.id,
+        metadata: { emailHash: this.hashAuditIdentifier(user.email) },
+      });
+    }
 
     return {
       requested: true,
@@ -208,6 +266,15 @@ export class AuthService {
     const now = new Date().toISOString();
     await this.repository.updateAccountChallenge({ ...challenge, consumedAt: now });
     await this.repository.markUserEmailVerified(challenge.userId, now);
+    const membership = await this.repository.findFirstMembershipForUser(challenge.userId);
+    await this.recordAudit({
+      tenantId: membership?.tenantId,
+      actorUserId: challenge.userId,
+      action: 'AUTH_EMAIL_VERIFIED',
+      entityType: 'USER',
+      entityId: challenge.userId,
+      metadata: { challengeId: challenge.id },
+    });
 
     return {
       verified: true,
@@ -220,6 +287,18 @@ export class AuthService {
     const passwordResetChallenge = user
       ? await this.createAccountChallenge(user, 'PASSWORD_RESET', PASSWORD_RESET_TTL_MS)
       : undefined;
+
+    if (user && passwordResetChallenge) {
+      const membership = await this.repository.findFirstMembershipForUser(user.id);
+      await this.recordAudit({
+        tenantId: membership?.tenantId,
+        actorUserId: user.id,
+        action: 'AUTH_PASSWORD_RESET_REQUESTED',
+        entityType: 'USER',
+        entityId: user.id,
+        metadata: { emailHash: this.hashAuditIdentifier(user.email) },
+      });
+    }
 
     return {
       requested: true,
@@ -251,6 +330,15 @@ export class AuthService {
       passwordIterations: password.iterations,
     });
     await this.repository.revokeSessionsForUser(user.id, now);
+    const membership = await this.repository.findFirstMembershipForUser(user.id);
+    await this.recordAudit({
+      tenantId: membership?.tenantId,
+      actorUserId: user.id,
+      action: 'AUTH_PASSWORD_RESET_COMPLETED',
+      entityType: 'USER',
+      entityId: user.id,
+      metadata: { challengeId: challenge.id, sessionsRevoked: true },
+    });
 
     return {
       reset: true,
@@ -283,13 +371,26 @@ export class AuthService {
       throw new ConflictException('An account with this email already exists.');
     }
 
+    const invite = await this.createTenantInviteRecord({
+      tenantId: tenant.id,
+      email,
+      role: input.role,
+      invitedByUserId: session.userId,
+    });
+    await this.recordAudit({
+      tenantId: tenant.id,
+      actorUserId: session.userId,
+      action: 'AUTH_TENANT_INVITE_CREATED',
+      entityType: 'TENANT_INVITE',
+      entityId: invite.id,
+      metadata: {
+        invitedEmailHash: this.hashAuditIdentifier(email),
+        invitedRole: input.role,
+      },
+    });
+
     return {
-      invite: await this.createTenantInviteRecord({
-        tenantId: tenant.id,
-        email,
-        role: input.role,
-        invitedByUserId: session.userId,
-      }),
+      invite,
     };
   }
 
@@ -364,6 +465,18 @@ export class AuthService {
       membership,
       termsAcceptance,
     });
+    await this.recordAudit({
+      tenantId: invite.tenantId,
+      actorUserId: user.id,
+      action: 'AUTH_TENANT_INVITE_ACCEPTED',
+      entityType: 'TENANT_INVITE',
+      entityId: invite.id,
+      metadata: {
+        invitedByUserId: invite.invitedByUserId,
+        acceptedRole: invite.role,
+        termsVersion: termsAcceptance.termsVersion,
+      },
+    });
 
     return {
       user: this.presentUser(user),
@@ -385,10 +498,26 @@ export class AuthService {
 
     const challenge = await this.repository.findMfaChallengeBySessionId(session.id);
     if (!challenge || challenge.consumedAt || Date.parse(challenge.expiresAt) <= Date.now()) {
+      await this.recordAudit({
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        action: 'AUTH_MFA_FAILED',
+        entityType: 'AUTH_SESSION',
+        entityId: session.id,
+        metadata: { reason: 'CHALLENGE_UNAVAILABLE' },
+      });
       throw new UnauthorizedException('MFA challenge expired or unavailable.');
     }
 
     if (challenge.failedAttempts >= MFA_MAX_FAILED_ATTEMPTS) {
+      await this.recordAudit({
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        action: 'AUTH_MFA_FAILED',
+        entityType: 'AUTH_SESSION',
+        entityId: session.id,
+        metadata: { reason: 'CHALLENGE_LOCKED', challengeId: challenge.id },
+      });
       throw new UnauthorizedException('MFA challenge locked after too many attempts.');
     }
 
@@ -396,6 +525,18 @@ export class AuthService {
       await this.repository.updateMfaChallenge({
         ...challenge,
         failedAttempts: challenge.failedAttempts + 1,
+      });
+      await this.recordAudit({
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        action: 'AUTH_MFA_FAILED',
+        entityType: 'AUTH_SESSION',
+        entityId: session.id,
+        metadata: {
+          reason: 'INVALID_CODE',
+          challengeId: challenge.id,
+          failedAttempts: challenge.failedAttempts + 1,
+        },
       });
       throw new UnauthorizedException('Invalid MFA code.');
     }
@@ -412,6 +553,14 @@ export class AuthService {
     await this.repository.markUserMfaVerified(session.userId, now);
 
     await this.repository.updateSession(updated);
+    await this.recordAudit({
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: 'AUTH_MFA_VERIFIED',
+      entityType: 'AUTH_SESSION',
+      entityId: session.id,
+      metadata: { challengeId: challenge.id },
+    });
     return {
       session: this.presentSession(updated),
       mfaVerifiedAt: now,
@@ -448,6 +597,22 @@ export class AuthService {
 
   async listTenants() {
     return this.repository.listTenants();
+  }
+
+  async listTenantAuditLogs(input: CheckTenantSessionDto) {
+    const session = await this.requireSession(input.sessionToken);
+    if (session.tenantId !== input.tenantId || session.role !== 'OWNER') {
+      throw new UnauthorizedException('Only a tenant owner can view audit logs for this tenant.');
+    }
+
+    if (!session.mfaVerified) {
+      throw new UnauthorizedException('MFA verification is required before viewing audit logs.');
+    }
+
+    return {
+      tenantId: input.tenantId,
+      auditLogs: await this.repository.listAuditLogsForTenant(input.tenantId),
+    };
   }
 
   private async createSession(
@@ -527,6 +692,10 @@ export class AuthService {
 
   private hashSessionToken(token: string): string {
     return createHash('sha256').update(token).digest('base64url');
+  }
+
+  private hashAuditIdentifier(value: string): string {
+    return createHash('sha256').update(value.trim().toLowerCase()).digest('base64url');
   }
 
   private hashAccountChallengeToken(purpose: AuthAccountChallengePurpose, token: string): string {
@@ -724,6 +893,14 @@ export class AuthService {
 
   private isProductionRuntime(): boolean {
     return process.env.NODE_ENV === 'production';
+  }
+
+  private async recordAudit(input: Omit<AuthAuditRecord, 'id' | 'createdAt'>): Promise<void> {
+    await this.repository.createAuditLog({
+      id: randomUUID(),
+      ...input,
+      createdAt: new Date().toISOString(),
+    });
   }
 
   private assertSafe(input: object, message: string): void {

@@ -70,6 +70,11 @@ export class AuthController {
     return this.auth.checkTenantSession(body);
   }
 
+  @Post('audit/tenant')
+  listTenantAuditLogs(@Body() body: CheckTenantSessionDto) {
+    return this.auth.listTenantAuditLogs(body);
+  }
+
   @Get('session')
   @ApiHeader({ name: 'x-session-token', required: true })
   getSession(@Headers('x-session-token') sessionToken: string) {
