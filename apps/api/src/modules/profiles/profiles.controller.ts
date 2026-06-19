@@ -9,7 +9,7 @@ import {
   ReviewProfileDraftDto,
   UpdateProfileDraftDto,
 } from './dto/create-profile-draft.dto';
-import { CreateProfileMediaDto } from './dto/profile-media.dto';
+import { CreateProfileMediaDto, PrepareProfileMediaUploadDto } from './dto/profile-media.dto';
 import { ProfilesService } from './profiles.service';
 
 @ApiTags('profiles')
@@ -54,6 +54,16 @@ export class ProfilesController {
   @Get('drafts/:id/media')
   listDraftMedia(@TenantId() tenantId: string, @Param('id') id: string) {
     return this.profiles.listDraftMedia(tenantId, id);
+  }
+
+  @Post('drafts/:id/media/uploads/prepare')
+  prepareDraftMediaUpload(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Param('id') id: string,
+    @Body() body: PrepareProfileMediaUploadDto,
+  ) {
+    return this.profiles.prepareDraftMediaUpload(tenantId, id, body, session.userId);
   }
 
   @Post('drafts/:id/media')

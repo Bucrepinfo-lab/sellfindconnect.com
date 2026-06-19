@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { detectMediaKind, evaluateMediaAssetInput, mediaPolicy } from './media';
+import {
+  detectMediaKind,
+  evaluateMediaAssetInput,
+  evaluateMediaUploadPreparationInput,
+  mediaPolicy,
+} from './media';
 
 describe('media policy', () => {
   it('detects supported image and video types', () => {
@@ -54,5 +59,25 @@ describe('media policy', () => {
 
     expect(missingDuration.reasons).toContain('VIDEO_DURATION_REQUIRED');
     expect(longVideo.reasons).toContain('VIDEO_TOO_LONG');
+  });
+
+  it('allows upload preparation before final video duration metadata is known', () => {
+    const prepared = evaluateMediaUploadPreparationInput({
+      tenantId: 'tenant-1',
+      ownerType: 'PROFILE_DRAFT',
+      ownerId: 'draft-1',
+      fileName: 'market-preview.mp4',
+      mimeType: 'video/mp4',
+      fileSizeBytes: 50_000_000,
+    });
+    const final = evaluateMediaAssetInput({
+      sourceUrl: 'https://cdn.example.test/market-preview.mp4',
+      fileName: 'market-preview.mp4',
+      mimeType: 'video/mp4',
+      fileSizeBytes: 50_000_000,
+    });
+
+    expect(prepared).toMatchObject({ allowed: true, kind: 'VIDEO' });
+    expect(final.reasons).toContain('VIDEO_DURATION_REQUIRED');
   });
 });

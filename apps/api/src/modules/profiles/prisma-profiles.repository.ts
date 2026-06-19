@@ -12,14 +12,17 @@ import {
   mediaAssetStatuses,
   mediaModerationStatuses,
   mediaOwnerTypes,
+  mediaTransformStatuses,
   mediaVisibilityStates,
   profileReviewDecisions,
   profileReviewReasons,
   type MediaAsset,
+  type MediaCdnVariant,
   type MediaAssetKind,
   type MediaAssetStatus,
   type MediaModerationStatus,
   type MediaOwnerType,
+  type MediaTransformStatus,
   type MediaVisibility,
   type ProfileDraft,
   type ProfileReviewDecision,
@@ -313,6 +316,11 @@ export class PrismaProfilesRepository implements ProfilesRepository {
       visibility: this.mapMediaVisibility(asset.visibility),
       moderationStatus: this.mapMediaModerationStatus(asset.moderationStatus),
       moderationReason: asset.moderationReason ?? undefined,
+      storageProvider: asset.storageProvider ?? undefined,
+      objectKey: asset.objectKey ?? undefined,
+      cdnUrl: asset.cdnUrl ?? undefined,
+      transformStatus: this.mapMediaTransformStatus(asset.transformStatus),
+      variants: this.mapMediaVariantsFromPrisma(asset.variants),
       uploadedAt: asset.uploadedAt.toISOString(),
       createdAt: asset.createdAt.toISOString(),
       updatedAt: asset.updatedAt.toISOString(),
@@ -341,6 +349,11 @@ export class PrismaProfilesRepository implements ProfilesRepository {
       visibility: asset.visibility,
       moderationStatus: asset.moderationStatus,
       moderationReason: asset.moderationReason,
+      storageProvider: asset.storageProvider,
+      objectKey: asset.objectKey,
+      cdnUrl: asset.cdnUrl,
+      transformStatus: asset.transformStatus,
+      variants: this.mapOptionalJsonToPrisma(asset.variants),
       uploadedAt: new Date(asset.uploadedAt),
       createdAt: new Date(asset.createdAt),
       updatedAt: new Date(asset.updatedAt),
@@ -476,6 +489,42 @@ export class PrismaProfilesRepository implements ProfilesRepository {
     return mediaModerationStatuses.includes(value as MediaModerationStatus)
       ? (value as MediaModerationStatus)
       : 'PENDING';
+  }
+
+  private mapMediaTransformStatus(value: string | null): MediaTransformStatus | undefined {
+    return mediaTransformStatuses.includes(value as MediaTransformStatus)
+      ? (value as MediaTransformStatus)
+      : undefined;
+  }
+
+  private mapMediaVariantsFromPrisma(value: unknown): MediaCdnVariant[] | undefined {
+    if (!Array.isArray(value)) {
+      return undefined;
+    }
+
+    const variants = value
+      .filter(
+        (item): item is { label: string; url: string; width?: unknown; height?: unknown } =>
+          this.isRecord(item) && typeof item.label === 'string' && typeof item.url === 'string',
+      )
+      .map((item) => {
+        const variant: MediaCdnVariant = {
+          label: item.label,
+          url: item.url,
+        };
+
+        if (typeof item.width === 'number') {
+          variant.width = item.width;
+        }
+
+        if (typeof item.height === 'number') {
+          variant.height = item.height;
+        }
+
+        return variant;
+      });
+
+    return variants.length > 0 ? variants : undefined;
   }
 
   private daysBetween(start: string, end: string): number {

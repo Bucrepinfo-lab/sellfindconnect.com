@@ -87,9 +87,11 @@ without validating it against the authenticated user's assignments.
   assignments, target country/tenant checks, and access-decision audit records.
   Rejected drafts remain blocked until edited. Profile media uses tenant-owned
   `MediaAsset` records attached to draft/live owners, a ten-item display cap,
-  recursive metadata safety checks, and publish-time media carry-over; provider
-  upload URLs, malware scanning, CDN transforms, and transcoding remain adapter
-  work.
+  recursive metadata safety checks, publish-time media carry-over, provider
+  upload preparation, and storage/moderation/CDN transform adapter hooks.
+  External storage credentials, signed URLs, malware/media scanning providers,
+  background image transforms, and video transcoding workers remain adapter
+  implementations.
 - Listings: draft, preview, publish, media, lifecycle, and visibility. Advert
   listing and lifecycle routes require an MFA-verified tenant session.
 - Safety: blocked categories, policy decisions, moderation cases, and reports.

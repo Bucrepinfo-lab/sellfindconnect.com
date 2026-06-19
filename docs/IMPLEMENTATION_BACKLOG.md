@@ -190,8 +190,12 @@ Progress:
   captions/URLs/filenames, tenant-session protected draft media routes,
   preview media slots, Prisma `MediaAsset` persistence, and publish-time media
   carry-over into the live profile.
-- Provider-backed upload URLs, malware scanning, CDN transforms, video
-  transcoding, listing media, and richer review case management remain next.
+- Added provider-neutral profile media upload preparation plus storage,
+  moderation, and CDN/transform adapter hooks, with persisted storage keys,
+  CDN URLs, transform status, and variant metadata.
+- Real object-storage credentials/signed URLs, provider-backed malware and media
+  scanning, background image/video workers, listing media, and richer review
+  case management remain next.
 
 ## Epic 4: Listing and Media Vertical Slice
 

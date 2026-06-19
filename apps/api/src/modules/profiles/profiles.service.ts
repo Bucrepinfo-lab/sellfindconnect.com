@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import {
   evaluateMediaAssetInput,
+  evaluateMediaUploadPreparationInput,
   evaluateSafetyFields,
   getCountry,
   industryCategories,
@@ -28,8 +29,13 @@ import type {
   ReviewProfileDraftDto,
   UpdateProfileDraftDto,
 } from './dto/create-profile-draft.dto';
-import type { CreateProfileMediaDto } from './dto/profile-media.dto';
+import type { CreateProfileMediaDto, PrepareProfileMediaUploadDto } from './dto/profile-media.dto';
 import { InMemoryProfilesRepository } from './in-memory-profiles.repository';
+import {
+  PROFILE_MEDIA_ADAPTERS,
+  createDefaultProfileMediaAdapters,
+  type ProfileMediaAdapters,
+} from './profile-media.adapters';
 import { PROFILES_REPOSITORY, type ProfilesRepository } from './profiles.repository';
 
 const highRiskProfileIndustryCodes = new Set(['EXTRACTIVES', 'FINANCE', 'HEALTH', 'LOGISTICS']);
@@ -49,6 +55,9 @@ export class ProfilesService {
     @Inject(PROFILES_REPOSITORY)
     private readonly repository: ProfilesRepository = new InMemoryProfilesRepository(),
     @Optional() private readonly auth?: AuthService,
+    @Optional()
+    @Inject(PROFILE_MEDIA_ADAPTERS)
+    private readonly mediaAdapters: ProfileMediaAdapters = createDefaultProfileMediaAdapters(),
   ) {}
 
   async createDraft(tenantId: string, input: CreateProfileDraftDto): Promise<ProfileDraft> {
@@ -300,6 +309,73 @@ export class ProfilesService {
     return this.repository.listMediaAssets(tenantId, 'PROFILE_DRAFT', draft.id);
   }
 
+  async prepareDraftMediaUpload(
+    tenantId: string,
+    id: string,
+    input: PrepareProfileMediaUploadDto,
+    actorUserId?: string,
+  ) {
+    await this.requireStoredTermsAcceptance(
+      tenantId,
+      actorUserId,
+      'Current stored terms acceptance is required before preparing profile media upload.',
+    );
+    const draft = await this.getDraft(tenantId, id);
+    const existingMedia = await this.repository.listMediaAssets(tenantId, 'PROFILE_DRAFT', draft.id);
+
+    if (existingMedia.length >= mediaPolicy.maxItemsPerOwner) {
+      throw new UnprocessableEntityException(
+        `A profile can display a maximum of ${mediaPolicy.maxItemsPerOwner} media items.`,
+      );
+    }
+
+    const uploadInput = {
+      tenantId,
+      ownerType: 'PROFILE_DRAFT' as const,
+      ownerId: draft.id,
+      fileName: input.fileName.trim(),
+      mimeType: input.mimeType.trim().toLowerCase(),
+      fileSizeBytes: input.fileSizeBytes,
+    };
+    const mediaDecision = evaluateMediaUploadPreparationInput(uploadInput);
+    if (!mediaDecision.allowed) {
+      throw new UnprocessableEntityException({
+        message: 'Profile media upload violates media policy.',
+        mediaPolicy: mediaDecision,
+      });
+    }
+
+    const safety = evaluateSafetyFields(uploadInput);
+    if (!safety.allowed) {
+      throw new UnprocessableEntityException({
+        message: 'Profile media upload metadata matches a zero-tolerance blocked category.',
+        safety,
+      });
+    }
+
+    const upload = await this.mediaAdapters.storage.prepareUpload(uploadInput);
+    await this.auth?.recordTenantAudit({
+      tenantId,
+      actorUserId,
+      action: 'PROFILE_MEDIA_UPLOAD_PREPARED',
+      entityType: 'PROFILE_DRAFT',
+      entityId: draft.id,
+      metadata: {
+        provider: upload.provider,
+        objectKey: upload.objectKey,
+        mimeType: uploadInput.mimeType,
+        fileSizeBytes: uploadInput.fileSizeBytes,
+        mediaCount: existingMedia.length,
+      },
+    });
+
+    return {
+      upload,
+      mediaSlots: this.mediaSlots(existingMedia),
+      expiresAt: upload.expiresAt,
+    };
+  }
+
   async addDraftMedia(
     tenantId: string,
     id: string,
@@ -352,9 +428,16 @@ export class ProfilesService {
         safety,
       });
     }
+    const moderation = await this.mediaAdapters.moderation.review(mediaInput);
+    if (!moderation.allowed) {
+      throw new UnprocessableEntityException({
+        message: 'Profile media failed moderation review.',
+        moderation,
+      });
+    }
 
     const now = new Date().toISOString();
-    const media: MediaAsset = {
+    const baseMedia: MediaAsset = {
       ...mediaInput,
       id: randomUUID(),
       tenantId,
@@ -362,10 +445,24 @@ export class ProfilesService {
       ownerId: draft.id,
       kind: mediaDecision.kind,
       status: 'READY_FOR_PREVIEW',
-      moderationStatus: 'PASSED',
+      moderationStatus: moderation.moderationStatus,
+      moderationReason: moderation.moderationReason,
+      storageProvider: mediaInput.storageProvider,
+      objectKey: mediaInput.objectKey,
+      cdnUrl: mediaInput.cdnUrl,
+      transformStatus: mediaInput.transformStatus,
+      variants: mediaInput.variants,
       uploadedAt: now,
       createdAt: now,
       updatedAt: now,
+    };
+    const transform = await this.mediaAdapters.transforms.plan(baseMedia);
+    const media: MediaAsset = {
+      ...baseMedia,
+      cdnUrl: transform.cdnUrl ?? baseMedia.cdnUrl,
+      thumbnailUrl: transform.thumbnailUrl ?? baseMedia.thumbnailUrl,
+      transformStatus: transform.transformStatus,
+      variants: transform.variants ?? baseMedia.variants,
     };
     const updatedDraft = this.mediaEditedDraft(draft, now);
 

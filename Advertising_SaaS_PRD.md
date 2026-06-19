@@ -360,9 +360,13 @@ Implementation progress on 2026-06-19:
   captions/URLs/filenames, tenant-session protected draft media routes, preview
   media slots, Prisma `MediaAsset` persistence, and publish-time media carry-over
   into the live profile.
-- Remaining hardening: provider-backed upload URLs, malware scanning, CDN
-  transforms, video transcoding, listing media, richer review case management,
-  and user-facing review status in web/mobile clients.
+- Added provider-neutral profile media upload preparation plus storage,
+  moderation, and CDN/transform adapter hooks, with persisted storage keys,
+  CDN URLs, transform status, and variant metadata.
+- Remaining hardening: real object-storage credentials/signed URLs,
+  provider-backed malware and media scanning, background image/video workers,
+  listing media, richer review case management, and user-facing review status
+  in web/mobile clients.
 
 ### 7.3 Media Display Area
 

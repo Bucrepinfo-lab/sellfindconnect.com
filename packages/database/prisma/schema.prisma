@@ -509,6 +509,11 @@ model MediaAsset {
   visibility       String   @db.VarChar(40)
   moderationStatus String   @db.VarChar(40)
   moderationReason String?  @db.VarChar(120)
+  storageProvider  String?  @db.VarChar(80)
+  objectKey        String?  @db.VarChar(500)
+  cdnUrl           String?  @db.VarChar(1000)
+  transformStatus  String?  @db.VarChar(40)
+  variants         Json?
   uploadedAt       DateTime @default(now())
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -517,6 +522,7 @@ model MediaAsset {
   @@index([tenantId, ownerType, ownerId, displayOrder])
   @@index([tenantId, status])
   @@index([ownerType, ownerId])
+  @@index([storageProvider, objectKey])
 }
 
 model Notification {

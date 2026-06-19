@@ -1,7 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { mediaPolicy, mediaVisibilityStates, type MediaVisibility } from '@telpen/domain';
+import {
+  mediaPolicy,
+  mediaTransformStatuses,
+  mediaVisibilityStates,
+  type MediaTransformStatus,
+  type MediaVisibility,
+} from '@telpen/domain';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsIn,
   IsInt,
   IsOptional,
@@ -11,7 +19,54 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
+
+export class PrepareProfileMediaUploadDto {
+  @ApiProperty({ example: 'demo-produce.jpg' })
+  @IsString()
+  @Length(2, 240)
+  declare fileName: string;
+
+  @ApiProperty({ example: 'image/jpeg' })
+  @IsString()
+  @Length(5, 120)
+  declare mimeType: string;
+
+  @ApiProperty({ example: 840000 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(mediaPolicy.maxVideoBytes)
+  declare fileSizeBytes: number;
+}
+
+export class MediaCdnVariantDto {
+  @ApiProperty({ example: 'thumbnail' })
+  @IsString()
+  @Length(2, 40)
+  declare label: string;
+
+  @ApiProperty({ example: 'https://cdn.sellfindconnect.com/profile/demo-produce-thumb.jpg' })
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true, require_tld: false })
+  declare url: string;
+
+  @ApiPropertyOptional({ example: 480 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(10000)
+  declare width?: number;
+
+  @ApiPropertyOptional({ example: 270 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(10000)
+  declare height?: number;
+}
 
 export class CreateProfileMediaDto {
   @ApiProperty({ example: 'https://cdn.sellfindconnect.com/profile/demo-produce.jpg' })
@@ -88,4 +143,34 @@ export class CreateProfileMediaDto {
   @IsOptional()
   @IsIn(mediaVisibilityStates)
   declare visibility?: MediaVisibility;
+
+  @ApiPropertyOptional({ example: 's3-compatible-development' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  declare storageProvider?: string;
+
+  @ApiPropertyOptional({ example: 'profile-drafts/tenant-id/draft-id/demo-produce.jpg' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  declare objectKey?: string;
+
+  @ApiPropertyOptional({ example: 'https://cdn.sellfindconnect.com/profile/demo-produce.jpg' })
+  @IsOptional()
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true, require_tld: false })
+  declare cdnUrl?: string;
+
+  @ApiPropertyOptional({ enum: mediaTransformStatuses, example: 'READY' })
+  @IsOptional()
+  @IsIn(mediaTransformStatuses)
+  declare transformStatus?: MediaTransformStatus;
+
+  @ApiPropertyOptional({ type: () => [MediaCdnVariantDto] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(6)
+  @ValidateNested({ each: true })
+  @Type(() => MediaCdnVariantDto)
+  declare variants?: MediaCdnVariantDto[];
 }

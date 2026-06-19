@@ -5,6 +5,7 @@ import type { AuthAuditRecord } from '../auth/auth.records';
 import type { PlatformAccessSession } from '../auth/auth.records';
 import type { AuthService } from '../auth/auth.service';
 import { InMemoryProfilesRepository } from './in-memory-profiles.repository';
+import type { ProfileMediaAdapters } from './profile-media.adapters';
 import { ProfilesService } from './profiles.service';
 
 const tenantId = '11111111-1111-4111-8111-111111111111';
@@ -147,6 +148,154 @@ describe('ProfilesService', () => {
     expect(preview.preview.mediaSlots).toEqual(result.mediaSlots);
     expect(await service.listDraftMedia(tenantId, draft.id)).toHaveLength(1);
     expect(auditLogs.some((record) => record.action === 'PROFILE_MEDIA_ADDED')).toBe(true);
+  });
+
+  it('prepares provider-neutral profile media upload instructions', async () => {
+    const auditLogs: TenantAuditInput[] = [];
+    const service = new ProfilesService(undefined, {
+      hasCurrentTermsAcceptance: async () => true,
+      recordTenantAudit: async (record: TenantAuditInput) => {
+        auditLogs.push(record);
+      },
+    } as Pick<AuthService, 'hasCurrentTermsAcceptance' | 'recordTenantAudit'> as AuthService);
+    const draft = await service.createDraft(tenantId, {
+      displayName: 'Nairobi Fresh Produce',
+      industryCode: 'AGRICULTURE',
+      role: 'SUPPLIER',
+      description: 'We supply fresh vegetables to hotels and shops in Nairobi.',
+      countryCode: 'KE',
+    });
+
+    const result = await service.prepareDraftMediaUpload(
+      tenantId,
+      draft.id,
+      {
+        fileName: 'Fresh Produce.JPG',
+        mimeType: 'IMAGE/JPEG',
+        fileSizeBytes: 800_000,
+      },
+      'user-1',
+    );
+
+    expect(result.upload).toMatchObject({
+      provider: 'development-s3-compatible',
+      publicUrl: expect.stringContaining('/public/profile_draft/'),
+      thumbnailUrl: expect.stringContaining('/thumb/profile_draft/'),
+      requiredHeaders: {
+        'content-type': 'image/jpeg',
+        'x-media-owner-type': 'PROFILE_DRAFT',
+      },
+    });
+    expect(result.upload.objectKey).toContain(`profile_draft/${tenantId}/${draft.id}/`);
+    expect(result.mediaSlots).toEqual({ used: 0, max: mediaPolicy.maxItemsPerOwner, remaining: 10 });
+    expect(auditLogs.some((record) => record.action === 'PROFILE_MEDIA_UPLOAD_PREPARED')).toBe(
+      true,
+    );
+  });
+
+  it('applies moderation and transform adapters when adding profile media', async () => {
+    const adapters: ProfileMediaAdapters = {
+      storage: {
+        prepareUpload: () => {
+          throw new Error('storage adapter should not be used');
+        },
+      },
+      moderation: {
+        review: () => ({
+          allowed: true,
+          moderationStatus: 'PENDING',
+          moderationReason: 'SCAN_QUEUED',
+        }),
+      },
+      transforms: {
+        plan: () => ({
+          transformStatus: 'READY',
+          cdnUrl: 'https://cdn.example.test/display/fresh-produce.jpg',
+          thumbnailUrl: 'https://cdn.example.test/thumb/fresh-produce.jpg',
+          variants: [
+            {
+              label: 'thumbnail',
+              url: 'https://cdn.example.test/thumb/fresh-produce.jpg',
+              width: 480,
+            },
+          ],
+        }),
+      },
+    };
+    const service = new ProfilesService(undefined, undefined, adapters);
+    const draft = await service.createDraft(tenantId, {
+      displayName: 'Nairobi Fresh Produce',
+      industryCode: 'AGRICULTURE',
+      role: 'SUPPLIER',
+      description: 'We supply fresh vegetables to hotels and shops in Nairobi.',
+      countryCode: 'KE',
+    });
+
+    const result = await service.addDraftMedia(tenantId, draft.id, {
+      sourceUrl: 'https://media.example.test/raw/fresh-produce.jpg',
+      fileName: 'fresh-produce.jpg',
+      mimeType: 'image/jpeg',
+      fileSizeBytes: 800_000,
+      storageProvider: 's3-compatible',
+      objectKey: 'profile-drafts/tenant/draft/fresh-produce.jpg',
+    });
+
+    expect(result.media).toMatchObject({
+      moderationStatus: 'PENDING',
+      moderationReason: 'SCAN_QUEUED',
+      storageProvider: 's3-compatible',
+      objectKey: 'profile-drafts/tenant/draft/fresh-produce.jpg',
+      cdnUrl: 'https://cdn.example.test/display/fresh-produce.jpg',
+      thumbnailUrl: 'https://cdn.example.test/thumb/fresh-produce.jpg',
+      transformStatus: 'READY',
+      variants: [
+        {
+          label: 'thumbnail',
+          url: 'https://cdn.example.test/thumb/fresh-produce.jpg',
+          width: 480,
+        },
+      ],
+    });
+  });
+
+  it('blocks profile media when the moderation adapter rejects it', async () => {
+    const adapters: ProfileMediaAdapters = {
+      storage: {
+        prepareUpload: () => {
+          throw new Error('storage adapter should not be used');
+        },
+      },
+      moderation: {
+        review: () => ({
+          allowed: false,
+          moderationStatus: 'BLOCKED',
+          moderationReason: 'MALWARE_OR_UNSAFE_MEDIA',
+        }),
+      },
+      transforms: {
+        plan: () => {
+          throw new Error('transform adapter should not be used');
+        },
+      },
+    };
+    const service = new ProfilesService(undefined, undefined, adapters);
+    const draft = await service.createDraft(tenantId, {
+      displayName: 'Nairobi Fresh Produce',
+      industryCode: 'AGRICULTURE',
+      role: 'SUPPLIER',
+      description: 'We supply fresh vegetables to hotels and shops in Nairobi.',
+      countryCode: 'KE',
+    });
+
+    await expect(
+      service.addDraftMedia(tenantId, draft.id, {
+        sourceUrl: 'https://media.example.test/raw/fresh-produce.jpg',
+        fileName: 'fresh-produce.jpg',
+        mimeType: 'image/jpeg',
+        fileSizeBytes: 800_000,
+      }),
+    ).rejects.toThrow('moderation review');
+    expect(await service.listDraftMedia(tenantId, draft.id)).toHaveLength(0);
   });
 
   it('requires current stored terms before profile media upload when auth is attached', async () => {

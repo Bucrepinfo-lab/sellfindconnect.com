@@ -4,6 +4,10 @@ import { ConfigService } from '@nestjs/config';
 import { AccessModule } from '../access/access.module';
 import { AuthModule } from '../auth/auth.module';
 import { InMemoryProfilesRepository } from './in-memory-profiles.repository';
+import {
+  PROFILE_MEDIA_ADAPTERS,
+  createDefaultProfileMediaAdapters,
+} from './profile-media.adapters';
 import { ProfileModerationController } from './profile-moderation.controller';
 import { ProfilesController } from './profiles.controller';
 import { PROFILES_REPOSITORY } from './profiles.repository';
@@ -39,6 +43,10 @@ import { ProfilesService } from './profiles.service';
         );
         return new PrismaProfilesRepository(createProfilesPrismaClient(databaseUrl));
       },
+    },
+    {
+      provide: PROFILE_MEDIA_ADAPTERS,
+      useFactory: createDefaultProfileMediaAdapters,
     },
     ProfilesService,
   ],
