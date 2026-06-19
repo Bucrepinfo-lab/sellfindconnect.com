@@ -141,15 +141,23 @@ export class AcceptTenantInviteDto {
   @Length(32, 256)
   declare token: string;
 
-  @ApiProperty({ example: 'Grace Agent' })
+  @ApiPropertyOptional({ example: 'existing-session-token' })
+  @IsOptional()
+  @IsString()
+  @Length(16, 256)
+  declare sessionToken?: string;
+
+  @ApiPropertyOptional({ example: 'Grace Agent' })
+  @IsOptional()
   @IsString()
   @Length(2, 160)
-  declare displayName: string;
+  declare displayName?: string;
 
-  @ApiProperty({ example: 'Invited-agent#2026' })
+  @ApiPropertyOptional({ example: 'Invited-agent#2026' })
+  @IsOptional()
   @IsString()
   @Length(8, 256)
-  declare password: string;
+  declare password?: string;
 
   @ApiPropertyOptional({ example: '+254700000001' })
   @IsOptional()

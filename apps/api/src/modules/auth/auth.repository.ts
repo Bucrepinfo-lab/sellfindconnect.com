@@ -11,6 +11,7 @@ import type {
   InvitedTenantUserRecords,
   OwnerRegistrationRecords,
   PasswordUpdateRecord,
+  TenantMembershipWithTermsRecords,
   TenantMembershipRecord,
 } from './auth.records';
 
@@ -22,6 +23,10 @@ export interface AuthRepository {
   findUserByEmail(email: string): RepositoryResult<AuthUserRecord | undefined>;
   findUserById(userId: string): RepositoryResult<AuthUserRecord | undefined>;
   findFirstMembershipForUser(userId: string): RepositoryResult<TenantMembershipRecord | undefined>;
+  findMembershipForUserAndTenant(
+    userId: string,
+    tenantId: string,
+  ): RepositoryResult<TenantMembershipRecord | undefined>;
   findTenantById(tenantId: string): RepositoryResult<AuthTenantRecord | undefined>;
   findTermsAcceptance(userId: string, tenantId: string): RepositoryResult<TermsAcceptanceEvidence | undefined>;
   findSessionByTokenHash(tokenHash: string): RepositoryResult<AuthSessionRecord | undefined>;
@@ -30,6 +35,7 @@ export interface AuthRepository {
   findTenantInviteByTokenHash(tokenHash: string): RepositoryResult<AuthTenantInviteRecord | undefined>;
   createOwnerRegistration(records: OwnerRegistrationRecords): RepositoryResult<void>;
   createInvitedTenantUser(records: InvitedTenantUserRecords): RepositoryResult<void>;
+  createTenantMembershipWithTerms(records: TenantMembershipWithTermsRecords): RepositoryResult<void>;
   createSession(session: AuthSessionRecord): RepositoryResult<void>;
   updateSession(session: AuthSessionRecord): RepositoryResult<void>;
   createMfaChallenge(challenge: AuthMfaChallengeRecord): RepositoryResult<void>;

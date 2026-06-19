@@ -367,8 +367,12 @@ export class AuthService {
     }
 
     const email = input.email.trim().toLowerCase();
-    if (await this.repository.findUserByEmail(email)) {
-      throw new ConflictException('An account with this email already exists.');
+    const existingInvitee = await this.repository.findUserByEmail(email);
+    if (
+      existingInvitee &&
+      (await this.repository.findMembershipForUserAndTenant(existingInvitee.id, tenant.id))
+    ) {
+      throw new ConflictException('This account already belongs to this tenant.');
     }
 
     const invite = await this.createTenantInviteRecord({
@@ -386,6 +390,7 @@ export class AuthService {
       metadata: {
         invitedEmailHash: this.hashAuditIdentifier(email),
         invitedRole: input.role,
+        existingAccount: Boolean(existingInvitee),
       },
     });
 
@@ -404,14 +409,83 @@ export class AuthService {
     );
 
     const invite = await this.requireTenantInvite(input.token);
-    if (await this.repository.findUserByEmail(invite.email)) {
-      throw new ConflictException('An account with this email already exists.');
-    }
-
     const tenant = await this.repository.findTenantById(invite.tenantId);
     const country = tenant ? getCountry(tenant.countryCode) : undefined;
     if (!tenant || !country) {
       throw new UnprocessableEntityException('Unsupported tenant.');
+    }
+
+    const existingUser = await this.repository.findUserByEmail(invite.email);
+    if (existingUser) {
+      if (!input.sessionToken) {
+        throw new UnauthorizedException('An active session is required to accept this invite.');
+      }
+
+      const inviteeSession = await this.requireSession(input.sessionToken);
+      if (inviteeSession.userId !== existingUser.id) {
+        throw new UnauthorizedException('Invite session does not belong to the invited account.');
+      }
+
+      if (await this.repository.findMembershipForUserAndTenant(existingUser.id, invite.tenantId)) {
+        throw new ConflictException('This account already belongs to this tenant.');
+      }
+
+      const now = new Date().toISOString();
+      const membership: TenantMembershipRecord = {
+        id: randomUUID(),
+        userId: existingUser.id,
+        tenantId: invite.tenantId,
+        role: invite.role,
+        createdAt: now,
+      };
+      const termsAcceptance = buildTermsAcceptanceEvidence({
+        accepted: input.acceptedTerms,
+        userId: existingUser.id,
+        tenantId: invite.tenantId,
+        countryCode: country.code,
+        locale: country.locale,
+        appSurface: 'WEB',
+        acceptanceSource: 'ADMIN_INVITE',
+        acceptedAt: now,
+      });
+
+      if (!termsAcceptance) {
+        throw new UnprocessableEntityException('Current terms acceptance is required.');
+      }
+
+      await this.repository.updateTenantInvite({ ...invite, acceptedAt: now });
+      await this.repository.createTenantMembershipWithTerms({
+        membership,
+        termsAcceptance,
+      });
+      await this.recordAudit({
+        tenantId: invite.tenantId,
+        actorUserId: existingUser.id,
+        action: 'AUTH_TENANT_INVITE_ACCEPTED',
+        entityType: 'TENANT_INVITE',
+        entityId: invite.id,
+        metadata: {
+          invitedByUserId: invite.invitedByUserId,
+          acceptedRole: invite.role,
+          termsVersion: termsAcceptance.termsVersion,
+          existingAccount: true,
+        },
+      });
+
+      return {
+        user: this.presentUser(existingUser),
+        tenant,
+        membership,
+        session: await this.createSession(existingUser, invite.tenantId, invite.role),
+        termsAcceptance,
+      };
+    }
+
+    const displayName = input.displayName?.trim();
+    if (!displayName || !input.password) {
+      throw new UnprocessableEntityException(
+        'Display name and password are required when accepting an invite for a new account.',
+      );
     }
 
     const passwordPolicy = evaluatePasswordPolicy(input.password);
@@ -428,7 +502,7 @@ export class AuthService {
     const user: AuthUserRecord = {
       id: userId,
       email: invite.email,
-      displayName: input.displayName,
+      displayName,
       phone: input.phone,
       passwordHash: password.hash,
       passwordSalt: password.salt,
@@ -475,6 +549,7 @@ export class AuthService {
         invitedByUserId: invite.invitedByUserId,
         acceptedRole: invite.role,
         termsVersion: termsAcceptance.termsVersion,
+        existingAccount: false,
       },
     });
 

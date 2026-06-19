@@ -275,6 +275,7 @@ Implementation progress on 2026-06-18:
 - Added generated, hashed, expiring email verification and password reset challenges, including password reset session revocation.
 - Added MVP tenant invites so verified owners can invite non-owner tenant roles and invited users can accept with current terms, verified email, role-aware membership, and a fresh session.
 - Added auth audit logging for sensitive auth and invite events, plus an owner/MFA-protected tenant audit lookup endpoint that excludes raw secrets, tokens, codes, invite links, and raw email addresses.
+- Added existing-account invite acceptance requiring an active session for the invited account before linking that account to another tenant.
 - Added an opt-in Prisma auth repository for durable user, tenant, membership, session, MFA challenge, account challenge, tenant invite, and policy-acceptance persistence when `AUTH_REPOSITORY=prisma` is enabled with `DATABASE_URL`.
 - Added a reusable tenant session guard that validates `x-session-token` against `x-tenant-id` and requires MFA before protected tenant routes proceed.
 - Migrated profile draft/preview routes and advert listing/lifecycle routes to the MFA-verified tenant session guard.
@@ -913,8 +914,9 @@ Implementation progress on 2026-06-18:
 - Added owner registration and login session groundwork so tenants can be created with an owner membership and first-month-free trial state.
 - Added generated, expiring MFA challenge records for tenant-owner sessions; provider-backed email/SMS/authenticator delivery remains a production hardening step.
 - Added hashed account challenge records for email verification and password reset; provider-backed email delivery remains a production hardening step.
-- Added tenant invite tokens for non-owner tenant roles; existing-account invite linking remains a future hardening step.
+- Added tenant invite tokens for non-owner tenant roles.
 - Added audit evidence for registration, login, MFA, email verification, password reset, tenant invite creation, and invite acceptance.
+- Added existing-user invite linking with same-account session verification before tenant membership is created.
 
 ## 10. Nonfunctional Requirements
 

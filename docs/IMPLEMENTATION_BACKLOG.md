@@ -118,6 +118,9 @@ Progress:
 - Added auth audit logging for owner registration, login, email verification,
   password reset, MFA, tenant invite creation, and tenant invite acceptance,
   plus an owner/MFA-protected tenant audit lookup endpoint.
+- Added existing-account tenant invite acceptance: an invited existing user can
+  join another tenant only with an active session belonging to that same user,
+  preventing invite-token-only account linking.
 - Added an opt-in Prisma-backed auth repository selected with
   `AUTH_REPOSITORY=prisma`, using `DATABASE_URL` and the generated Prisma
   client to persist users, tenants, memberships, auth sessions, MFA
@@ -139,9 +142,9 @@ Progress:
 - Added the initial Prisma migration and seed workflow required before enabling
   production Prisma persistence against a hosted PostgreSQL database.
 - Production identity provider, provider-backed email delivery,
-  provider-backed email/SMS/authenticator MFA delivery, existing-user invite
-  acceptance, broader non-auth product audit coverage, hosted database
-  migration/seed execution, and production Prisma enablement remain next.
+  provider-backed email/SMS/authenticator MFA delivery, broader non-auth product
+  audit coverage, hosted database migration/seed execution, and production
+  Prisma enablement remain next.
 
 ## Epic 3: Advertiser Profile Vertical Slice
 

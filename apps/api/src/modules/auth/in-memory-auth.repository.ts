@@ -12,6 +12,7 @@ import type {
   InvitedTenantUserRecords,
   OwnerRegistrationRecords,
   PasswordUpdateRecord,
+  TenantMembershipWithTermsRecords,
   TenantMembershipRecord,
 } from './auth.records';
 import type { AuthRepository } from './auth.repository';
@@ -39,6 +40,12 @@ export class InMemoryAuthRepository implements AuthRepository {
 
   findFirstMembershipForUser(userId: string): TenantMembershipRecord | undefined {
     return Array.from(this.memberships.values()).find((item) => item.userId === userId);
+  }
+
+  findMembershipForUserAndTenant(userId: string, tenantId: string): TenantMembershipRecord | undefined {
+    return Array.from(this.memberships.values()).find(
+      (item) => item.userId === userId && item.tenantId === tenantId,
+    );
   }
 
   findTenantById(tenantId: string): AuthTenantRecord | undefined {
@@ -83,6 +90,14 @@ export class InMemoryAuthRepository implements AuthRepository {
     this.memberships.set(records.membership.id, records.membership);
     this.termsEvidence.set(
       this.termsEvidenceKey(records.user.id, records.membership.tenantId),
+      records.termsAcceptance,
+    );
+  }
+
+  createTenantMembershipWithTerms(records: TenantMembershipWithTermsRecords): void {
+    this.memberships.set(records.membership.id, records.membership);
+    this.termsEvidence.set(
+      this.termsEvidenceKey(records.membership.userId, records.membership.tenantId),
       records.termsAcceptance,
     );
   }

@@ -146,6 +146,11 @@ export type InvitedTenantUserRecords = {
   termsAcceptance: TermsAcceptanceEvidence;
 };
 
+export type TenantMembershipWithTermsRecords = {
+  membership: TenantMembershipRecord;
+  termsAcceptance: TermsAcceptanceEvidence;
+};
+
 export type PasswordUpdateRecord = Pick<
   AuthUserRecord,
   'passwordHash' | 'passwordSalt' | 'passwordIterations'

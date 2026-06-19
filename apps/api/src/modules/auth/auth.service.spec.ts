@@ -325,6 +325,64 @@ describe('AuthService', () => {
     ).rejects.toThrow();
   });
 
+  it('lets an existing account accept a tenant invite with its own active session', async () => {
+    const service = new AuthService();
+    const owner = await service.registerTenantOwner({
+      email: 'owner@example.com',
+      password: strongPassword,
+      displayName: 'Mary Owner',
+      tenantDisplayName: 'Nairobi Fresh Produce Cooperative',
+      countryCode: 'KE',
+      industryCode: 'AGRICULTURE',
+      primaryRole: 'SUPPLIER',
+      userType: 'ADVERTISER',
+      acceptedTerms: true,
+    });
+    const existingUser = await service.registerTenantOwner({
+      email: 'agent@example.com',
+      password: 'Existing-agent#2026',
+      displayName: 'Grace Agent',
+      tenantDisplayName: 'Grace Agent Advisory',
+      countryCode: 'KE',
+      industryCode: 'PROFESSIONAL',
+      primaryRole: 'SERVICE_PROVIDER',
+      userType: 'BOTH',
+      acceptedTerms: true,
+    });
+
+    await service.verifyMfa({
+      sessionToken: owner.session.token,
+      code: owner.session.mfaChallenge?.developmentCode ?? '',
+    });
+
+    const invite = await service.createTenantInvite({
+      sessionToken: owner.session.token,
+      tenantId: owner.tenant.id,
+      email: 'agent@example.com',
+      role: 'ANALYTICS_VIEWER',
+    });
+
+    await expect(
+      service.acceptTenantInvite({
+        token: invite.invite.developmentToken ?? '',
+        sessionToken: owner.session.token,
+        acceptedTerms: true,
+      }),
+    ).rejects.toThrow();
+
+    const accepted = await service.acceptTenantInvite({
+      token: invite.invite.developmentToken ?? '',
+      sessionToken: existingUser.session.token,
+      acceptedTerms: true,
+    });
+
+    expect(accepted.user.id).toBe(existingUser.user.id);
+    expect(accepted.membership.tenantId).toBe(owner.tenant.id);
+    expect(accepted.membership.role).toBe('ANALYTICS_VIEWER');
+    expect(accepted.session.tenantId).toBe(owner.tenant.id);
+    expect(accepted.session.role).toBe('ANALYTICS_VIEWER');
+  });
+
   it('proves session tenant isolation', async () => {
     const service = new AuthService();
     const registered = await service.registerTenantOwner({

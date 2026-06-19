@@ -28,6 +28,7 @@ import type {
   InvitedTenantUserRecords,
   OwnerRegistrationRecords,
   PasswordUpdateRecord,
+  TenantMembershipWithTermsRecords,
   TenantMembershipRecord,
 } from './auth.records';
 import type { AuthRepository } from './auth.repository';
@@ -54,6 +55,16 @@ export class PrismaAuthRepository implements AuthRepository {
     const membership = await this.prisma.tenantMembership.findFirst({
       where: { userId },
       orderBy: { createdAt: 'asc' },
+    });
+    return membership ? this.mapMembership(membership) : undefined;
+  }
+
+  async findMembershipForUserAndTenant(
+    userId: string,
+    tenantId: string,
+  ): Promise<TenantMembershipRecord | undefined> {
+    const membership = await this.prisma.tenantMembership.findUnique({
+      where: { tenantId_userId: { tenantId, userId } },
     });
     return membership ? this.mapMembership(membership) : undefined;
   }
@@ -180,6 +191,35 @@ export class PrismaAuthRepository implements AuthRepository {
           createdAt: new Date(records.user.createdAt),
         },
       }),
+      this.prisma.tenantMembership.create({
+        data: {
+          id: records.membership.id,
+          userId: records.membership.userId,
+          tenantId: records.membership.tenantId,
+          role: records.membership.role as TenantRole,
+          createdAt: new Date(records.membership.createdAt),
+        },
+      }),
+      this.prisma.termsAcceptanceEvidence.create({
+        data: {
+          userId: records.termsAcceptance.userId,
+          tenantId: records.termsAcceptance.tenantId,
+          countryCode: records.termsAcceptance.countryCode,
+          locale: records.termsAcceptance.locale,
+          termsVersion: records.termsAcceptance.termsVersion,
+          privacyVersion: records.termsAcceptance.privacyVersion,
+          prohibitedContentVersion: records.termsAcceptance.prohibitedContentVersion,
+          subscriptionTermsVersion: records.termsAcceptance.subscriptionTermsVersion,
+          appSurface: records.termsAcceptance.appSurface,
+          acceptanceSource: records.termsAcceptance.acceptanceSource,
+          acceptedAt: new Date(records.termsAcceptance.acceptedAt),
+        },
+      }),
+    ]);
+  }
+
+  async createTenantMembershipWithTerms(records: TenantMembershipWithTermsRecords): Promise<void> {
+    await this.prisma.$transaction([
       this.prisma.tenantMembership.create({
         data: {
           id: records.membership.id,
