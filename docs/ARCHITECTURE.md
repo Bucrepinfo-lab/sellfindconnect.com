@@ -92,8 +92,11 @@ without validating it against the authenticated user's assignments.
   S3-compatible presigned PUT uploads are supported through env-configured
   Signature V4 signing. Media scan/transform jobs can use a Prisma/PostgreSQL
   outbox selected with `MEDIA_JOB_QUEUE_DRIVER=prisma`, including worker claim,
-  retry, completion, and failure state. Malware/media scanning providers,
-  background image transforms, and video transcoding workers remain production
+  retry, completion, and failure state. An internal job-key protected media
+  processing runner can execute bounded batches via
+  `POST /v1/operations/media/processing/run`. Malware/media scanning
+  providers, background image transforms, video transcoding adapters, media
+  asset result publication, and unsafe-media escalation remain production
   adapter implementations.
 - Listings: draft, preview, publish, media, lifecycle, and visibility. Advert
   listing, lifecycle, and media routes require an MFA-verified tenant session.
@@ -183,7 +186,8 @@ workflow are approved.
 - Media processing queue persistence is enabled with
   `MEDIA_JOB_QUEUE_DRIVER=prisma` after applying the database migrations and
   setting `DATABASE_URL`; development and tests use the in-memory queue by
-  default.
+  default. The protected operations runner can be scheduled by cron or run from
+  a dedicated worker service once provider adapters are configured.
 
 ## Notification Flow
 

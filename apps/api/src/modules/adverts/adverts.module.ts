@@ -1,25 +1,14 @@
 import { Module } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 
 import { AuthModule } from '../auth/auth.module';
-import {
-  MEDIA_ADAPTERS,
-  createConfiguredMediaAdaptersAsync,
-} from '../media/media.adapters';
+import { MediaModule } from '../media/media.module';
 import { AdvertsController } from './adverts.controller';
 import { AdvertsService } from './adverts.service';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, MediaModule],
   controllers: [AdvertsController],
-  providers: [
-    {
-      provide: MEDIA_ADAPTERS,
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => createConfiguredMediaAdaptersAsync(config),
-    },
-    AdvertsService,
-  ],
+  providers: [AdvertsService],
   exports: [AdvertsService],
 })
 export class AdvertsModule {}

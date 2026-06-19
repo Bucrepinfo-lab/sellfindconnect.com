@@ -3,10 +3,7 @@ import { ConfigService } from '@nestjs/config';
 
 import { AccessModule } from '../access/access.module';
 import { AuthModule } from '../auth/auth.module';
-import {
-  MEDIA_ADAPTERS,
-  createConfiguredMediaAdaptersAsync,
-} from '../media/media.adapters';
+import { MediaModule } from '../media/media.module';
 import { InMemoryProfilesRepository } from './in-memory-profiles.repository';
 import { ProfileModerationController } from './profile-moderation.controller';
 import { ProfilesController } from './profiles.controller';
@@ -14,7 +11,7 @@ import { PROFILES_REPOSITORY } from './profiles.repository';
 import { ProfilesService } from './profiles.service';
 
 @Module({
-  imports: [AuthModule, AccessModule],
+  imports: [AuthModule, AccessModule, MediaModule],
   controllers: [ProfilesController, ProfileModerationController],
   providers: [
     InMemoryProfilesRepository,
@@ -43,11 +40,6 @@ import { ProfilesService } from './profiles.service';
         );
         return new PrismaProfilesRepository(createProfilesPrismaClient(databaseUrl));
       },
-    },
-    {
-      provide: MEDIA_ADAPTERS,
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => createConfiguredMediaAdaptersAsync(config),
     },
     ProfilesService,
   ],

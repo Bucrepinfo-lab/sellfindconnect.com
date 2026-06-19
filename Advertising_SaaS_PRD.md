@@ -367,9 +367,13 @@ Implementation progress on 2026-06-19:
   Signature V4 signing, plus scan/transform processing job interfaces.
 - Added durable Prisma/PostgreSQL media processing job outbox persistence with
   worker claim, completion, retry, and final-failure support.
+- Added a shared media module and internal job-key protected media processing
+  runner, `POST /v1/operations/media/processing/run`, with development
+  processors for scan, moderation, image transform, and video transcode jobs.
 - Remaining hardening: live object-storage credentials, provider-backed malware
-  and media scanning, executable background image/video workers, richer review
-  case management, and user-facing review status in web/mobile clients.
+  and media scanning, provider-backed image/video execution, media asset state
+  updates from worker results, richer review case management, and user-facing
+  review status in web/mobile clients.
 
 ### 7.3 Media Display Area
 
@@ -440,9 +444,11 @@ Implementation progress:
   queue contracts shared with profile media.
 - Added durable media processing job outbox support so advert scan/transform
   jobs survive API restarts and can be processed by workers.
+- Added the protected media processing runner endpoint shared by advert and
+  profile media jobs.
 - Durable advert drafts, persisted advert repository, live storage credentials,
-  provider-backed media workers, pause/archive/renew controls, and public
-  listing preview remain next.
+  provider-backed media workers, media-result publication, pause/archive/renew
+  controls, and public listing preview remain next.
 
 ### 7.5 Search and Discovery
 

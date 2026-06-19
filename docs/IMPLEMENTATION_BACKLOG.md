@@ -198,9 +198,13 @@ Progress:
 - Added durable Prisma/PostgreSQL media processing job outbox persistence,
   including worker claim, complete, retry, and final-failure lifecycle support
   selected with `MEDIA_JOB_QUEUE_DRIVER=prisma`.
+- Added a shared media module and internal job-key protected media processing
+  runner: `POST /v1/operations/media/processing/run`, with development
+  processors for malware scan, content moderation, image transform, and video
+  transcode job completion.
 - Real object-storage credentials, provider-backed malware and media scanning,
-  executable background image/video workers, and richer review case management
-  remain next.
+  provider-backed image/video execution, media asset state updates from worker
+  results, and richer review case management remain next.
 
 ## Epic 4: Listing and Media Vertical Slice
 
@@ -235,8 +239,11 @@ Progress:
 - Added durable media job outbox support shared by advert and profile media so
   queued scan/transform work survives API restarts and can be processed by
   workers.
+- Added the protected media processing runner endpoint shared by advert and
+  profile media worker jobs.
 - A durable advert lifecycle scheduler, persisted advert repository, live
-  storage credentials, and provider-backed media workers remain next.
+  storage credentials, provider-backed media workers, and media-result
+  publication remain next.
 
 ## Epic 5: Source Finder and Relationship Graph
 

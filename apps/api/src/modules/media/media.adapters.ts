@@ -39,11 +39,14 @@ export interface MediaTransformAdapter {
   plan(input: MediaAsset): Promise<MediaTransformResult> | MediaTransformResult;
 }
 
-export type MediaProcessingJobType =
-  | 'MALWARE_SCAN'
-  | 'CONTENT_MODERATION'
-  | 'IMAGE_TRANSFORM'
-  | 'VIDEO_TRANSCODE';
+export const mediaProcessingJobTypes = [
+  'MALWARE_SCAN',
+  'CONTENT_MODERATION',
+  'IMAGE_TRANSFORM',
+  'VIDEO_TRANSCODE',
+] as const;
+
+export type MediaProcessingJobType = (typeof mediaProcessingJobTypes)[number];
 
 export type MediaProcessingJobStatus = 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED';
 
@@ -104,11 +107,30 @@ export interface MediaProcessingQueueAdapter {
   failJob(input: FailMediaProcessingJobInput): Promise<MediaProcessingJob | undefined> | MediaProcessingJob | undefined;
 }
 
+export type MediaJobProcessorResult =
+  | {
+      ok: true;
+      result?: MediaProcessingJobMetadata;
+    }
+  | {
+      ok: false;
+      reason: string;
+      retryable: boolean;
+      result?: MediaProcessingJobMetadata;
+    };
+
+export interface MediaJobProcessorAdapter {
+  process(input: MediaProcessingJob): Promise<MediaJobProcessorResult> | MediaJobProcessorResult;
+}
+
+export type MediaJobProcessorMap = Partial<Record<MediaProcessingJobType, MediaJobProcessorAdapter>>;
+
 export type MediaAdapters = {
   storage: MediaStorageAdapter;
   moderation: MediaModerationAdapter;
   transforms: MediaTransformAdapter;
   jobs?: MediaProcessingQueueAdapter;
+  processors?: MediaJobProcessorMap;
 };
 
 export const MEDIA_ADAPTERS = Symbol('MEDIA_ADAPTERS');
@@ -427,6 +449,51 @@ export class InMemoryMediaProcessingQueueAdapter implements MediaProcessingQueue
   }
 }
 
+export class DevelopmentMediaJobProcessorAdapter implements MediaJobProcessorAdapter {
+  constructor(private readonly type: MediaProcessingJobType) {}
+
+  process(input: MediaProcessingJob): MediaJobProcessorResult {
+    switch (this.type) {
+      case 'MALWARE_SCAN':
+        return {
+          ok: true,
+          result: {
+            provider: 'development-malware-scanner',
+            verdict: 'clean',
+            objectKeyPresent: Boolean(input.objectKey),
+          },
+        };
+      case 'CONTENT_MODERATION':
+        return {
+          ok: true,
+          result: {
+            provider: 'development-content-moderator',
+            verdict: 'passed',
+            sourceUrlChecked: Boolean(input.sourceUrl),
+          },
+        };
+      case 'IMAGE_TRANSFORM':
+        return {
+          ok: true,
+          result: {
+            provider: 'development-image-transformer',
+            transformStatus: 'READY',
+            cdnPublished: true,
+          },
+        };
+      case 'VIDEO_TRANSCODE':
+        return {
+          ok: true,
+          result: {
+            provider: 'development-video-transcoder',
+            transformStatus: 'READY',
+            streamPrepared: true,
+          },
+        };
+    }
+  }
+}
+
 export type MediaAdapterConfigReader = {
   get(key: string): string | undefined;
 };
@@ -448,6 +515,7 @@ export function createConfiguredMediaAdapters(config?: MediaAdapterConfigReader)
     moderation: new MetadataOnlyMediaModerationAdapter(),
     transforms: new DevelopmentMediaTransformAdapter(),
     jobs: new InMemoryMediaProcessingQueueAdapter(),
+    processors: createDevelopmentMediaJobProcessors(),
   };
 }
 
@@ -484,6 +552,7 @@ export function createDefaultMediaAdapters(): MediaAdapters {
     moderation: new MetadataOnlyMediaModerationAdapter(),
     transforms: new DevelopmentMediaTransformAdapter(),
     jobs: new InMemoryMediaProcessingQueueAdapter(),
+    processors: createDevelopmentMediaJobProcessors(),
   };
 }
 
@@ -501,6 +570,12 @@ export async function enqueueMediaProcessingJobs(
   ]);
 
   return [...scanJobs, ...transformJobs];
+}
+
+export function createDevelopmentMediaJobProcessors(): MediaJobProcessorMap {
+  return Object.fromEntries(
+    mediaProcessingJobTypes.map((type) => [type, new DevelopmentMediaJobProcessorAdapter(type)]),
+  );
 }
 
 function createS3CompatibleStorageAdapter(config?: MediaAdapterConfigReader): S3CompatibleMediaStorageAdapter {

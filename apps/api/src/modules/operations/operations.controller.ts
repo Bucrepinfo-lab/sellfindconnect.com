@@ -5,6 +5,8 @@ import { AdvertsService } from '../adverts/adverts.service';
 import { RunAdvertLifecycleDto } from '../adverts/dto/create-advert.dto';
 import { ConversationsService } from '../conversations/conversations.service';
 import { RunConversationSlaDto } from '../conversations/dto/conversations.dto';
+import { RunMediaProcessingJobsDto } from '../media/dto/media-worker.dto';
+import { MediaWorkerService } from '../media/media-worker.service';
 import { InternalJobGuard } from './internal-job.guard';
 
 @ApiTags('operations')
@@ -18,6 +20,7 @@ export class OperationsController {
   constructor(
     private readonly adverts: AdvertsService,
     private readonly conversations: ConversationsService,
+    private readonly mediaWorker: MediaWorkerService,
   ) {}
 
   @Post('adverts/lifecycle/run')
@@ -28,5 +31,10 @@ export class OperationsController {
   @Post('conversations/sla/run')
   runConversationSlaChecks(@Body() body: RunConversationSlaDto) {
     return this.conversations.runAllSlaChecks(body);
+  }
+
+  @Post('media/processing/run')
+  runMediaProcessingJobs(@Body() body: RunMediaProcessingJobsDto) {
+    return this.mediaWorker.runOnce(body);
   }
 }

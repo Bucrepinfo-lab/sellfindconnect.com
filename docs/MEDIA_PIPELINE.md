@@ -15,8 +15,11 @@ Last updated: 2026-06-19
 - Processing jobs use an in-memory development queue by default and can switch
   to a durable Prisma/PostgreSQL outbox so scan/transform jobs survive API
   restarts and can be claimed by background workers.
+- An internal worker runner can claim and process a bounded batch through
+  `POST /v1/operations/media/processing/run`, protected by `x-internal-job-key`.
 - Production still needs provider-backed malware scanning, content moderation,
-  image/video execution workers, and CDN publication.
+  image/video execution adapters, media asset status updates from worker
+  results, and CDN publication.
 
 ## Storage Modes
 
@@ -99,6 +102,21 @@ Workers should:
    final to move it to `FAILED`.
 
 Job states are `QUEUED`, `RUNNING`, `SUCCEEDED`, and `FAILED`. The next
-hardening step is to add executable worker entrypoints plus provider adapters
+hardening step is to replace the development processors with provider adapters
 for malware scanning, image resizing, CDN cache publication, video transcoding,
-and unsafe-media escalation.
+media asset state updates, and unsafe-media escalation.
+
+Internal batch runner:
+
+```text
+POST /v1/operations/media/processing/run
+x-internal-job-key: ...
+```
+
+Request controls:
+
+- `workerId`: stable worker identity for locks.
+- `limit`: maximum jobs to claim in this batch.
+- `jobTypes`: optional subset of media job types.
+- `retryAfterSeconds`: retry backoff for transient provider failures.
+- `now`: optional scheduler timestamp for deterministic runs/tests.
