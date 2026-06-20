@@ -1,4 +1,4 @@
-import { Injectable, UnprocessableEntityException } from '@nestjs/common';
+import { Inject, Injectable, Optional, UnprocessableEntityException } from '@nestjs/common';
 import {
   emptyAnalyticsTotals,
   evaluateSafetyText,
@@ -15,18 +15,27 @@ import type {
   AnalyticsSummaryQueryDto,
   CreateAnalyticsEventDto,
 } from './dto/create-analytics-event.dto';
+import { ANALYTICS_REPOSITORY, type AnalyticsRepository } from './analytics.repository';
+import { InMemoryAnalyticsRepository } from './in-memory-analytics.repository';
 
 @Injectable()
 export class AnalyticsService {
-  private readonly events = new Map<string, AnalyticsEvent>();
+  constructor(
+    @Optional()
+    @Inject(ANALYTICS_REPOSITORY)
+    private readonly repository: AnalyticsRepository = new InMemoryAnalyticsRepository(),
+  ) {}
 
-  recordEvent(tenantId: string, input: CreateAnalyticsEventDto): AnalyticsEvent {
+  async recordEvent(tenantId: string, input: CreateAnalyticsEventDto): Promise<AnalyticsEvent> {
     const country = getCountry(input.countryCode);
     if (!country) {
       throw new UnprocessableEntityException('Unsupported country.');
     }
 
-    if (input.industryCode && !industryCategories.some((item) => item.code === input.industryCode)) {
+    if (
+      input.industryCode &&
+      !industryCategories.some((item) => item.code === input.industryCode)
+    ) {
       throw new UnprocessableEntityException('Unsupported industry.');
     }
 
@@ -49,22 +58,24 @@ export class AnalyticsService {
       createdAt: now,
     };
 
-    this.events.set(this.key(tenantId, event.id), event);
+    await this.repository.createEvent(event);
     return event;
   }
 
-  summarizeTenant(tenantId: string, query: AnalyticsSummaryQueryDto = {}): TenantAnalyticsSummary {
+  async summarizeTenant(
+    tenantId: string,
+    query: AnalyticsSummaryQueryDto = {},
+  ): Promise<TenantAnalyticsSummary> {
     const periodEnd = query.to ?? new Date().toISOString();
     const periodStart =
-      query.from ??
-      new Date(Date.parse(periodEnd) - 30 * 24 * 60 * 60 * 1000).toISOString();
+      query.from ?? new Date(Date.parse(periodEnd) - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    const events = Array.from(this.events.values()).filter((event) => {
-      if (event.tenantId !== tenantId) return false;
-      if (event.occurredAt < periodStart || event.occurredAt > periodEnd) return false;
-      if (query.countryCode && event.countryCode !== query.countryCode) return false;
-      if (query.industryCode && event.industryCode !== query.industryCode) return false;
-      return true;
+    const events = await this.repository.listEvents({
+      tenantId,
+      from: periodStart,
+      to: periodEnd,
+      countryCode: query.countryCode,
+      industryCode: query.industryCode,
     });
 
     const totals = emptyAnalyticsTotals();
@@ -103,18 +114,16 @@ export class AnalyticsService {
 
     for (const event of events) {
       const key = `${event.entityType}:${event.entityId}`;
-      const current =
-        summaries.get(key) ??
-        {
-          entityId: event.entityId,
-          entityType: event.entityType,
-          views: 0,
-          clicks: 0,
-          inquiries: 0,
-          shares: 0,
-          downloads: 0,
-          lastEventAt: event.occurredAt,
-        };
+      const current = summaries.get(key) ?? {
+        entityId: event.entityId,
+        entityType: event.entityType,
+        views: 0,
+        clicks: 0,
+        inquiries: 0,
+        shares: 0,
+        downloads: 0,
+        lastEventAt: event.occurredAt,
+      };
 
       if (event.eventType === 'VIEW' || event.eventType === 'IMPRESSION') current.views += 1;
       if (event.eventType === 'CLICK') current.clicks += 1;
@@ -150,9 +159,5 @@ export class AnalyticsService {
       return Object.entries(value).flatMap(([key, item]) => [key, ...this.flattenMetadata(item)]);
     }
     return [];
-  }
-
-  private key(tenantId: string, id: string): string {
-    return `${tenantId}:${id}`;
   }
 }

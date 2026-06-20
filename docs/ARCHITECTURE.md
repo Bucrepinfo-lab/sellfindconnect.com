@@ -196,6 +196,11 @@ workflow are approved.
   selected automatically when the Prisma media queue is enabled with
   `DATABASE_URL`. Unsafe media review cases are persisted in `MediaReviewCase`
   and indexed by tenant, status, severity, job type, media, and source job.
+- Analytics event persistence is enabled with `ANALYTICS_REPOSITORY=prisma`
+  after migrations are applied and `DATABASE_URL` is set. The service writes
+  consent-aware events to `AnalyticsEvent` and summarizes tenant-scoped views,
+  clicks, inquiries, shares, downloads, saved searches, searches, and matches
+  from that durable store; development and tests keep the in-memory repository.
 
 ## Notification Flow
 

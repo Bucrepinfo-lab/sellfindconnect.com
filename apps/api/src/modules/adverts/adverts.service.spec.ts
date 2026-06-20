@@ -238,7 +238,7 @@ describe('AdvertsService', () => {
         lastAlertedAt: '2026-07-02T12:00:00.000Z',
       }),
     ]);
-    const summary = analytics.summarizeTenant(tenantId, {
+    const summary = await analytics.summarizeTenant(tenantId, {
       from: '2026-06-01T00:00:00.000Z',
       to: '2026-07-03T00:00:00.000Z',
     });
@@ -277,7 +277,7 @@ describe('AdvertsService', () => {
       occurredAt: '2026-07-02T00:01:00.000Z',
     });
 
-    const summary = analytics.summarizeTenant(tenantId, {
+    const summary = await analytics.summarizeTenant(tenantId, {
       from: '2026-07-01T00:00:00.000Z',
       to: '2026-07-03T00:00:00.000Z',
     });

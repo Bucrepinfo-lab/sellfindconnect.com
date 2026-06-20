@@ -632,7 +632,7 @@ export class AdvertsService {
     };
 
     await this.repository.createSavedSearch(record);
-    this.recordDiscoveryAnalytics(tenantId, {
+    await this.recordDiscoveryAnalytics(tenantId, {
       eventType: 'SAVE',
       entityType: 'SEARCH_RESULT',
       entityId: record.id,
@@ -688,7 +688,7 @@ export class AdvertsService {
     const alertsCreated: AdvertDiscoveryAlertRecord[] = [];
 
     for (const search of searches) {
-      this.recordDiscoveryAnalytics(tenantId, {
+      await this.recordDiscoveryAnalytics(tenantId, {
         eventType: 'SEARCH',
         entityType: 'SEARCH_RESULT',
         entityId: search.id,
@@ -729,7 +729,7 @@ export class AdvertsService {
           createdAt: now,
         };
         await this.repository.createDiscoveryAlert(alert);
-        this.recordDiscoveryAnalytics(tenantId, {
+        await this.recordDiscoveryAnalytics(tenantId, {
           eventType: 'MATCH',
           entityType: 'LISTING',
           entityId: result.id,
@@ -1368,7 +1368,7 @@ export class AdvertsService {
   private recordDiscoveryAnalytics(
     tenantId: string,
     input: Parameters<AnalyticsService['recordEvent']>[1],
-  ): AnalyticsEvent {
+  ): Promise<AnalyticsEvent> {
     return this.analytics.recordEvent(tenantId, input);
   }
 

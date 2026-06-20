@@ -278,6 +278,7 @@ GitHub source connection status on 2026-06-16:
   - `NODE_ENV=production`
   - `WEB_ORIGIN=https://adverts.telpen.net`
   - `DATABASE_URL` supplied by the production PostgreSQL service
+  - `ANALYTICS_REPOSITORY=prisma` after migrations are deployed
 
 ### Data Services
 

@@ -534,7 +534,7 @@ Implementation progress on 2026-06-20:
 - Added web/PWA saved-search UX with named searches, alert cadence, blocked
   search handling, restored-search controls, and previewable alert candidates.
 - Remaining hardening: Postgres full-text/pgvector or external search provider,
-  persisted analytics warehouse/rollups, relationship claim approval, external
+  analytics warehouse/aggregated rollups, relationship claim approval, external
   notification delivery, native mobile saved-search screens, hierarchy
   dashboards, and privacy/consent controls for behavioral matching.
 
@@ -739,6 +739,19 @@ Analytics requirements:
 - Retain raw event data according to privacy and retention policy.
 - Provide CSV/PDF export for tenant reports and internal reports.
 - Provide API/export for enterprise plans later.
+
+Implementation progress on 2026-06-20:
+
+- Added a selectable analytics repository boundary with in-memory development
+  storage and opt-in Prisma/PostgreSQL persistence through
+  `ANALYTICS_REPOSITORY=prisma`.
+- Analytics events now persist to the durable `AnalyticsEvent` store when Prisma
+  mode is enabled and tenant summaries read from the configured repository.
+- Saved-search and advert discovery interaction analytics now await durable
+  writes before returning, so view, click, inquiry, share, download, save,
+  search, and match counters survive API restarts in production mode.
+- Remaining hardening: aggregated analytics rollups/warehouse, export jobs,
+  hierarchy dashboards, retention automation, and privacy request workflows.
 
 ### 7.10 Subscription and Billing
 
