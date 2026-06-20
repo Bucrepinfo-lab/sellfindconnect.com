@@ -207,6 +207,10 @@ workflow are approved.
   `POST /v1/operations/analytics/retention/run` job, which supports dry-runs
   and defaults to a 395-day raw-event window until country-specific retention
   policies are configured.
+- Platform hierarchy analytics uses `VIEW_ANALYTICS` platform access
+  assignments before returning global, regional, continental, country, or tenant
+  reports. Reports are scope-filtered from the analytics repository and include
+  top countries, tenants, entities, industries, and consent-state breakdowns.
 
 ## Notification Flow
 

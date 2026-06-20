@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import type { PlatformAccessSession } from '../auth/auth.records';
+import type { AuthService } from '../auth/auth.service';
 import { AnalyticsService } from './analytics.service';
 import { InMemoryAnalyticsRepository } from './in-memory-analytics.repository';
 
@@ -183,5 +185,80 @@ describe('AnalyticsService', () => {
     });
     expect(summary.totals.VIEW).toBe(1);
     expect(summary.topEntities[0]?.entityId).toBe('current_profile');
+  });
+
+  it('builds scope-checked hierarchy analytics reports', async () => {
+    const accessChecks: Array<{ permission: string; resource: Record<string, unknown> }> = [];
+    const auth = {
+      requirePlatformAccess: async (
+        _session: PlatformAccessSession,
+        permission: string,
+        resource: Record<string, unknown>,
+      ) => {
+        accessChecks.push({ permission, resource });
+        return {
+          allowed: true,
+          permission: 'VIEW_ANALYTICS',
+          role: 'COUNTRY_ADMIN',
+          scopeLevel: 'COUNTRY',
+          reason: 'ACCESS_GRANTED',
+        };
+      },
+    };
+    const service = new AnalyticsService(undefined, auth as unknown as AuthService);
+    const session: PlatformAccessSession = {
+      sessionId: 'session_1',
+      sessionTenantId: tenantId,
+      userId: 'platform-user',
+      mfaVerified: true,
+      assignments: [],
+    };
+
+    await service.recordEvent(tenantId, {
+      eventType: 'VIEW',
+      entityType: 'LISTING',
+      entityId: 'advert_1',
+      countryCode: 'KE',
+      industryCode: 'AGRICULTURE',
+      consentState: 'GRANTED',
+      occurredAt: '2026-06-16T10:00:00.000Z',
+    });
+    await service.recordEvent(otherTenantId, {
+      eventType: 'CLICK',
+      entityType: 'LISTING',
+      entityId: 'advert_2',
+      countryCode: 'KE',
+      industryCode: 'AGRICULTURE',
+      consentState: 'GRANTED',
+      occurredAt: '2026-06-16T10:05:00.000Z',
+    });
+
+    const report = await service.buildHierarchyReport(session, {
+      countryCode: 'KE',
+      from: '2026-06-16T00:00:00.000Z',
+      to: '2026-06-17T00:00:00.000Z',
+    });
+
+    expect(accessChecks).toEqual([
+      {
+        permission: 'VIEW_ANALYTICS',
+        resource: { countryCode: 'KE' },
+      },
+    ]);
+    expect(report.scope).toMatchObject({
+      scopeLevel: 'COUNTRY',
+      label: 'Kenya',
+      countryCode: 'KE',
+    });
+    expect(report.eventCount).toBe(2);
+    expect(report.totals.VIEW).toBe(1);
+    expect(report.totals.CLICK).toBe(1);
+    expect(report.topTenants).toEqual(
+      expect.arrayContaining([
+        { label: tenantId, value: 1 },
+        { label: otherTenantId, value: 1 },
+      ]),
+    );
+    expect(report.access).toMatchObject({ role: 'COUNTRY_ADMIN', reason: 'ACCESS_GRANTED' });
   });
 });

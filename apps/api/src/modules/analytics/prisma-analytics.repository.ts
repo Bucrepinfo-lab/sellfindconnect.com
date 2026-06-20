@@ -5,6 +5,7 @@ import type { AnalyticsEvent } from '@telpen/domain';
 import type {
   AnalyticsRepository,
   ListAnalyticsEventsInput,
+  ListAnalyticsEventsForScopeInput,
   PruneAnalyticsEventsInput,
 } from './analytics.repository';
 
@@ -35,14 +36,24 @@ export class PrismaAnalyticsRepository implements AnalyticsRepository {
   }
 
   async listEvents(input: ListAnalyticsEventsInput): Promise<AnalyticsEvent[]> {
+    return this.listEventsForScope({
+      from: input.from,
+      to: input.to,
+      tenantId: input.tenantId,
+      countryCodes: input.countryCode ? [input.countryCode] : undefined,
+      industryCode: input.industryCode,
+    });
+  }
+
+  async listEventsForScope(input: ListAnalyticsEventsForScopeInput): Promise<AnalyticsEvent[]> {
     const events = await this.prisma.analyticsEvent.findMany({
       where: {
-        tenantId: input.tenantId,
+        ...(input.tenantId ? { tenantId: input.tenantId } : {}),
         occurredAt: {
           gte: new Date(input.from),
           lte: new Date(input.to),
         },
-        ...(input.countryCode ? { countryCode: input.countryCode } : {}),
+        ...(input.countryCodes?.length ? { countryCode: { in: input.countryCodes } } : {}),
         ...(input.industryCode ? { industryCode: input.industryCode } : {}),
       },
       orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }],

@@ -1,9 +1,15 @@
 import { Inject, Injectable, Optional, UnprocessableEntityException } from '@nestjs/common';
 import {
+  continents,
+  countries,
   emptyAnalyticsTotals,
   evaluateSafetyText,
   getCountry,
   industryCategories,
+  operationalRegions,
+  type AccessDecision,
+  type AccessResourceScope,
+  type AccessScopeLevel,
   type AnalyticsEntityType,
   type AnalyticsEvent,
   type AnalyticsEventType,
@@ -11,11 +17,14 @@ import {
 } from '@telpen/domain';
 import { randomUUID } from 'node:crypto';
 
+import { AuthService } from '../auth/auth.service';
+import type { PlatformAccessSession } from '../auth/auth.records';
 import type {
   AnalyticsExportFormat,
   AnalyticsExportQueryDto,
   AnalyticsSummaryQueryDto,
   CreateAnalyticsEventDto,
+  PlatformAnalyticsQueryDto,
   RunAnalyticsRetentionDto,
 } from './dto/create-analytics-event.dto';
 import { ANALYTICS_REPOSITORY, type AnalyticsRepository } from './analytics.repository';
@@ -66,12 +75,53 @@ export type AnalyticsRetentionRunResult = {
   completedAt: string;
 };
 
+type ResolvedAnalyticsHierarchyScope = {
+  scopeLevel: AccessScopeLevel;
+  label: string;
+  resource: AccessResourceScope;
+  countryCodes?: string[];
+  tenantId?: string;
+};
+
+export type PlatformAnalyticsHierarchyReport = {
+  scope: {
+    scopeLevel: AccessScopeLevel;
+    label: string;
+    regionCode?: string;
+    continentCode?: string;
+    countryCode?: string;
+    tenantId?: string;
+  };
+  generatedAt: string;
+  periodStart: string;
+  periodEnd: string;
+  eventCount: number;
+  totals: Record<AnalyticsEventType, number>;
+  topEntities: TenantAnalyticsSummary['topEntities'];
+  mostVisited: TenantAnalyticsSummary['mostVisited'];
+  topCountries: AnalyticsBreakdown;
+  topIndustries: AnalyticsBreakdown;
+  topTenants: AnalyticsBreakdown;
+  breakdowns: TenantAnalyticsReport['breakdowns'];
+  access: {
+    role?: string;
+    scopeLevel?: AccessScopeLevel;
+    reason?: string;
+  };
+  privacy: {
+    rawEventMetadataIncluded: false;
+    exportScope: 'AGGREGATED_PLATFORM_HIERARCHY_REPORT';
+    consentBasis: 'CONSENT_STATE_REQUIRED_PER_EVENT';
+  };
+};
+
 @Injectable()
 export class AnalyticsService {
   constructor(
     @Optional()
     @Inject(ANALYTICS_REPOSITORY)
     private readonly repository: AnalyticsRepository = new InMemoryAnalyticsRepository(),
+    @Optional() private readonly auth?: AuthService,
   ) {}
 
   async recordEvent(tenantId: string, input: CreateAnalyticsEventDto): Promise<AnalyticsEvent> {
@@ -175,6 +225,62 @@ export class AnalyticsService {
     };
   }
 
+  async buildHierarchyReport(
+    session: PlatformAccessSession,
+    query: PlatformAnalyticsQueryDto = {},
+  ): Promise<PlatformAnalyticsHierarchyReport> {
+    const scope = this.resolveHierarchyScope(query);
+    const decision = await this.requireHierarchyAccess(session, scope.resource);
+    const { events, periodStart, periodEnd } = await this.listHierarchyEventsForQuery(scope, query);
+    const totals = emptyAnalyticsTotals();
+    for (const event of events) {
+      totals[event.eventType] += 1;
+    }
+    const topEntities = this.topEntities(events);
+
+    return {
+      scope: {
+        scopeLevel: scope.scopeLevel,
+        label: scope.label,
+        regionCode: scope.resource.regionCode,
+        continentCode: scope.resource.continentCode,
+        countryCode: scope.resource.countryCode,
+        tenantId: scope.tenantId,
+      },
+      generatedAt: new Date().toISOString(),
+      periodStart,
+      periodEnd,
+      eventCount: events.length,
+      totals,
+      topEntities,
+      mostVisited: topEntities
+        .filter((entity) => entity.views > 0)
+        .map(({ entityId, entityType, views }) => ({ entityId, entityType, views }))
+        .sort((a, b) => b.views - a.views)
+        .slice(0, 10),
+      topCountries: this.breakdown(events, (event) => event.countryCode),
+      topIndustries: this.breakdown(events, (event) => event.industryCode ?? 'UNSPECIFIED'),
+      topTenants: this.breakdown(events, (event) => event.tenantId),
+      breakdowns: {
+        eventTypes: this.breakdown(events, (event) => event.eventType),
+        entityTypes: this.breakdown(events, (event) => event.entityType),
+        countries: this.breakdown(events, (event) => event.countryCode),
+        industries: this.breakdown(events, (event) => event.industryCode ?? 'UNSPECIFIED'),
+        consentStates: this.breakdown(events, (event) => event.consentState),
+      },
+      access: {
+        role: decision?.role,
+        scopeLevel: decision?.scopeLevel,
+        reason: decision?.reason,
+      },
+      privacy: {
+        rawEventMetadataIncluded: false,
+        exportScope: 'AGGREGATED_PLATFORM_HIERARCHY_REPORT',
+        consentBasis: 'CONSENT_STATE_REQUIRED_PER_EVENT',
+      },
+    };
+  }
+
   async runRetention(input: RunAnalyticsRetentionDto = {}): Promise<AnalyticsRetentionRunResult> {
     const retentionDays = input.retentionDays ?? DEFAULT_ANALYTICS_RETENTION_DAYS;
     const before =
@@ -248,6 +354,128 @@ export class AnalyticsService {
     });
 
     return { events, periodStart, periodEnd };
+  }
+
+  private async listHierarchyEventsForQuery(
+    scope: ResolvedAnalyticsHierarchyScope,
+    query: PlatformAnalyticsQueryDto,
+  ): Promise<{ events: AnalyticsEvent[]; periodStart: string; periodEnd: string }> {
+    const periodEnd = query.to ?? new Date().toISOString();
+    const periodStart =
+      query.from ?? new Date(Date.parse(periodEnd) - 30 * 24 * 60 * 60 * 1000).toISOString();
+    this.assertValidIsoDate(periodStart);
+    this.assertValidIsoDate(periodEnd);
+
+    const events = await this.repository.listEventsForScope({
+      from: periodStart,
+      to: periodEnd,
+      tenantId: scope.tenantId,
+      countryCodes: scope.countryCodes,
+      industryCode: query.industryCode,
+    });
+
+    return { events, periodStart, periodEnd };
+  }
+
+  private async requireHierarchyAccess(
+    session: PlatformAccessSession,
+    resource: AccessResourceScope,
+  ): Promise<AccessDecision | undefined> {
+    return this.auth?.requirePlatformAccess(session, 'VIEW_ANALYTICS', resource);
+  }
+
+  private resolveHierarchyScope(query: PlatformAnalyticsQueryDto): ResolvedAnalyticsHierarchyScope {
+    const scopeLevel = query.scopeLevel ?? this.inferHierarchyScopeLevel(query);
+
+    if (scopeLevel === 'GLOBAL') {
+      return {
+        scopeLevel,
+        label: 'Global',
+        resource: {},
+      };
+    }
+
+    if (scopeLevel === 'REGIONAL') {
+      const regionCode = query.regionCode?.trim().toUpperCase();
+      const region = operationalRegions.find((item) => item.code === regionCode);
+      if (!region) {
+        throw new UnprocessableEntityException(
+          'A valid regionCode is required for regional analytics.',
+        );
+      }
+
+      return {
+        scopeLevel,
+        label: region.name,
+        resource: { regionCode: region.code },
+        countryCodes: region.countryCodes,
+      };
+    }
+
+    if (scopeLevel === 'CONTINENT') {
+      const continentCode = query.continentCode?.trim().toUpperCase();
+      const continent = continents.find((item) => item.code === continentCode);
+      if (!continent) {
+        throw new UnprocessableEntityException(
+          'A valid continentCode is required for continental analytics.',
+        );
+      }
+
+      return {
+        scopeLevel,
+        label: continent.name,
+        resource: { continentCode: continent.code },
+        countryCodes: countries
+          .filter((country) => country.continentCode === continent.code)
+          .map((country) => country.code),
+      };
+    }
+
+    if (scopeLevel === 'COUNTRY') {
+      const country = query.countryCode ? getCountry(query.countryCode) : undefined;
+      if (!country) {
+        throw new UnprocessableEntityException(
+          'A valid countryCode is required for country analytics.',
+        );
+      }
+
+      return {
+        scopeLevel,
+        label: country.name,
+        resource: { countryCode: country.code },
+        countryCodes: [country.code],
+      };
+    }
+
+    if (!query.tenantId) {
+      throw new UnprocessableEntityException(
+        'A tenantId is required for tenant hierarchy analytics.',
+      );
+    }
+
+    const country = query.countryCode ? getCountry(query.countryCode) : undefined;
+    if (query.countryCode && !country) {
+      throw new UnprocessableEntityException('Unsupported country.');
+    }
+
+    return {
+      scopeLevel: 'TENANT',
+      label: query.tenantId,
+      resource: {
+        tenantId: query.tenantId,
+        countryCode: country?.code,
+      },
+      tenantId: query.tenantId,
+      countryCodes: country ? [country.code] : undefined,
+    };
+  }
+
+  private inferHierarchyScopeLevel(query: PlatformAnalyticsQueryDto): AccessScopeLevel {
+    if (query.tenantId) return 'TENANT';
+    if (query.countryCode) return 'COUNTRY';
+    if (query.continentCode) return 'CONTINENT';
+    if (query.regionCode) return 'REGIONAL';
+    return 'GLOBAL';
   }
 
   private breakdown(

@@ -1,15 +1,16 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import { AccessModule } from '../access/access.module';
 import { AuthModule } from '../auth/auth.module';
-import { AnalyticsController } from './analytics.controller';
+import { AnalyticsController, PlatformAnalyticsController } from './analytics.controller';
 import { ANALYTICS_REPOSITORY } from './analytics.repository';
 import { AnalyticsService } from './analytics.service';
 import { InMemoryAnalyticsRepository } from './in-memory-analytics.repository';
 
 @Module({
-  imports: [AuthModule],
-  controllers: [AnalyticsController],
+  imports: [AuthModule, AccessModule],
+  controllers: [AnalyticsController, PlatformAnalyticsController],
   providers: [
     InMemoryAnalyticsRepository,
     {

@@ -1,8 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  accessScopeLevels,
   analyticsEntityTypes,
   analyticsEventTypes,
   consentStates,
+  type AccessScopeLevel,
   type AnalyticsEntityType,
   type AnalyticsEventType,
   type ConsentState,
@@ -99,6 +101,31 @@ export class AnalyticsExportQueryDto extends AnalyticsSummaryQueryDto {
   @IsOptional()
   @IsIn(analyticsExportFormats)
   declare format?: AnalyticsExportFormat;
+}
+
+export class PlatformAnalyticsQueryDto extends AnalyticsExportQueryDto {
+  @ApiPropertyOptional({ enum: accessScopeLevels, example: 'COUNTRY' })
+  @IsOptional()
+  @IsIn(accessScopeLevels)
+  declare scopeLevel?: AccessScopeLevel;
+
+  @ApiPropertyOptional({ example: 'EMEA' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  declare regionCode?: string;
+
+  @ApiPropertyOptional({ example: 'AF' })
+  @IsOptional()
+  @IsString()
+  @Length(2, 8)
+  declare continentCode?: string;
+
+  @ApiPropertyOptional({ example: '11111111-1111-4111-8111-111111111111' })
+  @IsOptional()
+  @IsString()
+  @Length(2, 120)
+  declare tenantId?: string;
 }
 
 export class RunAnalyticsRetentionDto {

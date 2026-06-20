@@ -4,6 +4,7 @@ import type { AnalyticsEvent } from '@telpen/domain';
 import type {
   AnalyticsRepository,
   ListAnalyticsEventsInput,
+  ListAnalyticsEventsForScopeInput,
   PruneAnalyticsEventsInput,
 } from './analytics.repository';
 
@@ -16,10 +17,27 @@ export class InMemoryAnalyticsRepository implements AnalyticsRepository {
   }
 
   listEvents(input: ListAnalyticsEventsInput): AnalyticsEvent[] {
+    return this.filterEvents(input);
+  }
+
+  listEventsForScope(input: ListAnalyticsEventsForScopeInput): AnalyticsEvent[] {
+    return this.filterEvents(input);
+  }
+
+  private filterEvents(
+    input: ListAnalyticsEventsInput | ListAnalyticsEventsForScopeInput,
+  ): AnalyticsEvent[] {
+    const countryCodes =
+      'countryCodes' in input
+        ? input.countryCodes
+        : 'countryCode' in input && input.countryCode
+          ? [input.countryCode]
+          : undefined;
+
     return Array.from(this.events.values())
-      .filter((event) => event.tenantId === input.tenantId)
+      .filter((event) => !input.tenantId || event.tenantId === input.tenantId)
       .filter((event) => event.occurredAt >= input.from && event.occurredAt <= input.to)
-      .filter((event) => !input.countryCode || event.countryCode === input.countryCode)
+      .filter((event) => !countryCodes?.length || countryCodes.includes(event.countryCode))
       .filter((event) => !input.industryCode || event.industryCode === input.industryCode)
       .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt));
   }

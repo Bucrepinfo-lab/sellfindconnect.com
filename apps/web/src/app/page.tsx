@@ -1324,6 +1324,7 @@ export default function Home() {
               <AnalyticsRow label="Enquiries" value={formatNumber(totals.inquiries)} />
               <AnalyticsRow label="Shared" value={formatNumber(totals.shares)} />
               <AnalyticsRow label="Downloaded" value={formatNumber(totals.downloads)} />
+              <AnalyticsRow label="Hierarchy scope" value="Tenant / Country / Global" />
               <div className="visited-list">
                 {mostVisited.map((item) => (
                   <div key={item.id} className="visited-row">

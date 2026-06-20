@@ -754,9 +754,11 @@ Implementation progress on 2026-06-20:
   output that excludes raw event metadata by default.
 - Added a protected internal analytics retention sweep with dry-run support and
   a 395-day default retention window for raw event pruning.
+- Added platform hierarchy analytics foundation with `VIEW_ANALYTICS` scoped
+  access checks for global, regional, continental, country, and tenant reports.
 - Remaining hardening: full analytics warehouse/rollups, PDF exports, hierarchy
-  dashboards, automated privacy request workflows, and configurable country/legal
-  retention policies.
+  UI dashboards, automated privacy request workflows, and configurable
+  country/legal retention policies.
 
 ### 7.10 Subscription and Billing
 
