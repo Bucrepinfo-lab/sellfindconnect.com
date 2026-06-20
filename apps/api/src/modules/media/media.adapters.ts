@@ -50,7 +50,15 @@ export type MediaProcessingJobType = (typeof mediaProcessingJobTypes)[number];
 
 export type MediaProcessingJobStatus = 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED';
 
-export type MediaProcessingJobMetadata = Record<string, string | number | boolean>;
+export type MediaProcessingJobMetadataValue =
+  | string
+  | number
+  | boolean
+  | null
+  | MediaProcessingJobMetadataValue[]
+  | { [key: string]: MediaProcessingJobMetadataValue };
+
+export type MediaProcessingJobMetadata = Record<string, MediaProcessingJobMetadataValue>;
 
 export type MediaProcessingJob = {
   id: string;
@@ -494,6 +502,115 @@ export class DevelopmentMediaJobProcessorAdapter implements MediaJobProcessorAda
   }
 }
 
+type FetchLike = (
+  input: string | URL,
+  init?: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string;
+    signal?: AbortSignal;
+  },
+) => Promise<{
+  ok: boolean;
+  status: number;
+  text(): Promise<string>;
+}>;
+
+export type HttpMediaJobProcessorOptions = {
+  endpoint: string;
+  providerName: string;
+  apiKey?: string;
+  timeoutMs?: number;
+  fetcher?: FetchLike;
+};
+
+export class HttpMediaJobProcessorAdapter implements MediaJobProcessorAdapter {
+  private readonly fetcher: FetchLike;
+
+  constructor(private readonly options: HttpMediaJobProcessorOptions) {
+    this.fetcher = options.fetcher ?? fetch;
+  }
+
+  async process(input: MediaProcessingJob): Promise<MediaJobProcessorResult> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs());
+
+    try {
+      const response = await this.fetcher(this.options.endpoint, {
+        method: 'POST',
+        headers: this.headers(),
+        body: JSON.stringify({
+          jobId: input.id,
+          type: input.type,
+          tenantId: input.tenantId,
+          mediaId: input.mediaId,
+          ownerType: input.ownerType,
+          ownerId: input.ownerId,
+          objectKey: input.objectKey,
+          sourceUrl: input.sourceUrl,
+          metadata: input.metadata,
+        }),
+        signal: controller.signal,
+      });
+      const body = parseProviderResponse(await response.text());
+
+      if (!response.ok) {
+        return {
+          ok: false,
+          retryable: isRetryableStatus(response.status),
+          reason: body.reason ?? `Provider ${this.options.providerName} returned HTTP ${response.status}.`,
+          result: body.result,
+        };
+      }
+
+      if (body.ok === false) {
+        return {
+          ok: false,
+          retryable: body.retryable ?? false,
+          reason: body.reason ?? `Provider ${this.options.providerName} rejected the media job.`,
+          result: body.result,
+        };
+      }
+
+      return {
+        ok: true,
+        result: {
+          provider: this.options.providerName,
+          ...body.result,
+        },
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        retryable: true,
+        reason:
+          error instanceof Error
+            ? `Provider ${this.options.providerName} failed: ${error.message}`
+            : `Provider ${this.options.providerName} failed.`,
+      };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  private timeoutMs(): number {
+    return Math.min(120_000, Math.max(1_000, this.options.timeoutMs ?? 30_000));
+  }
+
+  private headers(): Record<string, string> {
+    const headers: Record<string, string> = {
+      'content-type': 'application/json',
+      accept: 'application/json',
+    };
+
+    if (this.options.apiKey) {
+      headers.authorization = `Bearer ${this.options.apiKey}`;
+    }
+
+    return headers;
+  }
+}
+
 export type MediaAdapterConfigReader = {
   get(key: string): string | undefined;
 };
@@ -515,7 +632,7 @@ export function createConfiguredMediaAdapters(config?: MediaAdapterConfigReader)
     moderation: new MetadataOnlyMediaModerationAdapter(),
     transforms: new DevelopmentMediaTransformAdapter(),
     jobs: new InMemoryMediaProcessingQueueAdapter(),
-    processors: createDevelopmentMediaJobProcessors(),
+    processors: createConfiguredMediaJobProcessors(config),
   };
 }
 
@@ -578,6 +695,33 @@ export function createDevelopmentMediaJobProcessors(): MediaJobProcessorMap {
   );
 }
 
+export function createConfiguredMediaJobProcessors(
+  config?: MediaAdapterConfigReader,
+): MediaJobProcessorMap {
+  const processors = createDevelopmentMediaJobProcessors();
+  const timeoutMs = normalizeConfigInt(config?.get('MEDIA_PROCESSOR_TIMEOUT_MS'));
+
+  for (const type of mediaProcessingJobTypes) {
+    const endpoint = normalizeOptionalConfigString(config?.get(processorEndpointKey(type)));
+    if (!endpoint) {
+      continue;
+    }
+
+    processors[type] = new HttpMediaJobProcessorAdapter({
+      endpoint,
+      providerName:
+        normalizeOptionalConfigString(config?.get(processorProviderKey(type))) ??
+        `${type.toLowerCase().replace(/_/g, '-')}-provider`,
+      apiKey:
+        normalizeOptionalConfigString(config?.get(processorApiKey(type))) ??
+        normalizeOptionalConfigString(config?.get('MEDIA_PROCESSOR_API_KEY')),
+      timeoutMs,
+    });
+  }
+
+  return processors;
+}
+
 function createS3CompatibleStorageAdapter(config?: MediaAdapterConfigReader): S3CompatibleMediaStorageAdapter {
   const options = {
     endpoint: requiredConfig(config, 'MEDIA_S3_ENDPOINT'),
@@ -631,6 +775,87 @@ function normalizeConfigBoolean(value: string | undefined): boolean {
 function normalizeConfigInt(value: string | undefined): number | undefined {
   const parsed = Number.parseInt(value ?? '', 10);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function processorEndpointKey(type: MediaProcessingJobType): string {
+  return `MEDIA_${type}_ENDPOINT`;
+}
+
+function processorProviderKey(type: MediaProcessingJobType): string {
+  return `MEDIA_${type}_PROVIDER_NAME`;
+}
+
+function processorApiKey(type: MediaProcessingJobType): string {
+  return `MEDIA_${type}_API_KEY`;
+}
+
+function isRetryableStatus(status: number): boolean {
+  return status === 408 || status === 409 || status === 425 || status === 429 || status >= 500;
+}
+
+function parseProviderResponse(value: string): {
+  ok?: boolean;
+  retryable?: boolean;
+  reason?: string;
+  result?: MediaProcessingJobMetadata;
+} {
+  if (!value.trim()) {
+    return {};
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!isRecord(parsed)) {
+      return {};
+    }
+
+    return {
+      ok: typeof parsed.ok === 'boolean' ? parsed.ok : undefined,
+      retryable: typeof parsed.retryable === 'boolean' ? parsed.retryable : undefined,
+      reason: typeof parsed.reason === 'string' ? parsed.reason : undefined,
+      result: mapMetadata(parsed.result ?? parsed),
+    };
+  } catch {
+    return { reason: value.slice(0, 500) };
+  }
+}
+
+function mapMetadata(value: unknown): MediaProcessingJobMetadata | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const entries = Object.entries(value)
+    .map(([key, item]) => [key, mapMetadataValue(item)] as const)
+    .filter((entry): entry is readonly [string, MediaProcessingJobMetadataValue] => entry[1] !== undefined);
+  return entries.length ? Object.fromEntries(entries) : undefined;
+}
+
+function mapMetadataValue(value: unknown): MediaProcessingJobMetadataValue | undefined {
+  if (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  ) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => mapMetadataValue(item))
+      .filter((item): item is MediaProcessingJobMetadataValue => item !== undefined);
+  }
+
+  if (isRecord(value)) {
+    return mapMetadata(value);
+  }
+
+  return undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function formatAmzDate(date: Date): string {

@@ -94,10 +94,12 @@ without validating it against the authenticated user's assignments.
   outbox selected with `MEDIA_JOB_QUEUE_DRIVER=prisma`, including worker claim,
   retry, completion, and failure state. An internal job-key protected media
   processing runner can execute bounded batches via
-  `POST /v1/operations/media/processing/run`. Malware/media scanning
-  providers, background image transforms, video transcoding adapters, media
-  asset result publication, and unsafe-media escalation remain production
-  adapter implementations.
+  `POST /v1/operations/media/processing/run`. Generic HTTP processor adapters
+  can call malware/media scanning, image transform, and video transcoding
+  providers. Prisma media-result publication updates `MediaAsset` moderation
+  state, blocked fail-closed state, transform status, CDN URLs, thumbnails, and
+  variants. Approved live vendors, CDN publication verification, and
+  unsafe-media escalation remain production readiness work.
 - Listings: draft, preview, publish, media, lifecycle, and visibility. Advert
   listing, lifecycle, and media routes require an MFA-verified tenant session.
   Advert media uses shared `MediaAsset` metadata, the ten-item display cap,
@@ -187,7 +189,10 @@ workflow are approved.
   `MEDIA_JOB_QUEUE_DRIVER=prisma` after applying the database migrations and
   setting `DATABASE_URL`; development and tests use the in-memory queue by
   default. The protected operations runner can be scheduled by cron or run from
-  a dedicated worker service once provider adapters are configured.
+  a dedicated worker service once provider adapters are configured. Media asset
+  result publication uses `MEDIA_ASSET_RESULT_PUBLISHER_DRIVER=prisma` or is
+  selected automatically when the Prisma media queue is enabled with
+  `DATABASE_URL`.
 
 ## Notification Flow
 

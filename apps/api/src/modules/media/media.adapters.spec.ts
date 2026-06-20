@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  HttpMediaJobProcessorAdapter,
   InMemoryMediaProcessingQueueAdapter,
   S3CompatibleMediaStorageAdapter,
   createConfiguredMediaAdapters,
@@ -83,6 +84,61 @@ describe('media adapters', () => {
           })[key],
       }),
     ).rejects.toThrow('DATABASE_URL is required when MEDIA_JOB_QUEUE_DRIVER=prisma.');
+  });
+
+  it('normalizes HTTP provider processor responses', async () => {
+    const media = mediaAsset({ kind: 'IMAGE' });
+    const queue = new InMemoryMediaProcessingQueueAdapter();
+    const [job] = queue.enqueueTransformJobs(media);
+    const adapter = new HttpMediaJobProcessorAdapter({
+      endpoint: 'https://processor.example.test/media/jobs',
+      providerName: 'unit-test-transformer',
+      apiKey: 'test-key',
+      fetcher: async (_input, init) => {
+        expect(init?.headers).toMatchObject({
+          authorization: 'Bearer test-key',
+          'content-type': 'application/json',
+        });
+        expect(JSON.parse(init?.body ?? '{}')).toMatchObject({
+          jobId: job!.id,
+          mediaId: media.id,
+          type: 'IMAGE_TRANSFORM',
+          objectKey: media.objectKey,
+        });
+
+        return {
+          ok: true,
+          status: 200,
+          text: async () =>
+            JSON.stringify({
+              result: {
+                transformStatus: 'READY',
+                cdnUrl: 'https://cdn.example.test/display/media.jpg',
+                thumbnailUrl: 'https://cdn.example.test/thumb/media.jpg',
+                variants: [
+                  {
+                    label: 'display',
+                    url: 'https://cdn.example.test/display/media.jpg',
+                    width: 1200,
+                  },
+                ],
+              },
+            }),
+        };
+      },
+    });
+
+    const result = await adapter.process(job!);
+
+    expect(result).toMatchObject({
+      ok: true,
+      result: {
+        provider: 'unit-test-transformer',
+        transformStatus: 'READY',
+        cdnUrl: 'https://cdn.example.test/display/media.jpg',
+        variants: [{ label: 'display', width: 1200 }],
+      },
+    });
   });
 
   it('queues scan and transform jobs through the media processing interface', async () => {

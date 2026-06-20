@@ -10,6 +10,12 @@ import {
   type MediaProcessingJobMetadata,
   type MediaProcessingJobType,
 } from './media.adapters';
+import {
+  MEDIA_ASSET_RESULT_PUBLISHER,
+  NoopMediaAssetResultPublisherAdapter,
+  type MediaAssetPublicationResult,
+  type MediaAssetResultPublisherAdapter,
+} from './media-result-publisher';
 
 export type RunMediaProcessingJobsInput = {
   workerId?: string;
@@ -29,6 +35,7 @@ export type MediaWorkerJobResult = {
   attempts: number;
   reason?: string;
   result?: MediaProcessingJobMetadata;
+  publication?: MediaAssetPublicationResult;
 };
 
 export type MediaWorkerRunResult = {
@@ -39,6 +46,7 @@ export type MediaWorkerRunResult = {
   retried: number;
   failed: number;
   skipped: number;
+  published: number;
   results: MediaWorkerJobResult[];
 };
 
@@ -50,6 +58,10 @@ export class MediaWorkerService {
     @Optional()
     @Inject(MEDIA_ADAPTERS)
     private readonly mediaAdapters: MediaAdapters = createDefaultMediaAdapters(),
+    @Optional()
+    @Inject(MEDIA_ASSET_RESULT_PUBLISHER)
+    private readonly resultPublisher: MediaAssetResultPublisherAdapter =
+      new NoopMediaAssetResultPublisherAdapter(),
   ) {}
 
   async runOnce(input: RunMediaProcessingJobsInput = {}): Promise<MediaWorkerRunResult> {
@@ -120,6 +132,12 @@ export class MediaWorkerService {
       return skippedJob(job, 'Job lock was lost before completion.');
     }
 
+    const publication = await this.resultPublisher.publish({
+      job: completed,
+      outcome: 'SUCCEEDED',
+      occurredAt: requestedAt,
+    });
+
     return {
       jobId: completed.id,
       mediaId: completed.mediaId,
@@ -127,6 +145,7 @@ export class MediaWorkerService {
       status: 'SUCCEEDED',
       attempts: completed.attempts,
       result: completed.result,
+      publication,
     };
   }
 
@@ -150,14 +169,26 @@ export class MediaWorkerService {
       return skippedJob(job, 'Job lock was lost before failure handling.');
     }
 
+    const status = failed.status === 'QUEUED' ? 'RETRY_QUEUED' : 'FAILED';
+    const publication =
+      status === 'FAILED'
+        ? await this.resultPublisher.publish({
+            job: failed,
+            outcome: 'FAILED',
+            occurredAt: requestedAt,
+            reason: decision.reason,
+          })
+        : undefined;
+
     return {
       jobId: failed.id,
       mediaId: failed.mediaId,
       type: failed.type,
-      status: failed.status === 'QUEUED' ? 'RETRY_QUEUED' : 'FAILED',
+      status,
       attempts: failed.attempts,
       reason: decision.reason,
       result: decision.result,
+      publication,
     };
   }
 }
@@ -189,6 +220,7 @@ function emptyRun(workerId: string, requestedAt: string): MediaWorkerRunResult {
     retried: 0,
     failed: 0,
     skipped: 0,
+    published: 0,
     results: [],
   };
 }
@@ -218,6 +250,7 @@ function summarizeRun(
     retried: results.filter((result) => result.status === 'RETRY_QUEUED').length,
     failed: results.filter((result) => result.status === 'FAILED').length,
     skipped: results.filter((result) => result.status === 'SKIPPED').length,
+    published: results.filter((result) => result.publication?.published).length,
     results,
   };
 }

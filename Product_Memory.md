@@ -1,7 +1,7 @@
 # Telpen Adverts Product Memory
 
 Date started: 2026-06-15
-Last updated: 2026-06-19
+Last updated: 2026-06-20
 Purpose: Persistent decision log and strategic memory for the Telpen Adverts multi-tenant advertising SaaS.
 
 This file must be updated whenever product strategy, pricing, compliance, architecture, market positioning, or execution decisions change.
@@ -163,3 +163,4 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - 2026-06-19: Continued media provider hardening without deployment. Added S3-compatible presigned PUT upload support using env-configured Signature V4 signing, plus shared media processing job contracts for malware scan, content moderation, image transform, and video transcode work. Added `docs/MEDIA_PIPELINE.md` with storage env vars and upload/worker contracts. Live object-storage credentials, durable queues, provider scanners, and media workers remain next.
 - 2026-06-19: Continued durable media worker readiness without deployment. Added a Prisma/PostgreSQL media processing job outbox selected with `MEDIA_JOB_QUEUE_DRIVER=prisma`, database migration/model support, and worker claim/complete/retry/fail lifecycle methods so scan/transform jobs survive API restarts. Provider-backed scanners, image/video worker entrypoints, CDN publication, and live storage credentials remain next.
 - 2026-06-19: Continued media worker execution without deployment. Added a shared `MediaModule`, development media job processors, a `MediaWorkerService`, and the protected `POST /v1/operations/media/processing/run` endpoint so internal workers can claim persisted scan/transform jobs and mark them succeeded, retryable, or failed. Real provider scanners/transcoders, media asset result publication, unsafe-media escalation, and live credentials remain next.
+- 2026-06-20: Continued provider-backed media processing without deployment. Added generic HTTP processor adapters for malware scan, content moderation, image transform, and video transcode endpoints, plus Prisma media asset result publication so completed/final worker jobs update moderation state, blocked fail-closed state, transform status, CDN URLs, thumbnails, and responsive variants. Approved live vendors, CDN publication verification, unsafe-media escalation, and live credentials remain next.

@@ -2,7 +2,7 @@
 
 Status: Execution backlog
 Date: 2026-06-15
-Last updated: 2026-06-19
+Last updated: 2026-06-20
 
 ## Delivery Principles
 
@@ -202,9 +202,14 @@ Progress:
   runner: `POST /v1/operations/media/processing/run`, with development
   processors for malware scan, content moderation, image transform, and video
   transcode job completion.
-- Real object-storage credentials, provider-backed malware and media scanning,
-  provider-backed image/video execution, media asset state updates from worker
-  results, and richer review case management remain next.
+- Added generic HTTP provider-backed processor adapters for malware scan,
+  content moderation, image transform, and video transcode endpoints.
+- Added Prisma media asset result publication for completed/final worker jobs,
+  including moderation state, blocked fail-closed states, transform status,
+  CDN URLs, thumbnails, and responsive variants.
+- Real object-storage credentials, approved live provider endpoints, CDN
+  publication verification, unsafe-media escalation cases, and richer review
+  case management remain next.
 
 ## Epic 4: Listing and Media Vertical Slice
 
@@ -241,9 +246,11 @@ Progress:
   workers.
 - Added the protected media processing runner endpoint shared by advert and
   profile media worker jobs.
+- Added shared HTTP processor adapters and Prisma media-result publication for
+  advert and profile media worker output.
 - A durable advert lifecycle scheduler, persisted advert repository, live
-  storage credentials, provider-backed media workers, and media-result
-  publication remain next.
+  storage credentials, approved media vendors, and media-result review
+  escalation remain next.
 
 ## Epic 5: Source Finder and Relationship Graph
 

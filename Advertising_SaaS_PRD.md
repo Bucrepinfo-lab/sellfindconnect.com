@@ -1,7 +1,7 @@
 # Product Requirements Document: Multi-Tenant Advertising SaaS
 
 Date: 2026-06-15
-Last updated: 2026-06-19
+Last updated: 2026-06-20
 Owner: Telpen Adverts
 Working name: Telpen Adverts Platform
 Status: Draft for validation
@@ -370,10 +370,14 @@ Implementation progress on 2026-06-19:
 - Added a shared media module and internal job-key protected media processing
   runner, `POST /v1/operations/media/processing/run`, with development
   processors for scan, moderation, image transform, and video transcode jobs.
-- Remaining hardening: live object-storage credentials, provider-backed malware
-  and media scanning, provider-backed image/video execution, media asset state
-  updates from worker results, richer review case management, and user-facing
-  review status in web/mobile clients.
+- Added generic HTTP provider-backed processor adapters for malware scan,
+  content moderation, image transform, and video transcode jobs.
+- Added Prisma media asset result publication from completed/final worker jobs,
+  including moderation state, blocked fail-closed states, transform status,
+  CDN URLs, thumbnails, and responsive variants.
+- Remaining hardening: live object-storage credentials, approved provider
+  endpoints, CDN publication verification, unsafe-media escalation, richer
+  review case management, and user-facing review status in web/mobile clients.
 
 ### 7.3 Media Display Area
 
@@ -446,8 +450,10 @@ Implementation progress:
   jobs survive API restarts and can be processed by workers.
 - Added the protected media processing runner endpoint shared by advert and
   profile media jobs.
+- Added shared HTTP processor adapters and Prisma media-result publication for
+  advert and profile media worker output.
 - Durable advert drafts, persisted advert repository, live storage credentials,
-  provider-backed media workers, media-result publication, pause/archive/renew
+  approved media vendors, unsafe-media review escalation, pause/archive/renew
   controls, and public listing preview remain next.
 
 ### 7.5 Search and Discovery

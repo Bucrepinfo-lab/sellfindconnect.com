@@ -1,7 +1,7 @@
 # Media Pipeline
 
 Status: provider-ready foundation
-Last updated: 2026-06-19
+Last updated: 2026-06-20
 
 ## Current Capability
 
@@ -17,9 +17,13 @@ Last updated: 2026-06-19
   restarts and can be claimed by background workers.
 - An internal worker runner can claim and process a bounded batch through
   `POST /v1/operations/media/processing/run`, protected by `x-internal-job-key`.
-- Production still needs provider-backed malware scanning, content moderation,
-  image/video execution adapters, media asset status updates from worker
-  results, and CDN publication.
+- Generic HTTP processor adapters can call provider-backed malware scanning,
+  content moderation, image transform, and video transcode services.
+- Completed worker jobs can publish result metadata back into Prisma
+  `MediaAsset` records, including moderation decisions, transform status,
+  CDN URLs, thumbnails, variants, and fail-closed blocked/failed states.
+- Production still needs live provider credentials, vendor-specific endpoint
+  mapping, unsafe-media escalation workflow, and CDN publication verification.
 
 ## Storage Modes
 
@@ -69,6 +73,81 @@ DATABASE_URL=postgresql://...
 the `MediaProcessingJob` table with status, attempts, retry availability,
 worker lock metadata, completion/failure timestamps, and result metadata.
 
+## Processor Provider Modes
+
+Development processors pass jobs locally:
+
+```text
+MEDIA_MALWARE_SCAN_ENDPOINT=
+MEDIA_CONTENT_MODERATION_ENDPOINT=
+MEDIA_IMAGE_TRANSFORM_ENDPOINT=
+MEDIA_VIDEO_TRANSCODE_ENDPOINT=
+```
+
+Generic HTTP provider-backed processors:
+
+```text
+MEDIA_MALWARE_SCAN_ENDPOINT=https://scanner.example.com/jobs
+MEDIA_CONTENT_MODERATION_ENDPOINT=https://moderation.example.com/jobs
+MEDIA_IMAGE_TRANSFORM_ENDPOINT=https://images.example.com/jobs
+MEDIA_VIDEO_TRANSCODE_ENDPOINT=https://video.example.com/jobs
+MEDIA_PROCESSOR_API_KEY=...
+MEDIA_PROCESSOR_TIMEOUT_MS=30000
+```
+
+Each job type can override shared credentials and provider labels:
+
+```text
+MEDIA_MALWARE_SCAN_API_KEY=...
+MEDIA_MALWARE_SCAN_PROVIDER_NAME=...
+MEDIA_CONTENT_MODERATION_API_KEY=...
+MEDIA_CONTENT_MODERATION_PROVIDER_NAME=...
+MEDIA_IMAGE_TRANSFORM_API_KEY=...
+MEDIA_IMAGE_TRANSFORM_PROVIDER_NAME=...
+MEDIA_VIDEO_TRANSCODE_API_KEY=...
+MEDIA_VIDEO_TRANSCODE_PROVIDER_NAME=...
+```
+
+Provider responses should return JSON:
+
+```json
+{
+  "ok": true,
+  "result": {
+    "verdict": "passed",
+    "transformStatus": "READY",
+    "cdnUrl": "https://cdn.sellfindconnect.com/path/display.jpg",
+    "thumbnailUrl": "https://cdn.sellfindconnect.com/path/thumb.jpg",
+    "variants": [
+      { "label": "display", "url": "https://cdn.sellfindconnect.com/path/display.jpg", "width": 1200 }
+    ]
+  }
+}
+```
+
+For blocked or unsafe media, providers can return `ok: false`,
+`retryable: false`, and a short `reason`; the worker will mark scan/moderation
+jobs as final failures and the publisher will block the media asset.
+
+## Result Publication
+
+Development mode uses a no-op publisher. Prisma publication is enabled with:
+
+```text
+MEDIA_ASSET_RESULT_PUBLISHER_DRIVER=prisma
+DATABASE_URL=postgresql://...
+```
+
+When `MEDIA_JOB_QUEUE_DRIVER=prisma` and `DATABASE_URL` is set, Prisma
+publication is selected automatically unless a different publication driver is
+explicitly configured. Publication behavior:
+
+- Clean malware scan: records `MALWARE_SCAN_PASSED` as the interim moderation reason.
+- Passed content moderation: sets moderation status to `PASSED`.
+- Blocked scan/moderation: sets media status and moderation status to `BLOCKED`.
+- Image/video transform success: writes transform status, CDN URL, thumbnail URL, and variants.
+- Final transform failure: sets transform status to `FAILED`.
+
 ## Upload Contract
 
 The API returns:
@@ -102,9 +181,9 @@ Workers should:
    final to move it to `FAILED`.
 
 Job states are `QUEUED`, `RUNNING`, `SUCCEEDED`, and `FAILED`. The next
-hardening step is to replace the development processors with provider adapters
-for malware scanning, image resizing, CDN cache publication, video transcoding,
-media asset state updates, and unsafe-media escalation.
+hardening step is to connect approved live vendors, verify each provider's
+response schema, publish CDN assets, and add unsafe-media escalation cases for
+human review.
 
 Internal batch runner:
 

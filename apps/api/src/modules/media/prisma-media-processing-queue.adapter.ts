@@ -235,10 +235,29 @@ export class PrismaMediaProcessingQueueAdapter implements MediaProcessingQueueAd
       return undefined;
     }
 
-    const entries = Object.entries(value).filter((entry): entry is [string, string | number | boolean] =>
-      ['string', 'number', 'boolean'].includes(typeof entry[1]),
-    );
+    const entries = Object.entries(value)
+      .map(([key, item]) => [key, this.mapMetadataValue(item)] as const)
+      .filter((entry): entry is readonly [string, MediaProcessingJobMetadata[string]] => entry[1] !== undefined);
     return entries.length ? Object.fromEntries(entries) : undefined;
+  }
+
+  private mapMetadataValue(value: unknown): MediaProcessingJobMetadata[string] | undefined {
+    if (
+      value === null ||
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    ) {
+      return value;
+    }
+
+    if (Array.isArray(value)) {
+      return value
+        .map((item) => this.mapMetadataValue(item))
+        .filter((item): item is MediaProcessingJobMetadata[string] => item !== undefined);
+    }
+
+    return this.mapMetadata(value);
   }
 
   private mapOptionalJsonToPrisma(

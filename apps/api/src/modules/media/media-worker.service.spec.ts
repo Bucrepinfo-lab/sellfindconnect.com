@@ -4,6 +4,11 @@ import {
   InMemoryMediaProcessingQueueAdapter,
   type MediaAdapters,
 } from './media.adapters';
+import {
+  buildMediaAssetPublicationPatch,
+  type MediaAssetResultPublicationInput,
+  type MediaAssetResultPublisherAdapter,
+} from './media-result-publisher';
 import { MediaWorkerService } from './media-worker.service';
 import type { MediaAsset } from '@telpen/domain';
 
@@ -14,6 +19,7 @@ describe('MediaWorkerService', () => {
     const jobs = queue.enqueueScanJobs(media);
     const runAt = new Date(Date.parse(jobs[0]!.availableAt) + 1000).toISOString();
     const retryAt = new Date(Date.parse(runAt) + 120_000).toISOString();
+    const publisher = collectingPublisher();
     const service = new MediaWorkerService(
       mediaAdapters(queue, {
         MALWARE_SCAN: {
@@ -27,6 +33,7 @@ describe('MediaWorkerService', () => {
           }),
         },
       }),
+      publisher,
     );
 
     const result = await service.runOnce({
@@ -44,6 +51,7 @@ describe('MediaWorkerService', () => {
       retried: 1,
       failed: 0,
       skipped: 0,
+      published: 1,
     });
     expect(result.results.map((job) => job.status).sort()).toEqual([
       'RETRY_QUEUED',
@@ -58,6 +66,12 @@ describe('MediaWorkerService', () => {
       availableAt: retryAt,
       lastError: 'moderation provider timeout',
     });
+    expect(publisher.publications).toHaveLength(1);
+    expect(publisher.publications[0]?.job.type).toBe('MALWARE_SCAN');
+    expect(result.results.find((job) => job.type === 'MALWARE_SCAN')?.publication).toMatchObject({
+      published: true,
+      patch: { moderationReason: 'MALWARE_SCAN_PASSED' },
+    });
   });
 
   it('marks non-retryable processor failures as final failures', async () => {
@@ -65,6 +79,7 @@ describe('MediaWorkerService', () => {
     const media = mediaAsset({ kind: 'IMAGE' });
     const jobs = queue.enqueueTransformJobs(media);
     const runAt = new Date(Date.parse(jobs[0]!.availableAt) + 1000).toISOString();
+    const publisher = collectingPublisher();
     const service = new MediaWorkerService(
       mediaAdapters(queue, {
         IMAGE_TRANSFORM: {
@@ -75,6 +90,7 @@ describe('MediaWorkerService', () => {
           }),
         },
       }),
+      publisher,
     );
 
     const result = await service.runOnce({
@@ -89,14 +105,37 @@ describe('MediaWorkerService', () => {
       retried: 0,
       failed: 1,
       skipped: 0,
+      published: 1,
     });
     expect(queue.listQueuedJobs()[0]).toMatchObject({
       status: 'FAILED',
       failedAt: runAt,
       lastError: 'unsafe image transform output',
     });
+    expect(publisher.publications).toHaveLength(1);
+    expect(result.results[0]?.publication).toMatchObject({
+      published: true,
+      patch: { transformStatus: 'FAILED' },
+    });
   });
 });
+
+function collectingPublisher(): MediaAssetResultPublisherAdapter & {
+  publications: MediaAssetResultPublicationInput[];
+} {
+  const publications: MediaAssetResultPublicationInput[] = [];
+  return {
+    publications,
+    publish: (input: MediaAssetResultPublicationInput) => {
+      publications.push(input);
+      return {
+        mediaId: input.job.mediaId,
+        published: true,
+        patch: buildMediaAssetPublicationPatch(input),
+      };
+    },
+  };
+}
 
 function mediaAdapters(
   jobs: InMemoryMediaProcessingQueueAdapter,
