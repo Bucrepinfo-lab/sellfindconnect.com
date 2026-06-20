@@ -180,6 +180,8 @@ model Country {
   tenants                   Tenant[]
   profileDrafts             ProfileDraft[]
   publishedProfiles         PublishedProfile[]
+  advertDrafts              AdvertDraft[]
+  publishedAdverts          PublishedAdvert[]
   taxProfiles               CountryTaxProfile[]
 
   @@index([continentCode])
@@ -221,42 +223,45 @@ model User {
 }
 
 model Tenant {
-  id                        String                     @id @default(uuid())
-  displayName               String                     @db.VarChar(160)
-  legalName                 String?                    @db.VarChar(240)
-  countryCode               String                     @db.VarChar(2)
-  primaryIndustryCode       String?                    @db.VarChar(80)
-  primaryRole               String?                    @db.VarChar(80)
-  onboardingUserType        String?                    @db.VarChar(80)
-  status                    TenantStatus               @default(TRIAL_PENDING)
-  trialStartedAt            DateTime?
-  trialEndsAt               DateTime?
-  paidStartedAt             DateTime?
-  renewalDate               DateTime?
-  createdAt                 DateTime                   @default(now())
-  updatedAt                 DateTime                   @updatedAt
-  country                   Country                    @relation(fields: [countryCode], references: [code])
-  memberships               TenantMembership[]
-  profileDrafts             ProfileDraft[]
-  publishedProfiles         PublishedProfile[]
-  mediaAssets               MediaAsset[]
-  taxSnapshots              TaxCalculationSnapshot[]
-  analyticsEvents           AnalyticsEvent[]
-  auditLogs                 AuditLog[]
-  notifications             Notification[]
-  conversations             Conversation[]
-  conversationMessages      ConversationMessage[]
-  conversationNotifications ConversationNotification[]
-  notificationPreferences   NotificationPreference[]
-  notificationOutboxRecords NotificationOutboxRecord[]
-  mediaProcessingJobs       MediaProcessingJob[]
-  mediaReviewCases          MediaReviewCase[]
-  accessAssignments         AccessAssignment[]
-  accessDecisionAudits      AccessDecisionAudit[]
-  authSessions              AuthSession[]
-  authMfaChallenges         AuthMfaChallenge[]
-  tenantInvites             TenantInvite[]
-  termsAcceptanceEvidence   TermsAcceptanceEvidence[]
+  id                           String                        @id @default(uuid())
+  displayName                  String                        @db.VarChar(160)
+  legalName                    String?                       @db.VarChar(240)
+  countryCode                  String                        @db.VarChar(2)
+  primaryIndustryCode          String?                       @db.VarChar(80)
+  primaryRole                  String?                       @db.VarChar(80)
+  onboardingUserType           String?                       @db.VarChar(80)
+  status                       TenantStatus                  @default(TRIAL_PENDING)
+  trialStartedAt               DateTime?
+  trialEndsAt                  DateTime?
+  paidStartedAt                DateTime?
+  renewalDate                  DateTime?
+  createdAt                    DateTime                      @default(now())
+  updatedAt                    DateTime                      @updatedAt
+  country                      Country                       @relation(fields: [countryCode], references: [code])
+  memberships                  TenantMembership[]
+  profileDrafts                ProfileDraft[]
+  publishedProfiles            PublishedProfile[]
+  advertDrafts                 AdvertDraft[]
+  publishedAdverts             PublishedAdvert[]
+  advertLifecycleNotifications AdvertLifecycleNotification[]
+  mediaAssets                  MediaAsset[]
+  taxSnapshots                 TaxCalculationSnapshot[]
+  analyticsEvents              AnalyticsEvent[]
+  auditLogs                    AuditLog[]
+  notifications                Notification[]
+  conversations                Conversation[]
+  conversationMessages         ConversationMessage[]
+  conversationNotifications    ConversationNotification[]
+  notificationPreferences      NotificationPreference[]
+  notificationOutboxRecords    NotificationOutboxRecord[]
+  mediaProcessingJobs          MediaProcessingJob[]
+  mediaReviewCases             MediaReviewCase[]
+  accessAssignments            AccessAssignment[]
+  accessDecisionAudits         AccessDecisionAudit[]
+  authSessions                 AuthSession[]
+  authMfaChallenges            AuthMfaChallenge[]
+  tenantInvites                TenantInvite[]
+  termsAcceptanceEvidence      TermsAcceptanceEvidence[]
 
   @@index([countryCode])
   @@index([status])
@@ -490,6 +495,76 @@ model PublishedProfile {
   @@index([countryCode, industryCode])
 }
 
+model AdvertDraft {
+  id           String    @id @default(uuid())
+  tenantId     String
+  countryCode  String    @db.VarChar(2)
+  industryCode String    @db.VarChar(80)
+  role         String    @db.VarChar(80)
+  title        String    @db.VarChar(160)
+  displayName  String    @db.VarChar(160)
+  description  String
+  phone        String?   @db.VarChar(80)
+  email        String?   @db.VarChar(320)
+  website      String?   @db.VarChar(500)
+  status       String    @default("DRAFT") @db.VarChar(40)
+  publishedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  country      Country   @relation(fields: [countryCode], references: [code])
+
+  @@index([tenantId, status])
+  @@index([countryCode, industryCode])
+}
+
+model PublishedAdvert {
+  id                String    @id @default(uuid())
+  tenantId          String
+  sourceDraftId     String?
+  countryCode       String    @db.VarChar(2)
+  industryCode      String    @db.VarChar(80)
+  role              String    @db.VarChar(80)
+  title             String    @db.VarChar(160)
+  displayName       String    @db.VarChar(160)
+  description       String
+  phone             String?   @db.VarChar(80)
+  email             String?   @db.VarChar(320)
+  website           String?   @db.VarChar(500)
+  status            String    @default("LIVE") @db.VarChar(40)
+  version           Int       @default(1)
+  publishedAt       DateTime
+  expiresAt         DateTime
+  renewalAlertsSent Json?
+  pausedAt          DateTime?
+  archivedAt        DateTime?
+  deletedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  country           Country   @relation(fields: [countryCode], references: [code])
+
+  @@index([tenantId, status])
+  @@index([sourceDraftId])
+  @@index([status, expiresAt])
+  @@index([countryCode, industryCode])
+}
+
+model AdvertLifecycleNotification {
+  id           String   @id @default(uuid())
+  tenantId     String
+  advertId     String   @db.VarChar(120)
+  title        String   @db.VarChar(160)
+  message      String
+  scheduledFor DateTime
+  day          Int
+  createdAt    DateTime @default(now())
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([advertId, day])
+  @@index([tenantId, scheduledFor])
+}
+
 model MediaAsset {
   id               String   @id @default(uuid())
   tenantId         String
@@ -528,29 +603,29 @@ model MediaAsset {
 }
 
 model MediaProcessingJob {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   tenantId    String
-  mediaId     String   @db.VarChar(120)
-  ownerType   String   @db.VarChar(40)
-  ownerId     String   @db.VarChar(120)
-  type        String   @db.VarChar(40)
-  status      String   @db.VarChar(40) @default("QUEUED")
-  objectKey   String?  @db.VarChar(500)
-  sourceUrl   String   @db.VarChar(1000)
-  attempts    Int      @default(0)
-  maxAttempts Int      @default(3)
-  availableAt DateTime @default(now())
+  mediaId     String    @db.VarChar(120)
+  ownerType   String    @db.VarChar(40)
+  ownerId     String    @db.VarChar(120)
+  type        String    @db.VarChar(40)
+  status      String    @default("QUEUED") @db.VarChar(40)
+  objectKey   String?   @db.VarChar(500)
+  sourceUrl   String    @db.VarChar(1000)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  availableAt DateTime  @default(now())
   lockedAt    DateTime?
-  lockedBy    String?  @db.VarChar(160)
+  lockedBy    String?   @db.VarChar(160)
   completedAt DateTime?
   failedAt    DateTime?
   lastError   String?
   metadata    Json?
   result      Json?
-  requestedAt DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requestedAt DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([status, availableAt])
   @@index([tenantId, status, availableAt])
@@ -568,7 +643,7 @@ model MediaReviewCase {
   sourceJobId String?   @db.VarChar(120)
   jobType     String    @db.VarChar(40)
   severity    String    @db.VarChar(40)
-  status      String    @db.VarChar(40) @default("OPEN")
+  status      String    @default("OPEN") @db.VarChar(40)
   reason      String    @db.VarChar(240)
   provider    String?   @db.VarChar(120)
   evidence    Json?

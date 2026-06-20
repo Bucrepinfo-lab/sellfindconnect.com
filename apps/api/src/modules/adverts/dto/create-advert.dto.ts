@@ -10,7 +10,9 @@ import {
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  Equals,
   IsArray,
+  IsBoolean,
   IsEmail,
   IsIn,
   IsInt,
@@ -77,6 +79,90 @@ export class CreateAdvertDto {
   declare website?: string;
 }
 
+export class UpdateAdvertDraftDto {
+  @ApiPropertyOptional({ example: 'Fresh vegetables for hotels and shops' })
+  @IsOptional()
+  @IsString()
+  @Length(2, 160)
+  declare title?: string;
+
+  @ApiPropertyOptional({ example: 'Nairobi Fresh Produce Cooperative' })
+  @IsOptional()
+  @IsString()
+  @Length(2, 120)
+  declare displayName?: string;
+
+  @ApiPropertyOptional({ example: 'AGRICULTURE' })
+  @IsOptional()
+  @IsString()
+  @Length(2, 80)
+  declare industryCode?: string;
+
+  @ApiPropertyOptional({ enum: supplyChainRoles, example: 'SUPPLIER' })
+  @IsOptional()
+  @IsIn(supplyChainRoles)
+  declare role?: (typeof supplyChainRoles)[number];
+
+  @ApiPropertyOptional({
+    example: 'We supply fresh vegetables to hotels and retailers in Nairobi.',
+  })
+  @IsOptional()
+  @IsString()
+  @Length(20, 2000)
+  declare description?: string;
+
+  @ApiPropertyOptional({ example: 'KE' })
+  @IsOptional()
+  @IsString()
+  @Length(2, 2)
+  declare countryCode?: string;
+
+  @ApiPropertyOptional({ example: '2026-06-16T00:00:00.000Z' })
+  @IsOptional()
+  @IsISO8601()
+  declare publishedAt?: string;
+
+  @ApiPropertyOptional({ example: '+254700000000' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  declare phone?: string;
+
+  @ApiPropertyOptional({ example: 'sales@example.co.ke' })
+  @IsOptional()
+  @IsEmail()
+  declare email?: string;
+
+  @ApiPropertyOptional({ example: 'https://example.co.ke' })
+  @IsOptional()
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true, require_tld: false })
+  declare website?: string;
+}
+
+export class PublishAdvertDraftDto {
+  @ApiProperty({ example: true })
+  @IsBoolean()
+  @Equals(true)
+  declare acceptedTerms: true;
+
+  @ApiPropertyOptional({ example: '2026-06-20T00:00:00.000Z' })
+  @IsOptional()
+  @IsISO8601()
+  declare publishedAt?: string;
+}
+
+export class RenewAdvertDto {
+  @ApiProperty({ example: true })
+  @IsBoolean()
+  @Equals(true)
+  declare acceptedTerms: true;
+
+  @ApiPropertyOptional({ example: '2026-07-10T00:00:00.000Z' })
+  @IsOptional()
+  @IsISO8601()
+  declare renewedAt?: string;
+}
+
 export class RunAdvertLifecycleDto {
   @ApiPropertyOptional({ example: '2026-07-25T00:00:00.000Z' })
   @IsOptional()
@@ -135,7 +221,9 @@ export class CreateAdvertMediaDto {
   @IsUrl({ protocols: ['http', 'https'], require_protocol: true, require_tld: false })
   declare sourceUrl: string;
 
-  @ApiPropertyOptional({ example: 'https://cdn.sellfindconnect.com/adverts/market-stall-thumb.jpg' })
+  @ApiPropertyOptional({
+    example: 'https://cdn.sellfindconnect.com/adverts/market-stall-thumb.jpg',
+  })
   @IsOptional()
   @IsUrl({ protocols: ['http', 'https'], require_protocol: true, require_tld: false })
   declare thumbnailUrl?: string;

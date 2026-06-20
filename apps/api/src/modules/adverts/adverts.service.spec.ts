@@ -9,9 +9,9 @@ import { AdvertsService } from './adverts.service';
 const tenantId = '11111111-1111-4111-8111-111111111111';
 type TenantAuditInput = Omit<AuthAuditRecord, 'id' | 'createdAt'>;
 
-function createService() {
+async function createService() {
   const service = new AdvertsService();
-  const advert = service.createAdvert(tenantId, {
+  const advert = await service.createAdvert(tenantId, {
     title: 'Fresh vegetable supply',
     displayName: 'Nairobi Fresh Produce',
     industryCode: 'AGRICULTURE',
@@ -25,22 +25,62 @@ function createService() {
 }
 
 describe('AdvertsService', () => {
-  it('creates a safe advert with a 40-day expiry date', () => {
-    const { advert } = createService();
+  it('creates a safe advert with a 40-day expiry date', async () => {
+    const { advert } = await createService();
 
     expect(advert.status).toBe('LIVE');
+    expect(advert.version).toBe(1);
     expect(advert.expiresAt).toBe('2026-07-11T00:00:00.000Z');
+  });
+
+  it('supports persisted draft preview and publish flow', async () => {
+    const service = new AdvertsService();
+    const draft = await service.createDraft(tenantId, {
+      title: 'Fresh vegetable supply',
+      displayName: 'Nairobi Fresh Produce',
+      industryCode: 'AGRICULTURE',
+      role: 'SUPPLIER',
+      description: 'We supply fresh vegetables to hotels and retailers in Nairobi.',
+      countryCode: 'KE',
+      publishedAt: '2026-06-01T00:00:00.000Z',
+    });
+    await service.addDraftMedia(tenantId, draft.id, {
+      sourceUrl: 'https://cdn.example.test/fresh-stall.jpg',
+      fileName: 'fresh-stall.jpg',
+      mimeType: 'image/jpeg',
+      fileSizeBytes: 800_000,
+    });
+
+    const preview = await service.previewDraft(tenantId, draft.id);
+    const published = await service.publishDraft(tenantId, draft.id, { acceptedTerms: true });
+
+    expect(preview.preview.mediaSlots).toEqual({
+      used: 1,
+      max: mediaPolicy.maxItemsPerOwner,
+      remaining: 9,
+    });
+    expect(published).toMatchObject({
+      sourceDraftId: draft.id,
+      status: 'LIVE',
+      version: 1,
+      publishedAt: '2026-06-01T00:00:00.000Z',
+      expiresAt: '2026-07-11T00:00:00.000Z',
+    });
+    await expect(service.getDraft(tenantId, draft.id)).resolves.toMatchObject({
+      status: 'PUBLISHED',
+    });
+    await expect(service.listAdvertMedia(tenantId, published.id)).resolves.toHaveLength(1);
   });
 
   it('prepares provider-neutral advert media upload instructions', async () => {
     const auditLogs: TenantAuditInput[] = [];
-    const service = new AdvertsService({
+    const service = new AdvertsService(undefined, {
       hasCurrentTermsAcceptance: async () => true,
       recordTenantAudit: async (record: TenantAuditInput) => {
         auditLogs.push(record);
       },
     } as Pick<AuthService, 'hasCurrentTermsAcceptance' | 'recordTenantAudit'> as AuthService);
-    const advert = service.createAdvert(tenantId, {
+    const advert = await service.createAdvert(tenantId, {
       title: 'Fresh vegetable supply',
       displayName: 'Nairobi Fresh Produce',
       industryCode: 'AGRICULTURE',
@@ -71,7 +111,11 @@ describe('AdvertsService', () => {
       },
     });
     expect(result.upload.objectKey).toContain(`advert/${tenantId}/${advert.id}/`);
-    expect(result.mediaSlots).toEqual({ used: 0, max: mediaPolicy.maxItemsPerOwner, remaining: 10 });
+    expect(result.mediaSlots).toEqual({
+      used: 0,
+      max: mediaPolicy.maxItemsPerOwner,
+      remaining: 10,
+    });
     expect(auditLogs.some((record) => record.action === 'ADVERT_MEDIA_UPLOAD_PREPARED')).toBe(true);
   });
 
@@ -83,7 +127,11 @@ describe('AdvertsService', () => {
         },
       },
       moderation: {
-        review: () => ({ allowed: true, moderationStatus: 'PENDING', moderationReason: 'SCAN_QUEUED' }),
+        review: () => ({
+          allowed: true,
+          moderationStatus: 'PENDING',
+          moderationReason: 'SCAN_QUEUED',
+        }),
       },
       transforms: {
         plan: () => ({
@@ -100,8 +148,8 @@ describe('AdvertsService', () => {
         }),
       },
     };
-    const service = new AdvertsService(undefined, adapters);
-    const advert = service.createAdvert(tenantId, {
+    const service = new AdvertsService(undefined, undefined, adapters);
+    const advert = await service.createAdvert(tenantId, {
       title: 'Fresh vegetable supply',
       displayName: 'Nairobi Fresh Produce',
       industryCode: 'AGRICULTURE',
@@ -120,7 +168,7 @@ describe('AdvertsService', () => {
       storageProvider: 's3-compatible',
       objectKey: 'adverts/tenant/advert/fresh-stall.jpg',
     });
-    const adverts = service.listAdverts(tenantId);
+    const adverts = await service.listAdverts(tenantId);
 
     expect(result.media).toMatchObject({
       ownerType: 'ADVERT',
@@ -134,7 +182,7 @@ describe('AdvertsService', () => {
       transformStatus: 'READY',
     });
     expect(result.mediaSlots).toEqual({ used: 1, max: mediaPolicy.maxItemsPerOwner, remaining: 9 });
-    expect(service.listAdvertMedia(tenantId, advert.id)).toHaveLength(1);
+    await expect(service.listAdvertMedia(tenantId, advert.id)).resolves.toHaveLength(1);
     expect(adverts[0]?.media).toHaveLength(1);
     expect(adverts[0]?.mediaSlots).toEqual(result.mediaSlots);
   });
@@ -159,8 +207,8 @@ describe('AdvertsService', () => {
         },
       },
     };
-    const service = new AdvertsService(undefined, rejectingAdapters);
-    const advert = service.createAdvert(tenantId, {
+    const service = new AdvertsService(undefined, undefined, rejectingAdapters);
+    const advert = await service.createAdvert(tenantId, {
       title: 'Fresh vegetable supply',
       displayName: 'Nairobi Fresh Produce',
       industryCode: 'AGRICULTURE',
@@ -195,11 +243,11 @@ describe('AdvertsService', () => {
         fileSizeBytes: 800_000,
       }),
     ).rejects.toThrow('moderation review');
-    expect(service.listAdvertMedia(tenantId, advert.id)).toHaveLength(0);
+    await expect(service.listAdvertMedia(tenantId, advert.id)).resolves.toHaveLength(0);
   });
 
   it('enforces the ten item media display limit per advert', async () => {
-    const { service, advert } = createService();
+    const { service, advert } = await createService();
 
     for (let index = 0; index < mediaPolicy.maxItemsPerOwner; index += 1) {
       await service.addAdvertMedia(tenantId, advert.id, {
@@ -218,48 +266,49 @@ describe('AdvertsService', () => {
         fileSizeBytes: 800_000,
       }),
     ).rejects.toThrow('maximum');
-    expect(service.listAdverts(tenantId)[0]?.mediaSlots).toEqual({
+    const adverts = await service.listAdverts(tenantId);
+    expect(adverts[0]?.mediaSlots).toEqual({
       used: 10,
       max: mediaPolicy.maxItemsPerOwner,
       remaining: 0,
     });
   });
 
-  it('creates one renewal alert on day 35 and does not duplicate it', () => {
-    const { service } = createService();
+  it('creates one renewal alert on day 35 and does not duplicate it', async () => {
+    const { service } = await createService();
 
-    const firstRun = service.runLifecycle(tenantId, { now: '2026-07-06T00:00:00.000Z' });
-    const secondRun = service.runLifecycle(tenantId, { now: '2026-07-06T12:00:00.000Z' });
+    const firstRun = await service.runLifecycle(tenantId, { now: '2026-07-06T00:00:00.000Z' });
+    const secondRun = await service.runLifecycle(tenantId, { now: '2026-07-06T12:00:00.000Z' });
 
     expect(firstRun.alertsCreated).toHaveLength(1);
     expect(firstRun.alertsCreated[0]?.day).toBe(35);
     expect(secondRun.alertsCreated).toHaveLength(0);
-    expect(service.listNotifications(tenantId)).toHaveLength(1);
+    await expect(service.listNotifications(tenantId)).resolves.toHaveLength(1);
   });
 
-  it('creates the final renewal alert on day 39', () => {
-    const { service } = createService();
+  it('creates the final renewal alert on day 39', async () => {
+    const { service } = await createService();
 
-    service.runLifecycle(tenantId, { now: '2026-07-06T00:00:00.000Z' });
-    const run = service.runLifecycle(tenantId, { now: '2026-07-10T00:00:00.000Z' });
+    await service.runLifecycle(tenantId, { now: '2026-07-06T00:00:00.000Z' });
+    const run = await service.runLifecycle(tenantId, { now: '2026-07-10T00:00:00.000Z' });
 
     expect(run.alertsCreated).toHaveLength(1);
     expect(run.alertsCreated[0]?.day).toBe(39);
-    expect(service.listNotifications(tenantId).map((item) => item.day)).toEqual([35, 39]);
+    expect((await service.listNotifications(tenantId)).map((item) => item.day)).toEqual([35, 39]);
   });
 
-  it('auto-deletes adverts on day 40', () => {
-    const { service } = createService();
+  it('auto-deletes adverts on day 40', async () => {
+    const { service } = await createService();
 
-    const run = service.runLifecycle(tenantId, { now: '2026-07-11T00:00:00.000Z' });
+    const run = await service.runLifecycle(tenantId, { now: '2026-07-11T00:00:00.000Z' });
 
     expect(run.autoDeleted).toHaveLength(1);
     expect(run.autoDeleted[0]?.status).toBe('AUTO_DELETED');
-    expect(service.listAdverts(tenantId)).toHaveLength(0);
+    await expect(service.listAdverts(tenantId)).resolves.toHaveLength(0);
   });
 
   it('archives advert media when the advert auto-deletes on day 40', async () => {
-    const { service, advert } = createService();
+    const { service, advert } = await createService();
     await service.addAdvertMedia(tenantId, advert.id, {
       sourceUrl: 'https://cdn.example.test/fresh-stall.jpg',
       fileName: 'fresh-stall.jpg',
@@ -267,18 +316,45 @@ describe('AdvertsService', () => {
       fileSizeBytes: 800_000,
     });
 
-    const run = service.runLifecycle(tenantId, { now: '2026-07-11T00:00:00.000Z' });
+    const run = await service.runLifecycle(tenantId, { now: '2026-07-11T00:00:00.000Z' });
 
     expect(run.autoDeleted).toHaveLength(1);
-    expect(() => service.listAdvertMedia(tenantId, advert.id)).toThrow('Advert not found');
-    expect(service.listAdverts(tenantId)).toHaveLength(0);
+    await expect(service.listAdvertMedia(tenantId, advert.id)).rejects.toThrow('Advert not found');
+    await expect(service.listAdverts(tenantId)).resolves.toHaveLength(0);
   });
 
-  it('runs lifecycle for all tenants for scheduler jobs', () => {
+  it('pauses, renews, and archives live adverts', async () => {
+    const { service, advert } = await createService();
+
+    const paused = await service.pauseAdvert(tenantId, advert.id, 'user-1');
+    const renewed = await service.renewAdvert(
+      tenantId,
+      advert.id,
+      { acceptedTerms: true, renewedAt: '2026-07-10T00:00:00.000Z' },
+      'user-1',
+    );
+    const archived = await service.archiveAdvert(tenantId, advert.id, 'user-1');
+
+    expect(paused.status).toBe('PAUSED');
+    expect(paused.pausedAt).toBeDefined();
+    expect(renewed).toMatchObject({
+      status: 'LIVE',
+      publishedAt: '2026-07-10T00:00:00.000Z',
+      expiresAt: '2026-08-19T00:00:00.000Z',
+      renewalAlertsSent: [],
+    });
+    expect(archived).toMatchObject({
+      status: 'ARCHIVED',
+      archivedAt: expect.any(String),
+    });
+    await expect(service.listAdverts(tenantId)).resolves.toHaveLength(0);
+  });
+
+  it('runs lifecycle for all tenants for scheduler jobs', async () => {
     const service = new AdvertsService();
     const otherTenantId = '22222222-2222-4222-8222-222222222222';
 
-    service.createAdvert(tenantId, {
+    await service.createAdvert(tenantId, {
       title: 'Fresh vegetable supply',
       displayName: 'Nairobi Fresh Produce',
       industryCode: 'AGRICULTURE',
@@ -287,7 +363,7 @@ describe('AdvertsService', () => {
       countryCode: 'KE',
       publishedAt: '2026-06-01T00:00:00.000Z',
     });
-    service.createAdvert(otherTenantId, {
+    await service.createAdvert(otherTenantId, {
       title: 'Packaging supply',
       displayName: 'Kiambu Packaging Works',
       industryCode: 'MANUFACTURING',
@@ -297,17 +373,17 @@ describe('AdvertsService', () => {
       publishedAt: '2026-06-01T00:00:00.000Z',
     });
 
-    const result = service.runAllLifecycles({ now: '2026-07-06T00:00:00.000Z' });
+    const result = await service.runAllLifecycles({ now: '2026-07-06T00:00:00.000Z' });
 
     expect(result.tenantsChecked).toBe(2);
     expect(result.results).toHaveLength(2);
     expect(result.results.every((tenant) => tenant.alertsCreated.length === 1)).toBe(true);
   });
 
-  it('blocks prohibited advert content', () => {
+  it('blocks prohibited advert content', async () => {
     const service = new AdvertsService();
 
-    expect(() =>
+    await expect(
       service.createAdvert(tenantId, {
         title: 'Unsafe advert',
         displayName: 'Bad Actor',
@@ -316,6 +392,6 @@ describe('AdvertsService', () => {
         description: 'Ammunition available for delivery.',
         countryCode: 'KE',
       }),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 });

@@ -464,9 +464,13 @@ Implementation progress:
   media processing output.
 - Added protected platform media review-case listing and resolution actions for
   scoped moderators, with unsafe review-note blocking and audit evidence.
-- Durable advert drafts, persisted advert repository, live storage credentials,
-  approved media vendors, moderator case assignment queues, pause/archive/renew
-  controls, and public listing preview remain next.
+- Added durable advert draft and published-advert repositories with in-memory
+  and Prisma implementations, database migration support, draft preview,
+  publish-to-live versioning, persisted renewal alerts, and pause/archive/renew
+  controls.
+- Live storage credentials, approved media vendors, moderator case assignment
+  queues, duplicate/boost controls, and richer public listing discovery remain
+  next.
 
 ### 7.5 Search and Discovery
 

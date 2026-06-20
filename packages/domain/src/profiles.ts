@@ -68,15 +68,42 @@ export type PublishedProfile = ProfileDraftInput & {
   updatedAt: string;
 };
 
-export type AdvertStatus = 'LIVE' | 'RENEWAL_DUE' | 'AUTO_DELETED';
+export const advertDraftStatuses = ['DRAFT', 'PUBLISHED'] as const;
+export type AdvertDraftStatus = (typeof advertDraftStatuses)[number];
 
-export type AdvertPost = ProfileDraftInput & {
+export const advertStatuses = [
+  'LIVE',
+  'RENEWAL_DUE',
+  'PAUSED',
+  'ARCHIVED',
+  'AUTO_DELETED',
+] as const;
+export type AdvertStatus = (typeof advertStatuses)[number];
+
+export type AdvertDraftInput = ProfileDraftInput & {
+  title: string;
+  publishedAt?: string;
+};
+
+export type AdvertDraft = AdvertDraftInput & {
   id: string;
   tenantId: string;
+  status: AdvertDraftStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdvertPost = AdvertDraftInput & {
+  id: string;
+  tenantId: string;
+  sourceDraftId?: string;
   title: string;
   status: AdvertStatus;
+  version: number;
   publishedAt: string;
   expiresAt: string;
+  pausedAt?: string;
+  archivedAt?: string;
   deletedAt?: string;
   renewalAlertsSent: number[];
   createdAt: string;
