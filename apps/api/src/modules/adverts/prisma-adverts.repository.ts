@@ -2,10 +2,13 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import {
   Prisma,
   PrismaClient,
+  type AdvertDiscoveryAlert as PrismaAdvertDiscoveryAlert,
+  type AdvertDiscoveryIndex as PrismaAdvertDiscoveryIndex,
   type AdvertDraft as PrismaAdvertDraft,
   type AdvertLifecycleNotification as PrismaAdvertLifecycleNotification,
   type MediaAsset as PrismaMediaAsset,
   type PublishedAdvert as PrismaPublishedAdvert,
+  type SavedAdvertSearch as PrismaSavedAdvertSearch,
 } from '@prisma/client';
 import {
   advertDraftStatuses,
@@ -20,6 +23,8 @@ import {
   type AdvertDraftStatus,
   type AdvertPost,
   type AdvertStatus,
+  type DiscoveryRelationshipSignal,
+  type DiscoveryVector,
   type MediaAsset,
   type MediaAssetKind,
   type MediaAssetStatus,
@@ -29,12 +34,18 @@ import {
   type MediaTransformStatus,
   type MediaVisibility,
   type SupplyChainRole,
+  supplyChainRoles,
 } from '@telpen/domain';
 
 import type {
+  AdvertDiscoveryAlertRecord,
+  AdvertDiscoveryIndexRecord,
   AdvertNotification,
   AdvertPublishRecords,
   AdvertsRepository,
+  ListAdvertDiscoveryIndexInput,
+  SavedAdvertSearchAlertFrequency,
+  SavedAdvertSearchRecord,
 } from './adverts.repository';
 
 export function createAdvertsPrismaClient(connectionString: string) {
@@ -207,6 +218,120 @@ export class PrismaAdvertsRepository implements AdvertsRepository {
     return notifications.map((notification) => this.mapNotification(notification));
   }
 
+  async upsertDiscoveryIndex(record: AdvertDiscoveryIndexRecord): Promise<void> {
+    await this.prisma.advertDiscoveryIndex.upsert({
+      where: {
+        tenantId_advertId: {
+          tenantId: record.tenantId,
+          advertId: record.advertId,
+        },
+      },
+      create: this.mapDiscoveryIndexToPrisma(record),
+      update: {
+        countryCode: record.countryCode,
+        industryCode: record.industryCode,
+        role: record.role,
+        status: record.status,
+        title: record.title,
+        displayName: record.displayName,
+        description: record.description,
+        searchText: record.searchText,
+        tokenVector: this.mapOptionalJsonToPrisma(record.tokenVector),
+        relationshipSignals: this.mapOptionalJsonToPrisma(record.relationshipSignals),
+        publishedAt: new Date(record.publishedAt),
+        expiresAt: new Date(record.expiresAt),
+        boostedAt: record.boostedAt ? new Date(record.boostedAt) : null,
+        boostExpiresAt: record.boostExpiresAt ? new Date(record.boostExpiresAt) : null,
+        boostWeight: record.boostWeight ?? null,
+        indexedAt: new Date(record.indexedAt),
+        updatedAt: new Date(record.updatedAt),
+      },
+    });
+  }
+
+  async listDiscoveryIndex(
+    input: ListAdvertDiscoveryIndexInput = {},
+  ): Promise<AdvertDiscoveryIndexRecord[]> {
+    const records = await this.prisma.advertDiscoveryIndex.findMany({
+      where: {
+        ...(input.countryCode ? { countryCode: input.countryCode } : {}),
+        ...(input.industryCode ? { industryCode: input.industryCode } : {}),
+        ...(input.role ? { role: input.role } : {}),
+        ...(input.statuses?.length ? { status: { in: input.statuses } } : {}),
+      },
+      orderBy: [{ indexedAt: 'desc' }, { publishedAt: 'desc' }],
+    });
+    return records.map((record) => this.mapDiscoveryIndex(record));
+  }
+
+  async deleteDiscoveryIndex(tenantId: string, advertId: string): Promise<void> {
+    await this.prisma.advertDiscoveryIndex.deleteMany({ where: { tenantId, advertId } });
+  }
+
+  async createSavedSearch(record: SavedAdvertSearchRecord): Promise<void> {
+    await this.prisma.savedAdvertSearch.create({
+      data: this.mapSavedSearchToPrisma(record),
+    });
+  }
+
+  async findSavedSearch(
+    tenantId: string,
+    id: string,
+  ): Promise<SavedAdvertSearchRecord | undefined> {
+    const record = await this.prisma.savedAdvertSearch.findFirst({ where: { tenantId, id } });
+    return record ? this.mapSavedSearch(record) : undefined;
+  }
+
+  async listSavedSearches(tenantId: string): Promise<SavedAdvertSearchRecord[]> {
+    const records = await this.prisma.savedAdvertSearch.findMany({
+      where: { tenantId },
+      orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
+    });
+    return records.map((record) => this.mapSavedSearch(record));
+  }
+
+  async updateSavedSearch(record: SavedAdvertSearchRecord): Promise<void> {
+    await this.prisma.savedAdvertSearch.update({
+      where: { id: record.id },
+      data: {
+        name: record.name,
+        query: record.query,
+        countryCode: record.countryCode ?? null,
+        industryCode: record.industryCode ?? null,
+        role: record.role ?? null,
+        alertFrequency: record.alertFrequency,
+        isActive: record.isActive,
+        lastAlertedAt: record.lastAlertedAt ? new Date(record.lastAlertedAt) : null,
+        updatedAt: new Date(record.updatedAt),
+      },
+    });
+  }
+
+  async createDiscoveryAlert(record: AdvertDiscoveryAlertRecord): Promise<void> {
+    await this.prisma.advertDiscoveryAlert.create({
+      data: this.mapDiscoveryAlertToPrisma(record),
+    });
+  }
+
+  async findDiscoveryAlert(
+    tenantId: string,
+    savedSearchId: string,
+    advertId: string,
+  ): Promise<AdvertDiscoveryAlertRecord | undefined> {
+    const record = await this.prisma.advertDiscoveryAlert.findFirst({
+      where: { tenantId, savedSearchId, advertId },
+    });
+    return record ? this.mapDiscoveryAlert(record) : undefined;
+  }
+
+  async listDiscoveryAlerts(tenantId: string): Promise<AdvertDiscoveryAlertRecord[]> {
+    const records = await this.prisma.advertDiscoveryAlert.findMany({
+      where: { tenantId },
+      orderBy: [{ createdAt: 'desc' }],
+    });
+    return records.map((record) => this.mapDiscoveryAlert(record));
+  }
+
   private mapDraftToPrisma(draft: AdvertDraft): Prisma.AdvertDraftUncheckedCreateInput {
     return {
       id: draft.id,
@@ -322,6 +447,126 @@ export class PrismaAdvertsRepository implements AdvertsRepository {
     };
   }
 
+  private mapDiscoveryIndexToPrisma(
+    record: AdvertDiscoveryIndexRecord,
+  ): Prisma.AdvertDiscoveryIndexUncheckedCreateInput {
+    return {
+      id: record.id,
+      tenantId: record.tenantId,
+      advertId: record.advertId,
+      countryCode: record.countryCode,
+      industryCode: record.industryCode,
+      role: record.role,
+      status: record.status,
+      title: record.title,
+      displayName: record.displayName,
+      description: record.description,
+      searchText: record.searchText,
+      tokenVector: this.mapOptionalJsonToPrisma(record.tokenVector),
+      relationshipSignals: this.mapOptionalJsonToPrisma(record.relationshipSignals),
+      publishedAt: new Date(record.publishedAt),
+      expiresAt: new Date(record.expiresAt),
+      boostedAt: record.boostedAt ? new Date(record.boostedAt) : undefined,
+      boostExpiresAt: record.boostExpiresAt ? new Date(record.boostExpiresAt) : undefined,
+      boostWeight: record.boostWeight,
+      indexedAt: new Date(record.indexedAt),
+      createdAt: new Date(record.createdAt),
+      updatedAt: new Date(record.updatedAt),
+    };
+  }
+
+  private mapDiscoveryIndex(record: PrismaAdvertDiscoveryIndex): AdvertDiscoveryIndexRecord {
+    return {
+      id: record.id,
+      tenantId: record.tenantId,
+      advertId: record.advertId,
+      countryCode: record.countryCode,
+      industryCode: record.industryCode,
+      role: this.mapSupplyChainRole(record.role),
+      status: this.mapAdvertStatus(record.status),
+      title: record.title,
+      displayName: record.displayName,
+      description: record.description,
+      searchText: record.searchText,
+      tokenVector: this.mapDiscoveryVector(record.tokenVector),
+      relationshipSignals: this.mapDiscoveryRelationshipSignals(record.relationshipSignals),
+      publishedAt: record.publishedAt.toISOString(),
+      expiresAt: record.expiresAt.toISOString(),
+      boostedAt: record.boostedAt?.toISOString(),
+      boostExpiresAt: record.boostExpiresAt?.toISOString(),
+      boostWeight: record.boostWeight ?? undefined,
+      indexedAt: record.indexedAt.toISOString(),
+      createdAt: record.createdAt.toISOString(),
+      updatedAt: record.updatedAt.toISOString(),
+    };
+  }
+
+  private mapSavedSearchToPrisma(
+    record: SavedAdvertSearchRecord,
+  ): Prisma.SavedAdvertSearchUncheckedCreateInput {
+    return {
+      id: record.id,
+      tenantId: record.tenantId,
+      name: record.name,
+      query: record.query,
+      countryCode: record.countryCode,
+      industryCode: record.industryCode,
+      role: record.role,
+      alertFrequency: record.alertFrequency,
+      isActive: record.isActive,
+      lastAlertedAt: record.lastAlertedAt ? new Date(record.lastAlertedAt) : undefined,
+      createdAt: new Date(record.createdAt),
+      updatedAt: new Date(record.updatedAt),
+    };
+  }
+
+  private mapSavedSearch(record: PrismaSavedAdvertSearch): SavedAdvertSearchRecord {
+    return {
+      id: record.id,
+      tenantId: record.tenantId,
+      name: record.name,
+      query: record.query,
+      countryCode: record.countryCode ?? undefined,
+      industryCode: record.industryCode ?? undefined,
+      role: record.role ? this.mapSupplyChainRole(record.role) : undefined,
+      alertFrequency: this.mapSavedSearchAlertFrequency(record.alertFrequency),
+      isActive: record.isActive,
+      lastAlertedAt: record.lastAlertedAt?.toISOString(),
+      createdAt: record.createdAt.toISOString(),
+      updatedAt: record.updatedAt.toISOString(),
+    };
+  }
+
+  private mapDiscoveryAlertToPrisma(
+    record: AdvertDiscoveryAlertRecord,
+  ): Prisma.AdvertDiscoveryAlertUncheckedCreateInput {
+    return {
+      id: record.id,
+      tenantId: record.tenantId,
+      savedSearchId: record.savedSearchId,
+      advertId: record.advertId,
+      title: record.title,
+      message: record.message,
+      rankScore: record.rankScore,
+      reasonCodes: this.mapOptionalJsonToPrisma(record.reasonCodes),
+      createdAt: new Date(record.createdAt),
+    };
+  }
+
+  private mapDiscoveryAlert(record: PrismaAdvertDiscoveryAlert): AdvertDiscoveryAlertRecord {
+    return {
+      id: record.id,
+      tenantId: record.tenantId,
+      savedSearchId: record.savedSearchId,
+      advertId: record.advertId,
+      title: record.title,
+      message: record.message,
+      rankScore: record.rankScore,
+      reasonCodes: this.mapStringArray(record.reasonCodes),
+      createdAt: record.createdAt.toISOString(),
+    };
+  }
+
   private mapDraftStatus(value: string): AdvertDraftStatus {
     return advertDraftStatuses.includes(value as AdvertDraftStatus)
       ? (value as AdvertDraftStatus)
@@ -332,12 +577,76 @@ export class PrismaAdvertsRepository implements AdvertsRepository {
     return advertStatuses.includes(value as AdvertStatus) ? (value as AdvertStatus) : 'LIVE';
   }
 
+  private mapSupplyChainRole(value: string): SupplyChainRole {
+    return supplyChainRoles.includes(value as SupplyChainRole)
+      ? (value as SupplyChainRole)
+      : 'SUPPLIER';
+  }
+
+  private mapSavedSearchAlertFrequency(value: string): SavedAdvertSearchAlertFrequency {
+    if (value === 'INSTANT' || value === 'DAILY' || value === 'WEEKLY') {
+      return value;
+    }
+
+    return 'DAILY';
+  }
+
   private mapRenewalAlerts(value: unknown): number[] {
     if (!Array.isArray(value)) {
       return [];
     }
 
     return value.filter((item): item is number => Number.isInteger(item));
+  }
+
+  private mapStringArray(value: unknown): string[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value.filter((item): item is string => typeof item === 'string');
+  }
+
+  private mapDiscoveryVector(value: unknown): DiscoveryVector {
+    if (!this.isRecord(value)) {
+      return {};
+    }
+
+    return Object.fromEntries(
+      Object.entries(value).filter(
+        (entry): entry is [string, number] =>
+          typeof entry[0] === 'string' && typeof entry[1] === 'number' && Number.isFinite(entry[1]),
+      ),
+    );
+  }
+
+  private mapDiscoveryRelationshipSignals(value: unknown): DiscoveryRelationshipSignal[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value
+      .filter((item): item is Record<string, unknown> => this.isRecord(item))
+      .filter(
+        (item) =>
+          typeof item.relationship === 'string' &&
+          typeof item.weight === 'number' &&
+          typeof item.reason === 'string',
+      )
+      .map((item) => ({
+        role: this.mapSupplyChainRole(String(item.role)),
+        relationship:
+          item.relationship === 'SUPPLIES' ||
+          item.relationship === 'BUYS_FROM' ||
+          item.relationship === 'DISTRIBUTES' ||
+          item.relationship === 'SERVES' ||
+          item.relationship === 'FINANCES' ||
+          item.relationship === 'CERTIFIES'
+            ? item.relationship
+            : 'SERVES',
+        weight: Number(item.weight),
+        reason: String(item.reason),
+      }));
   }
 
   private mapMediaAsset(asset: PrismaMediaAsset): MediaAsset {

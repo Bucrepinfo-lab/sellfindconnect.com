@@ -1,4 +1,12 @@
-import type { AdvertDraft, AdvertPost, MediaAsset, MediaOwnerType } from '@telpen/domain';
+import type {
+  AdvertDraft,
+  AdvertPost,
+  DiscoveryRelationshipSignal,
+  DiscoveryVector,
+  MediaAsset,
+  MediaOwnerType,
+  SupplyChainRole,
+} from '@telpen/domain';
 
 export const ADVERTS_REPOSITORY = Symbol('ADVERTS_REPOSITORY');
 
@@ -20,6 +28,67 @@ export type AdvertPublishRecords = {
   draft: AdvertDraft;
   published: AdvertPost;
   publishedMediaAssets?: MediaAsset[];
+};
+
+export type AdvertDiscoveryIndexRecord = {
+  id: string;
+  tenantId: string;
+  advertId: string;
+  countryCode: string;
+  industryCode: string;
+  role: SupplyChainRole;
+  status: AdvertPost['status'];
+  title: string;
+  displayName: string;
+  description: string;
+  searchText: string;
+  tokenVector: DiscoveryVector;
+  relationshipSignals: DiscoveryRelationshipSignal[];
+  publishedAt: string;
+  expiresAt: string;
+  boostedAt?: string;
+  boostExpiresAt?: string;
+  boostWeight?: number;
+  indexedAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ListAdvertDiscoveryIndexInput = {
+  countryCode?: string;
+  industryCode?: string;
+  role?: SupplyChainRole;
+  statuses?: AdvertPost['status'][];
+};
+
+export const savedAdvertSearchAlertFrequencies = ['INSTANT', 'DAILY', 'WEEKLY'] as const;
+export type SavedAdvertSearchAlertFrequency = (typeof savedAdvertSearchAlertFrequencies)[number];
+
+export type SavedAdvertSearchRecord = {
+  id: string;
+  tenantId: string;
+  name: string;
+  query: string;
+  countryCode?: string;
+  industryCode?: string;
+  role?: SupplyChainRole;
+  alertFrequency: SavedAdvertSearchAlertFrequency;
+  isActive: boolean;
+  lastAlertedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdvertDiscoveryAlertRecord = {
+  id: string;
+  tenantId: string;
+  savedSearchId: string;
+  advertId: string;
+  title: string;
+  message: string;
+  rankScore: number;
+  reasonCodes: string[];
+  createdAt: string;
 };
 
 export interface AdvertsRepository {
@@ -46,4 +115,23 @@ export interface AdvertsRepository {
   listAllPublishedAdverts(): RepositoryResult<AdvertPost[]>;
   createNotification(notification: AdvertNotification): RepositoryResult<void>;
   listNotifications(tenantId: string): RepositoryResult<AdvertNotification[]>;
+  upsertDiscoveryIndex(record: AdvertDiscoveryIndexRecord): RepositoryResult<void>;
+  listDiscoveryIndex(
+    input?: ListAdvertDiscoveryIndexInput,
+  ): RepositoryResult<AdvertDiscoveryIndexRecord[]>;
+  deleteDiscoveryIndex(tenantId: string, advertId: string): RepositoryResult<void>;
+  createSavedSearch(record: SavedAdvertSearchRecord): RepositoryResult<void>;
+  findSavedSearch(
+    tenantId: string,
+    id: string,
+  ): RepositoryResult<SavedAdvertSearchRecord | undefined>;
+  listSavedSearches(tenantId: string): RepositoryResult<SavedAdvertSearchRecord[]>;
+  updateSavedSearch(record: SavedAdvertSearchRecord): RepositoryResult<void>;
+  createDiscoveryAlert(record: AdvertDiscoveryAlertRecord): RepositoryResult<void>;
+  findDiscoveryAlert(
+    tenantId: string,
+    savedSearchId: string,
+    advertId: string,
+  ): RepositoryResult<AdvertDiscoveryAlertRecord | undefined>;
+  listDiscoveryAlerts(tenantId: string): RepositoryResult<AdvertDiscoveryAlertRecord[]>;
 }

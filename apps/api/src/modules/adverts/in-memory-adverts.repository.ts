@@ -2,9 +2,13 @@ import { Injectable } from '@nestjs/common';
 import type { AdvertDraft, AdvertPost, MediaAsset, MediaOwnerType } from '@telpen/domain';
 
 import type {
+  AdvertDiscoveryAlertRecord,
+  AdvertDiscoveryIndexRecord,
   AdvertNotification,
   AdvertPublishRecords,
   AdvertsRepository,
+  ListAdvertDiscoveryIndexInput,
+  SavedAdvertSearchRecord,
 } from './adverts.repository';
 
 @Injectable()
@@ -13,6 +17,9 @@ export class InMemoryAdvertsRepository implements AdvertsRepository {
   private readonly publishedAdverts = new Map<string, AdvertPost>();
   private readonly mediaAssets = new Map<string, MediaAsset>();
   private readonly notifications = new Map<string, AdvertNotification>();
+  private readonly discoveryIndex = new Map<string, AdvertDiscoveryIndexRecord>();
+  private readonly savedSearches = new Map<string, SavedAdvertSearchRecord>();
+  private readonly discoveryAlerts = new Map<string, AdvertDiscoveryAlertRecord>();
 
   createDraft(draft: AdvertDraft): void {
     this.drafts.set(this.key(draft.tenantId, draft.id), draft);
@@ -114,7 +121,67 @@ export class InMemoryAdvertsRepository implements AdvertsRepository {
       .sort((left, right) => left.scheduledFor.localeCompare(right.scheduledFor));
   }
 
+  upsertDiscoveryIndex(record: AdvertDiscoveryIndexRecord): void {
+    this.discoveryIndex.set(this.key(record.tenantId, record.advertId), record);
+  }
+
+  listDiscoveryIndex(input: ListAdvertDiscoveryIndexInput = {}): AdvertDiscoveryIndexRecord[] {
+    return Array.from(this.discoveryIndex.values())
+      .filter((record) => !input.countryCode || record.countryCode === input.countryCode)
+      .filter((record) => !input.industryCode || record.industryCode === input.industryCode)
+      .filter((record) => !input.role || record.role === input.role)
+      .filter((record) => !input.statuses?.length || input.statuses.includes(record.status))
+      .sort((left, right) => right.indexedAt.localeCompare(left.indexedAt));
+  }
+
+  deleteDiscoveryIndex(tenantId: string, advertId: string): void {
+    this.discoveryIndex.delete(this.key(tenantId, advertId));
+  }
+
+  createSavedSearch(record: SavedAdvertSearchRecord): void {
+    this.savedSearches.set(this.key(record.tenantId, record.id), record);
+  }
+
+  findSavedSearch(tenantId: string, id: string): SavedAdvertSearchRecord | undefined {
+    return this.savedSearches.get(this.key(tenantId, id));
+  }
+
+  listSavedSearches(tenantId: string): SavedAdvertSearchRecord[] {
+    return Array.from(this.savedSearches.values())
+      .filter((record) => record.tenantId === tenantId)
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  }
+
+  updateSavedSearch(record: SavedAdvertSearchRecord): void {
+    this.savedSearches.set(this.key(record.tenantId, record.id), record);
+  }
+
+  createDiscoveryAlert(record: AdvertDiscoveryAlertRecord): void {
+    this.discoveryAlerts.set(
+      this.alertKey(record.tenantId, record.savedSearchId, record.advertId),
+      record,
+    );
+  }
+
+  findDiscoveryAlert(
+    tenantId: string,
+    savedSearchId: string,
+    advertId: string,
+  ): AdvertDiscoveryAlertRecord | undefined {
+    return this.discoveryAlerts.get(this.alertKey(tenantId, savedSearchId, advertId));
+  }
+
+  listDiscoveryAlerts(tenantId: string): AdvertDiscoveryAlertRecord[] {
+    return Array.from(this.discoveryAlerts.values())
+      .filter((record) => record.tenantId === tenantId)
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  }
+
   private key(tenantId: string, id: string): string {
     return `${tenantId}:${id}`;
+  }
+
+  private alertKey(tenantId: string, savedSearchId: string, advertId: string): string {
+    return `${tenantId}:${savedSearchId}:${advertId}`;
   }
 }

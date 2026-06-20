@@ -27,6 +27,8 @@ import {
   ValidateNested,
 } from 'class-validator';
 
+const alertFrequencyOptions = ['INSTANT', 'DAILY', 'WEEKLY'] as const;
+
 export class CreateAdvertDto {
   @ApiProperty({ example: 'Fresh vegetables for hotels and shops' })
   @IsString()
@@ -232,6 +234,61 @@ export class PublicAdvertSearchDto {
   @IsOptional()
   @IsISO8601()
   declare now?: string;
+}
+
+export class CreateSavedAdvertSearchDto {
+  @ApiProperty({ example: 'Fresh vegetable buyers in Kenya' })
+  @IsString()
+  @Length(2, 120)
+  declare name: string;
+
+  @ApiProperty({ example: 'fresh vegetables hotel buyers' })
+  @IsString()
+  @MaxLength(240)
+  declare q: string;
+
+  @ApiPropertyOptional({ example: 'KE' })
+  @IsOptional()
+  @IsString()
+  @Length(2, 2)
+  declare countryCode?: string;
+
+  @ApiPropertyOptional({ example: 'AGRICULTURE' })
+  @IsOptional()
+  @IsString()
+  @Length(2, 80)
+  declare industryCode?: string;
+
+  @ApiPropertyOptional({ enum: supplyChainRoles, example: 'SUPPLIER' })
+  @IsOptional()
+  @IsIn(supplyChainRoles)
+  declare role?: (typeof supplyChainRoles)[number];
+
+  @ApiPropertyOptional({ enum: alertFrequencyOptions, example: 'DAILY' })
+  @IsOptional()
+  @IsIn(alertFrequencyOptions)
+  declare alertFrequency?: (typeof alertFrequencyOptions)[number];
+}
+
+export class RunSavedAdvertSearchAlertsDto {
+  @ApiPropertyOptional({ example: '2026-07-10T00:00:00.000Z' })
+  @IsOptional()
+  @IsISO8601()
+  declare now?: string;
+
+  @ApiPropertyOptional({ example: 'saved-search-id' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  declare savedSearchId?: string;
+
+  @ApiPropertyOptional({ example: 5, minimum: 1, maximum: 20 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  declare limit?: number;
 }
 
 export class RunAdvertLifecycleDto {

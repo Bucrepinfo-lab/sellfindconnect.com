@@ -7,15 +7,19 @@ import {
 } from '@nestjs/common';
 import {
   advertLifecyclePolicy,
+  buildDiscoveryIndexDocument,
   calculateAdvertLifecycle,
   evaluateMediaAssetInput,
   evaluateMediaUploadPreparationInput,
   evaluateSafetyFields,
   getCountry,
+  inferDesiredDiscoveryRoles,
   industryCategories,
   mediaPolicy,
+  scoreDiscoveryVector,
   type AdvertDraft,
   type AdvertPost,
+  type DiscoveryRelationshipSignal,
   type MediaAsset,
 } from '@telpen/domain';
 import { randomUUID } from 'node:crypto';
@@ -30,19 +34,24 @@ import {
 } from '../media/media.adapters';
 import {
   ADVERTS_REPOSITORY,
+  type AdvertDiscoveryAlertRecord,
+  type AdvertDiscoveryIndexRecord,
   type AdvertNotification,
   type AdvertsRepository,
+  type SavedAdvertSearchRecord,
 } from './adverts.repository';
 import type {
+  BoostAdvertDto,
   CreateAdvertDto,
   CreateAdvertMediaDto,
-  BoostAdvertDto,
+  CreateSavedAdvertSearchDto,
   DuplicateAdvertDto,
   PrepareAdvertMediaUploadDto,
   PublicAdvertSearchDto,
   PublishAdvertDraftDto,
   RenewAdvertDto,
   RunAdvertLifecycleDto,
+  RunSavedAdvertSearchAlertsDto,
   UpdateAdvertDraftDto,
 } from './dto/create-advert.dto';
 import { InMemoryAdvertsRepository } from './in-memory-adverts.repository';
@@ -67,6 +76,8 @@ type PublicAdvertSearchResult = AdvertPostWithMedia & {
   rankScore: number;
   rankReasons: string[];
   boosted: boolean;
+  matchedTerms: string[];
+  relationshipSignals: DiscoveryRelationshipSignal[];
 };
 
 @Injectable()
@@ -306,6 +317,7 @@ export class AdvertsService {
       published,
       publishedMediaAssets,
     });
+    await this.syncDiscoveryIndex(published);
     await this.auth?.recordTenantAudit({
       tenantId,
       actorUserId,
@@ -443,6 +455,7 @@ export class AdvertsService {
       updatedAt: now,
     };
     await this.repository.updatePublishedAdvert(paused);
+    await this.syncDiscoveryIndex(paused);
     await this.auditAdvertControl(tenantId, actorUserId, paused, 'ADVERT_PAUSED');
     return this.withMedia(paused);
   }
@@ -458,6 +471,7 @@ export class AdvertsService {
     };
     await this.repository.updatePublishedAdvert(archived);
     await this.repository.archiveMediaAssets(tenantId, 'ADVERT', advert.id, now);
+    await this.repository.deleteDiscoveryIndex(tenantId, advert.id);
     await this.auditAdvertControl(tenantId, actorUserId, archived, 'ADVERT_ARCHIVED');
     return archived;
   }
@@ -485,6 +499,7 @@ export class AdvertsService {
       updatedAt: now,
     };
     await this.repository.updatePublishedAdvert(renewed);
+    await this.syncDiscoveryIndex(renewed);
     await this.auditAdvertControl(tenantId, actorUserId, renewed, 'ADVERT_RENEWED');
     return this.withMedia(renewed);
   }
@@ -535,6 +550,7 @@ export class AdvertsService {
       updatedAt: now,
     };
     await this.repository.updatePublishedAdvert(boosted);
+    await this.syncDiscoveryIndex(boosted);
     await this.auditAdvertControl(tenantId, actorUserId, boosted, 'ADVERT_BOOSTED');
     return this.withMedia(boosted);
   }
@@ -544,22 +560,22 @@ export class AdvertsService {
     filters: Pick<PublicAdvertSearchDto, 'countryCode' | 'industryCode' | 'role'>;
     results: PublicAdvertSearchResult[];
   }> {
-    const safety = evaluateSafetyFields(input);
-    if (!safety.allowed) {
-      throw new UnprocessableEntityException({
-        message: 'Public advert search matches a zero-tolerance blocked category.',
-        safety,
-      });
-    }
-
+    this.assertValidPublicSearch(input);
     const now = input.now ?? new Date().toISOString();
     const query = input.q?.trim();
-    const terms = this.searchTerms(query);
     const limit = Math.min(100, Math.max(1, input.limit ?? 20));
-    const adverts = await this.repository.listAllPublishedAdverts();
-    const candidates = adverts.filter((advert) => this.isDiscoverable(advert, input, now));
+    const terms = this.searchTerms(query);
+    const entries = await this.repository.listDiscoveryIndex({
+      countryCode: input.countryCode?.toUpperCase(),
+      industryCode: input.industryCode,
+      role: input.role,
+      statuses: ['LIVE', 'RENEWAL_DUE'],
+    });
+    const candidates = entries.filter((entry) =>
+      this.isDiscoveryEntryDiscoverable(entry, input, now),
+    );
     const ranked = await Promise.all(
-      candidates.map(async (advert) => this.rankPublicAdvert(advert, terms, now)),
+      candidates.map(async (entry) => this.rankPublicAdvert(entry, query, terms, now)),
     );
 
     return {
@@ -570,9 +586,16 @@ export class AdvertsService {
         role: input.role,
       },
       results: ranked
+        .filter((result): result is PublicAdvertSearchResult => Boolean(result))
         .filter(
           (result) =>
-            !terms.length || result.rankReasons.some((reason) => reason.startsWith('MATCH_')),
+            !terms.length ||
+            result.rankReasons.some(
+              (reason) =>
+                reason.startsWith('MATCH_') ||
+                reason === 'VECTOR_MATCH' ||
+                reason.startsWith('RELATIONSHIP_GRAPH'),
+            ),
         )
         .sort(
           (left, right) =>
@@ -580,6 +603,155 @@ export class AdvertsService {
         )
         .slice(0, limit),
     };
+  }
+
+  async createSavedSearch(
+    tenantId: string,
+    input: CreateSavedAdvertSearchDto,
+    actorUserId?: string,
+  ): Promise<SavedAdvertSearchRecord> {
+    const normalized = this.normalizeSavedSearchInput(input);
+    const now = new Date().toISOString();
+    const record: SavedAdvertSearchRecord = {
+      id: randomUUID(),
+      tenantId,
+      name: normalized.name,
+      query: normalized.q,
+      countryCode: normalized.countryCode,
+      industryCode: normalized.industryCode,
+      role: normalized.role,
+      alertFrequency: normalized.alertFrequency ?? 'DAILY',
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await this.repository.createSavedSearch(record);
+    await this.auth?.recordTenantAudit({
+      tenantId,
+      actorUserId,
+      action: 'ADVERT_SAVED_SEARCH_CREATED',
+      entityType: 'ADVERT_SAVED_SEARCH',
+      entityId: record.id,
+      metadata: {
+        countryCode: record.countryCode ?? null,
+        industryCode: record.industryCode ?? null,
+        role: record.role ?? null,
+        alertFrequency: record.alertFrequency,
+      },
+    });
+
+    return record;
+  }
+
+  async listSavedSearches(tenantId: string): Promise<SavedAdvertSearchRecord[]> {
+    return this.repository.listSavedSearches(tenantId);
+  }
+
+  async listDiscoveryAlerts(tenantId: string): Promise<AdvertDiscoveryAlertRecord[]> {
+    return this.repository.listDiscoveryAlerts(tenantId);
+  }
+
+  async runSavedSearchAlerts(
+    tenantId: string,
+    input: RunSavedAdvertSearchAlertsDto = {},
+    actorUserId?: string,
+  ): Promise<{
+    checkedAt: string;
+    savedSearchesChecked: number;
+    alertsCreated: AdvertDiscoveryAlertRecord[];
+  }> {
+    const now = input.now ?? new Date().toISOString();
+    const limit = Math.min(20, Math.max(1, input.limit ?? 5));
+    const searches = input.savedSearchId
+      ? [await this.getSavedSearch(tenantId, input.savedSearchId)]
+      : (await this.repository.listSavedSearches(tenantId)).filter((search) => search.isActive);
+    const alertsCreated: AdvertDiscoveryAlertRecord[] = [];
+
+    for (const search of searches) {
+      const results = await this.searchPublicAdverts({
+        q: search.query,
+        countryCode: search.countryCode,
+        industryCode: search.industryCode,
+        role: search.role,
+        limit,
+        now,
+      });
+
+      for (const result of results.results) {
+        const existing = await this.repository.findDiscoveryAlert(tenantId, search.id, result.id);
+        if (existing) {
+          continue;
+        }
+
+        const alert: AdvertDiscoveryAlertRecord = {
+          id: randomUUID(),
+          tenantId,
+          savedSearchId: search.id,
+          advertId: result.id,
+          title: `New discovery match: ${result.title}`,
+          message: `${result.displayName} matches "${search.query}" with score ${result.rankScore}.`,
+          rankScore: result.rankScore,
+          reasonCodes: result.rankReasons,
+          createdAt: now,
+        };
+        await this.repository.createDiscoveryAlert(alert);
+        alertsCreated.push(alert);
+      }
+
+      await this.repository.updateSavedSearch({
+        ...search,
+        lastAlertedAt: now,
+        updatedAt: now,
+      });
+    }
+
+    await this.auth?.recordTenantAudit({
+      tenantId,
+      actorUserId,
+      action: 'ADVERT_SAVED_SEARCH_ALERTS_RUN',
+      entityType: 'ADVERT_SAVED_SEARCH',
+      metadata: {
+        savedSearchesChecked: searches.length,
+        alertsCreated: alertsCreated.length,
+      },
+    });
+
+    return {
+      checkedAt: now,
+      savedSearchesChecked: searches.length,
+      alertsCreated,
+    };
+  }
+
+  async rebuildDiscoveryIndex(
+    tenantId: string,
+    actorUserId?: string,
+  ): Promise<{ tenantId: string; indexed: number; removed: number }> {
+    const adverts = await this.repository.listPublishedAdverts(tenantId);
+    let indexed = 0;
+    let removed = 0;
+
+    for (const advert of adverts) {
+      if (advert.status === 'AUTO_DELETED' || advert.status === 'ARCHIVED') {
+        await this.repository.deleteDiscoveryIndex(tenantId, advert.id);
+        removed += 1;
+        continue;
+      }
+
+      await this.syncDiscoveryIndex(advert);
+      indexed += 1;
+    }
+
+    await this.auth?.recordTenantAudit({
+      tenantId,
+      actorUserId,
+      action: 'ADVERT_DISCOVERY_INDEX_REBUILT',
+      entityType: 'ADVERT_DISCOVERY_INDEX',
+      metadata: { indexed, removed },
+    });
+
+    return { tenantId, indexed, removed };
   }
 
   async runLifecycle(tenantId: string, input: RunAdvertLifecycleDto = {}) {
@@ -601,6 +773,7 @@ export class AdvertsService {
         };
         await this.repository.updatePublishedAdvert(deletedAdvert);
         await this.repository.archiveMediaAssets(tenantId, 'ADVERT', advert.id, now);
+        await this.repository.deleteDiscoveryIndex(tenantId, advert.id);
         deleted.push(deletedAdvert);
         continue;
       }
@@ -616,6 +789,7 @@ export class AdvertsService {
           updatedAt: now,
         };
         await this.repository.updatePublishedAdvert(updatedAdvert);
+        await this.syncDiscoveryIndex(updatedAdvert);
 
         for (const day of dueDays) {
           const notification = this.createRenewalNotification(tenantId, updatedAdvert, day, now);
@@ -948,21 +1122,18 @@ export class AdvertsService {
   }
 
   private async rankPublicAdvert(
-    advert: AdvertPost,
+    entry: AdvertDiscoveryIndexRecord,
+    query: string | undefined,
     terms: string[],
     now: string,
-  ): Promise<PublicAdvertSearchResult> {
+  ): Promise<PublicAdvertSearchResult | undefined> {
+    const advert = await this.repository.findPublishedAdvert(entry.tenantId, entry.advertId);
+    if (!advert || advert.status === 'AUTO_DELETED' || advert.status === 'ARCHIVED') {
+      return undefined;
+    }
+
     const withMedia = await this.withMedia(advert);
-    const searchable = this.normalizeSearchText(
-      [
-        advert.title,
-        advert.displayName,
-        advert.description,
-        advert.industryCode,
-        advert.role,
-        advert.countryCode,
-      ].join(' '),
-    );
+    const searchable = entry.searchText;
     const rankReasons: string[] = [];
     let rankScore = 0;
 
@@ -981,6 +1152,33 @@ export class AdvertsService {
         rankScore += 20;
         rankReasons.push(`MATCH_BODY:${term}`);
       }
+    }
+
+    const vectorScore = query
+      ? scoreDiscoveryVector(query, entry.tokenVector)
+      : { score: 0, matchedTerms: [] };
+    if (vectorScore.score > 0) {
+      rankScore += vectorScore.score;
+      rankReasons.push('VECTOR_MATCH');
+    }
+
+    const desiredRoles = query ? inferDesiredDiscoveryRoles(query) : [];
+    const matchingRelationshipSignals = entry.relationshipSignals.filter((signal) =>
+      desiredRoles.includes(signal.role),
+    );
+    if (matchingRelationshipSignals.length > 0) {
+      rankScore += Math.round(
+        matchingRelationshipSignals.reduce((sum, signal) => sum + signal.weight, 0) * 70,
+      );
+      for (const signal of matchingRelationshipSignals.slice(0, 3)) {
+        rankReasons.push(`RELATIONSHIP_GRAPH:${signal.role}`);
+      }
+    } else if (!desiredRoles.length && entry.relationshipSignals.length > 0) {
+      rankScore += Math.min(
+        18,
+        Math.round(entry.relationshipSignals.reduce((sum, signal) => sum + signal.weight, 0) * 5),
+      );
+      rankReasons.push('RELATIONSHIP_GRAPH');
     }
 
     const boosted = this.isBoostActive(advert, now);
@@ -1010,23 +1208,112 @@ export class AdvertsService {
       rankScore,
       rankReasons,
       boosted,
+      matchedTerms: vectorScore.matchedTerms,
+      relationshipSignals: entry.relationshipSignals,
     };
   }
 
-  private isDiscoverable(advert: AdvertPost, input: PublicAdvertSearchDto, now: string): boolean {
-    if (advert.status !== 'LIVE' && advert.status !== 'RENEWAL_DUE') {
+  private isDiscoveryEntryDiscoverable(
+    entry: AdvertDiscoveryIndexRecord,
+    input: PublicAdvertSearchDto,
+    now: string,
+  ): boolean {
+    if (entry.status !== 'LIVE' && entry.status !== 'RENEWAL_DUE') {
       return false;
     }
 
-    if (calculateAdvertLifecycle(advert.publishedAt, now).shouldAutoDelete) {
+    if (Date.parse(entry.expiresAt) <= Date.parse(now)) {
       return false;
     }
 
     return (
-      (!input.countryCode || advert.countryCode === input.countryCode.toUpperCase()) &&
-      (!input.industryCode || advert.industryCode === input.industryCode) &&
-      (!input.role || advert.role === input.role)
+      (!input.countryCode || entry.countryCode === input.countryCode.toUpperCase()) &&
+      (!input.industryCode || entry.industryCode === input.industryCode) &&
+      (!input.role || entry.role === input.role)
     );
+  }
+
+  private async syncDiscoveryIndex(advert: AdvertPost): Promise<void> {
+    if (advert.status === 'AUTO_DELETED' || advert.status === 'ARCHIVED') {
+      await this.repository.deleteDiscoveryIndex(advert.tenantId, advert.id);
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const document = buildDiscoveryIndexDocument({
+      title: advert.title,
+      displayName: advert.displayName,
+      description: advert.description,
+      industryCode: advert.industryCode,
+      countryCode: advert.countryCode,
+      role: advert.role,
+    });
+    await this.repository.upsertDiscoveryIndex({
+      id: randomUUID(),
+      tenantId: advert.tenantId,
+      advertId: advert.id,
+      countryCode: advert.countryCode,
+      industryCode: advert.industryCode,
+      role: advert.role,
+      status: advert.status,
+      title: advert.title,
+      displayName: advert.displayName,
+      description: advert.description,
+      searchText: document.searchText,
+      tokenVector: document.tokenVector,
+      relationshipSignals: document.relationshipSignals,
+      publishedAt: advert.publishedAt,
+      expiresAt: advert.expiresAt,
+      boostedAt: advert.boostedAt,
+      boostExpiresAt: advert.boostExpiresAt,
+      boostWeight: advert.boostWeight,
+      indexedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  private async getSavedSearch(tenantId: string, id: string): Promise<SavedAdvertSearchRecord> {
+    const search = await this.repository.findSavedSearch(tenantId, id);
+    if (!search) {
+      throw new NotFoundException('Saved advert search not found.');
+    }
+
+    return search;
+  }
+
+  private normalizeSavedSearchInput(input: CreateSavedAdvertSearchDto): CreateSavedAdvertSearchDto {
+    const normalized: CreateSavedAdvertSearchDto = {
+      name: input.name.trim(),
+      q: input.q.trim(),
+      countryCode: input.countryCode?.trim().toUpperCase(),
+      industryCode: input.industryCode?.trim(),
+      role: input.role,
+      alertFrequency: input.alertFrequency,
+    };
+    this.assertValidPublicSearch(normalized);
+    return normalized;
+  }
+
+  private assertValidPublicSearch(input: PublicAdvertSearchDto | CreateSavedAdvertSearchDto): void {
+    const safety = evaluateSafetyFields(input);
+    if (!safety.allowed) {
+      throw new UnprocessableEntityException({
+        message: 'Public advert discovery matches a zero-tolerance blocked category.',
+        safety,
+      });
+    }
+
+    if (input.countryCode && !getCountry(input.countryCode.toUpperCase())) {
+      throw new UnprocessableEntityException('Unsupported country.');
+    }
+
+    if (
+      input.industryCode &&
+      !industryCategories.some((industry) => industry.code === input.industryCode)
+    ) {
+      throw new UnprocessableEntityException('Unsupported industry.');
+    }
   }
 
   private isBoostActive(advert: AdvertPost, now: string): boolean {

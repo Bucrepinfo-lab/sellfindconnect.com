@@ -8,12 +8,14 @@ import {
   BoostAdvertDto,
   CreateAdvertDto,
   CreateAdvertMediaDto,
+  CreateSavedAdvertSearchDto,
   DuplicateAdvertDto,
   PrepareAdvertMediaUploadDto,
   PublicAdvertSearchDto,
   PublishAdvertDraftDto,
   RenewAdvertDto,
   RunAdvertLifecycleDto,
+  RunSavedAdvertSearchAlertsDto,
   UpdateAdvertDraftDto,
 } from './dto/create-advert.dto';
 
@@ -103,6 +105,42 @@ export class AdvertsController {
   @Get('notifications')
   listNotifications(@TenantId() tenantId: string) {
     return this.adverts.listNotifications(tenantId);
+  }
+
+  @Post('discovery/reindex')
+  rebuildDiscoveryIndex(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+  ) {
+    return this.adverts.rebuildDiscoveryIndex(tenantId, session.userId);
+  }
+
+  @Post('saved-searches')
+  createSavedSearch(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Body() body: CreateSavedAdvertSearchDto,
+  ) {
+    return this.adverts.createSavedSearch(tenantId, body, session.userId);
+  }
+
+  @Get('saved-searches')
+  listSavedSearches(@TenantId() tenantId: string) {
+    return this.adverts.listSavedSearches(tenantId);
+  }
+
+  @Post('saved-searches/alerts/run')
+  runSavedSearchAlerts(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Body() body: RunSavedAdvertSearchAlertsDto,
+  ) {
+    return this.adverts.runSavedSearchAlerts(tenantId, body, session.userId);
+  }
+
+  @Get('discovery/alerts')
+  listDiscoveryAlerts(@TenantId() tenantId: string) {
+    return this.adverts.listDiscoveryAlerts(tenantId);
   }
 
   @Get(':id/media')

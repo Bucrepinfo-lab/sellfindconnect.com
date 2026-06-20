@@ -476,8 +476,11 @@ Implementation progress:
   30-day maximum boost windows, and public listing discovery ranking that
   filters live/renewal-due adverts by country, industry, role, blocked search
   safety, active boost, freshness, query matches, and available media.
-- Live storage credentials, approved media vendors, persisted search indexing,
-  saved searches, and richer discovery analytics remain next.
+- Added a persisted advert discovery index foundation with full-text token
+  fields, sparse vector scoring, relationship graph signals, saved advert
+  searches, de-duplicated discovery alerts, and index rebuild controls.
+- Live storage credentials, approved media vendors, typo tolerance, richer
+  discovery analytics, and web/mobile saved-search UX remain next.
 
 ### 7.5 Search and Discovery
 
@@ -517,9 +520,13 @@ Implementation progress on 2026-06-20:
   country/industry/role filters, explainable ranking reasons, live/renewal-due
   visibility checks, active boost scoring, freshness scoring, and media presence
   scoring.
-- Remaining hardening: full-text/vector search index, typo tolerance, saved
-  searches, relationship graph ranking, analytics counters, and privacy/consent
-  controls for behavioral matching.
+- Added persisted advert discovery index records, deterministic sparse vector
+  scoring, relationship graph role signals, saved searches, de-duplicated alert
+  records, and tenant reindex controls.
+- Remaining hardening: Postgres full-text/pgvector or external search provider,
+  typo tolerance, synonym dictionaries, relationship claim approval, analytics
+  counters, hierarchy dashboards, and privacy/consent controls for behavioral
+  matching.
 
 ### 7.6 Precision Matching and Link Intelligence
 

@@ -244,6 +244,9 @@ model Tenant {
   advertDrafts                 AdvertDraft[]
   publishedAdverts             PublishedAdvert[]
   advertLifecycleNotifications AdvertLifecycleNotification[]
+  advertDiscoveryIndexes       AdvertDiscoveryIndex[]
+  savedAdvertSearches          SavedAdvertSearch[]
+  advertDiscoveryAlerts        AdvertDiscoveryAlert[]
   mediaAssets                  MediaAsset[]
   taxSnapshots                 TaxCalculationSnapshot[]
   analyticsEvents              AnalyticsEvent[]
@@ -567,6 +570,73 @@ model AdvertLifecycleNotification {
 
   @@unique([advertId, day])
   @@index([tenantId, scheduledFor])
+}
+
+model AdvertDiscoveryIndex {
+  id                  String    @id @default(uuid())
+  tenantId            String
+  advertId            String    @db.VarChar(120)
+  countryCode         String    @db.VarChar(2)
+  industryCode        String    @db.VarChar(80)
+  role                String    @db.VarChar(80)
+  status              String    @db.VarChar(40)
+  title               String    @db.VarChar(160)
+  displayName         String    @db.VarChar(160)
+  description         String
+  searchText          String
+  tokenVector         Json
+  relationshipSignals Json?
+  publishedAt         DateTime
+  expiresAt           DateTime
+  boostedAt           DateTime?
+  boostExpiresAt      DateTime?
+  boostWeight         Int?
+  indexedAt           DateTime
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  tenant              Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, advertId])
+  @@index([countryCode, industryCode, role, status])
+  @@index([status, indexedAt])
+  @@index([tenantId, status, indexedAt])
+}
+
+model SavedAdvertSearch {
+  id             String                 @id @default(uuid())
+  tenantId       String
+  name           String                 @db.VarChar(120)
+  query          String                 @db.VarChar(240)
+  countryCode    String?                @db.VarChar(2)
+  industryCode   String?                @db.VarChar(80)
+  role           String?                @db.VarChar(80)
+  alertFrequency String                 @default("DAILY") @db.VarChar(40)
+  isActive       Boolean                @default(true)
+  lastAlertedAt  DateTime?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  tenant         Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  alerts         AdvertDiscoveryAlert[]
+
+  @@index([tenantId, isActive])
+  @@index([tenantId, updatedAt])
+}
+
+model AdvertDiscoveryAlert {
+  id            String            @id @default(uuid())
+  tenantId      String
+  savedSearchId String
+  advertId      String            @db.VarChar(120)
+  title         String            @db.VarChar(160)
+  message       String
+  rankScore     Int
+  reasonCodes   Json?
+  createdAt     DateTime          @default(now())
+  tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  savedSearch   SavedAdvertSearch @relation(fields: [savedSearchId], references: [id], onDelete: Cascade)
+
+  @@unique([savedSearchId, advertId])
+  @@index([tenantId, createdAt])
 }
 
 model MediaAsset {

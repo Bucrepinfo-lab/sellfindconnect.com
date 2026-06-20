@@ -144,6 +144,75 @@ describe('AdvertsService', () => {
     });
   });
 
+  it('uses discovery index vector and relationship graph ranking for public adverts', async () => {
+    const service = new AdvertsService();
+    const advert = await service.createAdvert(tenantId, {
+      title: 'Fresh vegetable supply',
+      displayName: 'Nairobi Fresh Produce',
+      industryCode: 'AGRICULTURE',
+      role: 'SUPPLIER',
+      description: 'We supply fresh vegetables to hotels and retailers in Nairobi.',
+      countryCode: 'KE',
+      publishedAt: '2026-07-01T00:00:00.000Z',
+    });
+
+    const results = await service.searchPublicAdverts({
+      q: 'fresh vegetable hotel buyers',
+      countryCode: 'KE',
+      now: '2026-07-02T00:00:00.000Z',
+    });
+
+    expect(results.results[0]).toMatchObject({
+      id: advert.id,
+      rankReasons: expect.arrayContaining(['VECTOR_MATCH', 'RELATIONSHIP_GRAPH:BUYER']),
+      matchedTerms: expect.arrayContaining(['fresh', 'vegetable']),
+    });
+    expect(results.results[0]?.relationshipSignals.map((signal) => signal.role)).toContain('BUYER');
+  });
+
+  it('creates saved search alerts from discovery matches without duplicating adverts', async () => {
+    const service = new AdvertsService();
+    const advert = await service.createAdvert(tenantId, {
+      title: 'Fresh vegetable supply',
+      displayName: 'Nairobi Fresh Produce',
+      industryCode: 'AGRICULTURE',
+      role: 'SUPPLIER',
+      description: 'We supply fresh vegetables to hotels and retailers in Nairobi.',
+      countryCode: 'KE',
+      publishedAt: '2026-07-01T00:00:00.000Z',
+    });
+    const saved = await service.createSavedSearch(tenantId, {
+      name: 'Fresh vegetable buyers',
+      q: 'fresh vegetable buyers',
+      countryCode: 'KE',
+      alertFrequency: 'DAILY',
+    });
+
+    const firstRun = await service.runSavedSearchAlerts(tenantId, {
+      savedSearchId: saved.id,
+      now: '2026-07-02T00:00:00.000Z',
+    });
+    const secondRun = await service.runSavedSearchAlerts(tenantId, {
+      savedSearchId: saved.id,
+      now: '2026-07-02T12:00:00.000Z',
+    });
+
+    expect(firstRun.alertsCreated).toHaveLength(1);
+    expect(firstRun.alertsCreated[0]).toMatchObject({
+      advertId: advert.id,
+      savedSearchId: saved.id,
+      reasonCodes: expect.arrayContaining(['VECTOR_MATCH', 'RELATIONSHIP_GRAPH:BUYER']),
+    });
+    expect(secondRun.alertsCreated).toHaveLength(0);
+    await expect(service.listDiscoveryAlerts(tenantId)).resolves.toHaveLength(1);
+    await expect(service.listSavedSearches(tenantId)).resolves.toEqual([
+      expect.objectContaining({
+        id: saved.id,
+        lastAlertedAt: '2026-07-02T12:00:00.000Z',
+      }),
+    ]);
+  });
+
   it('blocks public discovery searches for prohibited categories', async () => {
     const { service } = await createService();
 
