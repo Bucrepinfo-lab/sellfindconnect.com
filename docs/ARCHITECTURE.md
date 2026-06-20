@@ -98,8 +98,10 @@ without validating it against the authenticated user's assignments.
   can call malware/media scanning, image transform, and video transcoding
   providers. Prisma media-result publication updates `MediaAsset` moderation
   state, blocked fail-closed state, transform status, CDN URLs, thumbnails, and
-  variants. Approved live vendors, CDN publication verification, and
-  unsafe-media escalation remain production readiness work.
+  variants. Unsafe or final-failed processing creates durable
+  `MediaReviewCase` records with severity, reason, source job, provider, and
+  evidence. Approved live vendors, CDN publication verification, moderator case
+  actions, and legal/reporting escalation remain production readiness work.
 - Listings: draft, preview, publish, media, lifecycle, and visibility. Advert
   listing, lifecycle, and media routes require an MFA-verified tenant session.
   Advert media uses shared `MediaAsset` metadata, the ten-item display cap,
@@ -192,7 +194,8 @@ workflow are approved.
   a dedicated worker service once provider adapters are configured. Media asset
   result publication uses `MEDIA_ASSET_RESULT_PUBLISHER_DRIVER=prisma` or is
   selected automatically when the Prisma media queue is enabled with
-  `DATABASE_URL`.
+  `DATABASE_URL`. Unsafe media review cases are persisted in `MediaReviewCase`
+  and indexed by tenant, status, severity, job type, media, and source job.
 
 ## Notification Flow
 

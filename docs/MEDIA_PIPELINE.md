@@ -22,8 +22,12 @@ Last updated: 2026-06-20
 - Completed worker jobs can publish result metadata back into Prisma
   `MediaAsset` records, including moderation decisions, transform status,
   CDN URLs, thumbnails, variants, and fail-closed blocked/failed states.
+- Unsafe or final-failed media processing can create durable
+  `MediaReviewCase` records with severity, reason, provider, job evidence, and
+  source media references for moderation follow-up.
 - Production still needs live provider credentials, vendor-specific endpoint
-  mapping, unsafe-media escalation workflow, and CDN publication verification.
+  mapping, moderator case actions, legal/reporting escalation playbooks, and
+  CDN publication verification.
 
 ## Storage Modes
 
@@ -148,6 +152,15 @@ explicitly configured. Publication behavior:
 - Image/video transform success: writes transform status, CDN URL, thumbnail URL, and variants.
 - Final transform failure: sets transform status to `FAILED`.
 
+Unsafe/final-failed publication also opens a `MediaReviewCase`:
+
+- `MALWARE_SCAN`: `CRITICAL`
+- `CONTENT_MODERATION`: `HIGH`
+- `IMAGE_TRANSFORM` / `VIDEO_TRANSCODE`: `MEDIUM`
+
+The case preserves job ID, job type, attempts, object key, source URL, provider
+result metadata, last error, and the exact media patch applied by publication.
+
 ## Upload Contract
 
 The API returns:
@@ -182,8 +195,8 @@ Workers should:
 
 Job states are `QUEUED`, `RUNNING`, `SUCCEEDED`, and `FAILED`. The next
 hardening step is to connect approved live vendors, verify each provider's
-response schema, publish CDN assets, and add unsafe-media escalation cases for
-human review.
+response schema, publish CDN assets, and add moderator case assignment,
+resolution, and country/legal escalation actions.
 
 Internal batch runner:
 

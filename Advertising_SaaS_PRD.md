@@ -375,9 +375,13 @@ Implementation progress on 2026-06-19:
 - Added Prisma media asset result publication from completed/final worker jobs,
   including moderation state, blocked fail-closed states, transform status,
   CDN URLs, thumbnails, and responsive variants.
+- Added durable unsafe-media review cases through Prisma `MediaReviewCase`
+  records for blocked or final-failed scan/moderation/transform output,
+  including severity, source job, provider, reason, and evidence.
 - Remaining hardening: live object-storage credentials, approved provider
-  endpoints, CDN publication verification, unsafe-media escalation, richer
-  review case management, and user-facing review status in web/mobile clients.
+  endpoints, CDN publication verification, moderator case assignment and
+  resolution, legal/reporting escalation playbooks, richer review case
+  management, and user-facing review status in web/mobile clients.
 
 ### 7.3 Media Display Area
 
@@ -452,8 +456,10 @@ Implementation progress:
   profile media jobs.
 - Added shared HTTP processor adapters and Prisma media-result publication for
   advert and profile media worker output.
+- Added durable media review cases for unsafe or final-failed advert/profile
+  media processing output.
 - Durable advert drafts, persisted advert repository, live storage credentials,
-  approved media vendors, unsafe-media review escalation, pause/archive/renew
+  approved media vendors, moderator review-case actions, pause/archive/renew
   controls, and public listing preview remain next.
 
 ### 7.5 Search and Discovery

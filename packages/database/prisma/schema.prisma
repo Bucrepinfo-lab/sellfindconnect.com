@@ -250,6 +250,7 @@ model Tenant {
   notificationPreferences   NotificationPreference[]
   notificationOutboxRecords NotificationOutboxRecord[]
   mediaProcessingJobs       MediaProcessingJob[]
+  mediaReviewCases          MediaReviewCase[]
   accessAssignments         AccessAssignment[]
   accessDecisionAudits      AccessDecisionAudit[]
   authSessions              AuthSession[]
@@ -556,6 +557,35 @@ model MediaProcessingJob {
   @@index([type, status, availableAt])
   @@index([mediaId, type, status])
   @@index([lockedBy, status])
+}
+
+model MediaReviewCase {
+  id          String    @id @default(uuid())
+  tenantId    String
+  mediaId     String    @db.VarChar(120)
+  ownerType   String    @db.VarChar(40)
+  ownerId     String    @db.VarChar(120)
+  sourceJobId String?   @db.VarChar(120)
+  jobType     String    @db.VarChar(40)
+  severity    String    @db.VarChar(40)
+  status      String    @db.VarChar(40) @default("OPEN")
+  reason      String    @db.VarChar(240)
+  provider    String?   @db.VarChar(120)
+  evidence    Json?
+  openedAt    DateTime  @default(now())
+  resolvedAt  DateTime?
+  resolvedBy  String?   @db.VarChar(120)
+  resolution  String?   @db.VarChar(120)
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status, openedAt])
+  @@index([mediaId, status])
+  @@index([jobType, status])
+  @@index([severity, status])
+  @@index([sourceJobId])
 }
 
 model Notification {

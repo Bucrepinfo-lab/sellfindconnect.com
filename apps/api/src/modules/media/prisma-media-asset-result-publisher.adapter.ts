@@ -3,9 +3,11 @@ import { Prisma, PrismaClient } from '@prisma/client';
 
 import {
   buildMediaAssetPublicationPatch,
+  buildMediaReviewCaseDraft,
   type MediaAssetPublicationResult,
   type MediaAssetResultPublicationInput,
   type MediaAssetResultPublisherAdapter,
+  type MediaReviewCaseDraft,
 } from './media-result-publisher';
 
 export function createMediaAssetPublisherPrismaClient(connectionString: string) {
@@ -40,11 +42,14 @@ export class PrismaMediaAssetResultPublisherAdapter
       data: this.mapPatchToPrisma(patch),
     });
 
+    const reviewCase = await this.createReviewCase(input, patch);
+
     return {
       mediaId: input.job.mediaId,
       published: updated.count > 0,
       reason: updated.count > 0 ? undefined : 'Media asset was not found for publication.',
       patch,
+      reviewCase,
     };
   }
 
@@ -84,5 +89,48 @@ export class PrismaMediaAssetResultPublisherAdapter
     }
 
     return data;
+  }
+
+  private async createReviewCase(
+    input: MediaAssetResultPublicationInput,
+    patch: NonNullable<MediaAssetPublicationResult['patch']>,
+  ): Promise<MediaReviewCaseDraft | undefined> {
+    const draft = buildMediaReviewCaseDraft(input, patch);
+    if (!draft) {
+      return undefined;
+    }
+
+    const existing = await this.prisma.mediaReviewCase.findFirst({
+      where: {
+        tenantId: draft.tenantId,
+        mediaId: draft.mediaId,
+        sourceJobId: draft.sourceJobId,
+        jobType: draft.jobType,
+        status: 'OPEN',
+      },
+    });
+
+    if (existing) {
+      return draft;
+    }
+
+    await this.prisma.mediaReviewCase.create({
+      data: {
+        tenantId: draft.tenantId,
+        mediaId: draft.mediaId,
+        ownerType: draft.ownerType,
+        ownerId: draft.ownerId,
+        sourceJobId: draft.sourceJobId,
+        jobType: draft.jobType,
+        severity: draft.severity,
+        status: draft.status,
+        reason: draft.reason,
+        provider: draft.provider,
+        evidence: draft.evidence as Prisma.InputJsonValue,
+        openedAt: new Date(draft.openedAt),
+      },
+    });
+
+    return draft;
   }
 }

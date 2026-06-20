@@ -207,9 +207,12 @@ Progress:
 - Added Prisma media asset result publication for completed/final worker jobs,
   including moderation state, blocked fail-closed states, transform status,
   CDN URLs, thumbnails, and responsive variants.
+- Added durable unsafe-media review cases through Prisma `MediaReviewCase`
+  records, including severity, reason, provider, source job, media reference,
+  and evidence payload for blocked or final-failed media processing.
 - Real object-storage credentials, approved live provider endpoints, CDN
-  publication verification, unsafe-media escalation cases, and richer review
-  case management remain next.
+  publication verification, moderator case assignment/resolution, country/legal
+  escalation actions, and richer review case management remain next.
 
 ## Epic 4: Listing and Media Vertical Slice
 
@@ -248,9 +251,11 @@ Progress:
   profile media worker jobs.
 - Added shared HTTP processor adapters and Prisma media-result publication for
   advert and profile media worker output.
+- Added durable media review cases for unsafe or final-failed advert/profile
+  media processing output.
 - A durable advert lifecycle scheduler, persisted advert repository, live
-  storage credentials, approved media vendors, and media-result review
-  escalation remain next.
+  storage credentials, approved media vendors, and moderator review-case
+  actions remain next.
 
 ## Epic 5: Source Finder and Relationship Graph
 

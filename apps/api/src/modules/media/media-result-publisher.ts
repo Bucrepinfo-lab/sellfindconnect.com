@@ -37,6 +37,7 @@ export type MediaAssetPublicationResult = {
   published: boolean;
   reason?: string;
   patch?: MediaAssetPublicationPatch;
+  reviewCase?: MediaReviewCaseDraft;
 };
 
 export interface MediaAssetResultPublisherAdapter {
@@ -51,6 +52,7 @@ export class NoopMediaAssetResultPublisherAdapter implements MediaAssetResultPub
       published: false,
       reason: 'No media asset result publisher is configured.',
       patch,
+      reviewCase: buildMediaReviewCaseDraft(input, patch),
     };
   }
 }
@@ -106,6 +108,101 @@ export function buildMediaAssetPublicationPatch(
     case 'VIDEO_TRANSCODE':
       return buildTransformPatch(result, input.occurredAt);
   }
+}
+
+export type MediaReviewCaseSeverity = 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
+export type MediaReviewCaseDraft = {
+  tenantId: string;
+  mediaId: string;
+  ownerType: string;
+  ownerId: string;
+  sourceJobId: string;
+  jobType: string;
+  severity: MediaReviewCaseSeverity;
+  status: 'OPEN';
+  reason: string;
+  provider?: string;
+  evidence: MediaProcessingJobMetadata;
+  openedAt: string;
+};
+
+export function buildMediaReviewCaseDraft(
+  input: MediaAssetResultPublicationInput,
+  patch = buildMediaAssetPublicationPatch(input),
+): MediaReviewCaseDraft | undefined {
+  if (!patch || !requiresMediaReviewCase(input, patch)) {
+    return undefined;
+  }
+
+  return {
+    tenantId: input.job.tenantId,
+    mediaId: input.job.mediaId,
+    ownerType: input.job.ownerType,
+    ownerId: input.job.ownerId,
+    sourceJobId: input.job.id,
+    jobType: input.job.type,
+    severity: reviewCaseSeverity(input),
+    status: 'OPEN',
+    reason: reviewCaseReason(input, patch),
+    provider: readString(input.job.result ?? {}, 'provider'),
+    evidence: reviewCaseEvidence(input, patch),
+    openedAt: input.occurredAt,
+  };
+}
+
+function requiresMediaReviewCase(
+  input: MediaAssetResultPublicationInput,
+  patch: MediaAssetPublicationPatch,
+): boolean {
+  return (
+    input.outcome === 'FAILED' ||
+    patch.status === 'BLOCKED' ||
+    patch.moderationStatus === 'BLOCKED' ||
+    patch.transformStatus === 'FAILED'
+  );
+}
+
+function reviewCaseSeverity(input: MediaAssetResultPublicationInput): MediaReviewCaseSeverity {
+  if (input.job.type === 'MALWARE_SCAN') {
+    return 'CRITICAL';
+  }
+
+  if (input.job.type === 'CONTENT_MODERATION') {
+    return 'HIGH';
+  }
+
+  return 'MEDIUM';
+}
+
+function reviewCaseReason(
+  input: MediaAssetResultPublicationInput,
+  patch: MediaAssetPublicationPatch,
+): string {
+  return truncateReviewReason(
+    input.reason ??
+      patch.moderationReason ??
+      input.job.lastError ??
+      readString(input.job.result ?? {}, 'reason') ??
+      `${input.job.type}_REQUIRES_REVIEW`,
+  );
+}
+
+function reviewCaseEvidence(
+  input: MediaAssetResultPublicationInput,
+  patch: MediaAssetPublicationPatch,
+): MediaProcessingJobMetadata {
+  return {
+    outcome: input.outcome,
+    jobId: input.job.id,
+    jobType: input.job.type,
+    attempts: input.job.attempts,
+    sourceUrl: input.job.sourceUrl,
+    objectKey: input.job.objectKey ?? null,
+    lastError: input.job.lastError ?? null,
+    result: input.job.result ?? {},
+    patch: patch as unknown as MediaProcessingJobMetadata,
+  };
 }
 
 function buildFailedPatch(input: MediaAssetResultPublicationInput): MediaAssetPublicationPatch {
@@ -244,6 +341,10 @@ function isPassingVerdict(value: string | undefined): boolean {
 
 function truncateReason(value: string): string {
   return value.trim().slice(0, 120) || 'MEDIA_PROCESSING_FAILED';
+}
+
+function truncateReviewReason(value: string): string {
+  return value.trim().slice(0, 240) || 'MEDIA_REVIEW_REQUIRED';
 }
 
 function normalizeConfigString(value: string | undefined): string | undefined {
