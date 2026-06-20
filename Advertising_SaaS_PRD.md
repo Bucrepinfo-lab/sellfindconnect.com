@@ -382,10 +382,14 @@ Implementation progress on 2026-06-19:
   `MODERATE_CONTENT` moderators to list scoped review cases, resolve cases as
   confirmed blocked, restored, escalated, or dismissed, block unsafe moderator
   notes, and persist tenant audit evidence for the decision.
+- Added moderator assignment queues for open media review cases, including
+  assigned/unassigned filters, assignment notes, assignment timestamps, scoped
+  platform access enforcement, unsafe assignment-note blocking, and tenant audit
+  evidence.
 - Remaining hardening: live object-storage credentials, approved provider
-  endpoints, CDN publication verification, moderator case assignment queues,
-  legal/reporting escalation playbooks, richer review case management, and
-  user-facing review status in web/mobile clients.
+  endpoints, CDN publication verification, legal/reporting escalation playbooks,
+  richer review case management, and user-facing review status in web/mobile
+  clients.
 
 ### 7.3 Media Display Area
 
@@ -468,9 +472,12 @@ Implementation progress:
   and Prisma implementations, database migration support, draft preview,
   publish-to-live versioning, persisted renewal alerts, and pause/archive/renew
   controls.
-- Live storage credentials, approved media vendors, moderator case assignment
-  queues, duplicate/boost controls, and richer public listing discovery remain
-  next.
+- Added duplicate controls for draft and live adverts, boost metadata with
+  30-day maximum boost windows, and public listing discovery ranking that
+  filters live/renewal-due adverts by country, industry, role, blocked search
+  safety, active boost, freshness, query matches, and available media.
+- Live storage credentials, approved media vendors, persisted search indexing,
+  saved searches, and richer discovery analytics remain next.
 
 ### 7.5 Search and Discovery
 
@@ -503,6 +510,16 @@ Implementation progress on 2026-06-17:
 - Added a tenant-scoped Source Finder API endpoint with server-side zero-tolerance blocking for prohibited searches.
 - Updated the web Source Finder to use the shared ranking engine, expose sort modes, show match reasons, and display related commercial links.
 - Remaining hardening: persisted search index, saved searches, relationship claim approval, outcome feedback, hierarchy dashboards, and privacy/consent controls for behavioral matching.
+
+Implementation progress on 2026-06-20:
+
+- Added a public advert discovery route with zero-tolerance search blocking,
+  country/industry/role filters, explainable ranking reasons, live/renewal-due
+  visibility checks, active boost scoring, freshness scoring, and media presence
+  scoring.
+- Remaining hardening: full-text/vector search index, typo tolerance, saved
+  searches, relationship graph ranking, analytics counters, and privacy/consent
+  controls for behavioral matching.
 
 ### 7.6 Precision Matching and Link Intelligence
 

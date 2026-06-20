@@ -9,7 +9,11 @@ import { evaluateSafetyFields, getCountry } from '@telpen/domain';
 
 import { AuthService } from '../auth/auth.service';
 import type { AuthTenantRecord, PlatformAccessSession } from '../auth/auth.records';
-import type { ListMediaReviewCasesDto, ResolveMediaReviewCaseDto } from './dto/media-review.dto';
+import type {
+  AssignMediaReviewCaseDto,
+  ListMediaReviewCasesDto,
+  ResolveMediaReviewCaseDto,
+} from './dto/media-review.dto';
 import { InMemoryMediaReviewCaseRepository } from './in-memory-media-review-case.repository';
 import {
   MEDIA_REVIEW_CASE_REPOSITORY,
@@ -35,6 +39,8 @@ export class MediaReviewService {
       status: input.status ?? 'OPEN',
       tenantId: input.tenantId,
       severity: input.severity,
+      assignedTo: input.unassignedOnly ? undefined : input.assignedTo,
+      unassignedOnly: input.unassignedOnly,
       limit: input.limit,
     });
 
@@ -109,6 +115,66 @@ export class MediaReviewService {
 
     return {
       ...resolved,
+      reviewerRole: decision?.role,
+    };
+  }
+
+  async assignCase(
+    id: string,
+    input: AssignMediaReviewCaseDto,
+    session: PlatformAccessSession,
+  ): Promise<MediaReviewCaseRecord & { reviewerRole?: string }> {
+    const existing = await this.repository.findCase(id);
+    if (!existing) {
+      throw new NotFoundException('Media review case not found.');
+    }
+
+    if (existing.status !== 'OPEN') {
+      throw new UnprocessableEntityException('Media review case is no longer open.');
+    }
+
+    if (input.note) {
+      const safety = evaluateSafetyFields({ note: input.note });
+      if (!safety.allowed) {
+        throw new UnprocessableEntityException({
+          message: 'Assignment note matches a zero-tolerance blocked category.',
+          safety,
+        });
+      }
+    }
+
+    const tenantCountryMap = await this.tenantCountryMap();
+    const decision = await this.auth?.requirePlatformAccess(
+      session,
+      'MODERATE_CONTENT',
+      this.caseAccessResource(existing, tenantCountryMap),
+    );
+    const assigned = await this.repository.assignCase({
+      id,
+      assignedTo: input.assignedTo?.trim() || session.userId,
+      assignmentNote: input.note?.trim(),
+    });
+
+    if (!assigned) {
+      throw new UnprocessableEntityException('Media review case is no longer open.');
+    }
+
+    await this.auth?.recordTenantAudit({
+      tenantId: assigned.tenantId,
+      actorUserId: session.userId,
+      action: 'MEDIA_REVIEW_CASE_ASSIGNED',
+      entityType: 'MEDIA_REVIEW_CASE',
+      entityId: assigned.id,
+      metadata: {
+        mediaId: assigned.mediaId,
+        assignedTo: assigned.assignedTo ?? null,
+        role: decision?.role ?? 'GLOBAL_MODERATOR_LEAD',
+        noteProvided: Boolean(input.note),
+      },
+    });
+
+    return {
+      ...assigned,
       reviewerRole: decision?.role,
     };
   }

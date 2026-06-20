@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 import {
   mediaReviewCaseStatuses,
@@ -27,6 +27,18 @@ export class ListMediaReviewCasesDto {
   @MaxLength(40)
   declare severity?: string;
 
+  @ApiPropertyOptional({ example: 'country-mod-1' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  declare assignedTo?: string;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  @IsBoolean()
+  declare unassignedOnly?: boolean;
+
   @ApiPropertyOptional({ example: 50, minimum: 1, maximum: 200 })
   @IsOptional()
   @Type(() => Number)
@@ -34,6 +46,20 @@ export class ListMediaReviewCasesDto {
   @Min(1)
   @Max(200)
   declare limit?: number;
+}
+
+export class AssignMediaReviewCaseDto {
+  @ApiPropertyOptional({ example: 'country-mod-1' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  declare assignedTo?: string;
+
+  @ApiPropertyOptional({ example: 'Prioritize this because the provider reported malware.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  declare note?: string;
 }
 
 export class ResolveMediaReviewCaseDto {

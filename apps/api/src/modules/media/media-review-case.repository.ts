@@ -29,6 +29,9 @@ export type MediaReviewCaseRecord = {
   provider?: string;
   evidence?: MediaProcessingJobMetadata;
   openedAt: string;
+  assignedTo?: string;
+  assignedAt?: string;
+  assignmentNote?: string;
   resolvedAt?: string;
   resolvedBy?: string;
   resolution?: MediaReviewResolution;
@@ -50,7 +53,16 @@ export type ListMediaReviewCasesInput = {
   status?: MediaReviewCaseStatus;
   tenantId?: string;
   severity?: string;
+  assignedTo?: string;
+  unassignedOnly?: boolean;
   limit?: number;
+};
+
+export type AssignMediaReviewCaseInput = {
+  id: string;
+  assignedTo: string;
+  assignedAt?: string;
+  assignmentNote?: string;
 };
 
 export type ResolveMediaReviewCaseInput = {
@@ -65,6 +77,9 @@ export interface MediaReviewCaseRepository {
   createCase(input: CreateMediaReviewCaseInput): RepositoryResult<MediaReviewCaseRecord>;
   findCase(id: string): RepositoryResult<MediaReviewCaseRecord | undefined>;
   listCases(input?: ListMediaReviewCasesInput): RepositoryResult<MediaReviewCaseRecord[]>;
+  assignCase(
+    input: AssignMediaReviewCaseInput,
+  ): RepositoryResult<MediaReviewCaseRecord | undefined>;
   resolveCase(
     input: ResolveMediaReviewCaseInput,
   ): RepositoryResult<MediaReviewCaseRecord | undefined>;

@@ -4,7 +4,11 @@ import { ApiHeader, ApiTags } from '@nestjs/swagger';
 import { PlatformAuthSession } from '../access/platform-access.decorator';
 import { PlatformModerationGuard } from '../access/platform-moderation.guard';
 import type { PlatformAccessSession } from '../auth/auth.records';
-import { ListMediaReviewCasesDto, ResolveMediaReviewCaseDto } from './dto/media-review.dto';
+import {
+  AssignMediaReviewCaseDto,
+  ListMediaReviewCasesDto,
+  ResolveMediaReviewCaseDto,
+} from './dto/media-review.dto';
 import { MediaReviewService } from './media-review.service';
 
 @ApiTags('media-review')
@@ -33,5 +37,14 @@ export class MediaReviewController {
     @Body() body: ResolveMediaReviewCaseDto,
   ) {
     return this.reviews.resolveCase(id, body, session);
+  }
+
+  @Post('reviews/:id/assign')
+  assignCase(
+    @PlatformAuthSession() session: PlatformAccessSession,
+    @Param('id') id: string,
+    @Body() body: AssignMediaReviewCaseDto,
+  ) {
+    return this.reviews.assignCase(id, body, session);
   }
 }

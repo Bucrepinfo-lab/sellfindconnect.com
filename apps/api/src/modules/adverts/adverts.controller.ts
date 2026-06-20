@@ -1,13 +1,16 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 
 import { TenantAuthSession, TenantId } from '../tenant/tenant-context.decorator';
 import { TenantSessionGuard, type TenantSessionDecision } from '../tenant/tenant-session.guard';
 import { AdvertsService } from './adverts.service';
 import {
+  BoostAdvertDto,
   CreateAdvertDto,
   CreateAdvertMediaDto,
+  DuplicateAdvertDto,
   PrepareAdvertMediaUploadDto,
+  PublicAdvertSearchDto,
   PublishAdvertDraftDto,
   RenewAdvertDto,
   RunAdvertLifecycleDto,
@@ -65,6 +68,16 @@ export class AdvertsController {
     @Body() body: UpdateAdvertDraftDto,
   ) {
     return this.adverts.updateDraft(tenantId, id, body, session.userId);
+  }
+
+  @Post('drafts/:id/duplicate')
+  duplicateDraft(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Param('id') id: string,
+    @Body() body: DuplicateAdvertDto,
+  ) {
+    return this.adverts.duplicateDraft(tenantId, id, body, session.userId);
   }
 
   @Post('drafts/:id/preview')
@@ -160,6 +173,16 @@ export class AdvertsController {
     return this.adverts.archiveAdvert(tenantId, id, session.userId);
   }
 
+  @Post(':id/duplicate')
+  duplicateAdvert(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Param('id') id: string,
+    @Body() body: DuplicateAdvertDto,
+  ) {
+    return this.adverts.duplicateAdvert(tenantId, id, body, session.userId);
+  }
+
   @Post(':id/renew')
   renewAdvert(
     @TenantId() tenantId: string,
@@ -170,8 +193,29 @@ export class AdvertsController {
     return this.adverts.renewAdvert(tenantId, id, body, session.userId);
   }
 
+  @Post(':id/boost')
+  boostAdvert(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Param('id') id: string,
+    @Body() body: BoostAdvertDto,
+  ) {
+    return this.adverts.boostAdvert(tenantId, id, body, session.userId);
+  }
+
   @Post('lifecycle/run')
   runLifecycle(@TenantId() tenantId: string, @Body() body: RunAdvertLifecycleDto) {
     return this.adverts.runLifecycle(tenantId, body);
+  }
+}
+
+@ApiTags('public-adverts')
+@Controller('public/adverts')
+export class PublicAdvertsController {
+  constructor(private readonly adverts: AdvertsService) {}
+
+  @Get('search')
+  search(@Query() query: PublicAdvertSearchDto) {
+    return this.adverts.searchPublicAdverts(query);
   }
 }

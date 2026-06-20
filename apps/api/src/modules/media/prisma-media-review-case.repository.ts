@@ -8,6 +8,7 @@ import {
 import type { MediaProcessingJobMetadata } from './media.adapters';
 import {
   type CreateMediaReviewCaseInput,
+  type AssignMediaReviewCaseInput,
   type ListMediaReviewCasesInput,
   type MediaReviewCaseRecord,
   type MediaReviewCaseRepository,
@@ -42,6 +43,9 @@ export class PrismaMediaReviewCaseRepository implements MediaReviewCaseRepositor
         provider: input.provider,
         evidence: this.mapOptionalJsonToPrisma(input.evidence),
         openedAt: new Date(input.openedAt),
+        assignedTo: input.assignedTo,
+        assignedAt: input.assignedAt ? new Date(input.assignedAt) : undefined,
+        assignmentNote: input.assignmentNote,
         resolvedAt: input.resolvedAt ? new Date(input.resolvedAt) : undefined,
         resolvedBy: input.resolvedBy,
         resolution: input.resolution,
@@ -65,12 +69,36 @@ export class PrismaMediaReviewCaseRepository implements MediaReviewCaseRepositor
         ...(input.status ? { status: input.status } : {}),
         ...(input.tenantId ? { tenantId: input.tenantId } : {}),
         ...(input.severity ? { severity: input.severity } : {}),
+        ...(input.assignedTo && !input.unassignedOnly ? { assignedTo: input.assignedTo } : {}),
+        ...(input.unassignedOnly ? { assignedTo: null } : {}),
       },
       orderBy: [{ openedAt: 'desc' }, { createdAt: 'desc' }],
       take: Math.min(200, Math.max(1, input.limit ?? 50)),
     });
 
     return records.map((record) => this.mapCase(record));
+  }
+
+  async assignCase(input: AssignMediaReviewCaseInput): Promise<MediaReviewCaseRecord | undefined> {
+    const assignedAt = input.assignedAt ? new Date(input.assignedAt) : new Date();
+    const updated = await this.prisma.mediaReviewCase.updateMany({
+      where: {
+        id: input.id,
+        status: 'OPEN',
+      },
+      data: {
+        assignedTo: input.assignedTo,
+        assignedAt,
+        assignmentNote: input.assignmentNote,
+        updatedAt: assignedAt,
+      },
+    });
+
+    if (updated.count === 0) {
+      return undefined;
+    }
+
+    return this.findCase(input.id);
   }
 
   async resolveCase(
@@ -114,6 +142,9 @@ export class PrismaMediaReviewCaseRepository implements MediaReviewCaseRepositor
       provider: record.provider ?? undefined,
       evidence: this.mapMetadata(record.evidence),
       openedAt: record.openedAt.toISOString(),
+      assignedTo: record.assignedTo ?? undefined,
+      assignedAt: record.assignedAt?.toISOString(),
+      assignmentNote: record.assignmentNote ?? undefined,
       resolvedAt: record.resolvedAt?.toISOString(),
       resolvedBy: record.resolvedBy ?? undefined,
       resolution: this.mapResolution(record.resolution),

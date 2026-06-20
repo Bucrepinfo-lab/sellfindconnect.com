@@ -163,6 +163,77 @@ export class RenewAdvertDto {
   declare renewedAt?: string;
 }
 
+export class DuplicateAdvertDto {
+  @ApiPropertyOptional({ example: 'Fresh vegetable supply - weekend copy' })
+  @IsOptional()
+  @IsString()
+  @Length(2, 160)
+  declare title?: string;
+}
+
+export class BoostAdvertDto {
+  @ApiProperty({ example: true })
+  @IsBoolean()
+  @Equals(true)
+  declare acceptedTerms: true;
+
+  @ApiPropertyOptional({ example: 3, minimum: 1, maximum: 10 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  declare boostWeight?: number;
+
+  @ApiPropertyOptional({ example: '2026-07-17T00:00:00.000Z' })
+  @IsOptional()
+  @IsISO8601()
+  declare boostExpiresAt?: string;
+
+  @ApiPropertyOptional({ example: '2026-07-10T00:00:00.000Z' })
+  @IsOptional()
+  @IsISO8601()
+  declare boostedAt?: string;
+}
+
+export class PublicAdvertSearchDto {
+  @ApiPropertyOptional({ example: 'fresh vegetables hotel supplier' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  declare q?: string;
+
+  @ApiPropertyOptional({ example: 'KE' })
+  @IsOptional()
+  @IsString()
+  @Length(2, 2)
+  declare countryCode?: string;
+
+  @ApiPropertyOptional({ example: 'AGRICULTURE' })
+  @IsOptional()
+  @IsString()
+  @Length(2, 80)
+  declare industryCode?: string;
+
+  @ApiPropertyOptional({ enum: supplyChainRoles, example: 'SUPPLIER' })
+  @IsOptional()
+  @IsIn(supplyChainRoles)
+  declare role?: (typeof supplyChainRoles)[number];
+
+  @ApiPropertyOptional({ example: 20, minimum: 1, maximum: 100 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  declare limit?: number;
+
+  @ApiPropertyOptional({ example: '2026-07-10T00:00:00.000Z' })
+  @IsOptional()
+  @IsISO8601()
+  declare now?: string;
+}
+
 export class RunAdvertLifecycleDto {
   @ApiPropertyOptional({ example: '2026-07-25T00:00:00.000Z' })
   @IsOptional()

@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 
 import {
   type CreateMediaReviewCaseInput,
+  type AssignMediaReviewCaseInput,
   type ListMediaReviewCasesInput,
   type MediaReviewCaseRecord,
   type MediaReviewCaseRepository,
@@ -37,8 +38,30 @@ export class InMemoryMediaReviewCaseRepository implements MediaReviewCaseReposit
       .filter((record) => (input.status ? record.status === input.status : true))
       .filter((record) => (input.tenantId ? record.tenantId === input.tenantId : true))
       .filter((record) => (input.severity ? record.severity === input.severity : true))
+      .filter((record) =>
+        input.assignedTo && !input.unassignedOnly ? record.assignedTo === input.assignedTo : true,
+      )
+      .filter((record) => (input.unassignedOnly ? !record.assignedTo : true))
       .sort((left, right) => right.openedAt.localeCompare(left.openedAt))
       .slice(0, limit);
+  }
+
+  assignCase(input: AssignMediaReviewCaseInput): MediaReviewCaseRecord | undefined {
+    const existing = this.cases.get(input.id);
+    if (!existing || existing.status !== 'OPEN') {
+      return undefined;
+    }
+
+    const assignedAt = input.assignedAt ?? new Date().toISOString();
+    const assigned: MediaReviewCaseRecord = {
+      ...existing,
+      assignedTo: input.assignedTo,
+      assignedAt,
+      assignmentNote: input.assignmentNote,
+      updatedAt: assignedAt,
+    };
+    this.cases.set(assigned.id, assigned);
+    return assigned;
   }
 
   resolveCase(input: ResolveMediaReviewCaseInput): MediaReviewCaseRecord | undefined {

@@ -102,6 +102,9 @@ export type AdvertPost = AdvertDraftInput & {
   version: number;
   publishedAt: string;
   expiresAt: string;
+  boostedAt?: string;
+  boostExpiresAt?: string;
+  boostWeight?: number;
   pausedAt?: string;
   archivedAt?: string;
   deletedAt?: string;

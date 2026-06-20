@@ -72,6 +72,89 @@ describe('AdvertsService', () => {
     await expect(service.listAdvertMedia(tenantId, published.id)).resolves.toHaveLength(1);
   });
 
+  it('duplicates live adverts into editable drafts with media copied for preview', async () => {
+    const { service, advert } = await createService();
+    await service.addAdvertMedia(tenantId, advert.id, {
+      sourceUrl: 'https://cdn.example.test/fresh-stall.jpg',
+      fileName: 'fresh-stall.jpg',
+      mimeType: 'image/jpeg',
+      fileSizeBytes: 800_000,
+    });
+
+    const duplicate = await service.duplicateAdvert(
+      tenantId,
+      advert.id,
+      { title: 'Fresh vegetable supply copy' },
+      'user-1',
+    );
+
+    expect(duplicate).toMatchObject({
+      status: 'DRAFT',
+      title: 'Copy of Fresh vegetable supply copy',
+      industryCode: advert.industryCode,
+      countryCode: advert.countryCode,
+    });
+    await expect(service.listDraftMedia(tenantId, duplicate.id)).resolves.toHaveLength(1);
+  });
+
+  it('boosts matching public adverts above otherwise similar listings', async () => {
+    const service = new AdvertsService();
+    const regular = await service.createAdvert(tenantId, {
+      title: 'Fresh vegetable supply',
+      displayName: 'Nairobi Fresh Produce',
+      industryCode: 'AGRICULTURE',
+      role: 'SUPPLIER',
+      description: 'We supply fresh vegetables to hotels and retailers in Nairobi.',
+      countryCode: 'KE',
+      publishedAt: '2026-07-01T00:00:00.000Z',
+    });
+    const boosted = await service.createAdvert(tenantId, {
+      title: 'Fresh vegetable delivery',
+      displayName: 'Nairobi Direct Produce',
+      industryCode: 'AGRICULTURE',
+      role: 'SUPPLIER',
+      description: 'We supply fresh vegetables to restaurants and hotels in Nairobi.',
+      countryCode: 'KE',
+      publishedAt: '2026-07-01T00:00:00.000Z',
+    });
+
+    await service.boostAdvert(
+      tenantId,
+      boosted.id,
+      {
+        acceptedTerms: true,
+        boostWeight: 5,
+        boostedAt: '2026-07-02T00:00:00.000Z',
+        boostExpiresAt: '2026-07-16T00:00:00.000Z',
+      },
+      'user-1',
+    );
+    const results = await service.searchPublicAdverts({
+      q: 'fresh vegetables hotels',
+      countryCode: 'KE',
+      industryCode: 'AGRICULTURE',
+      now: '2026-07-03T00:00:00.000Z',
+    });
+
+    expect(results.results.map((item) => item.id)).toEqual([boosted.id, regular.id]);
+    expect(results.results[0]).toMatchObject({
+      boosted: true,
+      boostWeight: 5,
+      rankReasons: expect.arrayContaining(['ACTIVE_BOOST']),
+    });
+  });
+
+  it('blocks public discovery searches for prohibited categories', async () => {
+    const { service } = await createService();
+
+    await expect(
+      service.searchPublicAdverts({
+        q: 'ammunition suppliers near me',
+        countryCode: 'KE',
+      }),
+    ).rejects.toThrow();
+  });
+
   it('prepares provider-neutral advert media upload instructions', async () => {
     const auditLogs: TenantAuditInput[] = [];
     const service = new AdvertsService(undefined, {

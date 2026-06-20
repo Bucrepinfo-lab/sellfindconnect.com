@@ -535,6 +535,9 @@ model PublishedAdvert {
   version           Int       @default(1)
   publishedAt       DateTime
   expiresAt         DateTime
+  boostedAt         DateTime?
+  boostExpiresAt    DateTime?
+  boostWeight       Int?
   renewalAlertsSent Json?
   pausedAt          DateTime?
   archivedAt        DateTime?
@@ -547,6 +550,7 @@ model PublishedAdvert {
   @@index([tenantId, status])
   @@index([sourceDraftId])
   @@index([status, expiresAt])
+  @@index([status, boostExpiresAt])
   @@index([countryCode, industryCode])
 }
 
@@ -635,31 +639,35 @@ model MediaProcessingJob {
 }
 
 model MediaReviewCase {
-  id          String    @id @default(uuid())
-  tenantId    String
-  mediaId     String    @db.VarChar(120)
-  ownerType   String    @db.VarChar(40)
-  ownerId     String    @db.VarChar(120)
-  sourceJobId String?   @db.VarChar(120)
-  jobType     String    @db.VarChar(40)
-  severity    String    @db.VarChar(40)
-  status      String    @default("OPEN") @db.VarChar(40)
-  reason      String    @db.VarChar(240)
-  provider    String?   @db.VarChar(120)
-  evidence    Json?
-  openedAt    DateTime  @default(now())
-  resolvedAt  DateTime?
-  resolvedBy  String?   @db.VarChar(120)
-  resolution  String?   @db.VarChar(120)
-  notes       String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id             String    @id @default(uuid())
+  tenantId       String
+  mediaId        String    @db.VarChar(120)
+  ownerType      String    @db.VarChar(40)
+  ownerId        String    @db.VarChar(120)
+  sourceJobId    String?   @db.VarChar(120)
+  jobType        String    @db.VarChar(40)
+  severity       String    @db.VarChar(40)
+  status         String    @default("OPEN") @db.VarChar(40)
+  reason         String    @db.VarChar(240)
+  provider       String?   @db.VarChar(120)
+  evidence       Json?
+  openedAt       DateTime  @default(now())
+  assignedTo     String?   @db.VarChar(120)
+  assignedAt     DateTime?
+  assignmentNote String?
+  resolvedAt     DateTime?
+  resolvedBy     String?   @db.VarChar(120)
+  resolution     String?   @db.VarChar(120)
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, status, openedAt])
   @@index([mediaId, status])
   @@index([jobType, status])
   @@index([severity, status])
+  @@index([status, assignedTo, openedAt])
   @@index([sourceJobId])
 }
 

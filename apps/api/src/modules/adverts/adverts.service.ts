@@ -17,7 +17,6 @@ import {
   type AdvertDraft,
   type AdvertPost,
   type MediaAsset,
-  type MediaOwnerType,
 } from '@telpen/domain';
 import { randomUUID } from 'node:crypto';
 
@@ -37,7 +36,10 @@ import {
 import type {
   CreateAdvertDto,
   CreateAdvertMediaDto,
+  BoostAdvertDto,
+  DuplicateAdvertDto,
   PrepareAdvertMediaUploadDto,
+  PublicAdvertSearchDto,
   PublishAdvertDraftDto,
   RenewAdvertDto,
   RunAdvertLifecycleDto,
@@ -60,6 +62,11 @@ type AdvertPostWithMedia = AdvertPost & {
   mediaSlots: MediaSlots;
   daysLive: number;
   daysRemaining: number;
+};
+type PublicAdvertSearchResult = AdvertPostWithMedia & {
+  rankScore: number;
+  rankReasons: string[];
+  boosted: boolean;
 };
 
 @Injectable()
@@ -166,6 +173,51 @@ export class AdvertsService {
     });
 
     return updated;
+  }
+
+  async duplicateDraft(
+    tenantId: string,
+    id: string,
+    input: DuplicateAdvertDto = {},
+    actorUserId?: string,
+  ): Promise<AdvertDraft> {
+    const source = await this.getDraft(tenantId, id);
+    const duplicate = await this.createDuplicateDraft(tenantId, source, input.title, actorUserId);
+    await this.copyAdvertMedia(tenantId, source.id, duplicate.id, 'READY_FOR_PREVIEW');
+    await this.auth?.recordTenantAudit({
+      tenantId,
+      actorUserId,
+      action: 'ADVERT_DRAFT_DUPLICATED',
+      entityType: 'ADVERT_DRAFT',
+      entityId: duplicate.id,
+      metadata: {
+        sourceDraftId: source.id,
+      },
+    });
+    return duplicate;
+  }
+
+  async duplicateAdvert(
+    tenantId: string,
+    id: string,
+    input: DuplicateAdvertDto = {},
+    actorUserId?: string,
+  ): Promise<AdvertDraft> {
+    const source = await this.getMutableAdvert(tenantId, id);
+    const duplicate = await this.createDuplicateDraft(tenantId, source, input.title, actorUserId);
+    await this.copyAdvertMedia(tenantId, source.id, duplicate.id, 'READY_FOR_PREVIEW');
+    await this.auth?.recordTenantAudit({
+      tenantId,
+      actorUserId,
+      action: 'ADVERT_DUPLICATED_TO_DRAFT',
+      entityType: 'ADVERT_DRAFT',
+      entityId: duplicate.id,
+      metadata: {
+        sourceAdvertId: source.id,
+        sourceVersion: source.version,
+      },
+    });
+    return duplicate;
   }
 
   async previewDraft(tenantId: string, id: string): Promise<AdvertDraftWithPreview> {
@@ -437,6 +489,99 @@ export class AdvertsService {
     return this.withMedia(renewed);
   }
 
+  async boostAdvert(
+    tenantId: string,
+    id: string,
+    input: BoostAdvertDto,
+    actorUserId?: string,
+  ): Promise<AdvertPostWithMedia> {
+    const advert = await this.getMutableAdvert(tenantId, id);
+    if (advert.status === 'PAUSED') {
+      throw new UnprocessableEntityException(
+        'Paused adverts must be renewed or unpaused before boosting.',
+      );
+    }
+
+    await this.requireCurrentTermsAcceptance(tenantId, actorUserId, input.acceptedTerms);
+    const now = new Date().toISOString();
+    const boostedAt = input.boostedAt ?? now;
+    const boostedAtMs = Date.parse(boostedAt);
+    if (!Number.isFinite(boostedAtMs)) {
+      throw new UnprocessableEntityException('Boost dates must be valid ISO-8601 timestamps.');
+    }
+
+    const boostExpiresAt =
+      input.boostExpiresAt ?? new Date(boostedAtMs + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const boostExpiresAtMs = Date.parse(boostExpiresAt);
+
+    if (!Number.isFinite(boostExpiresAtMs)) {
+      throw new UnprocessableEntityException('Boost dates must be valid ISO-8601 timestamps.');
+    }
+
+    if (boostExpiresAtMs <= boostedAtMs) {
+      throw new UnprocessableEntityException('Boost expiry must be after the boost start time.');
+    }
+
+    const maxBoostExpiresAt = boostedAtMs + 30 * 24 * 60 * 60 * 1000;
+    if (boostExpiresAtMs > maxBoostExpiresAt) {
+      throw new UnprocessableEntityException('Boost duration cannot exceed 30 days.');
+    }
+
+    const boosted: AdvertPost = {
+      ...advert,
+      boostedAt,
+      boostExpiresAt,
+      boostWeight: input.boostWeight ?? 3,
+      updatedAt: now,
+    };
+    await this.repository.updatePublishedAdvert(boosted);
+    await this.auditAdvertControl(tenantId, actorUserId, boosted, 'ADVERT_BOOSTED');
+    return this.withMedia(boosted);
+  }
+
+  async searchPublicAdverts(input: PublicAdvertSearchDto = {}): Promise<{
+    query?: string;
+    filters: Pick<PublicAdvertSearchDto, 'countryCode' | 'industryCode' | 'role'>;
+    results: PublicAdvertSearchResult[];
+  }> {
+    const safety = evaluateSafetyFields(input);
+    if (!safety.allowed) {
+      throw new UnprocessableEntityException({
+        message: 'Public advert search matches a zero-tolerance blocked category.',
+        safety,
+      });
+    }
+
+    const now = input.now ?? new Date().toISOString();
+    const query = input.q?.trim();
+    const terms = this.searchTerms(query);
+    const limit = Math.min(100, Math.max(1, input.limit ?? 20));
+    const adverts = await this.repository.listAllPublishedAdverts();
+    const candidates = adverts.filter((advert) => this.isDiscoverable(advert, input, now));
+    const ranked = await Promise.all(
+      candidates.map(async (advert) => this.rankPublicAdvert(advert, terms, now)),
+    );
+
+    return {
+      query,
+      filters: {
+        countryCode: input.countryCode,
+        industryCode: input.industryCode,
+        role: input.role,
+      },
+      results: ranked
+        .filter(
+          (result) =>
+            !terms.length || result.rankReasons.some((reason) => reason.startsWith('MATCH_')),
+        )
+        .sort(
+          (left, right) =>
+            right.rankScore - left.rankScore || right.publishedAt.localeCompare(left.publishedAt),
+        )
+        .slice(0, limit),
+    };
+  }
+
   async runLifecycle(tenantId: string, input: RunAdvertLifecycleDto = {}) {
     const now = input.now ?? new Date().toISOString();
     const alerts: AdvertNotification[] = [];
@@ -575,6 +720,71 @@ export class AdvertsService {
       mediaSlots: this.mediaSlots(existingMedia),
       expiresAt: upload.expiresAt,
     };
+  }
+
+  private async createDuplicateDraft(
+    tenantId: string,
+    source: AdvertDraft | AdvertPost,
+    title: string | undefined,
+    actorUserId: string | undefined,
+  ): Promise<AdvertDraft> {
+    const now = new Date().toISOString();
+    const draft: AdvertDraft = {
+      title: this.duplicateTitle(title ?? source.title),
+      displayName: source.displayName,
+      industryCode: source.industryCode,
+      role: source.role,
+      description: source.description,
+      countryCode: source.countryCode,
+      phone: source.phone,
+      email: source.email,
+      website: source.website,
+      id: randomUUID(),
+      tenantId,
+      status: 'DRAFT',
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.assertValidAdvert(draft);
+    await this.repository.createDraft(draft);
+    await this.auth?.recordTenantAudit({
+      tenantId,
+      actorUserId,
+      action: 'ADVERT_DUPLICATE_DRAFT_CREATED',
+      entityType: 'ADVERT_DRAFT',
+      entityId: draft.id,
+      metadata: {
+        sourceId: source.id,
+      },
+    });
+    return draft;
+  }
+
+  private async copyAdvertMedia(
+    tenantId: string,
+    sourceOwnerId: string,
+    targetOwnerId: string,
+    status: MediaAsset['status'],
+  ): Promise<void> {
+    const sourceMedia = await this.repository.listMediaAssets(tenantId, 'ADVERT', sourceOwnerId);
+    const now = new Date().toISOString();
+    for (const source of sourceMedia) {
+      await this.repository.createMediaAsset({
+        ...source,
+        id: randomUUID(),
+        ownerType: 'ADVERT',
+        ownerId: targetOwnerId,
+        status,
+        uploadedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+  }
+
+  private duplicateTitle(title: string): string {
+    const copied = title.startsWith('Copy of ') ? title : `Copy of ${title}`;
+    return copied.slice(0, 160);
   }
 
   private async addMedia(input: {
@@ -735,6 +945,122 @@ export class AdvertsService {
       daysLive: lifecycle.daysLive,
       daysRemaining: lifecycle.daysRemaining,
     };
+  }
+
+  private async rankPublicAdvert(
+    advert: AdvertPost,
+    terms: string[],
+    now: string,
+  ): Promise<PublicAdvertSearchResult> {
+    const withMedia = await this.withMedia(advert);
+    const searchable = this.normalizeSearchText(
+      [
+        advert.title,
+        advert.displayName,
+        advert.description,
+        advert.industryCode,
+        advert.role,
+        advert.countryCode,
+      ].join(' '),
+    );
+    const rankReasons: string[] = [];
+    let rankScore = 0;
+
+    for (const term of terms) {
+      if (!searchable.includes(term)) {
+        continue;
+      }
+
+      if (this.normalizeSearchText(advert.title).includes(term)) {
+        rankScore += 50;
+        rankReasons.push(`MATCH_TITLE:${term}`);
+      } else if (this.normalizeSearchText(advert.displayName).includes(term)) {
+        rankScore += 35;
+        rankReasons.push(`MATCH_ADVERTISER:${term}`);
+      } else {
+        rankScore += 20;
+        rankReasons.push(`MATCH_BODY:${term}`);
+      }
+    }
+
+    const boosted = this.isBoostActive(advert, now);
+    if (boosted) {
+      rankScore += (advert.boostWeight ?? 1) * 100;
+      rankReasons.push('ACTIVE_BOOST');
+    }
+
+    const lifecycle = calculateAdvertLifecycle(advert.publishedAt, now);
+    rankScore += Math.max(0, lifecycle.daysRemaining);
+    if (lifecycle.daysLive <= 7) {
+      rankScore += 20;
+      rankReasons.push('RECENTLY_POSTED');
+    }
+
+    if (withMedia.media.length > 0) {
+      rankScore += Math.min(20, withMedia.media.length * 4);
+      rankReasons.push('HAS_MEDIA');
+    }
+
+    if (!rankReasons.length) {
+      rankReasons.push('ACTIVE_LISTING');
+    }
+
+    return {
+      ...withMedia,
+      rankScore,
+      rankReasons,
+      boosted,
+    };
+  }
+
+  private isDiscoverable(advert: AdvertPost, input: PublicAdvertSearchDto, now: string): boolean {
+    if (advert.status !== 'LIVE' && advert.status !== 'RENEWAL_DUE') {
+      return false;
+    }
+
+    if (calculateAdvertLifecycle(advert.publishedAt, now).shouldAutoDelete) {
+      return false;
+    }
+
+    return (
+      (!input.countryCode || advert.countryCode === input.countryCode.toUpperCase()) &&
+      (!input.industryCode || advert.industryCode === input.industryCode) &&
+      (!input.role || advert.role === input.role)
+    );
+  }
+
+  private isBoostActive(advert: AdvertPost, now: string): boolean {
+    return Boolean(
+      advert.boostWeight &&
+      advert.boostWeight > 0 &&
+      advert.boostedAt &&
+      advert.boostExpiresAt &&
+      Date.parse(advert.boostedAt) <= Date.parse(now) &&
+      Date.parse(advert.boostExpiresAt) > Date.parse(now),
+    );
+  }
+
+  private searchTerms(value: string | undefined): string[] {
+    if (!value) {
+      return [];
+    }
+
+    return [
+      ...new Set(
+        this.normalizeSearchText(value)
+          .split(' ')
+          .filter((term) => term.length >= 2),
+      ),
+    ];
+  }
+
+  private normalizeSearchText(value: string): string {
+    return value
+      .normalize('NFKC')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim()
+      .replace(/\s+/g, ' ');
   }
 
   private mediaSlots(media: MediaAsset[]): MediaSlots {

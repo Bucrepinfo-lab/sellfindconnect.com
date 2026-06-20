@@ -62,6 +62,61 @@ describe('MediaReviewService', () => {
     ]);
   });
 
+  it('assigns open media review cases to the moderator queue and records audit context', async () => {
+    const auditLogs: unknown[] = [];
+    const repository = new InMemoryMediaReviewCaseRepository();
+    repository.createCase(reviewCase({ id: 'case-ke', tenantId: 'tenant-ke' }));
+    const service = new MediaReviewService(repository, authService(auditLogs));
+
+    const assigned = await service.assignCase(
+      'case-ke',
+      { note: 'Assign to Kenya moderation queue.' },
+      platformSession(),
+    );
+
+    expect(assigned).toMatchObject({
+      id: 'case-ke',
+      status: 'OPEN',
+      assignedTo: 'country-mod-1',
+      assignmentNote: 'Assign to Kenya moderation queue.',
+      reviewerRole: 'COUNTRY_MODERATOR',
+    });
+    expect(assigned.assignedAt).toBeDefined();
+    expect(auditLogs).toEqual([
+      expect.objectContaining({
+        tenantId: 'tenant-ke',
+        actorUserId: 'country-mod-1',
+        action: 'MEDIA_REVIEW_CASE_ASSIGNED',
+        entityType: 'MEDIA_REVIEW_CASE',
+        entityId: 'case-ke',
+        metadata: expect.objectContaining({
+          mediaId: 'media-1',
+          assignedTo: 'country-mod-1',
+          role: 'COUNTRY_MODERATOR',
+          noteProvided: true,
+        }),
+      }),
+    ]);
+  });
+
+  it('filters moderator queues by assigned and unassigned cases', async () => {
+    const repository = new InMemoryMediaReviewCaseRepository();
+    repository.createCase(reviewCase({ id: 'assigned-ke', tenantId: 'tenant-ke' }));
+    repository.createCase(reviewCase({ id: 'unassigned-ke', tenantId: 'tenant-ke' }));
+    const service = new MediaReviewService(repository, authService());
+
+    await service.assignCase('assigned-ke', { assignedTo: 'country-mod-1' }, platformSession());
+
+    const assignedCases = await service.listCases(
+      { assignedTo: 'country-mod-1' },
+      platformSession(),
+    );
+    const unassignedCases = await service.listCases({ unassignedOnly: true }, platformSession());
+
+    expect(assignedCases.map((reviewCase) => reviewCase.id)).toEqual(['assigned-ke']);
+    expect(unassignedCases.map((reviewCase) => reviewCase.id)).toEqual(['unassigned-ke']);
+  });
+
   it('blocks unsafe moderator notes before resolving a case', async () => {
     const repository = new InMemoryMediaReviewCaseRepository();
     repository.createCase(reviewCase({ id: 'case-ke', tenantId: 'tenant-ke' }));
@@ -107,6 +162,9 @@ function reviewCase(input: Partial<MediaReviewCaseRecord>): MediaReviewCaseRecor
     resolvedBy: input.resolvedBy,
     resolution: input.resolution,
     notes: input.notes,
+    assignedTo: input.assignedTo,
+    assignedAt: input.assignedAt,
+    assignmentNote: input.assignmentNote,
   };
 }
 
