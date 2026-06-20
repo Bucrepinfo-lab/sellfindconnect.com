@@ -378,10 +378,14 @@ Implementation progress on 2026-06-19:
 - Added durable unsafe-media review cases through Prisma `MediaReviewCase`
   records for blocked or final-failed scan/moderation/transform output,
   including severity, source job, provider, reason, and evidence.
+- Added protected platform media review endpoints for MFA-required
+  `MODERATE_CONTENT` moderators to list scoped review cases, resolve cases as
+  confirmed blocked, restored, escalated, or dismissed, block unsafe moderator
+  notes, and persist tenant audit evidence for the decision.
 - Remaining hardening: live object-storage credentials, approved provider
-  endpoints, CDN publication verification, moderator case assignment and
-  resolution, legal/reporting escalation playbooks, richer review case
-  management, and user-facing review status in web/mobile clients.
+  endpoints, CDN publication verification, moderator case assignment queues,
+  legal/reporting escalation playbooks, richer review case management, and
+  user-facing review status in web/mobile clients.
 
 ### 7.3 Media Display Area
 
@@ -458,8 +462,10 @@ Implementation progress:
   advert and profile media worker output.
 - Added durable media review cases for unsafe or final-failed advert/profile
   media processing output.
+- Added protected platform media review-case listing and resolution actions for
+  scoped moderators, with unsafe review-note blocking and audit evidence.
 - Durable advert drafts, persisted advert repository, live storage credentials,
-  approved media vendors, moderator review-case actions, pause/archive/renew
+  approved media vendors, moderator case assignment queues, pause/archive/renew
   controls, and public listing preview remain next.
 
 ### 7.5 Search and Discovery
