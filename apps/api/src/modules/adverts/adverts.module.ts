@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import { AnalyticsModule } from '../analytics/analytics.module';
 import { AuthModule } from '../auth/auth.module';
 import { MediaModule } from '../media/media.module';
 import { AdvertsController, PublicAdvertsController } from './adverts.controller';
@@ -9,7 +10,7 @@ import { AdvertsService } from './adverts.service';
 import { InMemoryAdvertsRepository } from './in-memory-adverts.repository';
 
 @Module({
-  imports: [AuthModule, MediaModule],
+  imports: [AuthModule, MediaModule, AnalyticsModule],
   controllers: [AdvertsController, PublicAdvertsController],
   providers: [
     InMemoryAdvertsRepository,

@@ -37,6 +37,16 @@ export type DiscoveryIndexDocument = {
 export type DiscoveryVectorScore = {
   score: number;
   matchedTerms: string[];
+  expandedTerms: string[];
+};
+
+export type DiscoveryQueryExpansion = {
+  originalTerms: string[];
+  expandedTerms: string[];
+  corrections: Array<{
+    from: string;
+    to: string;
+  }>;
 };
 
 const stopWords = new Set([
@@ -58,6 +68,59 @@ const stopWords = new Set([
   'to',
   'with',
 ]);
+
+export const discoverySynonymDictionary: Record<string, string[]> = {
+  buyer: ['client', 'customer', 'consumer', 'purchaser', 'procurement'],
+  buy: ['source', 'purchase', 'procure'],
+  carton: ['box', 'packaging'],
+  client: ['buyer', 'customer', 'consumer'],
+  cold: ['refrigerated', 'chilled'],
+  consumer: ['customer', 'client'],
+  delivery: ['transport', 'logistics', 'shipping', 'distribution'],
+  distributor: ['distribution', 'wholesaler'],
+  finance: ['financier', 'loan', 'credit', 'funding'],
+  fresh: ['produce', 'perishable'],
+  hotel: ['hospitality', 'restaurant', 'catering'],
+  manufacturer: ['producer', 'maker', 'factory'],
+  packaging: ['carton', 'box', 'label'],
+  produce: ['vegetable', 'fruit', 'farm'],
+  retailer: ['shop', 'store'],
+  source: ['supplier', 'seller', 'provider'],
+  supplier: ['source', 'seller', 'provider', 'vendor'],
+  transport: ['logistics', 'delivery', 'shipping'],
+  vegetable: ['produce', 'greens', 'farm'],
+  wholesaler: ['distributor', 'bulk'],
+};
+
+const canonicalCorrections = [
+  'buyer',
+  'carton',
+  'client',
+  'consumer',
+  'delivery',
+  'distributor',
+  'finance',
+  'fresh',
+  'hotel',
+  'logistics',
+  'manufacturer',
+  'packaging',
+  'producer',
+  'produce',
+  'restaurant',
+  'retailer',
+  'source',
+  'supplier',
+  'transport',
+  'vegetable',
+  'wholesaler',
+];
+
+const commonDiscoveryTypoCorrections: Record<string, string> = {
+  hotles: 'hotel',
+  vegtable: 'vegetable',
+  vegtables: 'vegetable',
+};
 
 const roleRelationshipSignals: Record<SupplyChainRole, DiscoveryRelationshipSignal[]> = {
   PRODUCER: [
@@ -245,10 +308,11 @@ export function scoreDiscoveryVector(
   query: string,
   document: DiscoveryVector,
 ): DiscoveryVectorScore {
-  const queryVector = buildQueryVector(query);
+  const expansion = expandDiscoveryQuery(query);
+  const queryVector = buildQueryVector(expansion.expandedTerms.join(' '));
   const matchedTerms = Object.keys(queryVector).filter((token) => document[token] !== undefined);
   if (!matchedTerms.length) {
-    return { score: 0, matchedTerms: [] };
+    return { score: 0, matchedTerms: [], expandedTerms: expansion.expandedTerms };
   }
 
   const dotProduct = matchedTerms.reduce(
@@ -265,6 +329,32 @@ export function scoreDiscoveryVector(
   return {
     score: Math.round(cosine * 100),
     matchedTerms,
+    expandedTerms: expansion.expandedTerms,
+  };
+}
+
+export function expandDiscoveryQuery(query: string): DiscoveryQueryExpansion {
+  const originalTerms = tokenizeRawDiscoveryText(query);
+  const corrections: DiscoveryQueryExpansion['corrections'] = [];
+  const expanded = new Set<string>();
+
+  for (const rawTerm of originalTerms) {
+    const corrected = correctDiscoveryToken(rawTerm);
+    if (corrected !== rawTerm) {
+      corrections.push({ from: rawTerm, to: corrected });
+    }
+
+    for (const token of [rawTerm, corrected, ...(discoverySynonymDictionary[corrected] ?? [])]) {
+      for (const normalized of tokenizeDiscoveryText(token)) {
+        expanded.add(normalized);
+      }
+    }
+  }
+
+  return {
+    originalTerms,
+    expandedTerms: Array.from(expanded),
+    corrections,
   };
 }
 
@@ -275,7 +365,7 @@ export function inferDiscoveryRelationshipSignals(
 }
 
 export function inferDesiredDiscoveryRoles(query: string): SupplyChainRole[] {
-  const tokens = new Set(tokenizeDiscoveryText(query));
+  const tokens = new Set(expandDiscoveryQuery(query).expandedTerms);
   const roles: SupplyChainRole[] = [];
   const add = (role: SupplyChainRole) => {
     if (!roles.includes(role)) {
@@ -382,6 +472,62 @@ function stemToken(token: string): string {
     return token.slice(0, -1);
   }
   return token;
+}
+
+function tokenizeRawDiscoveryText(value: string): string[] {
+  return value
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 2 && !stopWords.has(token));
+}
+
+function correctDiscoveryToken(token: string): string {
+  const commonCorrection = commonDiscoveryTypoCorrections[token];
+  if (commonCorrection) {
+    return commonCorrection;
+  }
+
+  const stemmed = stemToken(token);
+  if (canonicalCorrections.includes(stemmed)) {
+    return stemmed;
+  }
+
+  const threshold = 2;
+  const match = canonicalCorrections
+    .map((candidate) => ({ candidate, distance: levenshteinDistance(stemmed, candidate) }))
+    .filter((item) => item.distance <= threshold)
+    .sort(
+      (left, right) =>
+        left.distance - right.distance || left.candidate.localeCompare(right.candidate),
+    )[0];
+
+  return match?.candidate ?? stemmed;
+}
+
+function levenshteinDistance(left: string, right: string): number {
+  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  const current = Array.from({ length: right.length + 1 }, () => 0);
+
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
+    current[0] = leftIndex;
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
+      const cost = left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1;
+      current[rightIndex] = Math.min(
+        (current[rightIndex - 1] ?? Number.POSITIVE_INFINITY) + 1,
+        (previous[rightIndex] ?? Number.POSITIVE_INFINITY) + 1,
+        (previous[rightIndex - 1] ?? Number.POSITIVE_INFINITY) + cost,
+      );
+    }
+
+    for (let index = 0; index < previous.length; index += 1) {
+      previous[index] = current[index] ?? Number.POSITIVE_INFINITY;
+    }
+  }
+
+  return previous[right.length] ?? 0;
 }
 
 function relationshipSignal(

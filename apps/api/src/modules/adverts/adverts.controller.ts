@@ -13,6 +13,7 @@ import {
   PrepareAdvertMediaUploadDto,
   PublicAdvertSearchDto,
   PublishAdvertDraftDto,
+  RecordAdvertDiscoveryEventDto,
   RenewAdvertDto,
   RunAdvertLifecycleDto,
   RunSavedAdvertSearchAlertsDto,
@@ -141,6 +142,11 @@ export class AdvertsController {
   @Get('discovery/alerts')
   listDiscoveryAlerts(@TenantId() tenantId: string) {
     return this.adverts.listDiscoveryAlerts(tenantId);
+  }
+
+  @Post('discovery/events')
+  recordDiscoveryEvent(@TenantId() tenantId: string, @Body() body: RecordAdvertDiscoveryEventDto) {
+    return this.adverts.recordDiscoveryEvent(tenantId, body);
   }
 
   @Get(':id/media')

@@ -17,6 +17,8 @@ import {
   industryCategories,
   mediaPolicy,
   scoreDiscoveryVector,
+  type AnalyticsEvent,
+  type AnalyticsEventType,
   type AdvertDraft,
   type AdvertPost,
   type DiscoveryRelationshipSignal,
@@ -25,6 +27,7 @@ import {
 import { randomUUID } from 'node:crypto';
 
 import type { AuthService } from '../auth/auth.service';
+import { AnalyticsService } from '../analytics/analytics.service';
 import {
   MEDIA_ADAPTERS,
   createDefaultMediaAdapters,
@@ -49,6 +52,7 @@ import type {
   PrepareAdvertMediaUploadDto,
   PublicAdvertSearchDto,
   PublishAdvertDraftDto,
+  RecordAdvertDiscoveryEventDto,
   RenewAdvertDto,
   RunAdvertLifecycleDto,
   RunSavedAdvertSearchAlertsDto,
@@ -90,6 +94,7 @@ export class AdvertsService {
     @Optional()
     @Inject(MEDIA_ADAPTERS)
     private readonly mediaAdapters: MediaAdapters = createDefaultMediaAdapters(),
+    @Optional() private readonly analytics: AnalyticsService = new AnalyticsService(),
   ) {}
 
   async createAdvert(
@@ -627,6 +632,20 @@ export class AdvertsService {
     };
 
     await this.repository.createSavedSearch(record);
+    this.recordDiscoveryAnalytics(tenantId, {
+      eventType: 'SAVE',
+      entityType: 'SEARCH_RESULT',
+      entityId: record.id,
+      countryCode: record.countryCode ?? 'KE',
+      industryCode: record.industryCode,
+      consentState: 'GRANTED',
+      metadata: {
+        query: record.query,
+        alertFrequency: record.alertFrequency,
+        role: record.role ?? null,
+      },
+      occurredAt: now,
+    });
     await this.auth?.recordTenantAudit({
       tenantId,
       actorUserId,
@@ -669,6 +688,20 @@ export class AdvertsService {
     const alertsCreated: AdvertDiscoveryAlertRecord[] = [];
 
     for (const search of searches) {
+      this.recordDiscoveryAnalytics(tenantId, {
+        eventType: 'SEARCH',
+        entityType: 'SEARCH_RESULT',
+        entityId: search.id,
+        countryCode: search.countryCode ?? 'KE',
+        industryCode: search.industryCode,
+        consentState: 'GRANTED',
+        metadata: {
+          query: search.query,
+          role: search.role ?? null,
+          frequency: search.alertFrequency,
+        },
+        occurredAt: now,
+      });
       const results = await this.searchPublicAdverts({
         q: search.query,
         countryCode: search.countryCode,
@@ -696,6 +729,21 @@ export class AdvertsService {
           createdAt: now,
         };
         await this.repository.createDiscoveryAlert(alert);
+        this.recordDiscoveryAnalytics(tenantId, {
+          eventType: 'MATCH',
+          entityType: 'LISTING',
+          entityId: result.id,
+          countryCode: result.countryCode,
+          industryCode: result.industryCode,
+          consentState: 'GRANTED',
+          metadata: {
+            savedSearchId: search.id,
+            query: search.query,
+            rankScore: result.rankScore,
+            reasonCodes: result.rankReasons,
+          },
+          occurredAt: now,
+        });
         alertsCreated.push(alert);
       }
 
@@ -752,6 +800,41 @@ export class AdvertsService {
     });
 
     return { tenantId, indexed, removed };
+  }
+
+  async recordDiscoveryEvent(
+    tenantId: string,
+    input: RecordAdvertDiscoveryEventDto,
+  ): Promise<AnalyticsEvent> {
+    const eventTypes: AnalyticsEventType[] = ['VIEW', 'CLICK', 'INQUIRY', 'SHARE', 'DOWNLOAD'];
+    if (!eventTypes.includes(input.eventType)) {
+      throw new UnprocessableEntityException(
+        'Discovery event type must be VIEW, CLICK, INQUIRY, SHARE, or DOWNLOAD.',
+      );
+    }
+
+    const advert = await this.getMutableAdvert(tenantId, input.advertId);
+    if (advert.status !== 'LIVE' && advert.status !== 'RENEWAL_DUE') {
+      throw new UnprocessableEntityException(
+        'Only discoverable live adverts can record discovery events.',
+      );
+    }
+
+    return this.recordDiscoveryAnalytics(tenantId, {
+      eventType: input.eventType,
+      entityType: 'LISTING',
+      entityId: advert.id,
+      countryCode: advert.countryCode,
+      industryCode: advert.industryCode,
+      consentState: input.consentState,
+      occurredAt: input.occurredAt,
+      metadata: {
+        surface: 'advert_discovery',
+        query: input.query?.trim(),
+        position: input.position,
+        ...(input.metadata ?? {}),
+      },
+    });
   }
 
   async runLifecycle(tenantId: string, input: RunAdvertLifecycleDto = {}) {
@@ -1280,6 +1363,13 @@ export class AdvertsService {
     }
 
     return search;
+  }
+
+  private recordDiscoveryAnalytics(
+    tenantId: string,
+    input: Parameters<AnalyticsService['recordEvent']>[1],
+  ): AnalyticsEvent {
+    return this.analytics.recordEvent(tenantId, input);
   }
 
   private normalizeSavedSearchInput(input: CreateSavedAdvertSearchDto): CreateSavedAdvertSearchDto {

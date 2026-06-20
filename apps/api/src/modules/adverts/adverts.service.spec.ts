@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { mediaPolicy } from '@telpen/domain';
 
+import { AnalyticsService } from '../analytics/analytics.service';
 import type { AuthAuditRecord } from '../auth/auth.records';
 import type { AuthService } from '../auth/auth.service';
 import type { MediaAdapters } from '../media/media.adapters';
@@ -170,8 +171,34 @@ describe('AdvertsService', () => {
     expect(results.results[0]?.relationshipSignals.map((signal) => signal.role)).toContain('BUYER');
   });
 
-  it('creates saved search alerts from discovery matches without duplicating adverts', async () => {
+  it('matches public adverts through synonym and typo tolerant discovery scoring', async () => {
     const service = new AdvertsService();
+    const advert = await service.createAdvert(tenantId, {
+      title: 'Fresh vegetable supply',
+      displayName: 'Nairobi Fresh Produce',
+      industryCode: 'AGRICULTURE',
+      role: 'SUPPLIER',
+      description: 'We supply fresh vegetables to hotels and retailers in Nairobi.',
+      countryCode: 'KE',
+      publishedAt: '2026-07-01T00:00:00.000Z',
+    });
+
+    const results = await service.searchPublicAdverts({
+      q: 'vegtable hotles clients',
+      countryCode: 'KE',
+      now: '2026-07-02T00:00:00.000Z',
+    });
+
+    expect(results.results[0]).toMatchObject({
+      id: advert.id,
+      rankReasons: expect.arrayContaining(['VECTOR_MATCH', 'RELATIONSHIP_GRAPH:BUYER']),
+      matchedTerms: expect.arrayContaining(['vegetable', 'hotel']),
+    });
+  });
+
+  it('creates saved search alerts from discovery matches without duplicating adverts', async () => {
+    const analytics = new AnalyticsService();
+    const service = new AdvertsService(undefined, undefined, undefined, analytics);
     const advert = await service.createAdvert(tenantId, {
       title: 'Fresh vegetable supply',
       displayName: 'Nairobi Fresh Produce',
@@ -211,6 +238,57 @@ describe('AdvertsService', () => {
         lastAlertedAt: '2026-07-02T12:00:00.000Z',
       }),
     ]);
+    const summary = analytics.summarizeTenant(tenantId, {
+      from: '2026-06-01T00:00:00.000Z',
+      to: '2026-07-03T00:00:00.000Z',
+    });
+    expect(summary.totals.SAVE).toBe(1);
+    expect(summary.totals.SEARCH).toBe(2);
+    expect(summary.totals.MATCH).toBe(1);
+  });
+
+  it('records discovery interaction counters for live adverts', async () => {
+    const analytics = new AnalyticsService();
+    const service = new AdvertsService(undefined, undefined, undefined, analytics);
+    const advert = await service.createAdvert(tenantId, {
+      title: 'Fresh vegetable supply',
+      displayName: 'Nairobi Fresh Produce',
+      industryCode: 'AGRICULTURE',
+      role: 'SUPPLIER',
+      description: 'We supply fresh vegetables to hotels and retailers in Nairobi.',
+      countryCode: 'KE',
+      publishedAt: '2026-07-01T00:00:00.000Z',
+    });
+
+    await service.recordDiscoveryEvent(tenantId, {
+      advertId: advert.id,
+      eventType: 'VIEW',
+      consentState: 'GRANTED',
+      query: 'fresh vegetable buyers',
+      position: 1,
+      occurredAt: '2026-07-02T00:00:00.000Z',
+    });
+    await service.recordDiscoveryEvent(tenantId, {
+      advertId: advert.id,
+      eventType: 'CLICK',
+      consentState: 'GRANTED',
+      query: 'fresh vegetable buyers',
+      position: 1,
+      occurredAt: '2026-07-02T00:01:00.000Z',
+    });
+
+    const summary = analytics.summarizeTenant(tenantId, {
+      from: '2026-07-01T00:00:00.000Z',
+      to: '2026-07-03T00:00:00.000Z',
+    });
+    expect(summary.totals.VIEW).toBe(1);
+    expect(summary.totals.CLICK).toBe(1);
+    expect(summary.topEntities[0]).toMatchObject({
+      entityId: advert.id,
+      entityType: 'LISTING',
+      views: 1,
+      clicks: 1,
+    });
   });
 
   it('blocks public discovery searches for prohibited categories', async () => {

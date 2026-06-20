@@ -1,9 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  analyticsEventTypes,
+  consentStates,
   mediaPolicy,
   mediaTransformStatuses,
   mediaVisibilityStates,
   supplyChainRoles,
+  type AnalyticsEventType,
+  type ConsentState,
   type MediaTransformStatus,
   type MediaVisibility,
 } from '@telpen/domain';
@@ -17,6 +21,7 @@ import {
   IsIn,
   IsInt,
   IsISO8601,
+  IsObject,
   IsOptional,
   IsString,
   IsUrl,
@@ -289,6 +294,45 @@ export class RunSavedAdvertSearchAlertsDto {
   @Min(1)
   @Max(20)
   declare limit?: number;
+}
+
+export class RecordAdvertDiscoveryEventDto {
+  @ApiProperty({ example: 'advert-id' })
+  @IsString()
+  @Length(2, 120)
+  declare advertId: string;
+
+  @ApiProperty({ enum: analyticsEventTypes, example: 'VIEW' })
+  @IsIn(analyticsEventTypes)
+  declare eventType: AnalyticsEventType;
+
+  @ApiProperty({ enum: consentStates, example: 'GRANTED' })
+  @IsIn(consentStates)
+  declare consentState: ConsentState;
+
+  @ApiPropertyOptional({ example: 'fresh vegetable buyers' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  declare query?: string;
+
+  @ApiPropertyOptional({ example: 1, minimum: 1, maximum: 1000 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  declare position?: number;
+
+  @ApiPropertyOptional({ example: '2026-07-10T00:00:00.000Z' })
+  @IsOptional()
+  @IsISO8601()
+  declare occurredAt?: string;
+
+  @ApiPropertyOptional({ example: { surface: 'public_advert_search' } })
+  @IsOptional()
+  @IsObject()
+  declare metadata?: Record<string, unknown>;
 }
 
 export class RunAdvertLifecycleDto {

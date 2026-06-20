@@ -479,8 +479,12 @@ Implementation progress:
 - Added a persisted advert discovery index foundation with full-text token
   fields, sparse vector scoring, relationship graph signals, saved advert
   searches, de-duplicated discovery alerts, and index rebuild controls.
-- Live storage credentials, approved media vendors, typo tolerance, richer
-  discovery analytics, and web/mobile saved-search UX remain next.
+- Added typo-tolerant query expansion, synonym dictionaries, saved-search
+  analytics events, discovery interaction counters, and web/PWA saved-search
+  controls.
+- Live storage credentials, approved media vendors, production-grade search
+  provider hardening, persisted analytics rollups, external alert delivery, and
+  native mobile saved-search screens remain next.
 
 ### 7.5 Search and Discovery
 
@@ -523,10 +527,16 @@ Implementation progress on 2026-06-20:
 - Added persisted advert discovery index records, deterministic sparse vector
   scoring, relationship graph role signals, saved searches, de-duplicated alert
   records, and tenant reindex controls.
+- Added typo-tolerant query correction, synonym expansion dictionaries, expanded
+  role inference, saved-search save/search/match analytics events, and listing
+  discovery interaction counters for views, clicks, inquiries, shares, and
+  downloads.
+- Added web/PWA saved-search UX with named searches, alert cadence, blocked
+  search handling, restored-search controls, and previewable alert candidates.
 - Remaining hardening: Postgres full-text/pgvector or external search provider,
-  typo tolerance, synonym dictionaries, relationship claim approval, analytics
-  counters, hierarchy dashboards, and privacy/consent controls for behavioral
-  matching.
+  persisted analytics warehouse/rollups, relationship claim approval, external
+  notification delivery, native mobile saved-search screens, hierarchy
+  dashboards, and privacy/consent controls for behavioral matching.
 
 ### 7.6 Precision Matching and Link Intelligence
 

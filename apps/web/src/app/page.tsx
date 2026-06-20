@@ -43,6 +43,7 @@ import {
   evaluateAccess,
   evaluatePasswordPolicy,
   evaluateSafetyText,
+  expandDiscoveryQuery,
   getRemittanceAlertDecision,
   getCountry,
   industryCategories,
@@ -69,6 +70,24 @@ const tenantId = '11111111-1111-4111-8111-111111111111';
 const lifecycleDemoNow = new Date(Date.UTC(2026, 6, 10, 0, 0, 0)).toISOString();
 const conversationDemoOpenedAt = '2026-06-17T08:00:00.000Z';
 const conversationDemoNow = '2026-06-17T11:15:00.000Z';
+
+type SavedSearchFrequency = 'INSTANT' | 'DAILY' | 'WEEKLY';
+
+type SavedSearchPreview = {
+  id: string;
+  name: string;
+  query: string;
+  role: SupplyChainRole | 'ALL';
+  industryCode: string;
+  frequency: SavedSearchFrequency;
+};
+
+type SavedSearchAlertPreview = {
+  id: string;
+  savedSearch: SavedSearchPreview;
+  result: SourceFinderSearchResult | null;
+  status: 'READY' | 'BLOCKED';
+};
 
 const termsClauses = [
   {
@@ -135,6 +154,26 @@ function roleLabel(role: string) {
 
 export default function Home() {
   const [query, setQuery] = useState('fresh produce');
+  const [savedSearchName, setSavedSearchName] = useState('Fresh produce buyers');
+  const [savedSearchFrequency, setSavedSearchFrequency] = useState<SavedSearchFrequency>('DAILY');
+  const [savedSearches, setSavedSearches] = useState<SavedSearchPreview[]>([
+    {
+      id: 'saved-fresh-produce',
+      name: 'Fresh produce buyers',
+      query: 'fresh produce hotel buyers',
+      role: 'BUYER',
+      industryCode: 'ALL',
+      frequency: 'DAILY',
+    },
+    {
+      id: 'saved-packaging',
+      name: 'Packaging distributors',
+      query: 'food packaging distributors',
+      role: 'DISTRIBUTOR',
+      industryCode: 'MANUFACTURING',
+      frequency: 'WEEKLY',
+    },
+  ]);
   const [role, setRole] = useState<SupplyChainRole | 'ALL'>('ALL');
   const [industryCode, setIndustryCode] = useState('ALL');
   const [sortBy, setSortBy] = useState<SourceFinderSortOption>('RELEVANCE');
@@ -175,6 +214,7 @@ export default function Home() {
   const selectedIndustry = industryCategories.find((industry) => industry.code === industryCode);
   const safetyDecision = evaluateSafetyText(profileDescription);
   const querySafetyDecision = evaluateSafetyText(query);
+  const queryExpansion = expandDiscoveryQuery(query);
   const canPublish = safetyDecision.allowed && termsAccepted;
   const publishBlockReason = !safetyDecision.allowed
     ? 'Publishing is disabled because the draft contains prohibited content'
@@ -194,6 +234,59 @@ export default function Home() {
         pilotSourceFinderRecords,
       )
     : [];
+  const canSaveSearch = querySafetyDecision.allowed && query.trim().length >= 2;
+  const savedSearchAlerts: SavedSearchAlertPreview[] = savedSearches.flatMap(
+    (savedSearch): SavedSearchAlertPreview[] => {
+      const savedSearchSafety = evaluateSafetyText(savedSearch.query);
+      if (!savedSearchSafety.allowed) {
+        return [
+          {
+            id: `${savedSearch.id}-blocked`,
+            savedSearch,
+            result: null,
+            status: 'BLOCKED' as const,
+          },
+        ];
+      }
+
+      return searchSourceFinderRecords(
+        {
+          query: savedSearch.query,
+          role: savedSearch.role,
+          industryCode: savedSearch.industryCode,
+          countryCode,
+          sortBy: 'RELEVANCE',
+        },
+        pilotSourceFinderRecords,
+      )
+        .slice(0, 2)
+        .map((result) => ({
+          id: `${savedSearch.id}-${result.id}`,
+          savedSearch,
+          result,
+          status: 'READY' as const,
+        }));
+    },
+  );
+  const synonymPreview = queryExpansion.expandedTerms
+    .filter((term) => !queryExpansion.originalTerms.includes(term))
+    .slice(0, 6);
+  const saveCurrentSearch = () => {
+    if (!canSaveSearch) return;
+
+    const id = `saved-${Date.now()}`;
+    setSavedSearches((current) => [
+      {
+        id,
+        name: savedSearchName.trim() || query.trim(),
+        query: query.trim(),
+        role,
+        industryCode,
+        frequency: savedSearchFrequency,
+      },
+      ...current.filter((item) => item.query.toLowerCase() !== query.trim().toLowerCase()),
+    ]);
+  };
 
   const totals = filteredResults.reduce(
     (memo, item) => ({
@@ -219,9 +312,7 @@ export default function Home() {
     : 0;
   const clickThroughRate = totals.views ? Math.round((totals.clicks / totals.views) * 100) : 0;
   const selectedMatch = filteredResults[0];
-  const leadIntelligence = selectedMatch
-    ? buildLeadConversionIntelligence(selectedMatch)
-    : null;
+  const leadIntelligence = selectedMatch ? buildLeadConversionIntelligence(selectedMatch) : null;
   const canCreateLead = Boolean(termsAccepted && querySafetyDecision.allowed && selectedMatch);
   const chatSafetyDecision = evaluateSafetyText(chatMessage);
   const conversationSla =
@@ -253,10 +344,10 @@ export default function Home() {
       : [];
   const canSendChat = Boolean(
     canCreateLead &&
-      chatSafetyDecision.allowed &&
-      chatMessage.trim().length >= 2 &&
-      conversationStatus !== 'BLOCKED' &&
-      conversationStatus !== 'RESOLVED',
+    chatSafetyDecision.allowed &&
+    chatMessage.trim().length >= 2 &&
+    conversationStatus !== 'BLOCKED' &&
+    conversationStatus !== 'RESOLVED',
   );
   const notificationPreferences = defaultNotificationPreferences.map((preference) => {
     if (preference.channel === 'PUSH') {
@@ -327,7 +418,8 @@ export default function Home() {
     currencyCode: country.currencyCode,
   });
   const onboardingSafety = evaluateSafetyText(`${ownerEmail} ${tenantDisplayName}`);
-  const canCreateTenantOwner = ownerPasswordPolicy.allowed && onboardingSafety.allowed && termsAccepted;
+  const canCreateTenantOwner =
+    ownerPasswordPolicy.allowed && onboardingSafety.allowed && termsAccepted;
   const renewalQueue = filteredResults
     .map((item) => ({
       ...item,
@@ -390,11 +482,7 @@ export default function Home() {
             <button className="icon-button" title="Notifications">
               <Bell size={18} />
             </button>
-            <button
-              className="primary-button"
-              disabled={!canPublish}
-              title={publishBlockReason}
-            >
+            <button className="primary-button" disabled={!canPublish} title={publishBlockReason}>
               <Send size={16} />
               Publish Draft
             </button>
@@ -403,10 +491,26 @@ export default function Home() {
 
         <section className="metric-grid" aria-label="Performance metrics">
           <Metric label="Views" value={formatNumber(totals.views)} icon={<Eye size={18} />} />
-          <Metric label="Clicks" value={formatNumber(totals.clicks)} icon={<ArrowUpDown size={18} />} />
-          <Metric label="Inquiries" value={formatNumber(totals.inquiries)} icon={<Inbox size={18} />} />
-          <Metric label="Shares" value={formatNumber(totals.shares)} icon={<Handshake size={18} />} />
-          <Metric label="Downloads" value={formatNumber(totals.downloads)} icon={<Sparkles size={18} />} />
+          <Metric
+            label="Clicks"
+            value={formatNumber(totals.clicks)}
+            icon={<ArrowUpDown size={18} />}
+          />
+          <Metric
+            label="Inquiries"
+            value={formatNumber(totals.inquiries)}
+            icon={<Inbox size={18} />}
+          />
+          <Metric
+            label="Shares"
+            value={formatNumber(totals.shares)}
+            icon={<Handshake size={18} />}
+          />
+          <Metric
+            label="Downloads"
+            value={formatNumber(totals.downloads)}
+            icon={<Sparkles size={18} />}
+          />
         </section>
 
         <section className="work-grid">
@@ -429,7 +533,10 @@ export default function Home() {
                   aria-invalid={!querySafetyDecision.allowed}
                 />
               </label>
-              <select value={role} onChange={(event) => setRole(event.target.value as SupplyChainRole | 'ALL')}>
+              <select
+                value={role}
+                onChange={(event) => setRole(event.target.value as SupplyChainRole | 'ALL')}
+              >
                 <option value="ALL">All roles</option>
                 {supplyChainRoles.map((item) => (
                   <option key={item} value={item}>
@@ -437,7 +544,10 @@ export default function Home() {
                   </option>
                 ))}
               </select>
-              <select value={industryCode} onChange={(event) => setIndustryCode(event.target.value)}>
+              <select
+                value={industryCode}
+                onChange={(event) => setIndustryCode(event.target.value)}
+              >
                 <option value="ALL">All industries</option>
                 {industryCategories.map((industry) => (
                   <option key={industry.code} value={industry.code}>
@@ -458,6 +568,25 @@ export default function Home() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div className="discovery-intel-row" aria-label="Discovery query intelligence">
+              {queryExpansion.corrections.length > 0 ? (
+                <span>
+                  Corrected{' '}
+                  {queryExpansion.corrections
+                    .map((correction) => `${correction.from} to ${correction.to}`)
+                    .join(', ')}
+                </span>
+              ) : (
+                <span>Exact query terms</span>
+              )}
+              {synonymPreview.length > 0 ? (
+                <span>{synonymPreview.join(', ')}</span>
+              ) : (
+                <span>No synonym expansion</span>
+              )}
+              <span>{filteredResults.length} alert candidates</span>
             </div>
 
             {!querySafetyDecision.allowed ? (
@@ -639,10 +768,7 @@ export default function Home() {
                   type="password"
                 />
               </label>
-              <FinanceRow
-                label="Password score"
-                value={`${ownerPasswordPolicy.score}%`}
-              />
+              <FinanceRow label="Password score" value={`${ownerPasswordPolicy.score}%`} />
               <FinanceRow
                 label="Trial ends"
                 value={new Intl.DateTimeFormat(country.locale, {
@@ -656,11 +782,20 @@ export default function Home() {
                 value={formatMoney(ownerTrial.monthlyAmount, country.currencyCode, country.locale)}
               />
               <FinanceRow label="Terms version" value={activePolicyVersions.termsVersion} />
-              <FinanceRow label="Policy version" value={activePolicyVersions.prohibitedContentVersion} />
-              <div className={canCreateTenantOwner ? 'policy-box ok compact' : 'policy-box block compact'}>
+              <FinanceRow
+                label="Policy version"
+                value={activePolicyVersions.prohibitedContentVersion}
+              />
+              <div
+                className={
+                  canCreateTenantOwner ? 'policy-box ok compact' : 'policy-box block compact'
+                }
+              >
                 {canCreateTenantOwner ? <ShieldCheck size={18} /> : <CircleAlert size={18} />}
                 <div>
-                  <strong>{canCreateTenantOwner ? 'Owner signup ready' : 'Owner signup locked'}</strong>
+                  <strong>
+                    {canCreateTenantOwner ? 'Owner signup ready' : 'Owner signup locked'}
+                  </strong>
                   <span>
                     {canCreateTenantOwner
                       ? 'Safe owner tenant can enter trial with MFA required.'
@@ -752,7 +887,11 @@ export default function Home() {
               <FinanceRow label="Continent" value="Africa" />
               <FinanceRow label="Region" value="EMEA" />
               <FinanceRow label="Tenant" value={tenantId.slice(0, 8)} />
-              <div className={accessDecision.allowed ? 'policy-box ok compact' : 'policy-box block compact'}>
+              <div
+                className={
+                  accessDecision.allowed ? 'policy-box ok compact' : 'policy-box block compact'
+                }
+              >
                 {accessDecision.allowed ? <ShieldCheck size={18} /> : <CircleAlert size={18} />}
                 <div>
                   <strong>{accessDecision.allowed ? 'Access granted' : 'Access blocked'}</strong>
@@ -781,7 +920,11 @@ export default function Home() {
               />
               <FinanceRow
                 label="Computed tax"
-                value={formatMoney(pilotTaxSnapshot.taxAmount, country.currencyCode, country.locale)}
+                value={formatMoney(
+                  pilotTaxSnapshot.taxAmount,
+                  country.currencyCode,
+                  country.locale,
+                )}
               />
               <FinanceRow
                 label="Net revenue"
@@ -877,7 +1020,9 @@ export default function Home() {
             <section className="side-panel">
               <div className="panel-heading tight">
                 <h2>Conversation Workspace</h2>
-                <span>{conversationSla?.state ? codeLabel(conversationSla.state) : 'No thread'}</span>
+                <span>
+                  {conversationSla?.state ? codeLabel(conversationSla.state) : 'No thread'}
+                </span>
               </div>
               <FinanceRow
                 label="Assignment"
@@ -901,7 +1046,9 @@ export default function Home() {
                 <span>Status</span>
                 <select
                   value={conversationStatus}
-                  onChange={(event) => setConversationStatus(event.target.value as ConversationStatus)}
+                  onChange={(event) =>
+                    setConversationStatus(event.target.value as ConversationStatus)
+                  }
                 >
                   {conversationStatuses.map((status) => (
                     <option key={status} value={status}>
@@ -986,7 +1133,9 @@ export default function Home() {
                 <span>Urgency</span>
                 <select
                   value={notificationSeverity}
-                  onChange={(event) => setNotificationSeverity(event.target.value as NotificationSeverity)}
+                  onChange={(event) =>
+                    setNotificationSeverity(event.target.value as NotificationSeverity)
+                  }
                 >
                   {(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const).map((severity) => (
                     <option key={severity} value={severity}>
@@ -1057,10 +1206,109 @@ export default function Home() {
                 )}
                 <div>
                   <strong>
-                    {notificationPlan.requiresImmediateAttention ? 'Immediate alert' : 'Standard alert'}
+                    {notificationPlan.requiresImmediateAttention
+                      ? 'Immediate alert'
+                      : 'Standard alert'}
                   </strong>
                   <span>{notificationPlan.title}</span>
                 </div>
+              </div>
+            </section>
+
+            <section className="side-panel">
+              <div className="panel-heading tight">
+                <h2>Saved Searches</h2>
+                <span>{savedSearches.length} active</span>
+              </div>
+              <label className="field compact-field">
+                <span>Name</span>
+                <input
+                  value={savedSearchName}
+                  onChange={(event) => setSavedSearchName(event.target.value)}
+                />
+              </label>
+              <label className="lead-select-row">
+                <span>Alert cadence</span>
+                <select
+                  value={savedSearchFrequency}
+                  onChange={(event) =>
+                    setSavedSearchFrequency(event.target.value as SavedSearchFrequency)
+                  }
+                >
+                  <option value="INSTANT">Instant</option>
+                  <option value="DAILY">Daily</option>
+                  <option value="WEEKLY">Weekly</option>
+                </select>
+              </label>
+              <div className="terms-actions">
+                <button
+                  className="primary-button"
+                  type="button"
+                  disabled={!canSaveSearch}
+                  onClick={saveCurrentSearch}
+                >
+                  <Bell size={16} />
+                  Save Search
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={savedSearchAlerts.length === 0}
+                >
+                  <Search size={16} />
+                  Run Alerts
+                </button>
+              </div>
+              <div className={canSaveSearch ? 'policy-box ok compact' : 'policy-box block compact'}>
+                {canSaveSearch ? <ShieldCheck size={18} /> : <CircleAlert size={18} />}
+                <div>
+                  <strong>{canSaveSearch ? 'Alert-ready' : 'Alert blocked'}</strong>
+                  <span>
+                    {canSaveSearch
+                      ? `${queryExpansion.expandedTerms.length} normalized search terms ready.`
+                      : 'Saved alerts cannot be created for blocked or empty searches.'}
+                  </span>
+                </div>
+              </div>
+              <div className="saved-search-list">
+                {savedSearches.slice(0, 4).map((savedSearch) => (
+                  <button
+                    key={savedSearch.id}
+                    type="button"
+                    className="saved-search-row"
+                    onClick={() => {
+                      setQuery(savedSearch.query);
+                      setRole(savedSearch.role);
+                      setIndustryCode(savedSearch.industryCode);
+                      setSavedSearchName(savedSearch.name);
+                      setSavedSearchFrequency(savedSearch.frequency);
+                    }}
+                  >
+                    <span>
+                      <strong>{savedSearch.name}</strong>
+                      {savedSearch.query}
+                    </span>
+                    <em>{savedSearch.frequency.toLowerCase()}</em>
+                  </button>
+                ))}
+              </div>
+              <div className="alert-list">
+                {savedSearchAlerts.slice(0, 4).map((alert) => (
+                  <div
+                    key={alert.id}
+                    className={alert.status === 'READY' ? 'alert-row ready' : 'alert-row blocked'}
+                  >
+                    {alert.status === 'READY' ? <Sparkles size={15} /> : <Ban size={15} />}
+                    <div>
+                      <strong>{alert.result ? alert.result.name : alert.savedSearch.name}</strong>
+                      <span>
+                        {alert.result
+                          ? `${alert.savedSearch.name}: ${alert.result.score} match`
+                          : 'Blocked by safety policy'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </section>
 
