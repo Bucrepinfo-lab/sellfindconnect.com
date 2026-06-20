@@ -194,6 +194,10 @@ The production service settings were further optimized on 2026-06-16:
   scheduling: `POST /v1/operations/conversations/sla/run` with the same
   `x-internal-job-key` header. Run it frequently enough to create due-soon and
   breached response-time alerts.
+- The API exposes a protected analytics retention endpoint for future
+  scheduling: `POST /v1/operations/analytics/retention/run` with the same
+  `x-internal-job-key` header. Start with `dryRun: true`, then run on a monthly
+  schedule after country/legal retention policy is approved.
 - CDN caching was not enabled yet. The current app will become tenant-aware and
   authenticated, so edge caching should wait until cache-control headers clearly
   separate public static assets from tenant or user-specific pages.

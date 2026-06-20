@@ -95,4 +95,93 @@ describe('AnalyticsService', () => {
       }),
     ).toEqual([event]);
   });
+
+  it('exports aggregated tenant analytics without raw event metadata', async () => {
+    const service = new AnalyticsService();
+
+    await service.recordEvent(tenantId, {
+      eventType: 'VIEW',
+      entityType: 'LISTING',
+      entityId: 'advert_1',
+      countryCode: 'KE',
+      industryCode: 'AGRICULTURE',
+      consentState: 'GRANTED',
+      occurredAt: '2026-06-16T10:00:00.000Z',
+      metadata: {
+        query: 'private buyer note',
+      },
+    });
+    await service.recordEvent(tenantId, {
+      eventType: 'INQUIRY',
+      entityType: 'LISTING',
+      entityId: 'advert_1',
+      countryCode: 'KE',
+      industryCode: 'AGRICULTURE',
+      consentState: 'GRANTED',
+      occurredAt: '2026-06-16T10:05:00.000Z',
+    });
+
+    const report = await service.buildTenantReport(tenantId, {
+      from: '2026-06-16T00:00:00.000Z',
+      to: '2026-06-17T00:00:00.000Z',
+    });
+    const csv = await service.exportTenantReport(tenantId, {
+      from: '2026-06-16T00:00:00.000Z',
+      to: '2026-06-17T00:00:00.000Z',
+      format: 'CSV',
+    });
+
+    expect(report.breakdowns.eventTypes).toEqual(
+      expect.arrayContaining([
+        { label: 'VIEW', value: 1 },
+        { label: 'INQUIRY', value: 1 },
+      ]),
+    );
+    expect(csv.contentType).toBe('text/csv');
+    expect(csv.content).toContain('top_entities,advert_1,2,LISTING');
+    expect(csv.content).not.toContain('private buyer note');
+  });
+
+  it('supports dry-run retention before pruning old events', async () => {
+    const service = new AnalyticsService();
+
+    await service.recordEvent(tenantId, {
+      eventType: 'VIEW',
+      entityType: 'PROFILE',
+      entityId: 'old_profile',
+      countryCode: 'KE',
+      consentState: 'GRANTED',
+      occurredAt: '2025-01-01T00:00:00.000Z',
+    });
+    await service.recordEvent(tenantId, {
+      eventType: 'VIEW',
+      entityType: 'PROFILE',
+      entityId: 'current_profile',
+      countryCode: 'KE',
+      consentState: 'GRANTED',
+      occurredAt: '2026-06-16T00:00:00.000Z',
+    });
+
+    const dryRun = await service.runRetention({
+      before: '2026-01-01T00:00:00.000Z',
+      tenantId,
+      dryRun: true,
+    });
+    expect(dryRun.eventsMatched).toBe(1);
+    expect(dryRun.eventsDeleted).toBe(0);
+
+    const deleted = await service.runRetention({
+      before: '2026-01-01T00:00:00.000Z',
+      tenantId,
+    });
+    expect(deleted.eventsMatched).toBe(1);
+    expect(deleted.eventsDeleted).toBe(1);
+
+    const summary = await service.summarizeTenant(tenantId, {
+      from: '2025-01-01T00:00:00.000Z',
+      to: '2026-12-31T23:59:59.999Z',
+    });
+    expect(summary.totals.VIEW).toBe(1);
+    expect(summary.topEntities[0]?.entityId).toBe('current_profile');
+  });
 });

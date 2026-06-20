@@ -62,7 +62,8 @@ flowchart LR
 - Worker process for notifications, media moderation, analytics rollups, tax
   reminders, matching jobs, and search indexing.
 - Scheduler for advert lifecycle, day-35/day-39 renewal alerts, day-40
-  auto-deletion, conversation SLA sweeps, and finance/tax alert checks.
+  auto-deletion, conversation SLA sweeps, analytics retention pruning, and
+  finance/tax alert checks.
 - Object storage/CDN for images and clips.
 - Monitoring, logs, uptime alerts, error tracking, and backup verification.
 

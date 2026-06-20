@@ -201,6 +201,12 @@ workflow are approved.
   consent-aware events to `AnalyticsEvent` and summarizes tenant-scoped views,
   clicks, inquiries, shares, downloads, saved searches, searches, and matches
   from that durable store; development and tests keep the in-memory repository.
+- Tenant analytics reports are exported as aggregated CSV/JSON payloads from
+  the analytics service; raw event metadata is excluded by default to reduce
+  privacy risk. Raw event retention is pruned through the protected
+  `POST /v1/operations/analytics/retention/run` job, which supports dry-runs
+  and defaults to a 395-day raw-event window until country-specific retention
+  policies are configured.
 
 ## Notification Flow
 

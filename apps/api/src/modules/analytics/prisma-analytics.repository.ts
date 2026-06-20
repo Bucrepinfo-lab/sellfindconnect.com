@@ -2,7 +2,11 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { Prisma, PrismaClient, type AnalyticsEvent as PrismaAnalyticsEvent } from '@prisma/client';
 import type { AnalyticsEvent } from '@telpen/domain';
 
-import type { AnalyticsRepository, ListAnalyticsEventsInput } from './analytics.repository';
+import type {
+  AnalyticsRepository,
+  ListAnalyticsEventsInput,
+  PruneAnalyticsEventsInput,
+} from './analytics.repository';
 
 export function createAnalyticsPrismaClient(connectionString: string) {
   const adapter = new PrismaPg({ connectionString });
@@ -45,6 +49,22 @@ export class PrismaAnalyticsRepository implements AnalyticsRepository {
     });
 
     return events.map((event) => this.mapEvent(event));
+  }
+
+  async pruneEvents(input: PruneAnalyticsEventsInput): Promise<number> {
+    const where = {
+      ...(input.tenantId ? { tenantId: input.tenantId } : {}),
+      occurredAt: {
+        lt: new Date(input.before),
+      },
+    };
+
+    if (input.dryRun) {
+      return this.prisma.analyticsEvent.count({ where });
+    }
+
+    const result = await this.prisma.analyticsEvent.deleteMany({ where });
+    return result.count;
   }
 
   private mapEvent(event: PrismaAnalyticsEvent): AnalyticsEvent {

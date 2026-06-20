@@ -750,8 +750,13 @@ Implementation progress on 2026-06-20:
 - Saved-search and advert discovery interaction analytics now await durable
   writes before returning, so view, click, inquiry, share, download, save,
   search, and match counters survive API restarts in production mode.
-- Remaining hardening: aggregated analytics rollups/warehouse, export jobs,
-  hierarchy dashboards, retention automation, and privacy request workflows.
+- Added aggregated tenant analytics report and export endpoints with CSV/JSON
+  output that excludes raw event metadata by default.
+- Added a protected internal analytics retention sweep with dry-run support and
+  a 395-day default retention window for raw event pruning.
+- Remaining hardening: full analytics warehouse/rollups, PDF exports, hierarchy
+  dashboards, automated privacy request workflows, and configurable country/legal
+  retention policies.
 
 ### 7.10 Subscription and Billing
 

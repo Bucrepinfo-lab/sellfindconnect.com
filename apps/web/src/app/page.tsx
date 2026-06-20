@@ -1332,6 +1332,13 @@ export default function Home() {
                   </div>
                 ))}
               </div>
+              <div className="policy-box ok compact">
+                <FileCheck2 size={16} />
+                <div>
+                  <strong>Aggregated exports ready</strong>
+                  <span>CSV/JSON reports exclude raw metadata; retention sweep is 395 days.</span>
+                </div>
+              </div>
             </section>
 
             <section className="side-panel">

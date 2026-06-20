@@ -5,6 +5,7 @@ import { TenantId } from '../tenant/tenant-context.decorator';
 import { TenantSessionGuard } from '../tenant/tenant-session.guard';
 import { AnalyticsService } from './analytics.service';
 import {
+  AnalyticsExportQueryDto,
   AnalyticsSummaryQueryDto,
   CreateAnalyticsEventDto,
 } from './dto/create-analytics-event.dto';
@@ -16,7 +17,8 @@ import {
 })
 @ApiHeader({
   name: 'x-session-token',
-  description: 'Issued owner session token. MFA must be verified before analytics routes are available.',
+  description:
+    'Issued owner session token. MFA must be verified before analytics routes are available.',
 })
 @UseGuards(TenantSessionGuard)
 @Controller('analytics')
@@ -31,5 +33,15 @@ export class AnalyticsController {
   @Get('summary')
   summarizeTenant(@TenantId() tenantId: string, @Query() query: AnalyticsSummaryQueryDto) {
     return this.analytics.summarizeTenant(tenantId, query);
+  }
+
+  @Get('report')
+  buildTenantReport(@TenantId() tenantId: string, @Query() query: AnalyticsSummaryQueryDto) {
+    return this.analytics.buildTenantReport(tenantId, query);
+  }
+
+  @Get('export')
+  exportTenantReport(@TenantId() tenantId: string, @Query() query: AnalyticsExportQueryDto) {
+    return this.analytics.exportTenantReport(tenantId, query);
   }
 }

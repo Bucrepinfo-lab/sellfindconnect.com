@@ -12,7 +12,14 @@ export type ListAnalyticsEventsInput = {
   industryCode?: string;
 };
 
+export type PruneAnalyticsEventsInput = {
+  before: string;
+  tenantId?: string;
+  dryRun?: boolean;
+};
+
 export interface AnalyticsRepository {
   createEvent(event: AnalyticsEvent): RepositoryResult<void>;
   listEvents(input: ListAnalyticsEventsInput): RepositoryResult<AnalyticsEvent[]>;
+  pruneEvents(input: PruneAnalyticsEventsInput): RepositoryResult<number>;
 }

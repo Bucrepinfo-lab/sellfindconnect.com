@@ -3,6 +3,8 @@ import { ApiHeader, ApiTags } from '@nestjs/swagger';
 
 import { AdvertsService } from '../adverts/adverts.service';
 import { RunAdvertLifecycleDto } from '../adverts/dto/create-advert.dto';
+import { AnalyticsService } from '../analytics/analytics.service';
+import { RunAnalyticsRetentionDto } from '../analytics/dto/create-analytics-event.dto';
 import { ConversationsService } from '../conversations/conversations.service';
 import { RunConversationSlaDto } from '../conversations/dto/conversations.dto';
 import { RunMediaProcessingJobsDto } from '../media/dto/media-worker.dto';
@@ -19,6 +21,7 @@ import { InternalJobGuard } from './internal-job.guard';
 export class OperationsController {
   constructor(
     private readonly adverts: AdvertsService,
+    private readonly analytics: AnalyticsService,
     private readonly conversations: ConversationsService,
     private readonly mediaWorker: MediaWorkerService,
   ) {}
@@ -31,6 +34,11 @@ export class OperationsController {
   @Post('conversations/sla/run')
   runConversationSlaChecks(@Body() body: RunConversationSlaDto) {
     return this.conversations.runAllSlaChecks(body);
+  }
+
+  @Post('analytics/retention/run')
+  runAnalyticsRetention(@Body() body: RunAnalyticsRetentionDto) {
+    return this.analytics.runRetention(body);
   }
 
   @Post('media/processing/run')
