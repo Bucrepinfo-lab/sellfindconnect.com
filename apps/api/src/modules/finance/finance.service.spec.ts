@@ -154,4 +154,91 @@ describe('FinanceService', () => {
       }),
     ).toThrow();
   });
+
+  it('issues an invoice, captures payment, and produces a receipt', async () => {
+    const service = configuredService();
+
+    const invoice = service.issueInvoice(tenantId, {
+      countryCode: 'KE',
+      currencyCode: 'KES',
+      lines: [{ description: 'Monthly subscription', quantity: 1, unitAmount: 10 }],
+      taxAmount: 1.3793,
+      issuedAt: '2026-06-23T10:00:00.000Z',
+    });
+
+    expect(invoice.invoiceNumber).toBe('SFC-KE-2026-000001');
+    expect(invoice.total).toBe(11.3793);
+    expect(invoice.status).toBe('ISSUED');
+
+    const paid = await service.payInvoice(tenantId, { invoiceId: invoice.id, method: 'CARD' });
+
+    expect(paid.idempotentReplay).toBe(false);
+    expect(paid.payment.status).toBe('CAPTURED');
+    expect(paid.invoice.status).toBe('PAID');
+    expect(paid.receipt?.amount).toBe(11.3793);
+    expect(service.listReceipts(tenantId)).toHaveLength(1);
+  });
+
+  it('is idempotent when paying with the same idempotency key', async () => {
+    const service = configuredService();
+    const invoice = service.issueInvoice(tenantId, {
+      countryCode: 'KE',
+      currencyCode: 'KES',
+      lines: [{ description: 'Monthly subscription', quantity: 1, unitAmount: 10 }],
+    });
+
+    const first = await service.payInvoice(tenantId, {
+      invoiceId: invoice.id,
+      method: 'MOBILE_MONEY',
+      idempotencyKey: 'idem-001',
+    });
+    const replay = await service.payInvoice(tenantId, {
+      invoiceId: invoice.id,
+      method: 'MOBILE_MONEY',
+      idempotencyKey: 'idem-001',
+    });
+
+    expect(first.idempotentReplay).toBe(false);
+    expect(replay.idempotentReplay).toBe(true);
+    expect(replay.payment.id).toBe(first.payment.id);
+    expect(service.listPayments(tenantId)).toHaveLength(1);
+  });
+
+  it('refunds a captured invoice and updates its status', async () => {
+    const service = configuredService();
+    const invoice = service.issueInvoice(tenantId, {
+      countryCode: 'KE',
+      currencyCode: 'KES',
+      lines: [{ description: 'Monthly subscription', quantity: 1, unitAmount: 10 }],
+    });
+    await service.payInvoice(tenantId, { invoiceId: invoice.id, method: 'CARD' });
+
+    const refunded = await service.refundInvoice(tenantId, { invoiceId: invoice.id });
+
+    expect(refunded.invoice.status).toBe('REFUNDED');
+    expect(refunded.refund.amount).toBeLessThan(0);
+  });
+
+  it('reconciles a provider settlement and raises a variance alert', async () => {
+    const service = configuredService();
+    const invoice = service.issueInvoice(tenantId, {
+      countryCode: 'KE',
+      currencyCode: 'KES',
+      lines: [{ description: 'Monthly subscription', quantity: 1, unitAmount: 10 }],
+    });
+    const paid = await service.payInvoice(tenantId, { invoiceId: invoice.id, method: 'CARD' });
+
+    const reconciliation = service.reconcileProviderSettlement({
+      statementReference: 'PROVIDER-2026-06',
+      currencyCode: 'KES',
+      settlementLines: [
+        { reference: paid.payment.providerPaymentId, amount: paid.payment.amount + 1, currencyCode: 'KES' },
+      ],
+    });
+
+    expect(reconciliation.run.summary.hasVariance).toBe(true);
+    expect(
+      reconciliation.openAlerts.some((alert) => alert.alertType === 'RECONCILIATION_VARIANCE'),
+    ).toBe(true);
+  });
 });

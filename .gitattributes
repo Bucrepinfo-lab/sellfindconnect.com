@@ -1,0 +1,34 @@
+# Normalize line endings across Windows, macOS, and Linux so collaborators and
+# sandboxed tooling stop producing whole-file CRLF<->LF diffs.
+* text=auto eol=lf
+
+# Generated lockfiles: keep LF, hide from diffs, and mark as generated so they
+# do not dominate review or trip up language statistics.
+package-lock.json -diff linguist-generated=true
+
+# Explicit text types (defensive; covered by text=auto but documented for clarity).
+*.ts   text eol=lf
+*.tsx  text eol=lf
+*.js   text eol=lf
+*.jsx  text eol=lf
+*.json text eol=lf
+*.md   text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.prisma text eol=lf
+*.css  text eol=lf
+*.html text eol=lf
+
+# Shell scripts must stay LF to remain executable on Linux/macOS.
+*.sh text eol=lf
+
+# Binary assets: never normalize.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary

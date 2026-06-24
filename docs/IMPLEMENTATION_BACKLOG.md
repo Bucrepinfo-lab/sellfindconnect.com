@@ -344,7 +344,25 @@ Progress:
   tenant summaries.
 - Added web dashboard metrics for most visited, sorted, clicks, enquiries,
   shares, downloads, and age.
-- Database persistence and hierarchy dashboards remain next.
+- Added protected platform hierarchy reports and CSV/JSON hierarchy exports with
+  scoped `VIEW_ANALYTICS` checks and raw metadata excluded from export payloads.
+- Added web dashboard live hierarchy report loading with platform session token
+  authorization and seeded preview fallback.
+- Added first-party dashboard platform sign-in, session verification, MFA
+  verification, and managed token reuse for protected hierarchy analytics.
+- Added country-scoped analytics retention policy resolution with legal-basis
+  metadata, dry-run/delete filtering, and explicit override reporting.
+- Added CSV/JSON/PDF tenant and platform hierarchy analytics exports with
+  explicit UTF-8/base64 payload encoding and raw metadata excluded from exported
+  content.
+- Added daily analytics warehouse rollups for tenant/country/industry/entity
+  aggregates, Prisma persistence, in-memory parity, and a protected dry-run
+  rebuild job for scheduled operations.
+- Added rollup-backed tenant and platform hierarchy report reads with explicit
+  `AUTO`, `RAW`, and `ROLLUP` data-source selection plus web/PWA controls and
+  resolved-source display.
+- Privacy request automation and deeper country retention approvals remain
+  next.
 
 ## Epic 8: Subscription, Finance, and Tax
 
@@ -373,8 +391,24 @@ Progress:
   stored in finance metadata or configuration.
 - Added web Finance Readiness indicators for subscription amount, computed tax,
   net revenue, and next remittance alert.
-- Persistence, payment adapters, invoices/receipts, reconciliation, approval
-  workflow, evidence attachments, and report exports remain next.
+- Added a provider-neutral `PaymentAdapter` interface plus a deterministic,
+  offline `ManualPaymentAdapter` (selected by `PAYMENT_PROVIDER`), so live
+  providers (Stripe, mobile money, app-store billing) drop in behind the same
+  contract without touching the finance service.
+- Added invoice issuance with country-scoped sequential numbering, immutable
+  line totals, optional tax-snapshot linkage, idempotent payment capture,
+  receipts, and partial/full refunds with status transitions
+  (ISSUED → PAID → PARTIALLY_REFUNDED → REFUNDED).
+- Added provider/bank reconciliation (`reconcileSettlement`) that matches
+  captured payments against a settlement statement within a tolerance and raises
+  `RECONCILIATION_VARIANCE` finance alerts for variances and missing lines.
+- Added shared, tested domain helpers (`summarizeInvoiceLines`,
+  `buildInvoiceNumber`, `reconcileSettlement`, payment/invoice types) plus
+  tenant-session protected finance endpoints for invoices, payments, refunds,
+  receipts, and reconciliation, all behind zero-tolerance `assertSafe` checks.
+- Durable Prisma persistence for invoices/payments/receipts/reconciliation,
+  approved live payment providers, approval-workflow evidence attachments, and
+  report exports remain next.
 
 ## Epic 9: Mobile, Localization, and Launch
 

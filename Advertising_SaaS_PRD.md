@@ -1,10 +1,20 @@
 # Product Requirements Document: Multi-Tenant Advertising SaaS
 
 Date: 2026-06-15
-Last updated: 2026-06-20
+Last updated: 2026-06-23
 Owner: Telpen Adverts
 Working name: Telpen Adverts Platform
 Status: Draft for validation
+
+> Implementation status (2026-06-23): MVP vertical slices are in place across
+> auth/tenancy, advertiser profiles, listings + media pipeline, Source Finder,
+> matching/lead conversion, conversations, analytics (with daily rollups and
+> hierarchy reports), and finance/tax. The finance engine now also covers a
+> provider-neutral payment adapter, invoices/receipts, refunds, and
+> provider/bank reconciliation. An AI-native agent system (Research, Operation,
+> Support, Sales, Finance, Legal) operates the platform from `.agents/`. See
+> `docs/IMPLEMENTATION_BACKLOG.md` for per-epic progress and `Product_Memory.md`
+> for the dated decision log.
 
 ## 1. Executive Summary
 
@@ -737,7 +747,7 @@ Analytics requirements:
 - Events must include timestamp, tenant_id, profile_id, listing_id, actor_id when known, anonymous_session_id when allowed, country_id, continent_id, device_type, platform, source, campaign, referrer, and privacy consent state.
 - Use aggregated and anonymized dashboards where possible.
 - Retain raw event data according to privacy and retention policy.
-- Provide CSV/PDF export for tenant reports and internal reports.
+- Provide CSV/JSON/PDF export for tenant reports and internal reports.
 - Provide API/export for enterprise plans later.
 
 Implementation progress on 2026-06-20:
@@ -750,15 +760,34 @@ Implementation progress on 2026-06-20:
 - Saved-search and advert discovery interaction analytics now await durable
   writes before returning, so view, click, inquiry, share, download, save,
   search, and match counters survive API restarts in production mode.
-- Added aggregated tenant analytics report and export endpoints with CSV/JSON
+- Added aggregated tenant analytics report and export endpoints with CSV/JSON/PDF
   output that excludes raw event metadata by default.
 - Added a protected internal analytics retention sweep with dry-run support and
   a 395-day default retention window for raw event pruning.
+- Added configurable analytics raw-event retention policy resolution with
+  country-scoped pruning, policy legal basis metadata, and emergency
+  retention-day overrides for internal jobs.
 - Added platform hierarchy analytics foundation with `VIEW_ANALYTICS` scoped
   access checks for global, regional, continental, country, and tenant reports.
-- Remaining hardening: full analytics warehouse/rollups, PDF exports, hierarchy
-  UI dashboards, automated privacy request workflows, and configurable
-  country/legal retention policies.
+- Added web/PWA hierarchy dashboard controls for report scope, CSV/JSON/PDF export
+  readiness, access grant/block state, aggregate metrics, top country, top
+  industry, and top tenant previews.
+- Added protected platform hierarchy CSV/JSON/PDF export output plus web/PWA report
+  and export route surfacing for the API-backed dashboard contract.
+- Added web/PWA live hierarchy report loading from the protected report API
+  using platform `x-session-token` authorization, while retaining seeded preview
+  metrics as the unauthenticated fallback.
+- Added first-party web/PWA platform auth controls for dashboard sign-in,
+  session verification, MFA verification, managed token use, and safe fallback
+  to preview metrics when the session changes.
+- Added a daily analytics warehouse rollup table plus a protected internal
+  rollup rebuild job with dry-run support, tenant/country scoping, replacement
+  counts, and no raw metadata in aggregate rows.
+- Added rollup-backed tenant and hierarchy report reads with `AUTO`, `RAW`, and
+  `ROLLUP` data-source selection plus web/PWA controls that surface the resolved
+  raw-event or daily-rollup source.
+- Remaining hardening: automated privacy request workflows and deeper
+  country/legal retention approvals.
 
 ### 7.10 Subscription and Billing
 

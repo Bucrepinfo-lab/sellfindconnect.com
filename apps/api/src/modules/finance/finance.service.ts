@@ -1,11 +1,25 @@
-import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import {
+  Injectable,
+  NotFoundException,
+  Optional,
+  UnprocessableEntityException,
+} from '@nestjs/common';
+import {
+  buildInvoiceNumber,
   calculateTaxSnapshotAmounts,
   evaluateSafetyFields,
   getCountry,
   getRemittanceAlertDecision,
+  reconcileSettlement,
+  roundMoney,
+  summarizeInvoiceLines,
   type FilingFrequency,
   type FinanceAlertType,
+  type InvoiceLine,
+  type InvoiceStatus,
+  type PaymentMethod,
+  type PaymentStatus,
+  type ReconciliationSummary,
   type TaxProfileStatus,
 } from '@telpen/domain';
 import { randomUUID } from 'node:crypto';
@@ -15,8 +29,17 @@ import type {
   ConfigureCountryTaxProfileDto,
   CreateTaxRuleDto,
   GenerateTaxReturnDto,
+  IssueInvoiceDto,
+  PayInvoiceDto,
+  ReconcileSettlementDto,
+  RefundInvoiceDto,
   RunFinanceAlertsDto,
 } from './dto/finance.dto';
+import {
+  buildPaymentIdempotencyKey,
+  createConfiguredPaymentAdapter,
+  type PaymentAdapter,
+} from './payment.adapter';
 
 type CountryTaxProfileRecord = {
   id: string;
@@ -107,6 +130,63 @@ type FinanceAlertRecord = {
   createdAt: string;
 };
 
+type InvoiceRecord = {
+  id: string;
+  tenantId: string;
+  invoiceNumber: string;
+  countryCode: string;
+  currencyCode: string;
+  status: InvoiceStatus;
+  lines: InvoiceLine[];
+  subtotal: number;
+  taxAmount: number;
+  total: number;
+  amountPaid: number;
+  amountRefunded: number;
+  taxCalculationSnapshotId?: string;
+  issuedAt: string;
+  dueAt?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type PaymentRecord = {
+  id: string;
+  tenantId: string;
+  invoiceId: string;
+  provider: string;
+  providerPaymentId: string;
+  method: PaymentMethod;
+  status: PaymentStatus;
+  amount: number;
+  currencyCode: string;
+  idempotencyKey: string;
+  failureReason?: string;
+  capturedAt?: string;
+  createdAt: string;
+};
+
+type ReceiptRecord = {
+  id: string;
+  tenantId: string;
+  invoiceId: string;
+  paymentId: string;
+  receiptNumber: string;
+  amount: number;
+  currencyCode: string;
+  issuedAt: string;
+};
+
+type ReconciliationRunRecord = {
+  id: string;
+  provider: string;
+  statementReference: string;
+  countryCode?: string;
+  currencyCode?: string;
+  summary: ReconciliationSummary;
+  createdAt: string;
+};
+
 @Injectable()
 export class FinanceService {
   private readonly countryProfiles = new Map<string, CountryTaxProfileRecord>();
@@ -115,6 +195,18 @@ export class FinanceService {
   private readonly ledgerEntries = new Map<string, TaxLedgerEntryRecord>();
   private readonly taxReturns = new Map<string, TaxReturnRecord>();
   private readonly financeAlerts = new Map<string, FinanceAlertRecord>();
+  private readonly invoices = new Map<string, InvoiceRecord>();
+  private readonly payments = new Map<string, PaymentRecord>();
+  private readonly receipts = new Map<string, ReceiptRecord>();
+  private readonly reconciliationRuns = new Map<string, ReconciliationRunRecord>();
+  private readonly invoiceSequences = new Map<string, number>();
+  private readonly paymentAdapter: PaymentAdapter;
+
+  constructor(@Optional() paymentAdapter?: PaymentAdapter) {
+    this.paymentAdapter =
+      paymentAdapter ??
+      createConfiguredPaymentAdapter({ get: (key) => process.env[key] });
+  }
 
   configureCountryTaxProfile(input: ConfigureCountryTaxProfileDto): CountryTaxProfileRecord {
     this.assertSafe(input, 'Country tax profile contains blocked content.');
@@ -313,6 +405,312 @@ export class FinanceService {
     return Array.from(this.financeAlerts.values()).sort((a, b) =>
       b.createdAt.localeCompare(a.createdAt),
     );
+  }
+
+  issueInvoice(tenantId: string, input: IssueInvoiceDto): InvoiceRecord {
+    this.assertSafe(input, 'Invoice contains blocked content.');
+
+    // Validates the country has an APPROVED tax profile before any invoice is
+    // issued; throws otherwise.
+    this.requireApprovedProfile(input.countryCode);
+    const issuedAt = input.issuedAt ?? new Date().toISOString();
+
+    let taxAmount = input.taxAmount ?? 0;
+    let currencyCode = input.currencyCode.toUpperCase();
+    let taxCalculationSnapshotId: string | undefined;
+
+    if (input.taxCalculationSnapshotId) {
+      const snapshot = this.snapshots.get(input.taxCalculationSnapshotId);
+      if (!snapshot || snapshot.tenantId !== tenantId) {
+        throw new NotFoundException('Tax calculation snapshot not found for this tenant.');
+      }
+      taxAmount = snapshot.taxAmount;
+      currencyCode = snapshot.presentmentCurrency;
+      taxCalculationSnapshotId = snapshot.id;
+    }
+
+    const summary = summarizeInvoiceLines(input.lines, taxAmount);
+    const sequence = this.nextInvoiceSequence(input.countryCode);
+    const now = new Date().toISOString();
+    const invoice: InvoiceRecord = {
+      id: randomUUID(),
+      tenantId,
+      invoiceNumber: buildInvoiceNumber({
+        countryCode: input.countryCode,
+        sequence,
+        issuedAtIso: issuedAt,
+      }),
+      countryCode: input.countryCode,
+      currencyCode,
+      status: 'ISSUED',
+      lines: summary.lines,
+      subtotal: summary.totals.subtotal,
+      taxAmount: summary.totals.taxAmount,
+      total: summary.totals.total,
+      amountPaid: 0,
+      amountRefunded: 0,
+      taxCalculationSnapshotId,
+      issuedAt,
+      dueAt: input.dueAt,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    this.invoices.set(invoice.id, invoice);
+    return invoice;
+  }
+
+  listInvoices(tenantId: string): InvoiceRecord[] {
+    return Array.from(this.invoices.values())
+      .filter((invoice) => invoice.tenantId === tenantId)
+      .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt));
+  }
+
+  async payInvoice(tenantId: string, input: PayInvoiceDto) {
+    this.assertSafe(input, 'Payment contains blocked content.');
+
+    const invoice = this.requireTenantInvoice(tenantId, input.invoiceId);
+
+    // Idempotency is checked first so a replay with the same key returns the
+    // original result instead of tripping the "already paid" guard below.
+    const attempt = this.countInvoicePayments(invoice.id) + 1;
+    const idempotencyKey =
+      input.idempotencyKey ??
+      buildPaymentIdempotencyKey({ tenantId, invoiceId: invoice.id, attempt });
+    const existing = Array.from(this.payments.values()).find(
+      (payment) => payment.idempotencyKey === idempotencyKey,
+    );
+    if (existing) {
+      return {
+        invoice: this.invoices.get(existing.invoiceId) ?? invoice,
+        payment: existing,
+        receipt: this.findReceiptForPayment(existing.id),
+        idempotentReplay: true,
+      };
+    }
+
+    if (invoice.status === 'PAID') {
+      throw new UnprocessableEntityException('Invoice is already fully paid.');
+    }
+    if (['VOID', 'UNCOLLECTIBLE', 'REFUNDED'].includes(invoice.status)) {
+      throw new UnprocessableEntityException(`Invoice in ${invoice.status} state cannot be paid.`);
+    }
+
+    const outstanding = roundMoney(invoice.total - invoice.amountPaid);
+    const result = await this.paymentAdapter.capture({
+      tenantId,
+      invoiceId: invoice.id,
+      amount: outstanding,
+      currencyCode: invoice.currencyCode,
+      method: input.method,
+      idempotencyKey,
+      customerReference: input.customerReference,
+    });
+    const now = new Date().toISOString();
+    const payment: PaymentRecord = {
+      id: randomUUID(),
+      tenantId,
+      invoiceId: invoice.id,
+      provider: result.provider,
+      providerPaymentId: result.providerPaymentId,
+      method: input.method,
+      status: result.status,
+      amount: result.status === 'CAPTURED' ? result.capturedAmount : outstanding,
+      currencyCode: invoice.currencyCode,
+      idempotencyKey,
+      failureReason: result.failureReason,
+      capturedAt: result.status === 'CAPTURED' ? now : undefined,
+      createdAt: now,
+    };
+    this.payments.set(payment.id, payment);
+
+    if (result.status !== 'CAPTURED') {
+      throw new UnprocessableEntityException({
+        message: 'Payment capture failed.',
+        payment,
+      });
+    }
+
+    const amountPaid = roundMoney(invoice.amountPaid + result.capturedAmount);
+    const paidInvoice: InvoiceRecord = {
+      ...invoice,
+      amountPaid,
+      status: amountPaid >= invoice.total ? 'PAID' : invoice.status,
+      updatedAt: now,
+    };
+    this.invoices.set(invoice.id, paidInvoice);
+
+    const receipt: ReceiptRecord = {
+      id: randomUUID(),
+      tenantId,
+      invoiceId: invoice.id,
+      paymentId: payment.id,
+      receiptNumber: `${paidInvoice.invoiceNumber}-R${this.countInvoiceReceipts(invoice.id) + 1}`,
+      amount: result.capturedAmount,
+      currencyCode: invoice.currencyCode,
+      issuedAt: now,
+    };
+    this.receipts.set(receipt.id, receipt);
+
+    return { invoice: paidInvoice, payment, receipt, idempotentReplay: false };
+  }
+
+  async refundInvoice(tenantId: string, input: RefundInvoiceDto) {
+    this.assertSafe(input, 'Refund contains blocked content.');
+
+    const invoice = this.requireTenantInvoice(tenantId, input.invoiceId);
+    const capturedPayments = Array.from(this.payments.values()).filter(
+      (payment) => payment.invoiceId === invoice.id && payment.status === 'CAPTURED',
+    );
+    const source = capturedPayments[capturedPayments.length - 1];
+    if (!source) {
+      throw new UnprocessableEntityException('Invoice has no captured payment to refund.');
+    }
+
+    const refundable = roundMoney(invoice.amountPaid - invoice.amountRefunded);
+    const requested = roundMoney(input.amount ?? refundable);
+    if (requested <= 0 || requested > refundable) {
+      throw new UnprocessableEntityException('Refund amount must be between zero and the refundable balance.');
+    }
+    const result = await this.paymentAdapter.refund({
+      provider: source.provider,
+      providerPaymentId: source.providerPaymentId,
+      amount: requested,
+      currencyCode: invoice.currencyCode,
+      reason: input.reason,
+    });
+    const now = new Date().toISOString();
+    const refundPayment: PaymentRecord = {
+      id: randomUUID(),
+      tenantId,
+      invoiceId: invoice.id,
+      provider: result.provider,
+      providerPaymentId: result.providerRefundId,
+      method: source.method,
+      status: result.status === 'FAILED' ? 'FAILED' : 'REFUNDED',
+      amount: -roundMoney(result.refundedAmount || requested),
+      currencyCode: invoice.currencyCode,
+      idempotencyKey: `${source.idempotencyKey}:refund:${this.countInvoiceRefunds(invoice.id) + 1}`,
+      failureReason: result.failureReason,
+      createdAt: now,
+    };
+    this.payments.set(refundPayment.id, refundPayment);
+
+    if (result.status === 'FAILED') {
+      throw new UnprocessableEntityException({ message: 'Refund failed.', payment: refundPayment });
+    }
+
+    const amountRefunded = roundMoney(invoice.amountRefunded + result.refundedAmount);
+    const refundedInvoice: InvoiceRecord = {
+      ...invoice,
+      amountRefunded,
+      status: amountRefunded >= invoice.amountPaid ? 'REFUNDED' : 'PARTIALLY_REFUNDED',
+      updatedAt: now,
+    };
+    this.invoices.set(invoice.id, refundedInvoice);
+
+    return { invoice: refundedInvoice, refund: refundPayment };
+  }
+
+  listPayments(tenantId: string): PaymentRecord[] {
+    return Array.from(this.payments.values())
+      .filter((payment) => payment.tenantId === tenantId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  listReceipts(tenantId: string): ReceiptRecord[] {
+    return Array.from(this.receipts.values())
+      .filter((receipt) => receipt.tenantId === tenantId)
+      .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt));
+  }
+
+  reconcileProviderSettlement(input: ReconcileSettlementDto) {
+    this.assertSafe(input, 'Reconciliation input contains blocked content.');
+
+    const currencyFilter = input.currencyCode?.toUpperCase();
+    const ledgerLines = Array.from(this.payments.values())
+      .filter((payment) => payment.status === 'CAPTURED')
+      .filter((payment) => !input.provider || payment.provider === input.provider)
+      .filter((payment) => !currencyFilter || payment.currencyCode === currencyFilter)
+      .map((payment) => ({
+        reference: payment.providerPaymentId,
+        amount: payment.amount,
+        currencyCode: payment.currencyCode,
+      }));
+    const settlementLines = input.settlementLines.map((line) => ({
+      reference: line.reference,
+      amount: line.amount,
+      currencyCode: line.currencyCode.toUpperCase(),
+    }));
+
+    const summary = reconcileSettlement(ledgerLines, settlementLines, input.toleranceAmount ?? 0);
+    const now = new Date().toISOString();
+    const run: ReconciliationRunRecord = {
+      id: randomUUID(),
+      provider: input.provider ?? 'ALL_PROVIDERS',
+      statementReference: input.statementReference,
+      countryCode: input.countryCode,
+      currencyCode: currencyFilter,
+      summary,
+      createdAt: now,
+    };
+    this.reconciliationRuns.set(run.id, run);
+
+    if (summary.hasVariance) {
+      this.createFinanceAlert({
+        countryCode: input.countryCode ?? 'GLOBAL',
+        alertType: 'RECONCILIATION_VARIANCE',
+        message: `Settlement ${input.statementReference} has ${summary.varianceCount} amount variance(s), ${summary.missingInLedgerCount} missing in ledger, ${summary.missingInSettlementCount} missing in settlement. Total absolute variance: ${summary.totalVarianceAmount} ${currencyFilter ?? ''}.`.trim(),
+        severity: 'WARNING',
+        dueAt: now,
+        createdAt: now,
+        dedupeKey: `reconciliation:${input.statementReference}`,
+      });
+    }
+
+    return { run, openAlerts: this.listFinanceAlerts() };
+  }
+
+  listReconciliationRuns(): ReconciliationRunRecord[] {
+    return Array.from(this.reconciliationRuns.values()).sort((a, b) =>
+      b.createdAt.localeCompare(a.createdAt),
+    );
+  }
+
+  private requireTenantInvoice(tenantId: string, invoiceId: string): InvoiceRecord {
+    const invoice = this.invoices.get(invoiceId);
+    if (!invoice || invoice.tenantId !== tenantId) {
+      throw new NotFoundException('Invoice not found for this tenant.');
+    }
+    return invoice;
+  }
+
+  private nextInvoiceSequence(countryCode: string): number {
+    const next = (this.invoiceSequences.get(countryCode) ?? 0) + 1;
+    this.invoiceSequences.set(countryCode, next);
+    return next;
+  }
+
+  private countInvoicePayments(invoiceId: string): number {
+    return Array.from(this.payments.values()).filter(
+      (payment) => payment.invoiceId === invoiceId && payment.amount > 0,
+    ).length;
+  }
+
+  private countInvoiceRefunds(invoiceId: string): number {
+    return Array.from(this.payments.values()).filter(
+      (payment) => payment.invoiceId === invoiceId && payment.amount < 0,
+    ).length;
+  }
+
+  private countInvoiceReceipts(invoiceId: string): number {
+    return Array.from(this.receipts.values()).filter(
+      (receipt) => receipt.invoiceId === invoiceId,
+    ).length;
+  }
+
+  private findReceiptForPayment(paymentId: string): ReceiptRecord | undefined {
+    return Array.from(this.receipts.values()).find((receipt) => receipt.paymentId === paymentId);
   }
 
   private requireApprovedProfile(countryCode: string): CountryTaxProfileRecord {

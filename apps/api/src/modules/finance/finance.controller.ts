@@ -8,6 +8,10 @@ import {
   ConfigureCountryTaxProfileDto,
   CreateTaxRuleDto,
   GenerateTaxReturnDto,
+  IssueInvoiceDto,
+  PayInvoiceDto,
+  ReconcileSettlementDto,
+  RefundInvoiceDto,
   RunFinanceAlertsDto,
 } from './dto/finance.dto';
 import { FinanceService } from './finance.service';
@@ -74,5 +78,45 @@ export class FinanceController {
   @Get('alerts')
   listFinanceAlerts() {
     return this.finance.listFinanceAlerts();
+  }
+
+  @Post('invoices')
+  issueInvoice(@TenantId() tenantId: string, @Body() body: IssueInvoiceDto) {
+    return this.finance.issueInvoice(tenantId, body);
+  }
+
+  @Get('invoices')
+  listInvoices(@TenantId() tenantId: string) {
+    return this.finance.listInvoices(tenantId);
+  }
+
+  @Post('invoices/pay')
+  payInvoice(@TenantId() tenantId: string, @Body() body: PayInvoiceDto) {
+    return this.finance.payInvoice(tenantId, body);
+  }
+
+  @Post('invoices/refund')
+  refundInvoice(@TenantId() tenantId: string, @Body() body: RefundInvoiceDto) {
+    return this.finance.refundInvoice(tenantId, body);
+  }
+
+  @Get('payments')
+  listPayments(@TenantId() tenantId: string) {
+    return this.finance.listPayments(tenantId);
+  }
+
+  @Get('receipts')
+  listReceipts(@TenantId() tenantId: string) {
+    return this.finance.listReceipts(tenantId);
+  }
+
+  @Post('reconciliation/run')
+  reconcileSettlement(@Body() body: ReconcileSettlementDto) {
+    return this.finance.reconcileProviderSettlement(body);
+  }
+
+  @Get('reconciliation')
+  listReconciliationRuns() {
+    return this.finance.listReconciliationRuns();
   }
 }
