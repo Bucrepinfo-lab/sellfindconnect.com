@@ -162,14 +162,28 @@ Notes:
 
 ## Scheduled jobs
 
-Create App Platform scheduled jobs (or an external cron) that POST to the
-protected internal endpoints with header `x-internal-job-key: $INTERNAL_JOB_KEY`:
+DigitalOcean App Platform has no native recurring cron (only PRE/POST-deploy
+jobs), so production scheduling runs from the checked-in GitHub Actions workflow
+**`.github/workflows/scheduled-jobs.yml`**, which POSTs to the protected internal
+endpoints with header `x-internal-job-key: $INTERNAL_JOB_KEY`:
 
+- `POST /v1/operations/conversations/sla/run` — every 15 min.
+- `POST /v1/operations/media/processing/run` — every 15 min (scan/transform tick).
 - `POST /v1/operations/adverts/lifecycle/run` — daily (day-35/39 alerts, day-40 delete).
-- `POST /v1/operations/conversations/sla/run` — frequently (e.g. every 15 min).
 - `POST /v1/operations/analytics/rollups/run` — daily warehouse rebuild.
-- `POST /v1/operations/media/processing/run` — media scan/transform worker tick.
-- Finance remittance alerts (`finance/alerts/run`) — daily.
+- `POST /v1/operations/analytics/retention/run` — weekly retention sweep.
+
+Set two **GitHub repository secrets** (Settings → Secrets and variables →
+Actions): `API_BASE_URL` (e.g. `https://sellfindconnect.com/api/v1`) and
+`INTERNAL_JOB_KEY` (the same value set on the API service). You can trigger any
+group manually via the workflow's "Run workflow" button.
+
+> Not yet automated: finance remittance alerts run per-tenant
+> (`POST /v1/finance/alerts/run`, tenant-session protected). Add an all-tenant
+> internal endpoint (like the others) before scheduling it here.
+
+Alternatively, run the same calls from a DigitalOcean Function with a scheduled
+trigger or a small worker service if you prefer to keep scheduling on DO.
 
 ## Cutover smoke checklist
 

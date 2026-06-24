@@ -1,0 +1,88 @@
+name: Scheduled jobs
+
+# Production scheduler for Sell Find Connect. DigitalOcean App Platform has no
+# native cron, so GitHub Actions triggers the protected internal maintenance
+# endpoints (guarded by the shared x-internal-job-key) on a schedule.
+#
+# Required repository secrets (Settings -> Secrets and variables -> Actions):
+#   API_BASE_URL      e.g. https://sellfindconnect.com/api/v1
+#   INTERNAL_JOB_KEY  the same secret set on the API service
+#
+# Note: cron times are UTC. GitHub may delay scheduled runs under load.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *' # frequent: conversation SLA + media processing
+    - cron: '0 2 * * *'    # daily: advert lifecycle + analytics rollups
+    - cron: '0 3 * * 0'    # weekly: analytics retention sweep
+  workflow_dispatch:
+    inputs:
+      group:
+        description: Which group to run manually
+        type: choice
+        default: all
+        options: [all, frequent, daily, weekly]
+
+concurrency:
+  group: scheduled-jobs
+  cancel-in-progress: false
+
+jobs:
+  run:
+    name: Run scheduled maintenance jobs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      API_BASE_URL: ${{ secrets.API_BASE_URL }}
+      INTERNAL_JOB_KEY: ${{ secrets.INTERNAL_JOB_KEY }}
+      FREQUENT: ${{ github.event.schedule == '*/15 * * * *' || (github.event_name == 'workflow_dispatch' && (inputs.group == 'all' || inputs.group == 'frequent')) }}
+      DAILY: ${{ github.event.schedule == '0 2 * * *' || (github.event_name == 'workflow_dispatch' && (inputs.group == 'all' || inputs.group == 'daily')) }}
+      WEEKLY: ${{ github.event.schedule == '0 3 * * 0' || (github.event_name == 'workflow_dispatch' && (inputs.group == 'all' || inputs.group == 'weekly')) }}
+    steps:
+      - name: Validate secrets
+        run: |
+          if [ -z "$API_BASE_URL" ] || [ -z "$INTERNAL_JOB_KEY" ]; then
+            echo "::error::Set the API_BASE_URL and INTERNAL_JOB_KEY repository secrets."
+            exit 1
+          fi
+
+      - name: Conversation SLA sweep
+        if: env.FREQUENT == 'true'
+        run: |
+          curl -fsS --retry 3 --retry-delay 5 -X POST \
+            "$API_BASE_URL/operations/conversations/sla/run" \
+            -H "x-internal-job-key: $INTERNAL_JOB_KEY" \
+            -H "content-type: application/json" -d '{}'
+
+      - name: Media processing tick
+        if: env.FREQUENT == 'true'
+        run: |
+          curl -fsS --retry 3 --retry-delay 5 -X POST \
+            "$API_BASE_URL/operations/media/processing/run" \
+            -H "x-internal-job-key: $INTERNAL_JOB_KEY" \
+            -H "content-type: application/json" \
+            -d '{"workerId":"github-scheduler","limit":25}'
+
+      - name: Advert lifecycle (day-35/39 alerts, day-40 delete)
+        if: env.DAILY == 'true'
+        run: |
+          curl -fsS --retry 3 --retry-delay 5 -X POST \
+            "$API_BASE_URL/operations/adverts/lifecycle/run" \
+            -H "x-internal-job-key: $INTERNAL_JOB_KEY" \
+            -H "content-type: application/json" -d '{}'
+
+      - name: Analytics warehouse rollups
+        if: env.DAILY == 'true'
+        run: |
+          curl -fsS --retry 3 --retry-delay 5 -X POST \
+            "$API_BASE_URL/operations/analytics/rollups/run" \
+            -H "x-internal-job-key: $INTERNAL_JOB_KEY" \
+            -H "content-type: application/json" -d '{}'
+
+      - name: Analytics retention sweep
+        if: env.WEEKLY == 'true'
+        run: |
+          curl -fsS --retry 3 --retry-delay 5 -X POST \
+            "$API_BASE_URL/operations/analytics/retention/run" \
+            -H "x-internal-job-key: $INTERNAL_JOB_KEY" \
+            -H "content-type: application/json" -d '{}'
