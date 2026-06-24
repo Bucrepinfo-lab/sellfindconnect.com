@@ -10,3 +10,7 @@ coverage/
 *.tsbuildinfo
 packages/database/src/generated/
 apps/api/.nest/
+
+# Deployment CLI pull/config artifacts (not source)
+.railway-config-pull-*/
+scripts/render/
