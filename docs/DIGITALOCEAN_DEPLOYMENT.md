@@ -171,16 +171,14 @@ endpoints with header `x-internal-job-key: $INTERNAL_JOB_KEY`:
 - `POST /v1/operations/media/processing/run` — every 15 min (scan/transform tick).
 - `POST /v1/operations/adverts/lifecycle/run` — daily (day-35/39 alerts, day-40 delete).
 - `POST /v1/operations/analytics/rollups/run` — daily warehouse rebuild.
+- `POST /v1/operations/finance/alerts/run` — daily all-tenant remittance alerts
+  (T-30/14/7/3/1, due, overdue, reconciliation variance).
 - `POST /v1/operations/analytics/retention/run` — weekly retention sweep.
 
 Set two **GitHub repository secrets** (Settings → Secrets and variables →
 Actions): `API_BASE_URL` (e.g. `https://sellfindconnect.com/api/v1`) and
 `INTERNAL_JOB_KEY` (the same value set on the API service). You can trigger any
 group manually via the workflow's "Run workflow" button.
-
-> Not yet automated: finance remittance alerts run per-tenant
-> (`POST /v1/finance/alerts/run`, tenant-session protected). Add an all-tenant
-> internal endpoint (like the others) before scheduling it here.
 
 Alternatively, run the same calls from a DigitalOcean Function with a scheduled
 trigger or a small worker service if you prefer to keep scheduling on DO.

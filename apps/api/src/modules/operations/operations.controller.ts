@@ -10,6 +10,8 @@ import {
 } from '../analytics/dto/create-analytics-event.dto';
 import { ConversationsService } from '../conversations/conversations.service';
 import { RunConversationSlaDto } from '../conversations/dto/conversations.dto';
+import { RunFinanceAlertsDto } from '../finance/dto/finance.dto';
+import { FinanceService } from '../finance/finance.service';
 import { RunMediaProcessingJobsDto } from '../media/dto/media-worker.dto';
 import { MediaWorkerService } from '../media/media-worker.service';
 import { InternalJobGuard } from './internal-job.guard';
@@ -26,6 +28,7 @@ export class OperationsController {
     private readonly adverts: AdvertsService,
     private readonly analytics: AnalyticsService,
     private readonly conversations: ConversationsService,
+    private readonly finance: FinanceService,
     private readonly mediaWorker: MediaWorkerService,
   ) {}
 
@@ -52,5 +55,10 @@ export class OperationsController {
   @Post('media/processing/run')
   runMediaProcessingJobs(@Body() body: RunMediaProcessingJobsDto) {
     return this.mediaWorker.runOnce(body);
+  }
+
+  @Post('finance/alerts/run')
+  runFinanceAlerts(@Body() body: RunFinanceAlertsDto) {
+    return this.finance.runFinanceAlerts(body);
   }
 }
