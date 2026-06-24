@@ -23,8 +23,10 @@ import {
   Min,
 } from 'class-validator';
 
-export const analyticsExportFormats = ['CSV', 'JSON'] as const;
+export const analyticsExportFormats = ['CSV', 'JSON', 'PDF'] as const;
 export type AnalyticsExportFormat = (typeof analyticsExportFormats)[number];
+export const analyticsReportDataSources = ['AUTO', 'RAW', 'ROLLUP'] as const;
+export type AnalyticsReportDataSource = (typeof analyticsReportDataSources)[number];
 
 export class CreateAnalyticsEventDto {
   @ApiProperty({ enum: analyticsEventTypes, example: 'VIEW' })
@@ -94,6 +96,11 @@ export class AnalyticsSummaryQueryDto {
   @IsString()
   @MaxLength(80)
   declare industryCode?: string;
+
+  @ApiPropertyOptional({ enum: analyticsReportDataSources, example: 'AUTO' })
+  @IsOptional()
+  @IsIn(analyticsReportDataSources)
+  declare dataSource?: AnalyticsReportDataSource;
 }
 
 export class AnalyticsExportQueryDto extends AnalyticsSummaryQueryDto {
@@ -146,6 +153,41 @@ export class RunAnalyticsRetentionDto {
   @IsString()
   @Length(2, 120)
   declare tenantId?: string;
+
+  @ApiPropertyOptional({ example: 'KE' })
+  @IsOptional()
+  @IsString()
+  @Length(2, 2)
+  declare countryCode?: string;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  declare dryRun?: boolean;
+}
+
+export class RunAnalyticsRollupDto {
+  @ApiPropertyOptional({ example: '2026-06-16T00:00:00.000Z' })
+  @IsOptional()
+  @IsISO8601()
+  declare from?: string;
+
+  @ApiPropertyOptional({ example: '2026-06-17T00:00:00.000Z' })
+  @IsOptional()
+  @IsISO8601()
+  declare to?: string;
+
+  @ApiPropertyOptional({ example: '11111111-1111-4111-8111-111111111111' })
+  @IsOptional()
+  @IsString()
+  @Length(2, 120)
+  declare tenantId?: string;
+
+  @ApiPropertyOptional({ example: 'KE' })
+  @IsOptional()
+  @IsString()
+  @Length(2, 2)
+  declare countryCode?: string;
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()

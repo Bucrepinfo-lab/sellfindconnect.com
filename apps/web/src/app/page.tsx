@@ -47,6 +47,7 @@ import {
   getRemittanceAlertDecision,
   getCountry,
   industryCategories,
+  operationalRegions,
   pilotSourceFinderRecords,
   prohibitedCategorySummaries,
   searchSourceFinderRecords,
@@ -57,6 +58,7 @@ import {
   type MatchFeedbackAction,
   type ConversationStatus,
   type AccessPermission,
+  type AccessResourceScope,
   type AccessRole,
   type AccessScopeLevel,
   type NotificationSeverity,
@@ -70,6 +72,7 @@ const tenantId = '11111111-1111-4111-8111-111111111111';
 const lifecycleDemoNow = new Date(Date.UTC(2026, 6, 10, 0, 0, 0)).toISOString();
 const conversationDemoOpenedAt = '2026-06-17T08:00:00.000Z';
 const conversationDemoNow = '2026-06-17T11:15:00.000Z';
+const analyticsApiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/v1';
 
 type SavedSearchFrequency = 'INSTANT' | 'DAILY' | 'WEEKLY';
 
@@ -87,6 +90,93 @@ type SavedSearchAlertPreview = {
   savedSearch: SavedSearchPreview;
   result: SourceFinderSearchResult | null;
   status: 'READY' | 'BLOCKED';
+};
+
+type AnalyticsExportFormat = 'CSV' | 'JSON' | 'PDF';
+type AnalyticsReportDataSource = 'AUTO' | 'RAW' | 'ROLLUP';
+type HierarchyReportStatus = 'PREVIEW' | 'LOADING' | 'LIVE' | 'BLOCKED' | 'ERROR';
+type PlatformAuthStatus =
+  | 'SIGNED_OUT'
+  | 'LOGIN_PENDING'
+  | 'MFA_REQUIRED'
+  | 'VERIFYING'
+  | 'SIGNED_IN'
+  | 'ERROR';
+
+type HierarchyBreakdown = {
+  label: string;
+  value: number;
+};
+
+type HierarchyAnalyticsReport = {
+  scope: {
+    scopeLevel: AccessScopeLevel;
+    label: string;
+    regionCode?: string;
+    continentCode?: string;
+    countryCode?: string;
+    tenantId?: string;
+  };
+  generatedAt: string;
+  periodStart: string;
+  periodEnd: string;
+  eventCount: number;
+  totals: Record<string, number>;
+  mostVisited: Array<{
+    entityId: string;
+    entityType: string;
+    views: number;
+  }>;
+  topCountries: HierarchyBreakdown[];
+  topIndustries: HierarchyBreakdown[];
+  topTenants: HierarchyBreakdown[];
+  access?: {
+    role?: string;
+    scopeLevel?: AccessScopeLevel;
+    reason?: string;
+  };
+  privacy: {
+    rawEventMetadataIncluded: boolean;
+  };
+  warehouse?: {
+    requestedDataSource: AnalyticsReportDataSource;
+    dataSource: 'RAW_EVENTS' | 'DAILY_ROLLUPS';
+    rollupRows: number;
+    fallbackReason?: string;
+  };
+};
+
+type HierarchyVisitedRow = {
+  id: string;
+  name: string;
+  views: number;
+};
+
+type PresentedSession = {
+  token?: string;
+  tenantId: string;
+  role: string;
+  mfaRequired: boolean;
+  mfaVerified: boolean;
+  expiresAt: string;
+  mfaChallenge?: {
+    id: string;
+    deliveryChannel: string;
+    expiresAt: string;
+    developmentCode?: string;
+  };
+};
+
+type AuthSessionPayload = {
+  session: PresentedSession;
+  user?: {
+    email?: string;
+    displayName?: string;
+  };
+  tenant?: {
+    id: string;
+    displayName: string;
+  };
 };
 
 const termsClauses = [
@@ -152,6 +242,107 @@ function roleLabel(role: string) {
   return codeLabel(role);
 }
 
+function statusLabel(status: HierarchyReportStatus) {
+  if (status === 'PREVIEW') return 'Seeded preview';
+  if (status === 'LOADING') return 'Loading';
+  if (status === 'LIVE') return 'Live API';
+  return codeLabel(status);
+}
+
+function platformStatusLabel(status: PlatformAuthStatus) {
+  if (status === 'SIGNED_OUT') return 'No verified session';
+  if (status === 'LOGIN_PENDING') return 'Signing in';
+  if (status === 'MFA_REQUIRED') return 'MFA required';
+  if (status === 'VERIFYING') return 'Verifying';
+  if (status === 'SIGNED_IN') return 'Session verified';
+  return 'Auth error';
+}
+
+function sessionSummary(payload: AuthSessionPayload) {
+  const identity = payload.user?.email ?? payload.user?.displayName ?? 'Platform user';
+  const tenant = payload.tenant?.displayName ?? payload.session.tenantId;
+  const mfa = payload.session.mfaVerified ? 'MFA verified' : 'MFA pending';
+  return `${identity} / ${tenant} / ${mfa}`;
+}
+
+async function readApiError(response: Response, fallback: string) {
+  const body = await response.text();
+  if (!body) return response.statusText || fallback;
+
+  try {
+    const parsed = JSON.parse(body) as { message?: string | string[] };
+    if (Array.isArray(parsed.message)) return parsed.message.join(', ');
+    return parsed.message ?? response.statusText ?? fallback;
+  } catch {
+    return body;
+  }
+}
+
+function getEventTotal(report: HierarchyAnalyticsReport, eventType: string) {
+  return report.totals[eventType] ?? 0;
+}
+
+function displayCountryBreakdown(item: HierarchyBreakdown | undefined) {
+  if (!item) return 'No country';
+  const country = getCountry(item.label);
+  return `${country?.name ?? item.label} (${formatNumber(item.value)})`;
+}
+
+function displayIndustryBreakdown(item: HierarchyBreakdown | undefined) {
+  if (!item) return 'No industry';
+  const industry = industryCategories.find((category) => category.code === item.label);
+  return industry?.name ?? item.label;
+}
+
+function reportPeriodDays(report: HierarchyAnalyticsReport) {
+  const start = Date.parse(report.periodStart);
+  const end = Date.parse(report.periodEnd);
+  if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return 'Live API';
+  return `${Math.max(1, Math.round((end - start) / (24 * 60 * 60 * 1000)))} day report`;
+}
+
+function buildHierarchyAnalyticsApiPath(input: {
+  scopeLevel: AccessScopeLevel;
+  countryCode: string;
+  tenantId: string;
+  industryCode: string;
+  format: AnalyticsExportFormat;
+  dataSource: AnalyticsReportDataSource;
+  exportRoute?: boolean;
+}) {
+  const params = new URLSearchParams({
+    scopeLevel: input.scopeLevel,
+    format: input.format,
+    dataSource: input.dataSource,
+  });
+
+  if (input.scopeLevel === 'REGIONAL') {
+    params.set('regionCode', 'EMEA');
+  }
+
+  if (input.scopeLevel === 'CONTINENT') {
+    params.set('continentCode', 'AF');
+  }
+
+  if (input.scopeLevel === 'COUNTRY') {
+    params.set('countryCode', input.countryCode);
+  }
+
+  if (input.scopeLevel === 'TENANT') {
+    params.set('tenantId', input.tenantId);
+    params.set('countryCode', input.countryCode);
+  }
+
+  if (input.industryCode !== 'ALL') {
+    params.set('industryCode', input.industryCode);
+  }
+
+  const route = input.exportRoute
+    ? '/platform/analytics/hierarchy/export'
+    : '/platform/analytics/hierarchy';
+  return `${route}?${params.toString()}`;
+}
+
 export default function Home() {
   const [query, setQuery] = useState('fresh produce');
   const [savedSearchName, setSavedSearchName] = useState('Fresh produce buyers');
@@ -186,6 +377,20 @@ export default function Home() {
   const [accessScopeLevel, setAccessScopeLevel] = useState<AccessScopeLevel>('COUNTRY');
   const [accessPermission, setAccessPermission] = useState<AccessPermission>('MANAGE_COUNTRY');
   const [accessMfaVerified, setAccessMfaVerified] = useState(true);
+  const [analyticsScopeLevel, setAnalyticsScopeLevel] = useState<AccessScopeLevel>('COUNTRY');
+  const [analyticsExportFormat, setAnalyticsExportFormat] = useState<AnalyticsExportFormat>('CSV');
+  const [analyticsDataSource, setAnalyticsDataSource] = useState<AnalyticsReportDataSource>('AUTO');
+  const [platformEmail, setPlatformEmail] = useState('owner@sellfindconnect.com');
+  const [platformPassword, setPlatformPassword] = useState('Strong-owner#2026');
+  const [platformMfaCode, setPlatformMfaCode] = useState('');
+  const [platformAuthStatus, setPlatformAuthStatus] = useState<PlatformAuthStatus>('SIGNED_OUT');
+  const [platformSessionSummary, setPlatformSessionSummary] = useState('No session');
+  const [platformAuthError, setPlatformAuthError] = useState('');
+  const [platformSessionToken, setPlatformSessionToken] = useState('');
+  const [hierarchyReport, setHierarchyReport] = useState<HierarchyAnalyticsReport | null>(null);
+  const [hierarchyReportStatus, setHierarchyReportStatus] =
+    useState<HierarchyReportStatus>('PREVIEW');
+  const [hierarchyReportError, setHierarchyReportError] = useState('');
   const [ownerEmail, setOwnerEmail] = useState('owner@sellfindconnect.com');
   const [ownerPassword, setOwnerPassword] = useState('Strong-owner#2026');
   const [tenantDisplayName, setTenantDisplayName] = useState('Nairobi Fresh Produce Cooperative');
@@ -298,19 +503,6 @@ export default function Home() {
     }),
     { views: 0, clicks: 0, inquiries: 0, shares: 0, downloads: 0 },
   );
-  const mostVisited = [...filteredResults]
-    .sort((a, b) => b.analytics.views - a.analytics.views)
-    .slice(0, 3);
-  const averageDaysLive = filteredResults.length
-    ? Math.round(
-        filteredResults.reduce(
-          (memo, item) =>
-            memo + calculateAdvertLifecycle(item.publishedAt, lifecycleDemoNow).daysLive,
-          0,
-        ) / filteredResults.length,
-      )
-    : 0;
-  const clickThroughRate = totals.views ? Math.round((totals.clicks / totals.views) * 100) : 0;
   const selectedMatch = filteredResults[0];
   const leadIntelligence = selectedMatch ? buildLeadConversionIntelligence(selectedMatch) : null;
   const canCreateLead = Boolean(termsAccepted && querySafetyDecision.allowed && selectedMatch);
@@ -411,6 +603,316 @@ export default function Home() {
       countryCode: country.code,
     },
   });
+  const selectedAnalyticsRegion = operationalRegions.find(
+    (regionItem) => regionItem.code === 'EMEA',
+  );
+  const analyticsResource: AccessResourceScope =
+    analyticsScopeLevel === 'GLOBAL'
+      ? {}
+      : analyticsScopeLevel === 'REGIONAL'
+        ? { regionCode: 'EMEA' }
+        : analyticsScopeLevel === 'CONTINENT'
+          ? { continentCode: 'AF' }
+          : analyticsScopeLevel === 'COUNTRY'
+            ? { countryCode: country.code }
+            : { tenantId, countryCode: country.code };
+  const analyticsScopeLabel = codeLabel(analyticsScopeLevel);
+  const hierarchyAccessDecision = evaluateAccess({
+    subject: {
+      userId: 'country-admin-1',
+      role: accessRole,
+      mfaVerified: accessMfaVerified,
+      scope: {
+        level: accessScopeLevel,
+        regionCodes: ['EMEA'],
+        continentCodes: ['AF'],
+        countryCodes: [country.code],
+        tenantIds: [tenantId],
+      },
+    },
+    permission: 'VIEW_ANALYTICS',
+    resource: analyticsResource,
+  });
+  const hierarchyRecords =
+    analyticsScopeLevel === 'TENANT'
+      ? filteredResults
+      : pilotSourceFinderRecords.filter((record) => {
+          const recordCountry = getCountry(record.countryCode);
+          const recordContinentCode = recordCountry?.continentCode;
+          const recordInRegion = Boolean(
+            selectedAnalyticsRegion &&
+            (selectedAnalyticsRegion.countryCodes.includes(record.countryCode) ||
+              (recordContinentCode &&
+                selectedAnalyticsRegion.continentCodes.includes(recordContinentCode))),
+          );
+
+          return (
+            (analyticsScopeLevel === 'GLOBAL' ||
+              (analyticsScopeLevel === 'REGIONAL' && recordInRegion) ||
+              (analyticsScopeLevel === 'CONTINENT' && recordContinentCode === 'AF') ||
+              (analyticsScopeLevel === 'COUNTRY' && record.countryCode === country.code)) &&
+            (industryCode === 'ALL' || record.industryCode === industryCode)
+          );
+        });
+  const hierarchyTotals = hierarchyRecords.reduce(
+    (memo, item) => ({
+      views: memo.views + item.analytics.views,
+      clicks: memo.clicks + item.analytics.clicks,
+      inquiries: memo.inquiries + item.analytics.inquiries,
+      shares: memo.shares + item.analytics.shares,
+      downloads: memo.downloads + item.analytics.downloads,
+    }),
+    { views: 0, clicks: 0, inquiries: 0, shares: 0, downloads: 0 },
+  );
+  const hierarchyMostVisited = [...hierarchyRecords]
+    .sort((a, b) => b.analytics.views - a.analytics.views)
+    .slice(0, 3);
+  const hierarchyAverageDaysLive = hierarchyRecords.length
+    ? Math.round(
+        hierarchyRecords.reduce(
+          (memo, item) =>
+            memo + calculateAdvertLifecycle(item.publishedAt, lifecycleDemoNow).daysLive,
+          0,
+        ) / hierarchyRecords.length,
+      )
+    : 0;
+  const hierarchyClickThroughRate = hierarchyTotals.views
+    ? Math.round((hierarchyTotals.clicks / hierarchyTotals.views) * 100)
+    : 0;
+  const hierarchyTopIndustry =
+    [...hierarchyRecords].sort((left, right) => {
+      const rightTotal = right.analytics.views + right.analytics.clicks + right.analytics.inquiries;
+      const leftTotal = left.analytics.views + left.analytics.clicks + left.analytics.inquiries;
+      return rightTotal - leftTotal;
+    })[0]?.industryCode ?? 'None';
+  const hierarchyTopIndustryName =
+    industryCategories.find((industry) => industry.code === hierarchyTopIndustry)?.name ??
+    hierarchyTopIndustry;
+  const hierarchyTopTenant =
+    [...hierarchyRecords].sort((left, right) => right.analytics.views - left.analytics.views)[0]
+      ?.name ?? 'No tenant';
+  const hierarchyCountryViews = hierarchyRecords.reduce<Record<string, number>>((memo, item) => {
+    memo[item.countryCode] = (memo[item.countryCode] ?? 0) + item.analytics.views;
+    return memo;
+  }, {});
+  const hierarchyTopCountryEntry = Object.entries(hierarchyCountryViews).sort(
+    (left, right) => right[1] - left[1],
+  )[0];
+  const hierarchyTopCountryLabel = hierarchyTopCountryEntry
+    ? `${getCountry(hierarchyTopCountryEntry[0])?.name ?? hierarchyTopCountryEntry[0]} (${formatNumber(
+        hierarchyTopCountryEntry[1],
+      )})`
+    : 'No country';
+  const hierarchyExportName = `analytics-${analyticsScopeLevel.toLowerCase()}-${country.code}.${analyticsExportFormat.toLowerCase()}`;
+  const hierarchyReportApiPath = buildHierarchyAnalyticsApiPath({
+    scopeLevel: analyticsScopeLevel,
+    countryCode: country.code,
+    tenantId,
+    industryCode,
+    format: analyticsExportFormat,
+    dataSource: analyticsDataSource,
+  });
+  const hierarchyExportApiPath = buildHierarchyAnalyticsApiPath({
+    scopeLevel: analyticsScopeLevel,
+    countryCode: country.code,
+    tenantId,
+    industryCode,
+    format: analyticsExportFormat,
+    dataSource: analyticsDataSource,
+    exportRoute: true,
+  });
+  const hierarchyReportUrl = `${analyticsApiBaseUrl.replace(/\/$/, '')}${hierarchyReportApiPath}`;
+  const platformLoginUrl = `${analyticsApiBaseUrl.replace(/\/$/, '')}/auth/login`;
+  const platformMfaUrl = `${analyticsApiBaseUrl.replace(/\/$/, '')}/auth/mfa/verify`;
+  const platformSessionUrl = `${analyticsApiBaseUrl.replace(/\/$/, '')}/auth/session`;
+  const resetHierarchyReport = () => {
+    setHierarchyReport(null);
+    setHierarchyReportError('');
+    setHierarchyReportStatus('PREVIEW');
+  };
+  const applyPlatformSession = (payload: AuthSessionPayload) => {
+    if (payload.session.token) {
+      setPlatformSessionToken(payload.session.token);
+    }
+
+    resetHierarchyReport();
+    setPlatformSessionSummary(sessionSummary(payload));
+    setPlatformAuthStatus(
+      payload.session.mfaRequired && !payload.session.mfaVerified ? 'MFA_REQUIRED' : 'SIGNED_IN',
+    );
+    setPlatformAuthError('');
+
+    if (payload.session.mfaChallenge?.developmentCode) {
+      setPlatformMfaCode(payload.session.mfaChallenge.developmentCode);
+    }
+  };
+  const signInPlatformSession = async () => {
+    if (!platformEmail.trim() || !platformPassword || platformAuthStatus === 'LOGIN_PENDING') {
+      return;
+    }
+
+    setPlatformAuthStatus('LOGIN_PENDING');
+    setPlatformAuthError('');
+
+    try {
+      const response = await fetch(platformLoginUrl, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: platformEmail.trim(),
+          password: platformPassword,
+        }),
+      });
+
+      if (!response.ok) {
+        setPlatformAuthStatus('ERROR');
+        setPlatformAuthError(await readApiError(response, 'Sign-in failed'));
+        return;
+      }
+
+      applyPlatformSession((await response.json()) as AuthSessionPayload);
+    } catch (error) {
+      setPlatformAuthStatus('ERROR');
+      setPlatformAuthError(error instanceof Error ? error.message : 'Sign-in failed');
+    }
+  };
+  const verifyPlatformMfa = async () => {
+    const sessionToken = platformSessionToken.trim();
+    const code = platformMfaCode.trim();
+    if (!sessionToken || code.length !== 6 || platformAuthStatus === 'VERIFYING') return;
+
+    setPlatformAuthStatus('VERIFYING');
+    setPlatformAuthError('');
+
+    try {
+      const response = await fetch(platformMfaUrl, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          sessionToken,
+          code,
+        }),
+      });
+
+      if (!response.ok) {
+        setPlatformAuthStatus('MFA_REQUIRED');
+        setPlatformAuthError(await readApiError(response, 'MFA verification failed'));
+        return;
+      }
+
+      const payload = (await response.json()) as AuthSessionPayload;
+      setPlatformMfaCode('');
+      applyPlatformSession(payload);
+    } catch (error) {
+      setPlatformAuthStatus('ERROR');
+      setPlatformAuthError(error instanceof Error ? error.message : 'MFA verification failed');
+    }
+  };
+  const verifyPlatformSession = async () => {
+    const sessionToken = platformSessionToken.trim();
+    if (!sessionToken || platformAuthStatus === 'VERIFYING') return;
+
+    setPlatformAuthStatus('VERIFYING');
+    setPlatformAuthError('');
+
+    try {
+      const response = await fetch(platformSessionUrl, {
+        headers: {
+          'x-session-token': sessionToken,
+        },
+      });
+
+      if (!response.ok) {
+        setPlatformAuthStatus('ERROR');
+        setPlatformSessionSummary('No session');
+        setPlatformAuthError(await readApiError(response, 'Session verification failed'));
+        return;
+      }
+
+      applyPlatformSession((await response.json()) as AuthSessionPayload);
+    } catch (error) {
+      setPlatformAuthStatus('ERROR');
+      setPlatformAuthError(error instanceof Error ? error.message : 'Session verification failed');
+    }
+  };
+  const loadHierarchyReport = async () => {
+    const sessionToken = platformSessionToken.trim();
+    if (!sessionToken || hierarchyReportStatus === 'LOADING') return;
+
+    setHierarchyReportStatus('LOADING');
+    setHierarchyReportError('');
+
+    try {
+      const response = await fetch(hierarchyReportUrl, {
+        headers: {
+          'x-session-token': sessionToken,
+        },
+      });
+
+      if (!response.ok) {
+        setHierarchyReport(null);
+        setHierarchyReportStatus(
+          response.status === 401 || response.status === 403 ? 'BLOCKED' : 'ERROR',
+        );
+        setHierarchyReportError(await readApiError(response, 'Report request failed'));
+        return;
+      }
+
+      setHierarchyReport((await response.json()) as HierarchyAnalyticsReport);
+      setHierarchyReportStatus('LIVE');
+    } catch (error) {
+      setHierarchyReport(null);
+      setHierarchyReportStatus('ERROR');
+      setHierarchyReportError(error instanceof Error ? error.message : 'Report request failed');
+    }
+  };
+  const displayHierarchyTotals = hierarchyReport
+    ? {
+        views:
+          getEventTotal(hierarchyReport, 'VIEW') + getEventTotal(hierarchyReport, 'IMPRESSION'),
+        clicks: getEventTotal(hierarchyReport, 'CLICK'),
+        inquiries: getEventTotal(hierarchyReport, 'INQUIRY'),
+        shares: getEventTotal(hierarchyReport, 'SHARE'),
+        downloads: getEventTotal(hierarchyReport, 'DOWNLOAD'),
+      }
+    : hierarchyTotals;
+  const displayHierarchyVisitedRows: HierarchyVisitedRow[] = hierarchyReport
+    ? hierarchyReport.mostVisited.slice(0, 3).map((item) => ({
+        id: `${item.entityType}-${item.entityId}`,
+        name: `${codeLabel(item.entityType)} ${item.entityId}`,
+        views: item.views,
+      }))
+    : hierarchyMostVisited.map((item) => ({
+        id: item.id,
+        name: item.name,
+        views: item.analytics.views,
+      }));
+  const displayHierarchyClickThroughRate = displayHierarchyTotals.views
+    ? Math.round((displayHierarchyTotals.clicks / displayHierarchyTotals.views) * 100)
+    : 0;
+  const displayHierarchyAverageAge = hierarchyReport
+    ? reportPeriodDays(hierarchyReport)
+    : `${hierarchyAverageDaysLive} days`;
+  const displayHierarchyTopCountry = hierarchyReport
+    ? displayCountryBreakdown(hierarchyReport.topCountries[0])
+    : hierarchyTopCountryLabel;
+  const displayHierarchyTopIndustry = hierarchyReport
+    ? displayIndustryBreakdown(hierarchyReport.topIndustries[0])
+    : hierarchyTopIndustryName;
+  const displayHierarchyTopTenant = hierarchyReport?.topTenants[0]?.label ?? hierarchyTopTenant;
+  const displayHierarchyAccess = hierarchyReport
+    ? codeLabel(hierarchyReport.access?.reason ?? 'ACCESS_GRANTED')
+    : hierarchyAccessDecision.allowed
+      ? 'Granted'
+      : codeLabel(hierarchyAccessDecision.reason);
+  const hierarchyPolicyAllowed =
+    hierarchyReportStatus === 'LIVE' ||
+    ((hierarchyReportStatus === 'PREVIEW' || hierarchyReportStatus === 'LOADING') &&
+      hierarchyAccessDecision.allowed);
   const ownerPasswordPolicy = evaluatePasswordPolicy(ownerPassword);
   const ownerTrial = calculateTrialSubscription({
     startedAt: '2026-06-18T00:00:00.000Z',
@@ -546,7 +1048,10 @@ export default function Home() {
               </select>
               <select
                 value={industryCode}
-                onChange={(event) => setIndustryCode(event.target.value)}
+                onChange={(event) => {
+                  resetHierarchyReport();
+                  setIndustryCode(event.target.value);
+                }}
               >
                 <option value="ALL">All industries</option>
                 {industryCategories.map((industry) => (
@@ -1277,6 +1782,7 @@ export default function Home() {
                     type="button"
                     className="saved-search-row"
                     onClick={() => {
+                      resetHierarchyReport();
                       setQuery(savedSearch.query);
                       setRole(savedSearch.role);
                       setIndustryCode(savedSearch.industryCode);
@@ -1315,29 +1821,235 @@ export default function Home() {
             <section className="side-panel">
               <div className="panel-heading tight">
                 <h2>Analytics Command</h2>
-                <span>Tenant</span>
+                <span>{analyticsScopeLabel}</span>
               </div>
-              <AnalyticsRow label="Most visited" value={mostVisited[0]?.name ?? 'No visits'} />
+              <label className="lead-select-row">
+                <span>Report scope</span>
+                <select
+                  value={analyticsScopeLevel}
+                  onChange={(event) => {
+                    resetHierarchyReport();
+                    setAnalyticsScopeLevel(event.target.value as AccessScopeLevel);
+                  }}
+                >
+                  {(['GLOBAL', 'REGIONAL', 'CONTINENT', 'COUNTRY', 'TENANT'] as const).map(
+                    (scopeOption) => (
+                      <option key={scopeOption} value={scopeOption}>
+                        {codeLabel(scopeOption)}
+                      </option>
+                    ),
+                  )}
+                </select>
+              </label>
+              <label className="lead-select-row">
+                <span>Export</span>
+                <select
+                  value={analyticsExportFormat}
+                  onChange={(event) => {
+                    resetHierarchyReport();
+                    setAnalyticsExportFormat(event.target.value as AnalyticsExportFormat);
+                  }}
+                >
+                  <option value="CSV">CSV</option>
+                  <option value="JSON">JSON</option>
+                  <option value="PDF">PDF</option>
+                </select>
+              </label>
+              <label className="lead-select-row">
+                <span>Data</span>
+                <select
+                  value={analyticsDataSource}
+                  onChange={(event) => {
+                    resetHierarchyReport();
+                    setAnalyticsDataSource(event.target.value as AnalyticsReportDataSource);
+                  }}
+                >
+                  <option value="AUTO">Auto</option>
+                  <option value="RAW">Raw</option>
+                  <option value="ROLLUP">Rollup</option>
+                </select>
+              </label>
+              <label className="field compact-field">
+                <span>Platform email</span>
+                <input
+                  type="email"
+                  value={platformEmail}
+                  onChange={(event) => setPlatformEmail(event.target.value)}
+                />
+              </label>
+              <label className="field compact-field">
+                <span>Platform password</span>
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={platformPassword}
+                  onChange={(event) => setPlatformPassword(event.target.value)}
+                />
+              </label>
+              <div className="terms-actions">
+                <button
+                  className="primary-button"
+                  type="button"
+                  disabled={
+                    !platformEmail.trim() ||
+                    !platformPassword ||
+                    platformAuthStatus === 'LOGIN_PENDING'
+                  }
+                  onClick={signInPlatformSession}
+                >
+                  <UserCheck size={16} />
+                  {platformAuthStatus === 'LOGIN_PENDING' ? 'Signing In' : 'Sign In'}
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={!platformSessionToken.trim() || platformAuthStatus === 'VERIFYING'}
+                  onClick={verifyPlatformSession}
+                >
+                  <BadgeCheck size={16} />
+                  Verify Session
+                </button>
+              </div>
+              <label className="field compact-field">
+                <span>MFA code</span>
+                <input
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={platformMfaCode}
+                  onChange={(event) => setPlatformMfaCode(event.target.value.replace(/\D/g, ''))}
+                />
+              </label>
+              <div className="terms-actions">
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={
+                    !platformSessionToken.trim() ||
+                    platformMfaCode.trim().length !== 6 ||
+                    platformAuthStatus === 'VERIFYING'
+                  }
+                  onClick={verifyPlatformMfa}
+                >
+                  <ShieldCheck size={16} />
+                  {platformAuthStatus === 'VERIFYING' ? 'Verifying' : 'Verify MFA'}
+                </button>
+              </div>
+              <label className="field compact-field">
+                <span>Session token</span>
+                <input
+                  type="password"
+                  autoComplete="off"
+                  value={platformSessionToken}
+                  onChange={(event) => {
+                    resetHierarchyReport();
+                    setPlatformSessionToken(event.target.value);
+                    setPlatformSessionSummary(
+                      event.target.value.trim() ? 'Manual token' : 'No session',
+                    );
+                    setPlatformAuthError('');
+                    setPlatformAuthStatus('SIGNED_OUT');
+                  }}
+                />
+              </label>
+              <div className="terms-actions">
+                <button
+                  className="primary-button"
+                  type="button"
+                  disabled={!platformSessionToken.trim() || hierarchyReportStatus === 'LOADING'}
+                  onClick={loadHierarchyReport}
+                >
+                  <ChartNoAxesCombined size={16} />
+                  {hierarchyReportStatus === 'LOADING' ? 'Loading' : 'Load Report'}
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={!hierarchyReport && hierarchyReportStatus === 'PREVIEW'}
+                  onClick={resetHierarchyReport}
+                >
+                  <ArrowUpDown size={16} />
+                  Preview
+                </button>
+              </div>
+              <AnalyticsRow label="Auth status" value={platformStatusLabel(platformAuthStatus)} />
+              <AnalyticsRow label="Session" value={platformSessionSummary} />
+              {platformAuthError ? (
+                <AnalyticsRow label="Auth error" value={platformAuthError} />
+              ) : null}
+              <AnalyticsRow label="Report source" value={statusLabel(hierarchyReportStatus)} />
+              <AnalyticsRow
+                label="Data source"
+                value={
+                  hierarchyReport?.warehouse
+                    ? `${codeLabel(hierarchyReport.warehouse.dataSource)} (${formatNumber(
+                        hierarchyReport.warehouse.rollupRows,
+                      )} rollups)`
+                    : codeLabel(analyticsDataSource)
+                }
+              />
+              {hierarchyReportError ? (
+                <AnalyticsRow label="Report error" value={hierarchyReportError} />
+              ) : null}
+              <AnalyticsRow
+                label="Most visited"
+                value={displayHierarchyVisitedRows[0]?.name ?? 'No visits'}
+              />
               <AnalyticsRow label="Sorted by" value="Match score" />
-              <AnalyticsRow label="Click rate" value={`${clickThroughRate}%`} />
-              <AnalyticsRow label="Average age" value={`${averageDaysLive} days`} />
-              <AnalyticsRow label="Enquiries" value={formatNumber(totals.inquiries)} />
-              <AnalyticsRow label="Shared" value={formatNumber(totals.shares)} />
-              <AnalyticsRow label="Downloaded" value={formatNumber(totals.downloads)} />
-              <AnalyticsRow label="Hierarchy scope" value="Tenant / Country / Global" />
+              <AnalyticsRow label="Click rate" value={`${displayHierarchyClickThroughRate}%`} />
+              <AnalyticsRow label="Average age" value={displayHierarchyAverageAge} />
+              <AnalyticsRow
+                label="Enquiries"
+                value={formatNumber(displayHierarchyTotals.inquiries)}
+              />
+              <AnalyticsRow label="Shared" value={formatNumber(displayHierarchyTotals.shares)} />
+              <AnalyticsRow
+                label="Downloaded"
+                value={formatNumber(displayHierarchyTotals.downloads)}
+              />
+              <AnalyticsRow label="Scope access" value={displayHierarchyAccess} />
+              <AnalyticsRow
+                label="Hierarchy views"
+                value={formatNumber(displayHierarchyTotals.views)}
+              />
+              <AnalyticsRow
+                label="Hierarchy clicks"
+                value={formatNumber(displayHierarchyTotals.clicks)}
+              />
+              <AnalyticsRow label="Top country" value={displayHierarchyTopCountry} />
+              <AnalyticsRow label="Top industry" value={displayHierarchyTopIndustry} />
+              <AnalyticsRow label="Top tenant" value={displayHierarchyTopTenant} />
+              <AnalyticsRow label="Export file" value={hierarchyExportName} />
+              <AnalyticsRow label="API base" value={analyticsApiBaseUrl} />
+              <AnalyticsRow label="Report API" value={`GET ${hierarchyReportApiPath}`} />
+              <AnalyticsRow
+                label="Export API"
+                value={`${analyticsExportFormat} ${hierarchyExportApiPath}`}
+              />
               <div className="visited-list">
-                {mostVisited.map((item) => (
+                {displayHierarchyVisitedRows.map((item) => (
                   <div key={item.id} className="visited-row">
                     <span>{item.name}</span>
-                    <strong>{formatNumber(item.analytics.views)}</strong>
+                    <strong>{formatNumber(item.views)}</strong>
                   </div>
                 ))}
               </div>
-              <div className="policy-box ok compact">
-                <FileCheck2 size={16} />
+              <div
+                className={
+                  hierarchyPolicyAllowed ? 'policy-box ok compact' : 'policy-box block compact'
+                }
+              >
+                {hierarchyPolicyAllowed ? <FileCheck2 size={16} /> : <Ban size={16} />}
                 <div>
-                  <strong>Aggregated exports ready</strong>
-                  <span>CSV/JSON reports exclude raw metadata; retention sweep is 395 days.</span>
+                  <strong>
+                    {hierarchyPolicyAllowed
+                      ? `${analyticsScopeLabel} export ready`
+                      : 'Hierarchy export blocked'}
+                  </strong>
+                  <span>
+                    {hierarchyPolicyAllowed
+                      ? 'Protected CSV/JSON/PDF API excludes raw metadata; retention sweep is 395 days.'
+                      : `${displayHierarchyAccess} for VIEW ANALYTICS.`}
+                  </span>
                 </div>
               </div>
             </section>

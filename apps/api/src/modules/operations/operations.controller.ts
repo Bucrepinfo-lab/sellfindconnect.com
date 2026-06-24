@@ -4,7 +4,10 @@ import { ApiHeader, ApiTags } from '@nestjs/swagger';
 import { AdvertsService } from '../adverts/adverts.service';
 import { RunAdvertLifecycleDto } from '../adverts/dto/create-advert.dto';
 import { AnalyticsService } from '../analytics/analytics.service';
-import { RunAnalyticsRetentionDto } from '../analytics/dto/create-analytics-event.dto';
+import {
+  RunAnalyticsRetentionDto,
+  RunAnalyticsRollupDto,
+} from '../analytics/dto/create-analytics-event.dto';
 import { ConversationsService } from '../conversations/conversations.service';
 import { RunConversationSlaDto } from '../conversations/dto/conversations.dto';
 import { RunMediaProcessingJobsDto } from '../media/dto/media-worker.dto';
@@ -39,6 +42,11 @@ export class OperationsController {
   @Post('analytics/retention/run')
   runAnalyticsRetention(@Body() body: RunAnalyticsRetentionDto) {
     return this.analytics.runRetention(body);
+  }
+
+  @Post('analytics/rollups/run')
+  runAnalyticsRollups(@Body() body: RunAnalyticsRollupDto) {
+    return this.analytics.runRollupRefresh(body);
   }
 
   @Post('media/processing/run')

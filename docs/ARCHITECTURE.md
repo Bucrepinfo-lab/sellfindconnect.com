@@ -201,16 +201,39 @@ workflow are approved.
   consent-aware events to `AnalyticsEvent` and summarizes tenant-scoped views,
   clicks, inquiries, shares, downloads, saved searches, searches, and matches
   from that durable store; development and tests keep the in-memory repository.
-- Tenant analytics reports are exported as aggregated CSV/JSON payloads from
+- Tenant analytics reports are exported as aggregated CSV/JSON/PDF payloads from
   the analytics service; raw event metadata is excluded by default to reduce
   privacy risk. Raw event retention is pruned through the protected
   `POST /v1/operations/analytics/retention/run` job, which supports dry-runs
-  and defaults to a 395-day raw-event window until country-specific retention
-  policies are configured.
+  and resolves country/legal retention policy metadata before deleting raw
+  events. The job defaults to a 395-day platform window, supports country-scoped
+  pruning, and records whether an operator-supplied retention-day override was
+  applied.
+- Analytics warehouse groundwork is stored in `AnalyticsDailyRollup`, which
+  aggregates daily tenant/country/industry/entity/consent rows with event-type
+  counters and no raw event metadata. The protected
+  `POST /v1/operations/analytics/rollups/run` job rebuilds a requested period
+  and scope from raw events, supports dry-runs, and replaces existing aggregate
+  rows for that slice. Tenant and hierarchy reports accept `dataSource=AUTO`,
+  `dataSource=RAW`, or `dataSource=ROLLUP`; `AUTO` uses daily rollups when rows
+  are available and falls back to raw events otherwise, while exports include
+  warehouse metadata identifying the resolved source.
 - Platform hierarchy analytics uses `VIEW_ANALYTICS` platform access
   assignments before returning global, regional, continental, country, or tenant
   reports. Reports are scope-filtered from the analytics repository and include
   top countries, tenants, entities, industries, and consent-state breakdowns.
+- Platform hierarchy analytics exports reuse the same scoped access checks and
+  return aggregated CSV/JSON/PDF payloads from
+  `GET /v1/platform/analytics/hierarchy/export`; raw event metadata remains
+  excluded from export payloads.
+- The web/PWA Analytics Command panel mirrors the hierarchy reporting model with
+  selectable scope, CSV/JSON/PDF export readiness, raw/rollup data-source
+  selection, grant/block state from `VIEW_ANALYTICS`, aggregate counters, top
+  country, industry, and tenant previews, and the protected report/export API
+  routes. It can load live hierarchy report data with an `x-session-token`,
+  supports first-party platform sign-in/session/MFA verification, and falls back
+  to seeded preview metrics when no verified session is available or the session
+  changes.
 
 ## Notification Flow
 
