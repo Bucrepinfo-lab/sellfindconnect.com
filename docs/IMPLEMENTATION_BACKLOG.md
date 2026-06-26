@@ -344,7 +344,30 @@ Progress:
   tenant summaries.
 - Added web dashboard metrics for most visited, sorted, clicks, enquiries,
   shares, downloads, and age.
-- Database persistence and hierarchy dashboards remain next.
+- Added protected platform hierarchy reports and CSV/JSON hierarchy exports with
+  scoped `VIEW_ANALYTICS` checks and raw metadata excluded from export payloads.
+- Added web dashboard live hierarchy report loading with platform session token
+  authorization and seeded preview fallback.
+- Added first-party dashboard platform sign-in, session verification, MFA
+  verification, and managed token reuse for protected hierarchy analytics.
+- Added country-scoped analytics retention policy resolution with legal-basis
+  metadata, dry-run/delete filtering, and explicit override reporting.
+- Added CSV/JSON/PDF tenant and platform hierarchy analytics exports with
+  explicit UTF-8/base64 payload encoding and raw metadata excluded from exported
+  content.
+- Added daily analytics warehouse rollups for tenant/country/industry/entity
+  aggregates, Prisma persistence, in-memory parity, and a protected dry-run
+  rebuild job for scheduled operations.
+- Added rollup-backed tenant and platform hierarchy report reads with explicit
+  `AUTO`, `RAW`, and `ROLLUP` data-source selection plus web/PWA controls and
+  resolved-source display.
+- Added protected analytics privacy request automation for tenant-scoped access
+  summaries and dry-run-by-default erasure with country/date scoping plus rollup
+  cleanup/rebuild after deletion.
+- Added legal approval status metadata to analytics retention policies, review
+  due dates for pending country schedules, and mandatory `approvalReference`
+  enforcement for retention-day overrides.
+- External legal review and approval records remain an operational follow-up.
 
 ## Epic 8: Subscription, Finance, and Tax
 
@@ -369,12 +392,18 @@ Progress:
 - Added tenant-scoped finance API endpoints for approved country tax profiles,
   effective-dated tax rules, tax calculation snapshots, ledger entries, tax
   return generation, and T-30/T-14/T-7/T-3/T-1/due/overdue alert runs.
+- Added tenant-scoped invoice and receipt command endpoints with country/year
+  document numbering, payment-balance tracking, and a paid transaction path
+  that creates an invoice, optional receipt, tax snapshot, and ledger entries.
+- Added tenant-scoped refund, chargeback, and dunning command endpoints with
+  credit-note numbering, proportional tax/revenue reversal ledger entries,
+  disputed-balance reopening, and duplicate-safe overdue invoice notices.
 - Added zero-tolerance checks to finance inputs so prohibited content cannot be
   stored in finance metadata or configuration.
 - Added web Finance Readiness indicators for subscription amount, computed tax,
   net revenue, and next remittance alert.
-- Persistence, payment adapters, invoices/receipts, reconciliation, approval
-  workflow, evidence attachments, and report exports remain next.
+- Persistence, payment adapters, reconciliation, approval workflow, evidence
+  attachments, period locks, and report exports remain next.
 
 ## Epic 9: Mobile, Localization, and Launch
 

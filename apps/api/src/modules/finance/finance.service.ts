@@ -1,11 +1,21 @@
 import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import {
+  calculateFinanceAdjustmentBreakdown,
+  calculatePaymentBalance,
   calculateTaxSnapshotAmounts,
+  createFinanceDocumentNumber,
   evaluateSafetyFields,
+  getDunningNoticeDecision,
   getCountry,
   getRemittanceAlertDecision,
+  roundMoney,
+  type DunningNoticeStage,
+  type FinanceAdjustmentStatus,
+  type FinanceAdjustmentType,
+  type FinanceDocumentType,
   type FilingFrequency,
   type FinanceAlertType,
+  type InvoicePaymentStatus,
   type TaxProfileStatus,
 } from '@telpen/domain';
 import { randomUUID } from 'node:crypto';
@@ -13,8 +23,13 @@ import { randomUUID } from 'node:crypto';
 import type {
   CalculateTaxDto,
   ConfigureCountryTaxProfileDto,
+  CreateInvoiceDto,
   CreateTaxRuleDto,
   GenerateTaxReturnDto,
+  IssueReceiptDto,
+  OpenChargebackDto,
+  RequestRefundDto,
+  RunDunningDto,
   RunFinanceAlertsDto,
 } from './dto/finance.dto';
 
@@ -72,7 +87,13 @@ type TaxCalculationSnapshotRecord = {
 type TaxLedgerEntryRecord = {
   id: string;
   taxCalculationSnapshotId: string;
-  entryType: 'TAX_LIABILITY' | 'PLATFORM_REVENUE';
+  entryType:
+    | 'TAX_LIABILITY'
+    | 'PLATFORM_REVENUE'
+    | 'REFUND_TAX_REVERSAL'
+    | 'REFUND_REVENUE_REVERSAL'
+    | 'CHARGEBACK_TAX_REVERSAL'
+    | 'CHARGEBACK_REVENUE_REVERSAL';
   amount: number;
   currencyCode: string;
   occurredAt: string;
@@ -94,11 +115,111 @@ type TaxReturnRecord = {
   updatedAt: string;
 };
 
+type FinanceInvoiceLineItemRecord = {
+  description: string;
+  quantity: number;
+  unitAmount: number;
+  taxableAmount: number;
+  taxAmount: number;
+  grossAmount: number;
+  currencyCode: string;
+};
+
+type FinanceInvoiceRecord = {
+  id: string;
+  tenantId: string;
+  invoiceNumber: string;
+  countryCode: string;
+  customerName: string;
+  customerEmail?: string;
+  billingReference?: string;
+  taxCalculationSnapshotId: string;
+  lineItems: FinanceInvoiceLineItemRecord[];
+  subtotalAmount: number;
+  taxAmount: number;
+  totalAmount: number;
+  amountPaid: number;
+  amountDue: number;
+  refundedAmount: number;
+  chargebackAmount: number;
+  netCollectedAmount: number;
+  paymentStatus: InvoicePaymentStatus;
+  presentmentCurrency: string;
+  filingCurrency: string;
+  status: 'ISSUED' | 'PAID' | 'VOID' | 'OVERDUE' | 'REFUNDED' | 'DISPUTED';
+  issuedAt: string;
+  dueAt?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type FinanceReceiptRecord = {
+  id: string;
+  tenantId: string;
+  receiptNumber: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  countryCode: string;
+  taxCalculationSnapshotId: string;
+  amountPaid: number;
+  currencyCode: string;
+  paymentProvider: string;
+  paymentReference: string;
+  paidAt: string;
+  issuedAt: string;
+  createdAt: string;
+};
+
+type FinanceAdjustmentRecord = {
+  id: string;
+  tenantId: string;
+  adjustmentType: FinanceAdjustmentType;
+  creditNoteNumber?: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  countryCode: string;
+  taxCalculationSnapshotId: string;
+  amount: number;
+  taxAmount: number;
+  netRevenueAmount: number;
+  currencyCode: string;
+  filingCurrency: string;
+  reason: string;
+  paymentProvider?: string;
+  providerReference?: string;
+  evidenceUrl?: string;
+  status: FinanceAdjustmentStatus;
+  requestedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+  settledAt?: string;
+};
+
+type DunningNoticeRecord = {
+  id: string;
+  tenantId: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  countryCode: string;
+  stage: DunningNoticeStage;
+  daysOverdue: number;
+  amountDue: number;
+  currencyCode: string;
+  message: string;
+  severity: 'INFO' | 'WARNING' | 'CRITICAL';
+  status: 'OPEN' | 'SENT' | 'SUPPRESSED' | 'RESOLVED';
+  dueAt: string;
+  createdAt: string;
+  dedupeKey: string;
+};
+
 type FinanceAlertRecord = {
   id: string;
   dedupeKey: string;
+  tenantId?: string;
   countryCode: string;
   taxReturnId?: string;
+  invoiceId?: string;
   alertType: FinanceAlertType;
   message: string;
   severity: 'INFO' | 'WARNING' | 'CRITICAL';
@@ -114,7 +235,12 @@ export class FinanceService {
   private readonly snapshots = new Map<string, TaxCalculationSnapshotRecord>();
   private readonly ledgerEntries = new Map<string, TaxLedgerEntryRecord>();
   private readonly taxReturns = new Map<string, TaxReturnRecord>();
+  private readonly invoices = new Map<string, FinanceInvoiceRecord>();
+  private readonly receipts = new Map<string, FinanceReceiptRecord>();
+  private readonly adjustments = new Map<string, FinanceAdjustmentRecord>();
+  private readonly dunningNotices = new Map<string, DunningNoticeRecord>();
   private readonly financeAlerts = new Map<string, FinanceAlertRecord>();
+  private readonly documentSequences = new Map<string, number>();
 
   configureCountryTaxProfile(input: ConfigureCountryTaxProfileDto): CountryTaxProfileRecord {
     this.assertSafe(input, 'Country tax profile contains blocked content.');
@@ -272,6 +398,212 @@ export class FinanceService {
     );
   }
 
+  createInvoice(tenantId: string, input: CreateInvoiceDto) {
+    this.assertSafe(input, 'Invoice request contains blocked content.');
+
+    const taxCalculation = this.calculateTax(tenantId, input);
+    const now = new Date().toISOString();
+    const invoice = this.createInvoiceRecord(tenantId, input, taxCalculation.snapshot, now);
+    this.invoices.set(invoice.id, invoice);
+
+    const receipt = input.issueReceipt
+      ? this.createReceiptForInvoice(
+          invoice,
+          {
+            amountPaid: input.amountPaid ?? invoice.totalAmount,
+            paymentProvider: input.paymentProvider ?? input.provider ?? 'MANUAL',
+            paymentReference:
+              input.paymentReference ?? input.providerReference ?? input.billingReference,
+            paidAt: input.paidAt,
+          },
+          now,
+        )
+      : undefined;
+
+    return { invoice, receipt, taxCalculation };
+  }
+
+  listInvoices(tenantId: string): FinanceInvoiceRecord[] {
+    return Array.from(this.invoices.values())
+      .filter((invoice) => invoice.tenantId === tenantId)
+      .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt));
+  }
+
+  issueReceipt(tenantId: string, input: IssueReceiptDto) {
+    this.assertSafe(input, 'Receipt request contains blocked content.');
+
+    const invoice = this.invoices.get(input.invoiceId);
+    if (!invoice || invoice.tenantId !== tenantId) {
+      throw new NotFoundException('Invoice not found.');
+    }
+
+    const now = new Date().toISOString();
+    const receipt = this.createReceiptForInvoice(invoice, input, now);
+    return { invoice, receipt };
+  }
+
+  listReceipts(tenantId: string): FinanceReceiptRecord[] {
+    return Array.from(this.receipts.values())
+      .filter((receipt) => receipt.tenantId === tenantId)
+      .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt));
+  }
+
+  requestRefund(tenantId: string, input: RequestRefundDto) {
+    this.assertSafe(input, 'Refund request contains blocked content.');
+
+    const invoice = this.requireTenantInvoice(tenantId, input.invoiceId);
+    const now = new Date().toISOString();
+    const adjustment = this.createAdjustmentRecord(
+      invoice,
+      {
+        adjustmentType: 'REFUND',
+        amount: input.amount,
+        reason: input.reason,
+        paymentProvider: input.paymentProvider,
+        providerReference: input.providerReference,
+        evidenceUrl: input.evidenceUrl,
+        requestedBy: input.requestedBy,
+        status: input.providerReference ? 'SETTLED' : 'REQUESTED',
+        settledAt: input.settledAt ?? (input.providerReference ? now : undefined),
+      },
+      now,
+    );
+    const ledgerEntries = this.createAdjustmentLedgerEntries(adjustment, now);
+
+    this.adjustments.set(adjustment.id, adjustment);
+    for (const entry of ledgerEntries) {
+      this.ledgerEntries.set(entry.id, entry);
+    }
+    this.applyAdjustmentToInvoice(invoice, adjustment, now);
+
+    const financeAlert = this.createFinanceAlert({
+      tenantId,
+      countryCode: invoice.countryCode,
+      invoiceId: invoice.id,
+      alertType: 'REFUND_ISSUED',
+      message: `Refund ${adjustment.creditNoteNumber} created for ${invoice.invoiceNumber}. Amount: ${adjustment.amount} ${adjustment.currencyCode}.`,
+      severity: 'INFO',
+      dueAt: now,
+      createdAt: now,
+      dedupeKey: `${adjustment.id}:REFUND_ISSUED`,
+    });
+
+    return { adjustment, invoice, ledgerEntries, financeAlert };
+  }
+
+  openChargeback(tenantId: string, input: OpenChargebackDto) {
+    this.assertSafe(input, 'Chargeback request contains blocked content.');
+
+    const invoice = this.requireTenantInvoice(tenantId, input.invoiceId);
+    const now = input.openedAt ?? new Date().toISOString();
+    const adjustment = this.createAdjustmentRecord(
+      invoice,
+      {
+        adjustmentType: 'CHARGEBACK',
+        amount: input.amount,
+        reason: input.reason,
+        paymentProvider: input.paymentProvider,
+        providerReference: input.providerReference,
+        evidenceUrl: input.evidenceUrl,
+        requestedBy: input.openedBy,
+        status: 'SUBMITTED',
+      },
+      now,
+    );
+    const ledgerEntries = this.createAdjustmentLedgerEntries(adjustment, now);
+
+    this.adjustments.set(adjustment.id, adjustment);
+    for (const entry of ledgerEntries) {
+      this.ledgerEntries.set(entry.id, entry);
+    }
+    this.applyAdjustmentToInvoice(invoice, adjustment, now);
+
+    const financeAlert = this.createFinanceAlert({
+      tenantId,
+      countryCode: invoice.countryCode,
+      invoiceId: invoice.id,
+      alertType: 'CHARGEBACK_OPENED',
+      message: `Chargeback opened for ${invoice.invoiceNumber}. Amount: ${adjustment.amount} ${adjustment.currencyCode}. Evidence and response are required.`,
+      severity: 'WARNING',
+      dueAt: now,
+      createdAt: now,
+      dedupeKey: `${adjustment.id}:CHARGEBACK_OPENED`,
+    });
+
+    return { adjustment, invoice, ledgerEntries, financeAlert };
+  }
+
+  listAdjustments(tenantId: string): FinanceAdjustmentRecord[] {
+    return Array.from(this.adjustments.values())
+      .filter((adjustment) => adjustment.tenantId === tenantId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  runDunning(tenantId: string, input: RunDunningDto = {}) {
+    const now = input.now ?? new Date().toISOString();
+    const noticesCreated: DunningNoticeRecord[] = [];
+
+    for (const invoice of this.invoices.values()) {
+      if (invoice.tenantId !== tenantId) continue;
+      if (input.invoiceId && invoice.id !== input.invoiceId) continue;
+      if (!invoice.dueAt || invoice.amountDue <= 0) continue;
+      if (['VOID', 'REFUNDED'].includes(invoice.status)) continue;
+
+      const decision = getDunningNoticeDecision(invoice.dueAt, now);
+      if (!decision) continue;
+
+      const dedupeKey = `${invoice.id}:DUNNING:${decision.stage}`;
+      if (this.hasDunningNoticeDedupeKey(dedupeKey)) continue;
+
+      const notice: DunningNoticeRecord = {
+        id: randomUUID(),
+        tenantId,
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        countryCode: invoice.countryCode,
+        stage: decision.stage,
+        daysOverdue: decision.daysOverdue,
+        amountDue: invoice.amountDue,
+        currencyCode: invoice.presentmentCurrency,
+        message: this.dunningMessage(invoice, decision),
+        severity: decision.severity,
+        status: 'OPEN',
+        dueAt: invoice.dueAt,
+        createdAt: now,
+        dedupeKey,
+      };
+
+      invoice.status = 'OVERDUE';
+      invoice.updatedAt = now;
+      this.invoices.set(invoice.id, invoice);
+      this.dunningNotices.set(notice.id, notice);
+      this.createFinanceAlert({
+        tenantId,
+        countryCode: invoice.countryCode,
+        invoiceId: invoice.id,
+        alertType: 'DUNNING_NOTICE',
+        message: notice.message,
+        severity: notice.severity,
+        dueAt: invoice.dueAt,
+        createdAt: now,
+        dedupeKey,
+      });
+      noticesCreated.push(notice);
+    }
+
+    return {
+      checkedAt: now,
+      noticesCreated,
+      openNotices: this.listDunningNotices(tenantId),
+    };
+  }
+
+  listDunningNotices(tenantId: string): DunningNoticeRecord[] {
+    return Array.from(this.dunningNotices.values())
+      .filter((notice) => notice.tenantId === tenantId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
   runFinanceAlerts(input: RunFinanceAlertsDto = {}) {
     const now = input.now ?? new Date().toISOString();
     const alertsCreated: FinanceAlertRecord[] = [];
@@ -373,6 +705,278 @@ export class FinanceService {
     ];
   }
 
+  private createInvoiceRecord(
+    tenantId: string,
+    input: CreateInvoiceDto,
+    snapshot: TaxCalculationSnapshotRecord,
+    now: string,
+  ): FinanceInvoiceRecord {
+    const issuedAt = now;
+    const balance = calculatePaymentBalance({
+      totalAmount: snapshot.grossAmount,
+      amountPaid: 0,
+    });
+
+    return {
+      id: randomUUID(),
+      tenantId,
+      invoiceNumber: this.nextDocumentNumber(input.countryCode, 'INVOICE', issuedAt),
+      countryCode: input.countryCode,
+      customerName: input.customerName,
+      customerEmail: input.customerEmail,
+      billingReference: input.billingReference ?? input.providerReference,
+      taxCalculationSnapshotId: snapshot.id,
+      lineItems: [
+        {
+          description: input.lineItemDescription,
+          quantity: 1,
+          unitAmount: roundMoney(input.grossAmount),
+          taxableAmount: snapshot.taxableAmount,
+          taxAmount: snapshot.taxAmount,
+          grossAmount: snapshot.grossAmount,
+          currencyCode: snapshot.presentmentCurrency,
+        },
+      ],
+      subtotalAmount: snapshot.taxableAmount,
+      taxAmount: snapshot.taxAmount,
+      totalAmount: balance.totalAmount,
+      amountPaid: balance.amountPaid,
+      amountDue: balance.amountDue,
+      refundedAmount: 0,
+      chargebackAmount: 0,
+      netCollectedAmount: 0,
+      paymentStatus: balance.paymentStatus,
+      presentmentCurrency: snapshot.presentmentCurrency,
+      filingCurrency: snapshot.filingCurrency,
+      status: 'ISSUED',
+      issuedAt,
+      dueAt: input.dueAt,
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+
+  private createReceiptForInvoice(
+    invoice: FinanceInvoiceRecord,
+    input: {
+      amountPaid?: number;
+      paymentProvider: string;
+      paymentReference?: string;
+      paidAt?: string;
+    },
+    now: string,
+  ): FinanceReceiptRecord {
+    if (invoice.paymentStatus === 'PAID' || invoice.paymentStatus === 'OVERPAID') {
+      throw new UnprocessableEntityException('Invoice already has a settled payment balance.');
+    }
+
+    if (!input.paymentReference) {
+      throw new UnprocessableEntityException('Payment reference is required to issue a receipt.');
+    }
+
+    const duplicateReceipt = Array.from(this.receipts.values()).find(
+      (receipt) =>
+        receipt.paymentProvider === input.paymentProvider &&
+        receipt.paymentReference === input.paymentReference,
+    );
+    if (duplicateReceipt) {
+      throw new UnprocessableEntityException('Payment reference already has a receipt.');
+    }
+
+    const receiptAmount = input.amountPaid ?? invoice.amountDue;
+    if (receiptAmount <= 0) {
+      throw new UnprocessableEntityException('Receipt amount must be greater than zero.');
+    }
+
+    const paidAt = input.paidAt ?? now;
+    const receipt: FinanceReceiptRecord = {
+      id: randomUUID(),
+      tenantId: invoice.tenantId,
+      receiptNumber: this.nextDocumentNumber(invoice.countryCode, 'RECEIPT', now),
+      invoiceId: invoice.id,
+      invoiceNumber: invoice.invoiceNumber,
+      countryCode: invoice.countryCode,
+      taxCalculationSnapshotId: invoice.taxCalculationSnapshotId,
+      amountPaid: roundMoney(receiptAmount),
+      currencyCode: invoice.presentmentCurrency,
+      paymentProvider: input.paymentProvider,
+      paymentReference: input.paymentReference,
+      paidAt,
+      issuedAt: now,
+      createdAt: now,
+    };
+
+    const balance = calculatePaymentBalance({
+      totalAmount: invoice.totalAmount,
+      amountPaid: invoice.amountPaid + receipt.amountPaid,
+    });
+    invoice.amountPaid = balance.amountPaid;
+    invoice.amountDue = balance.amountDue;
+    invoice.paymentStatus = balance.paymentStatus;
+    invoice.netCollectedAmount = roundMoney(
+      invoice.amountPaid - invoice.refundedAmount - invoice.chargebackAmount,
+    );
+    invoice.status =
+      balance.paymentStatus === 'PAID' || balance.paymentStatus === 'OVERPAID'
+        ? 'PAID'
+        : 'ISSUED';
+    invoice.updatedAt = now;
+
+    this.invoices.set(invoice.id, invoice);
+    this.receipts.set(receipt.id, receipt);
+    return receipt;
+  }
+
+  private requireTenantInvoice(tenantId: string, invoiceId: string): FinanceInvoiceRecord {
+    const invoice = this.invoices.get(invoiceId);
+    if (!invoice || invoice.tenantId !== tenantId) {
+      throw new NotFoundException('Invoice not found.');
+    }
+
+    return invoice;
+  }
+
+  private createAdjustmentRecord(
+    invoice: FinanceInvoiceRecord,
+    input: {
+      adjustmentType: FinanceAdjustmentType;
+      amount: number;
+      reason: string;
+      paymentProvider?: string;
+      providerReference?: string;
+      evidenceUrl?: string;
+      requestedBy?: string;
+      status: FinanceAdjustmentStatus;
+      settledAt?: string;
+    },
+    now: string,
+  ): FinanceAdjustmentRecord {
+    const availableAmount = this.availableAdjustmentAmount(invoice);
+    if (input.amount <= 0) {
+      throw new UnprocessableEntityException('Adjustment amount must be greater than zero.');
+    }
+
+    if (input.amount > availableAmount) {
+      throw new UnprocessableEntityException('Adjustment amount exceeds the collected balance.');
+    }
+
+    const snapshot = this.snapshots.get(invoice.taxCalculationSnapshotId);
+    if (!snapshot) {
+      throw new NotFoundException('Tax calculation snapshot not found for invoice.');
+    }
+
+    const breakdown = calculateFinanceAdjustmentBreakdown({
+      grossAmount: snapshot.grossAmount,
+      taxAmount: snapshot.taxAmount,
+      netRevenueAmount: snapshot.netRevenueAmount,
+      adjustmentAmount: input.amount,
+    });
+
+    return {
+      id: randomUUID(),
+      tenantId: invoice.tenantId,
+      adjustmentType: input.adjustmentType,
+      creditNoteNumber:
+        input.adjustmentType === 'REFUND'
+          ? this.nextDocumentNumber(invoice.countryCode, 'CREDIT_NOTE', now)
+          : undefined,
+      invoiceId: invoice.id,
+      invoiceNumber: invoice.invoiceNumber,
+      countryCode: invoice.countryCode,
+      taxCalculationSnapshotId: invoice.taxCalculationSnapshotId,
+      amount: breakdown.grossAmount,
+      taxAmount: breakdown.taxAmount,
+      netRevenueAmount: breakdown.netRevenueAmount,
+      currencyCode: invoice.presentmentCurrency,
+      filingCurrency: invoice.filingCurrency,
+      reason: input.reason,
+      paymentProvider: input.paymentProvider,
+      providerReference: input.providerReference,
+      evidenceUrl: input.evidenceUrl,
+      status: input.status,
+      requestedBy: input.requestedBy,
+      createdAt: now,
+      updatedAt: now,
+      settledAt: input.settledAt,
+    };
+  }
+
+  private availableAdjustmentAmount(invoice: FinanceInvoiceRecord): number {
+    return roundMoney(invoice.amountPaid - invoice.refundedAmount - invoice.chargebackAmount);
+  }
+
+  private createAdjustmentLedgerEntries(
+    adjustment: FinanceAdjustmentRecord,
+    now: string,
+  ): TaxLedgerEntryRecord[] {
+    const taxEntryType =
+      adjustment.adjustmentType === 'REFUND'
+        ? 'REFUND_TAX_REVERSAL'
+        : 'CHARGEBACK_TAX_REVERSAL';
+    const revenueEntryType =
+      adjustment.adjustmentType === 'REFUND'
+        ? 'REFUND_REVENUE_REVERSAL'
+        : 'CHARGEBACK_REVENUE_REVERSAL';
+    return [
+      {
+        id: randomUUID(),
+        taxCalculationSnapshotId: adjustment.taxCalculationSnapshotId,
+        entryType: taxEntryType,
+        amount: -adjustment.taxAmount,
+        currencyCode: adjustment.filingCurrency,
+        occurredAt: adjustment.settledAt ?? adjustment.createdAt,
+        createdAt: now,
+      },
+      {
+        id: randomUUID(),
+        taxCalculationSnapshotId: adjustment.taxCalculationSnapshotId,
+        entryType: revenueEntryType,
+        amount: -adjustment.netRevenueAmount,
+        currencyCode: adjustment.currencyCode,
+        occurredAt: adjustment.settledAt ?? adjustment.createdAt,
+        createdAt: now,
+      },
+    ];
+  }
+
+  private applyAdjustmentToInvoice(
+    invoice: FinanceInvoiceRecord,
+    adjustment: FinanceAdjustmentRecord,
+    now: string,
+  ): void {
+    if (adjustment.adjustmentType === 'REFUND') {
+      invoice.refundedAmount = roundMoney(invoice.refundedAmount + adjustment.amount);
+      invoice.status = invoice.refundedAmount >= invoice.amountPaid ? 'REFUNDED' : invoice.status;
+    } else {
+      invoice.chargebackAmount = roundMoney(invoice.chargebackAmount + adjustment.amount);
+      invoice.status = 'DISPUTED';
+    }
+
+    invoice.netCollectedAmount = roundMoney(
+      invoice.amountPaid - invoice.refundedAmount - invoice.chargebackAmount,
+    );
+    const balance = calculatePaymentBalance({
+      totalAmount: invoice.totalAmount,
+      amountPaid: invoice.netCollectedAmount,
+    });
+    invoice.amountDue = balance.amountDue;
+    invoice.paymentStatus = balance.paymentStatus;
+    invoice.updatedAt = now;
+    this.invoices.set(invoice.id, invoice);
+  }
+
+  private nextDocumentNumber(
+    countryCode: string,
+    documentType: FinanceDocumentType,
+    issuedAt: string,
+  ): string {
+    const year = new Date(issuedAt).getUTCFullYear();
+    const key = `${countryCode.toUpperCase()}:${documentType}:${year}`;
+    const sequence = (this.documentSequences.get(key) ?? 0) + 1;
+    this.documentSequences.set(key, sequence);
+    return createFinanceDocumentNumber({ countryCode, documentType, issuedAt, sequence });
+  }
+
   private createReturnAlert(
     taxReturn: TaxReturnRecord,
     alertType: Extract<FinanceAlertType, 'RETURN_READY_FOR_REVIEW' | 'APPROVAL_REQUIRED'>,
@@ -395,8 +999,10 @@ export class FinanceService {
   }
 
   private createFinanceAlert(input: {
+    tenantId?: string;
     countryCode: string;
     taxReturnId?: string;
+    invoiceId?: string;
     alertType: FinanceAlertType;
     message: string;
     severity: 'INFO' | 'WARNING' | 'CRITICAL';
@@ -412,8 +1018,10 @@ export class FinanceService {
     const alert: FinanceAlertRecord = {
       id: randomUUID(),
       dedupeKey: input.dedupeKey,
+      tenantId: input.tenantId,
       countryCode: input.countryCode,
       taxReturnId: input.taxReturnId,
+      invoiceId: input.invoiceId,
       alertType: input.alertType,
       message: input.message,
       severity: input.severity,
@@ -430,6 +1038,10 @@ export class FinanceService {
     return Array.from(this.financeAlerts.values()).some((alert) => alert.dedupeKey === dedupeKey);
   }
 
+  private hasDunningNoticeDedupeKey(dedupeKey: string): boolean {
+    return Array.from(this.dunningNotices.values()).some((notice) => notice.dedupeKey === dedupeKey);
+  }
+
   private remittanceMessage(taxReturn: TaxReturnRecord, daysUntilDue: number): string {
     if (daysUntilDue < 0) {
       return `${taxReturn.countryCode} ${taxReturn.taxType} remittance is overdue since ${taxReturn.paymentDeadline}. Amount: ${taxReturn.computedTaxDue} ${taxReturn.filingCurrency}. Escalated to Global Finance.`;
@@ -440,6 +1052,21 @@ export class FinanceService {
     }
 
     return `${taxReturn.taxType} remittance due in ${daysUntilDue} days for ${taxReturn.countryCode}. Amount to remit: ${taxReturn.computedTaxDue} ${taxReturn.filingCurrency}. Filing deadline: ${taxReturn.filingDeadline}. Payment deadline: ${taxReturn.paymentDeadline}.`;
+  }
+
+  private dunningMessage(
+    invoice: FinanceInvoiceRecord,
+    decision: { stage: DunningNoticeStage; daysOverdue: number },
+  ): string {
+    if (decision.stage === 'FINAL_NOTICE') {
+      return `Final dunning notice for ${invoice.invoiceNumber}. ${invoice.amountDue} ${invoice.presentmentCurrency} is ${decision.daysOverdue} days overdue. Escalate before service suspension.`;
+    }
+
+    if (decision.stage === 'FIRST_NOTICE') {
+      return `Payment reminder for ${invoice.invoiceNumber}. ${invoice.amountDue} ${invoice.presentmentCurrency} is ${decision.daysOverdue} days overdue. Send retry instructions and support contact.`;
+    }
+
+    return `Grace-period dunning notice for ${invoice.invoiceNumber}. ${invoice.amountDue} ${invoice.presentmentCurrency} is ${decision.daysOverdue} day overdue.`;
   }
 
   private assertSafe(input: object, message: string): void {

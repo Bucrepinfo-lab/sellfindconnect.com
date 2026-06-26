@@ -15,11 +15,40 @@ export const financeAlertTypes = [
   'UPCOMING_REMITTANCE',
   'DUE_TODAY',
   'OVERDUE_REMITTANCE',
+  'DUNNING_NOTICE',
+  'REFUND_ISSUED',
+  'CHARGEBACK_OPENED',
   'RECONCILIATION_VARIANCE',
   'FILING_COMPLETED',
 ] as const;
 
 export type FinanceAlertType = (typeof financeAlertTypes)[number];
+
+export const financeDocumentTypes = ['INVOICE', 'RECEIPT', 'CREDIT_NOTE'] as const;
+
+export type FinanceDocumentType = (typeof financeDocumentTypes)[number];
+
+export const invoicePaymentStatuses = ['UNPAID', 'PARTIALLY_PAID', 'PAID', 'OVERPAID'] as const;
+
+export type InvoicePaymentStatus = (typeof invoicePaymentStatuses)[number];
+
+export const financeAdjustmentTypes = ['REFUND', 'CHARGEBACK'] as const;
+
+export type FinanceAdjustmentType = (typeof financeAdjustmentTypes)[number];
+
+export const financeAdjustmentStatuses = [
+  'REQUESTED',
+  'APPROVED',
+  'SUBMITTED',
+  'SETTLED',
+  'DECLINED',
+] as const;
+
+export type FinanceAdjustmentStatus = (typeof financeAdjustmentStatuses)[number];
+
+export const dunningNoticeStages = ['GRACE_PERIOD', 'FIRST_NOTICE', 'FINAL_NOTICE'] as const;
+
+export type DunningNoticeStage = (typeof dunningNoticeStages)[number];
 
 export type TaxCalculationAmounts = {
   grossAmount: number;
@@ -40,7 +69,50 @@ export type RemittanceAlertDecision = {
   severity: 'INFO' | 'WARNING' | 'CRITICAL';
 };
 
+export type FinanceDocumentNumberInput = {
+  countryCode: string;
+  documentType: FinanceDocumentType;
+  issuedAt: string;
+  sequence: number;
+};
+
+export type PaymentBalanceInput = {
+  totalAmount: number;
+  amountPaid?: number;
+};
+
+export type PaymentBalance = {
+  totalAmount: number;
+  amountPaid: number;
+  amountDue: number;
+  paymentStatus: InvoicePaymentStatus;
+};
+
+export type FinanceAdjustmentBreakdownInput = {
+  grossAmount: number;
+  taxAmount: number;
+  netRevenueAmount: number;
+  adjustmentAmount: number;
+};
+
+export type FinanceAdjustmentBreakdown = {
+  grossAmount: number;
+  taxAmount: number;
+  netRevenueAmount: number;
+};
+
+export type DunningNoticeDecision = {
+  stage: DunningNoticeStage;
+  daysOverdue: number;
+  severity: 'INFO' | 'WARNING' | 'CRITICAL';
+};
+
 const dayMs = 24 * 60 * 60 * 1000;
+const financeDocumentTypeCodes = {
+  INVOICE: 'INV',
+  RECEIPT: 'RCT',
+  CREDIT_NOTE: 'CRN',
+} satisfies Record<FinanceDocumentType, string>;
 
 export function roundMoney(value: number, precision = 4): number {
   const multiplier = 10 ** precision;
@@ -80,6 +152,80 @@ export function calculateTaxSnapshotAmounts(
   };
 }
 
+export function createFinanceDocumentNumber(input: FinanceDocumentNumberInput): string {
+  if (input.sequence < 1 || !Number.isInteger(input.sequence)) {
+    throw new Error('Finance document sequence must be a positive integer.');
+  }
+
+  const countryCode = input.countryCode.trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(countryCode)) {
+    throw new Error('Finance document country code must be ISO alpha-2.');
+  }
+
+  const issuedAt = new Date(input.issuedAt);
+  if (Number.isNaN(issuedAt.getTime())) {
+    throw new Error('Finance document issuedAt must be a valid ISO date.');
+  }
+
+  const year = issuedAt.getUTCFullYear();
+  const sequence = String(input.sequence).padStart(6, '0');
+  return `${countryCode}-${year}-${financeDocumentTypeCodes[input.documentType]}-${sequence}`;
+}
+
+export function calculatePaymentBalance(input: PaymentBalanceInput): PaymentBalance {
+  if (input.totalAmount < 0) {
+    throw new Error('Payment balance total amount must be zero or greater.');
+  }
+
+  const amountPaid = input.amountPaid ?? 0;
+  if (amountPaid < 0) {
+    throw new Error('Payment balance amount paid must be zero or greater.');
+  }
+
+  const totalAmount = roundMoney(input.totalAmount);
+  const paid = roundMoney(amountPaid);
+  const amountDue = roundMoney(Math.max(totalAmount - paid, 0));
+  let paymentStatus: InvoicePaymentStatus = 'UNPAID';
+
+  if (paid > totalAmount) {
+    paymentStatus = 'OVERPAID';
+  } else if (paid === totalAmount) {
+    paymentStatus = 'PAID';
+  } else if (paid > 0) {
+    paymentStatus = 'PARTIALLY_PAID';
+  }
+
+  return {
+    totalAmount,
+    amountPaid: paid,
+    amountDue,
+    paymentStatus,
+  };
+}
+
+export function calculateFinanceAdjustmentBreakdown(
+  input: FinanceAdjustmentBreakdownInput,
+): FinanceAdjustmentBreakdown {
+  if (input.adjustmentAmount <= 0) {
+    throw new Error('Finance adjustment amount must be greater than zero.');
+  }
+
+  if (input.grossAmount <= 0) {
+    throw new Error('Finance adjustment gross amount must be greater than zero.');
+  }
+
+  if (input.adjustmentAmount > input.grossAmount) {
+    throw new Error('Finance adjustment amount cannot exceed the source gross amount.');
+  }
+
+  const ratio = input.adjustmentAmount / input.grossAmount;
+  return {
+    grossAmount: roundMoney(input.adjustmentAmount),
+    taxAmount: roundMoney(input.taxAmount * ratio),
+    netRevenueAmount: roundMoney(input.netRevenueAmount * ratio),
+  };
+}
+
 export function getRemittanceAlertDecision(
   paymentDeadlineIso: string,
   nowIso = new Date().toISOString(),
@@ -113,4 +259,39 @@ export function getRemittanceAlertDecision(
   }
 
   return null;
+}
+
+export function getDunningNoticeDecision(
+  dueAtIso: string,
+  nowIso = new Date().toISOString(),
+): DunningNoticeDecision | null {
+  const dueAt = new Date(dueAtIso);
+  const now = new Date(nowIso);
+  const daysOverdue = Math.floor((now.getTime() - dueAt.getTime()) / dayMs);
+
+  if (Number.isNaN(dueAt.getTime()) || Number.isNaN(now.getTime()) || daysOverdue < 1) {
+    return null;
+  }
+
+  if (daysOverdue <= 3) {
+    return {
+      stage: 'GRACE_PERIOD',
+      daysOverdue,
+      severity: 'INFO',
+    };
+  }
+
+  if (daysOverdue <= 14) {
+    return {
+      stage: 'FIRST_NOTICE',
+      daysOverdue,
+      severity: 'WARNING',
+    };
+  }
+
+  return {
+    stage: 'FINAL_NOTICE',
+    daysOverdue,
+    severity: 'CRITICAL',
+  };
 }

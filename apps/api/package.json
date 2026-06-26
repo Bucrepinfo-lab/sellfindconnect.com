@@ -6,7 +6,7 @@
     "build": "npm run build -w @telpen/domain && npm run generate -w @telpen/database && nest build",
     "dev": "nest start --watch",
     "start": "node dist/main.js",
-    "typecheck": "npm run build -w @telpen/domain && tsc -p tsconfig.json --noEmit",
+    "typecheck": "npm run build -w @telpen/domain && npm run generate -w @telpen/database && tsc -p tsconfig.json --noEmit",
     "test": "npm run build -w @telpen/domain && vitest run"
   },
   "dependencies": {

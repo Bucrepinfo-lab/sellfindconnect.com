@@ -103,6 +103,15 @@ GitHub-connected Railway project currently visible to `bucrepinfo@gmail.com`:
   - API deployment: `2187c01e-7204-4660-be68-742ef6ba22bc` (`SUCCESS`)
   - Web deployment: `e4947ac7-018c-4096-a00e-7abbe1bf1595` (`SUCCESS`)
   - Commit: `d848b2e` (`Add finance tax command slice`)
+- Finance invoice/receipt continuation on 2026-06-23:
+  - Local only; deployment is still paused while core coding continues.
+  - Adds protected invoice and receipt finance API commands backed by the
+    existing in-memory finance service.
+- Finance refund/chargeback/dunning continuation on 2026-06-24:
+  - Local only; deployment remains paused.
+  - Adds protected refund, chargeback, adjustment listing, dunning run, and
+    dunning notice finance API commands backed by the existing in-memory
+    finance service.
 - Explainable Source Finder deployment on 2026-06-17:
   - API deployment: `c1ace549-e96d-4a97-b564-12cef6161997` (`SUCCESS`)
   - Web deployment: `3ca76bbf-78e2-45cd-8b34-dd0f865eb0ed` (`SUCCESS`)
@@ -196,8 +205,22 @@ The production service settings were further optimized on 2026-06-16:
   breached response-time alerts.
 - The API exposes a protected analytics retention endpoint for future
   scheduling: `POST /v1/operations/analytics/retention/run` with the same
-  `x-internal-job-key` header. Start with `dryRun: true`, then run on a monthly
-  schedule after country/legal retention policy is approved.
+  `x-internal-job-key` header. Start with `dryRun: true`; pass `countryCode`
+  for country-scoped policy resolution. Passing `retentionDays` requires an
+  `approvalReference`; use overrides only for approved emergency retention
+  windows.
+- The API exposes a protected analytics rollup endpoint for future scheduling:
+  `POST /v1/operations/analytics/rollups/run` with the same
+  `x-internal-job-key` header. Start with `dryRun: true`; schedule it after
+  raw events settle for the period and pass `tenantId` or `countryCode` when
+  rebuilding a narrower slice.
+- The API exposes a protected analytics privacy request endpoint:
+  `POST /v1/operations/analytics/privacy-requests/run` with the same
+  `x-internal-job-key` header. Use `requestType: "ACCESS"` for aggregate
+  tenant analytics summaries and `requestType: "ERASURE"` for deletion.
+  Erasure defaults to dry-run; pass `dryRun: false` only after approval, and
+  keep `rebuildRollups` enabled so aggregate rows are cleaned up after raw
+  analytics deletion.
 - CDN caching was not enabled yet. The current app will become tenant-aware and
   authenticated, so edge caching should wait until cache-control headers clearly
   separate public static assets from tenant or user-specific pages.

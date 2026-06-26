@@ -1,4 +1,4 @@
-import type { AnalyticsEvent } from '@telpen/domain';
+import type { AnalyticsDailyRollup, AnalyticsEvent } from '@telpen/domain';
 
 export const ANALYTICS_REPOSITORY = Symbol('ANALYTICS_REPOSITORY');
 
@@ -23,7 +23,37 @@ export type ListAnalyticsEventsForScopeInput = {
 export type PruneAnalyticsEventsInput = {
   before: string;
   tenantId?: string;
+  countryCode?: string;
   dryRun?: boolean;
+};
+
+export type DeleteAnalyticsEventsForPrivacyRequestInput = {
+  tenantId: string;
+  from: string;
+  to: string;
+  countryCode?: string;
+  dryRun?: boolean;
+};
+
+export type ListAnalyticsDailyRollupsInput = {
+  from: string;
+  to: string;
+  tenantId?: string;
+  countryCodes?: string[];
+  industryCode?: string;
+};
+
+export type ReplaceAnalyticsDailyRollupsInput = {
+  from: string;
+  to: string;
+  tenantId?: string;
+  countryCodes?: string[];
+  rollups: AnalyticsDailyRollup[];
+};
+
+export type ReplaceAnalyticsDailyRollupsResult = {
+  deleted: number;
+  upserted: number;
 };
 
 export interface AnalyticsRepository {
@@ -31,4 +61,12 @@ export interface AnalyticsRepository {
   listEvents(input: ListAnalyticsEventsInput): RepositoryResult<AnalyticsEvent[]>;
   listEventsForScope(input: ListAnalyticsEventsForScopeInput): RepositoryResult<AnalyticsEvent[]>;
   pruneEvents(input: PruneAnalyticsEventsInput): RepositoryResult<number>;
+  deleteEventsForPrivacyRequest(
+    input: DeleteAnalyticsEventsForPrivacyRequestInput,
+  ): RepositoryResult<number>;
+  listDailyRollups(input: ListAnalyticsDailyRollupsInput): RepositoryResult<AnalyticsDailyRollup[]>;
+  countDailyRollups(input: ListAnalyticsDailyRollupsInput): RepositoryResult<number>;
+  replaceDailyRollups(
+    input: ReplaceAnalyticsDailyRollupsInput,
+  ): RepositoryResult<ReplaceAnalyticsDailyRollupsResult>;
 }

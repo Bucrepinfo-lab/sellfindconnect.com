@@ -68,4 +68,12 @@ export class PlatformAnalyticsController {
   ) {
     return this.analytics.buildHierarchyReport(session, query);
   }
+
+  @Get('hierarchy/export')
+  exportHierarchyReport(
+    @PlatformAuthSession() session: PlatformAccessSession,
+    @Query() query: PlatformAnalyticsQueryDto,
+  ) {
+    return this.analytics.exportHierarchyReport(session, query);
+  }
 }

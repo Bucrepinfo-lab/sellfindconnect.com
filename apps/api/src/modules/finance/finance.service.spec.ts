@@ -110,6 +110,157 @@ describe('FinanceService', () => {
     ]);
   });
 
+  it('creates an invoice, receipt, tax snapshot, and ledger entries for a paid transaction', () => {
+    const service = configuredService();
+
+    const result = service.createInvoice(tenantId, {
+      countryCode: 'KE',
+      grossAmount: 10,
+      presentmentCurrency: 'KES',
+      productTaxCode: 'SFC_SUBSCRIPTION',
+      provider: 'MANUAL',
+      providerReference: 'checkout-session-123',
+      customerEvidence: { billingCountry: 'KE', customerType: 'BUSINESS' },
+      customerName: 'Acme Supplies Ltd',
+      customerEmail: 'billing@example.com',
+      billingReference: 'billing-123',
+      lineItemDescription: 'Sell Find Connect monthly subscription',
+      issueReceipt: true,
+      paymentProvider: 'MANUAL',
+      paymentReference: 'manual-payment-123',
+      paidAt: '2026-06-23T12:05:00.000Z',
+    });
+
+    expect(result.invoice.invoiceNumber).toMatch(/^KE-\d{4}-INV-\d{6}$/);
+    expect(result.invoice.paymentStatus).toBe('PAID');
+    expect(result.invoice.amountDue).toBe(0);
+    expect(result.receipt?.receiptNumber).toMatch(/^KE-\d{4}-RCT-\d{6}$/);
+    expect(result.receipt?.amountPaid).toBe(10);
+    expect(result.taxCalculation.snapshot.taxAmount).toBe(1.3793);
+    expect(result.taxCalculation.ledgerEntries).toHaveLength(2);
+    expect(service.listInvoices(tenantId)).toHaveLength(1);
+    expect(service.listReceipts(tenantId)).toHaveLength(1);
+  });
+
+  it('issues receipts against an existing invoice until the balance is paid', () => {
+    const service = configuredService();
+    const invoiceResult = service.createInvoice(tenantId, {
+      countryCode: 'KE',
+      grossAmount: 10,
+      presentmentCurrency: 'KES',
+      productTaxCode: 'SFC_SUBSCRIPTION',
+      customerEvidence: { billingCountry: 'KE' },
+      customerName: 'Acme Supplies Ltd',
+      lineItemDescription: 'Sell Find Connect monthly subscription',
+    });
+
+    const partial = service.issueReceipt(tenantId, {
+      invoiceId: invoiceResult.invoice.id,
+      amountPaid: 4,
+      paymentProvider: 'MANUAL',
+      paymentReference: 'manual-payment-1',
+    });
+
+    expect(partial.invoice.paymentStatus).toBe('PARTIALLY_PAID');
+    expect(partial.invoice.amountDue).toBe(6);
+
+    const final = service.issueReceipt(tenantId, {
+      invoiceId: invoiceResult.invoice.id,
+      paymentProvider: 'MANUAL',
+      paymentReference: 'manual-payment-2',
+    });
+
+    expect(final.invoice.paymentStatus).toBe('PAID');
+    expect(final.receipt.amountPaid).toBe(6);
+    expect(service.listReceipts(tenantId)).toHaveLength(2);
+    expect(() =>
+      service.issueReceipt(tenantId, {
+        invoiceId: invoiceResult.invoice.id,
+        paymentProvider: 'MANUAL',
+        paymentReference: 'manual-payment-2',
+      }),
+    ).toThrow();
+  });
+
+  it('creates refund credit notes and reversal ledger entries against paid invoices', () => {
+    const service = configuredService();
+    const invoiceResult = service.createInvoice(tenantId, {
+      countryCode: 'KE',
+      grossAmount: 10,
+      presentmentCurrency: 'KES',
+      productTaxCode: 'SFC_SUBSCRIPTION',
+      customerEvidence: { billingCountry: 'KE' },
+      customerName: 'Acme Supplies Ltd',
+      lineItemDescription: 'Sell Find Connect monthly subscription',
+      issueReceipt: true,
+      paymentReference: 'manual-payment-123',
+    });
+
+    const result = service.requestRefund(tenantId, {
+      invoiceId: invoiceResult.invoice.id,
+      amount: 5,
+      reason: 'Customer cancelled during support grace period.',
+      paymentProvider: 'MANUAL',
+      providerReference: 'refund-123',
+      requestedBy: 'billing-manager',
+    });
+
+    expect(result.adjustment.adjustmentType).toBe('REFUND');
+    expect(result.adjustment.creditNoteNumber).toMatch(/^KE-\d{4}-CRN-\d{6}$/);
+    expect(result.adjustment.taxAmount).toBe(0.6897);
+    expect(result.ledgerEntries.map((entry) => entry.entryType)).toEqual([
+      'REFUND_TAX_REVERSAL',
+      'REFUND_REVENUE_REVERSAL',
+    ]);
+    expect(result.ledgerEntries.every((entry) => entry.amount < 0)).toBe(true);
+    expect(result.invoice.refundedAmount).toBe(5);
+    expect(result.invoice.netCollectedAmount).toBe(5);
+    expect(service.listAdjustments(tenantId)).toHaveLength(1);
+  });
+
+  it('opens chargebacks and creates dunning notices for reopened balances', () => {
+    const service = configuredService();
+    const invoiceResult = service.createInvoice(tenantId, {
+      countryCode: 'KE',
+      grossAmount: 10,
+      presentmentCurrency: 'KES',
+      productTaxCode: 'SFC_SUBSCRIPTION',
+      customerEvidence: { billingCountry: 'KE' },
+      customerName: 'Acme Supplies Ltd',
+      lineItemDescription: 'Sell Find Connect monthly subscription',
+      dueAt: '2026-06-20T00:00:00.000Z',
+      issueReceipt: true,
+      paymentReference: 'manual-payment-123',
+    });
+
+    const chargeback = service.openChargeback(tenantId, {
+      invoiceId: invoiceResult.invoice.id,
+      amount: 10,
+      reason: 'Cardholder dispute received from payment provider.',
+      paymentProvider: 'MANUAL',
+      providerReference: 'chargeback-123',
+      openedBy: 'billing-manager',
+      openedAt: '2026-06-24T00:00:00.000Z',
+    });
+
+    expect(chargeback.adjustment.adjustmentType).toBe('CHARGEBACK');
+    expect(chargeback.invoice.status).toBe('DISPUTED');
+    expect(chargeback.invoice.amountDue).toBe(10);
+    expect(chargeback.ledgerEntries.map((entry) => entry.entryType)).toEqual([
+      'CHARGEBACK_TAX_REVERSAL',
+      'CHARGEBACK_REVENUE_REVERSAL',
+    ]);
+
+    const firstRun = service.runDunning(tenantId, { now: '2026-06-27T00:00:00.000Z' });
+    const secondRun = service.runDunning(tenantId, { now: '2026-06-27T12:00:00.000Z' });
+
+    expect(firstRun.noticesCreated).toHaveLength(1);
+    expect(firstRun.noticesCreated[0]?.stage).toBe('FIRST_NOTICE');
+    expect(firstRun.noticesCreated[0]?.amountDue).toBe(10);
+    expect(secondRun.noticesCreated).toHaveLength(0);
+    expect(service.listDunningNotices(tenantId)).toHaveLength(1);
+  });
+
   it('creates remittance alerts on milestone days without duplicating them', () => {
     const service = configuredService();
 

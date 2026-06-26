@@ -6,8 +6,13 @@ import { TenantSessionGuard } from '../tenant/tenant-session.guard';
 import {
   CalculateTaxDto,
   ConfigureCountryTaxProfileDto,
+  CreateInvoiceDto,
   CreateTaxRuleDto,
   GenerateTaxReturnDto,
+  IssueReceiptDto,
+  OpenChargebackDto,
+  RequestRefundDto,
+  RunDunningDto,
   RunFinanceAlertsDto,
 } from './dto/finance.dto';
 import { FinanceService } from './finance.service';
@@ -64,6 +69,51 @@ export class FinanceController {
   @Get('tax-returns')
   listTaxReturns() {
     return this.finance.listTaxReturns();
+  }
+
+  @Post('invoices')
+  createInvoice(@TenantId() tenantId: string, @Body() body: CreateInvoiceDto) {
+    return this.finance.createInvoice(tenantId, body);
+  }
+
+  @Get('invoices')
+  listInvoices(@TenantId() tenantId: string) {
+    return this.finance.listInvoices(tenantId);
+  }
+
+  @Post('receipts')
+  issueReceipt(@TenantId() tenantId: string, @Body() body: IssueReceiptDto) {
+    return this.finance.issueReceipt(tenantId, body);
+  }
+
+  @Get('receipts')
+  listReceipts(@TenantId() tenantId: string) {
+    return this.finance.listReceipts(tenantId);
+  }
+
+  @Post('refunds')
+  requestRefund(@TenantId() tenantId: string, @Body() body: RequestRefundDto) {
+    return this.finance.requestRefund(tenantId, body);
+  }
+
+  @Post('chargebacks')
+  openChargeback(@TenantId() tenantId: string, @Body() body: OpenChargebackDto) {
+    return this.finance.openChargeback(tenantId, body);
+  }
+
+  @Get('adjustments')
+  listAdjustments(@TenantId() tenantId: string) {
+    return this.finance.listAdjustments(tenantId);
+  }
+
+  @Post('dunning/run')
+  runDunning(@TenantId() tenantId: string, @Body() body: RunDunningDto) {
+    return this.finance.runDunning(tenantId, body);
+  }
+
+  @Get('dunning-notices')
+  listDunningNotices(@TenantId() tenantId: string) {
+    return this.finance.listDunningNotices(tenantId);
   }
 
   @Post('alerts/run')

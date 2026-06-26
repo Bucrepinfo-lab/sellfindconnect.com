@@ -250,6 +250,7 @@ model Tenant {
   mediaAssets                  MediaAsset[]
   taxSnapshots                 TaxCalculationSnapshot[]
   analyticsEvents              AnalyticsEvent[]
+  analyticsDailyRollups        AnalyticsDailyRollup[]
   auditLogs                    AuditLog[]
   notifications                Notification[]
   conversations                Conversation[]
@@ -833,6 +834,39 @@ model AnalyticsEvent {
   @@index([tenantId, eventType, occurredAt])
   @@index([countryCode, industryCode, occurredAt])
   @@index([entityType, entityId, occurredAt])
+}
+
+model AnalyticsDailyRollup {
+  id           String              @id @default(uuid())
+  day          DateTime
+  tenantId     String
+  countryCode  String              @db.VarChar(2)
+  industryCode String              @db.VarChar(80)
+  entityType   AnalyticsEntityType
+  entityId     String              @db.VarChar(120)
+  consentState ConsentState
+  impressions  Int                 @default(0)
+  views        Int                 @default(0)
+  clicks       Int                 @default(0)
+  inquiries    Int                 @default(0)
+  shares       Int                 @default(0)
+  downloads    Int                 @default(0)
+  saves        Int                 @default(0)
+  searches     Int                 @default(0)
+  matches      Int                 @default(0)
+  chatMessages Int                 @default(0)
+  responseTime Int                 @default(0)
+  eventCount   Int                 @default(0)
+  lastEventAt  DateTime
+  refreshedAt  DateTime
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([day, tenantId, countryCode, industryCode, entityType, entityId, consentState], map: "analytics_daily_rollup_unique")
+  @@index([tenantId, day], map: "analytics_daily_rollup_tenant_day_idx")
+  @@index([countryCode, industryCode, day], map: "analytics_daily_rollup_country_industry_day_idx")
+  @@index([entityType, entityId, day], map: "analytics_daily_rollup_entity_day_idx")
 }
 
 model Conversation {
