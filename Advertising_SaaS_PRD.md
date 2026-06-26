@@ -1,10 +1,20 @@
 # Product Requirements Document: Multi-Tenant Advertising SaaS
 
 Date: 2026-06-15
-Last updated: 2026-06-20
+Last updated: 2026-06-23
 Owner: Telpen Adverts
 Working name: Telpen Adverts Platform
 Status: Draft for validation
+
+> Implementation status (2026-06-23): MVP vertical slices are in place across
+> auth/tenancy, advertiser profiles, listings + media pipeline, Source Finder,
+> matching/lead conversion, conversations, analytics (with daily rollups and
+> hierarchy reports), and finance/tax. The finance engine now also covers a
+> provider-neutral payment adapter, invoices/receipts, refunds, and
+> provider/bank reconciliation. An AI-native agent system (Research, Operation,
+> Support, Sales, Finance, Legal) operates the platform from `.agents/`. See
+> `docs/IMPLEMENTATION_BACKLOG.md` for per-epic progress and `Product_Memory.md`
+> for the dated decision log.
 
 ## 1. Executive Summary
 

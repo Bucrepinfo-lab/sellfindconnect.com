@@ -1,18 +1,21 @@
-# Sell Find Connect DigitalOcean Deployment Candidate
+# Sell Find Connect DigitalOcean Deployment Runbook
 
-Status: Deployment paused while product coding continues
+Status: Active — DigitalOcean selected; production domain `sellfindconnect.com`
 Date: 2026-06-18
+Last updated: 2026-06-24
 
 ## Current Decision
 
-Do not start a new deployment migration now. Finish the core product coding
-first, then choose and activate the production platform before onboarding
-subscribers.
+DigitalOcean App Platform is the chosen production host. The canonical domain is
+**`sellfindconnect.com`**, owned by the project owner through **GoDaddy**. This
+runbook is the executable path to first launch; the App Platform spec lives at
+`deploy/digitalocean/app.yaml` and builds from the existing
+`deploy/web.Dockerfile` and `deploy/api.Dockerfile`.
 
-DigitalOcean is now the leading deployment candidate because the first country
-launch needs excellent Africa latency, and a Cape Town/South Africa point of
-presence or region would be a major advantage if the required DigitalOcean
-products are available there.
+DigitalOcean was chosen because the first country launch needs strong Africa
+latency. Pick the closest available App Platform region (e.g. `fra1`) until a
+South Africa point of presence is available; keep latency-critical web/API close
+to users and durable services in the nearest stable region.
 
 ## Verification Gate
 
@@ -54,7 +57,8 @@ flowchart LR
 ## Required Services
 
 - Web app service for `sellfindconnect.com` and `www.sellfindconnect.com`.
-- API service for `api.sellfindconnect.com`.
+- API service path-routed at `sellfindconnect.com/api` (or `api.sellfindconnect.com`
+  if you choose the two-app subdomain layout).
 - Managed PostgreSQL for tenant, auth, finance, analytics, moderation, and
   relationship graph data.
 - Redis-compatible service for queues, rate limits, chat fan-out, notification
@@ -97,11 +101,106 @@ The seed command builds the shared domain package first, then loads baseline
 continents, country configuration, and industry categories from the same data
 used by the web and API.
 
+## Step-by-step: first deployment (App Platform)
+
+Prerequisites: a DigitalOcean account, `doctl` installed and authenticated
+(`doctl auth init`), and GitHub connected to DigitalOcean for
+`Bucrepinfo-lab/sellfindconnect.com`.
+
+1. **Pick the region.** Edit `region:` in `deploy/digitalocean/app.yaml` to the
+   closest available App Platform region (e.g. `fra1`).
+2. **Create the app from the spec:**
+   ```
+   doctl apps create --spec deploy/digitalocean/app.yaml
+   ```
+   This provisions the `web` and `api` services, the managed `sfc-postgres`
+   database, and the `db-migrate` pre-deploy job.
+3. **Set secrets** in the DO dashboard (App → Settings → each component → Env):
+   - `api` → `INTERNAL_JOB_KEY` = a long random secret (used by scheduled jobs).
+   - Any live `PAYMENT_PROVIDER` / media-storage secrets only after approval.
+   `DATABASE_URL` is auto-injected from the managed DB (`${sfc-postgres.DATABASE_URL}`).
+4. **First deploy runs migrations** automatically via the `db-migrate`
+   PRE_DEPLOY job (`npm run db:migrate:deploy`). Seed once, manually, from a
+   console or a one-off job: `npm run db:seed`.
+5. **Add the custom domains** (App → Settings → Domains): `sellfindconnect.com`
+   (primary) and `www.sellfindconnect.com`. The API is path-routed on the same
+   domain (`/api`), so no API subdomain is needed in this layout. DO displays the
+   exact DNS target for each domain and auto-provisions Let's Encrypt TLS once
+   DNS resolves.
+
+## GoDaddy DNS records
+
+The spec uses a single app with path-based routing, so only the apex and `www`
+point at DigitalOcean. Two clean options:
+
+**Option A (recommended) — delegate DNS to DigitalOcean.** In GoDaddy, set the
+domain's nameservers to `ns1.digitalocean.com`, `ns2.digitalocean.com`,
+`ns3.digitalocean.com`. Then DO manages the apex `ALIAS` automatically (this is
+what `app.yaml`'s `type: ALIAS`/`PRIMARY` assumes). Nothing else to add in
+GoDaddy.
+
+**Option B — keep DNS at GoDaddy.** Point records at the targets DO shows
+(App → Settings → Domains gives a `*.ondigitalocean.app` hostname):
+
+| Type  | Name | Value                              | Notes                       |
+| ----- | ---- | ---------------------------------- | --------------------------- |
+| A     | @    | (DO-provided apex IP)              | Apex `sellfindconnect.com`  |
+| CNAME | www  | `<app>.ondigitalocean.app`         | `www.sellfindconnect.com`   |
+
+Notes:
+- GoDaddy does not support a true apex `CNAME`; for the apex use the **A record**
+  DO provides (Option B) or delegate nameservers (Option A).
+- Remove GoDaddy parking/forwarding records for `@` and `www` first.
+- After records propagate, DO issues TLS automatically and forces HTTPS. Verify
+  `https://sellfindconnect.com`, `https://www...` (redirects to apex), and the
+  API at `https://sellfindconnect.com/api/v1/health`.
+
+> Subdomain alternative: if you prefer `api.sellfindconnect.com`, deploy the API
+> as a **second** App Platform app, add that subdomain to it (CNAME `api` →
+> its `*.ondigitalocean.app`), and set the web app's
+> `NEXT_PUBLIC_API_URL=https://api.sellfindconnect.com/v1`.
+
+## Scheduled jobs
+
+DigitalOcean App Platform has no native recurring cron (only PRE/POST-deploy
+jobs), so production scheduling runs from the checked-in GitHub Actions workflow
+**`.github/workflows/scheduled-jobs.yml`**, which POSTs to the protected internal
+endpoints with header `x-internal-job-key: $INTERNAL_JOB_KEY`:
+
+- `POST /v1/operations/conversations/sla/run` — every 15 min.
+- `POST /v1/operations/media/processing/run` — every 15 min (scan/transform tick).
+- `POST /v1/operations/adverts/lifecycle/run` — daily (day-35/39 alerts, day-40 delete).
+- `POST /v1/operations/analytics/rollups/run` — daily warehouse rebuild.
+- `POST /v1/operations/finance/alerts/run` — daily all-tenant remittance alerts
+  (T-30/14/7/3/1, due, overdue, reconciliation variance).
+- `POST /v1/operations/analytics/retention/run` — weekly retention sweep.
+
+Set two **GitHub repository secrets** (Settings → Secrets and variables →
+Actions): `API_BASE_URL` (e.g. `https://sellfindconnect.com/api/v1`) and
+`INTERNAL_JOB_KEY` (the same value set on the API service). You can trigger any
+group manually via the workflow's "Run workflow" button.
+
+Alternatively, run the same calls from a DigitalOcean Function with a scheduled
+trigger or a small worker service if you prefer to keep scheduling on DO.
+
+## Cutover smoke checklist
+
+Before onboarding any paying subscriber, verify on the live domains:
+- `GET https://sellfindconnect.com/api/v1/health` returns healthy.
+- Web loads at `https://sellfindconnect.com`; `www` redirects to apex.
+- Owner registration, login, MFA, tenant-session checks.
+- Terms gate + zero-tolerance blocking on publish/upload/chat/pay.
+- Source Finder, lead conversion, notifications, analytics dashboards.
+- Advert lifecycle + finance/tax readiness; invoice → payment → receipt →
+  reconciliation round-trips with `PAYMENT_PROVIDER=manual`.
+- Scheduled jobs run and migrations/seed are repeatable.
+
 ## Current Deployment Posture
 
-- Railway remains the only already-proven live deployment.
-- No new deployment migration should be started until coding reaches the next
-  production-readiness checkpoint.
-- Render is not the active deployment path.
-- DigitalOcean is the leading candidate to evaluate because of the Africa
-  latency requirement.
+- DigitalOcean App Platform is the selected production host; spec checked in at
+  `deploy/digitalocean/app.yaml`.
+- `sellfindconnect.com` (GoDaddy) is the canonical domain; `api.` subdomain for
+  the API, `www.` redirects to apex.
+- Railway remains available as a fallback/staging target until DigitalOcean is
+  verified stable. Render is not used.
+- Go live only after the cutover smoke checklist passes.
