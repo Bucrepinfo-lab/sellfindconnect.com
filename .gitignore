@@ -10,3 +10,5 @@ coverage/
 *.tsbuildinfo
 packages/database/src/generated/
 apps/api/.nest/
+
+.railway-config-pull-8124/
