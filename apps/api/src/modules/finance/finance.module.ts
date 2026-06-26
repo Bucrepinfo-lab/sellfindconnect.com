@@ -1,13 +1,31 @@
-import { Module } from '@nestjs/common';
-
-import { AuthModule } from '../auth/auth.module';
-import { FinanceController } from './finance.controller';
+﻿import { Module } from '@nestjs/common';
+import { PrismaModule } from '../prisma/prisma.module';
 import { FinanceService } from './finance.service';
+import { FinanceController } from './finance.controller';
+import { PrismaFinanceRepository } from './prisma-finance.repository';
+
+const FINANCE_PERSISTENCE = Symbol('FINANCE_PERSISTENCE');
 
 @Module({
-  imports: [AuthModule],
+  imports: [PrismaModule],
+  providers: [
+    PrismaFinanceRepository,
+    {
+      provide: FINANCE_PERSISTENCE,
+      useFactory: (prismaRepo: PrismaFinanceRepository) => {
+        if (process.env.FINANCE_REPOSITORY === 'prisma') return prismaRepo;
+        return null;
+      },
+      inject: [PrismaFinanceRepository],
+    },
+    {
+      provide: FinanceService,
+      useFactory: (repo: PrismaFinanceRepository | null) =>
+        new FinanceService(repo ?? undefined),
+      inject: [FINANCE_PERSISTENCE],
+    },
+  ],
   controllers: [FinanceController],
-  providers: [FinanceService],
   exports: [FinanceService],
 })
 export class FinanceModule {}

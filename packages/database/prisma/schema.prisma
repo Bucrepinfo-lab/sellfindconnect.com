@@ -1085,7 +1085,7 @@ model FinanceAlert {
   createdAt           DateTime           @default(now())
   countryTaxProfile   CountryTaxProfile  @relation(fields: [countryTaxProfileId], references: [id], onDelete: Cascade)
   assignedTo          User?              @relation("FinanceAlertAssignee", fields: [assignedToUserId], references: [id])
-
+dedupeKey String? @unique
   @@index([status, dueAt])
   @@index([assignedToUserId])
 }
@@ -1101,7 +1101,9 @@ model ReconciliationRun {
   varianceAmount Decimal  @db.Decimal(18, 4)
   status         String   @db.VarChar(80)
   createdAt      DateTime @default(now())
-
+tenantId     String?
+  variances    Json?
+  matchedCount Int     @default(0)
   @@index([countryCode, periodStart, periodEnd])
 }
 
@@ -1112,7 +1114,8 @@ model CreditNote {
   currency  String   @db.VarChar(3)
   reason    String
   createdAt DateTime @default(now())
-
+tenantId       String?
+  idempotencyKey String?
   @@index([tenantId])
 }
 
@@ -1123,7 +1126,8 @@ model Refund {
   currency  String   @db.VarChar(3)
   reason    String
   createdAt DateTime @default(now())
-
+tenantId       String?
+  idempotencyKey String?
   @@index([tenantId])
 }
 
@@ -1135,7 +1139,7 @@ model Chargeback {
   status    String   @db.VarChar(80)
   evidence  Json?
   createdAt DateTime @default(now())
-
+idempotencyKey String?
   @@index([tenantId, status])
 }
 
@@ -1153,4 +1157,62 @@ model AuditLog {
 
   @@index([tenantId, createdAt])
   @@index([actorUserId, createdAt])
+}
+
+model FinanceIdempotency {
+  id        String   @id @default(uuid())
+  tenantId  String
+  scope     String   @db.VarChar(80)
+  key       String
+  resultId  String
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, scope, key])
+  @@index([tenantId])
+}
+
+model FinanceSequence {
+  id        String @id @default(uuid())
+  countryId String @db.VarChar(2)
+  kind      String @db.VarChar(20)
+  year      Int
+  value     Int    @default(0)
+
+  @@unique([countryId, kind, year])
+}
+
+model FinancePeriodLock {
+  id        String   @id @default(uuid())
+  tenantId  String
+  countryId String   @db.VarChar(2)
+  period    String   @db.VarChar(7)
+  lockedAt  DateTime
+  lockedBy  String
+
+  @@unique([tenantId, countryId, period])
+  @@index([tenantId])
+}
+
+model FinanceReturnApproval {
+  id          String    @id @default(uuid())
+  tenantId    String
+  countryId   String    @db.VarChar(2)
+  period      String    @db.VarChar(7)
+  status      String    @default("PENDING") @db.VarChar(20)
+  requestedBy String
+  decidedBy   String?
+  decidedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([tenantId, countryId, period])
+  @@index([tenantId, status])
+}
+
+model CountryPricing {
+  country     String   @id @db.VarChar(2)
+  currency    String   @db.VarChar(3)
+  amountMinor BigInt
+  display     String   @db.VarChar(40)
+  mode        String   @db.VarChar(10)
+  updatedAt   DateTime @updatedAt
 }
