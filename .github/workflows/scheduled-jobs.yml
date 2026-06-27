@@ -1,4 +1,4 @@
-name: Scheduled jobs
+﻿name: Scheduled jobs
 
 # Production scheduler for Sell Find Connect. DigitalOcean App Platform has no
 # native cron, so GitHub Actions triggers the protected internal maintenance
@@ -11,10 +11,10 @@ name: Scheduled jobs
 # Note: cron times are UTC. GitHub may delay scheduled runs under load.
 
 on:
-  schedule:
-    - cron: '*/15 * * * *' # frequent: conversation SLA + media processing
-    - cron: '0 2 * * *'    # daily: advert lifecycle + analytics rollups
-    - cron: '0 3 * * 0'    # weekly: analytics retention sweep
+  # schedule: # disabled until API is deployed - re-enable after Step 7 of DEPLOYMENT-RUNBOOK.md
+  #   - cron: '*/15 * * * *' # frequent: conversation SLA + media processing
+  #   - cron: '0 2 * * *'    # daily: advert lifecycle + analytics rollups
+  #   - cron: '0 3 * * 0'    # weekly: analytics retention sweep
   workflow_dispatch:
     inputs:
       group:
@@ -94,3 +94,4 @@ jobs:
             "$API_BASE_URL/operations/analytics/retention/run" \
             -H "x-internal-job-key: $INTERNAL_JOB_KEY" \
             -H "content-type: application/json" -d '{}'
+
