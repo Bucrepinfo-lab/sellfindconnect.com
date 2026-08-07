@@ -1,0 +1,35 @@
+# Fly.io — SellFindConnect Web (Next.js 16, standalone)  ·  deploy: fly deploy --config fly.web.toml --remote-only
+# Run from the repo root. NEXT_PUBLIC_API_URL is baked at BUILD time (client bundle).
+app = "sellfindconnect-web"
+primary_region = "fra"
+
+[build]
+dockerfile = "deploy/web.Dockerfile"
+
+# NEXT_PUBLIC_API_URL must point at the API. Start with the API's fly.dev URL;
+# switch to https://api.sellfindconnect.com/v1 once the custom domain cert is issued.
+[build.args]
+NEXT_PUBLIC_API_URL = "https://sellfindconnect-api.fly.dev/v1"
+
+[env]
+PORT = "8080"
+NODE_ENV = "production"
+HOSTNAME = "0.0.0.0"
+
+[http_service]
+internal_port = 8080
+force_https = true
+auto_stop_machines = "stop"
+auto_start_machines = true
+min_machines_running = 1
+
+[[http_service.checks]]
+interval = "30s"
+timeout = "5s"
+grace_period = "30s"
+method = "GET"
+path = "/"
+
+[[vm]]
+size = "shared-cpu-1x"
+memory = "512mb"
