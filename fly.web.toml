@@ -9,7 +9,7 @@ dockerfile = "deploy/web.Dockerfile"
 # NEXT_PUBLIC_API_URL must point at the API. Start with the API's fly.dev URL;
 # switch to https://api.sellfindconnect.com/v1 once the custom domain cert is issued.
 [build.args]
-NEXT_PUBLIC_API_URL = "https://sellfindconnect-api.fly.dev/v1"
+NEXT_PUBLIC_API_URL = "https://api.sellfindconnect.com/v1"
 
 [env]
 PORT = "8080"
