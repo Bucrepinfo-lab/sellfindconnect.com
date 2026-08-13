@@ -23,6 +23,7 @@ type RepositoryResult<T> = T | Promise<T>;
 
 export interface AuthRepository {
   findUserByEmail(email: string): RepositoryResult<AuthUserRecord | undefined>;
+  findUserByPhone(phone: string): RepositoryResult<AuthUserRecord | undefined>;
   findUserById(userId: string): RepositoryResult<AuthUserRecord | undefined>;
   findFirstMembershipForUser(userId: string): RepositoryResult<TenantMembershipRecord | undefined>;
   findMembershipForUserAndTenant(
@@ -49,6 +50,7 @@ export interface AuthRepository {
   createTenantInvite(invite: AuthTenantInviteRecord): RepositoryResult<void>;
   updateTenantInvite(invite: AuthTenantInviteRecord): RepositoryResult<void>;
   markUserEmailVerified(userId: string, emailVerifiedAt: string): RepositoryResult<void>;
+  markUserPhoneVerified(userId: string, phoneVerifiedAt: string): RepositoryResult<void>;
   updateUserPassword(userId: string, password: PasswordUpdateRecord): RepositoryResult<void>;
   markUserMfaVerified(userId: string, mfaVerifiedAt: string): RepositoryResult<void>;
   revokeSessionsForUser(userId: string, revokedAt: string): RepositoryResult<void>;

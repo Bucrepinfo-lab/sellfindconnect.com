@@ -50,6 +50,10 @@ export class PrismaAuthRepository implements AuthRepository {
     return this.mapUser(await this.prisma.user.findUnique({ where: { email } }));
   }
 
+  async findUserByPhone(phone: string): Promise<AuthUserRecord | undefined> {
+    return this.mapUser(await this.prisma.user.findFirst({ where: { phone } }));
+  }
+
   async findUserById(userId: string): Promise<AuthUserRecord | undefined> {
     return this.mapUser(await this.prisma.user.findUnique({ where: { id: userId } }));
   }
@@ -350,6 +354,7 @@ export class PrismaAuthRepository implements AuthRepository {
         id: challenge.id,
         userId: challenge.userId,
         email: challenge.email,
+        phone: challenge.phone ?? undefined,
         purpose: challenge.purpose,
         tokenHash: challenge.tokenHash,
         expiresAt: new Date(challenge.expiresAt),
@@ -401,6 +406,13 @@ export class PrismaAuthRepository implements AuthRepository {
     await this.prisma.user.update({
       where: { id: userId },
       data: { emailVerifiedAt: new Date(emailVerifiedAt) },
+    });
+  }
+
+  async markUserPhoneVerified(userId: string, phoneVerifiedAt: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { phoneVerifiedAt: new Date(phoneVerifiedAt) },
     });
   }
 
@@ -494,6 +506,7 @@ export class PrismaAuthRepository implements AuthRepository {
       passwordSalt: user.passwordSalt,
       passwordIterations: user.passwordIterations,
       emailVerifiedAt: user.emailVerifiedAt?.toISOString(),
+      phoneVerifiedAt: user.phoneVerifiedAt?.toISOString(),
       mfaRequired: user.mfaRequired,
       mfaVerifiedAt: user.lastMfaVerifiedAt?.toISOString(),
       createdAt: user.createdAt.toISOString(),
@@ -615,6 +628,7 @@ export class PrismaAuthRepository implements AuthRepository {
       id: challenge.id,
       userId: challenge.userId,
       email: challenge.email,
+      phone: challenge.phone ?? undefined,
       purpose: challenge.purpose as AuthAccountChallengeRecord['purpose'],
       tokenHash: challenge.tokenHash,
       expiresAt: challenge.expiresAt.toISOString(),

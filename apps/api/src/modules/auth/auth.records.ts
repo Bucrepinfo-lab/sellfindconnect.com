@@ -16,6 +16,7 @@ export type AuthUserRecord = {
   passwordSalt: string;
   passwordIterations: number;
   emailVerifiedAt?: string;
+  phoneVerifiedAt?: string;
   mfaRequired: boolean;
   mfaVerifiedAt?: string;
   createdAt: string;
@@ -80,12 +81,13 @@ export type PresentedMfaChallenge = Pick<
   developmentCode?: string;
 };
 
-export type AuthAccountChallengePurpose = 'EMAIL_VERIFICATION' | 'PASSWORD_RESET';
+export type AuthAccountChallengePurpose = 'EMAIL_VERIFICATION' | 'PASSWORD_RESET' | 'PHONE_LOGIN';
 
 export type AuthAccountChallengeRecord = {
   id: string;
   userId: string;
   email: string;
+  phone?: string;
   purpose: AuthAccountChallengePurpose;
   tokenHash: string;
   expiresAt: string;

@@ -13,6 +13,7 @@ import { HealthModule } from './health/health.module';
 import { LeadsModule } from './leads/leads.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OperationsModule } from './operations/operations.module';
+import { PaymentsModule } from './payments/payments.module';
 import { ProfilesModule } from './profiles/profiles.module';
 import { SafetyModule } from './safety/safety.module';
 import { SourceFinderModule } from './source-finder/source-finder.module';
@@ -30,6 +31,7 @@ import { SourceFinderModule } from './source-finder/source-finder.module';
     AnalyticsModule,
     AdvertsModule,
     OperationsModule,
+    PaymentsModule,
     FinanceModule,
     SourceFinderModule,
     LeadsModule,

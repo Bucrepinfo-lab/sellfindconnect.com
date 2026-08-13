@@ -22,6 +22,7 @@ import type { AuthRepository } from './auth.repository';
 @Injectable()
 export class InMemoryAuthRepository implements AuthRepository {
   private readonly usersByEmail = new Map<string, AuthUserRecord>();
+  private readonly usersByPhone = new Map<string, AuthUserRecord>();
   private readonly usersById = new Map<string, AuthUserRecord>();
   private readonly tenants = new Map<string, AuthTenantRecord>();
   private readonly memberships = new Map<string, TenantMembershipRecord>();
@@ -36,6 +37,10 @@ export class InMemoryAuthRepository implements AuthRepository {
 
   findUserByEmail(email: string): AuthUserRecord | undefined {
     return this.usersByEmail.get(email);
+  }
+
+  findUserByPhone(phone: string): AuthUserRecord | undefined {
+    return this.usersByPhone.get(phone);
   }
 
   findUserById(userId: string): AuthUserRecord | undefined {
@@ -85,8 +90,7 @@ export class InMemoryAuthRepository implements AuthRepository {
   }
 
   createOwnerRegistration(records: OwnerRegistrationRecords): void {
-    this.usersByEmail.set(records.user.email, records.user);
-    this.usersById.set(records.user.id, records.user);
+    this.saveUser(records.user);
     this.tenants.set(records.tenant.id, records.tenant);
     this.memberships.set(records.membership.id, records.membership);
     this.termsEvidence.set(
@@ -157,6 +161,15 @@ export class InMemoryAuthRepository implements AuthRepository {
     this.saveUser({ ...user, emailVerifiedAt });
   }
 
+  markUserPhoneVerified(userId: string, phoneVerifiedAt: string): void {
+    const user = this.usersById.get(userId);
+    if (!user) {
+      return;
+    }
+
+    this.saveUser({ ...user, phoneVerifiedAt });
+  }
+
   updateUserPassword(userId: string, password: PasswordUpdateRecord): void {
     const user = this.usersById.get(userId);
     if (!user) {
@@ -204,6 +217,9 @@ export class InMemoryAuthRepository implements AuthRepository {
   private saveUser(user: AuthUserRecord): void {
     this.usersById.set(user.id, user);
     this.usersByEmail.set(user.email, user);
+    if (user.phone) {
+      this.usersByPhone.set(user.phone, user);
+    }
   }
 
   private termsEvidenceKey(userId: string, tenantId: string): string {

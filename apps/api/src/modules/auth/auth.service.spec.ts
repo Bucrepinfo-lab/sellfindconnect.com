@@ -94,6 +94,48 @@ describe('AuthService', () => {
     await expect(service.login({ email: 'owner@example.com', password: 'Wrong-owner#2026' })).rejects.toThrow();
   });
 
+  it('logs in via phone OTP and issues a session for the same account', async () => {
+    const service = new AuthService();
+    await service.registerTenantOwner({
+      email: 'owner@example.com',
+      password: strongPassword,
+      displayName: 'Mary Owner',
+      tenantDisplayName: 'Nairobi Fresh Produce Cooperative',
+      countryCode: 'KE',
+      industryCode: 'AGRICULTURE',
+      primaryRole: 'SUPPLIER',
+      userType: 'ADVERTISER',
+      phone: '0712345678',
+      acceptedTerms: true,
+    });
+
+    // Normalises to E.164 and issues a code for the existing account.
+    const requested = await service.requestPhoneOtp({ phone: '+254 712 345 678' });
+    expect(requested.requested).toBe(true);
+    expect(requested.developmentCode).toMatch(/^\d{6}$/);
+
+    const verified = await service.verifyPhoneOtp({
+      phone: '0712345678',
+      code: requested.developmentCode as string,
+    });
+    expect(verified.session.token).toEqual(expect.any(String));
+    expect(verified.user.phoneVerifiedAt).toBeTruthy();
+
+    // The code is single-use.
+    await expect(
+      service.verifyPhoneOtp({ phone: '0712345678', code: requested.developmentCode as string }),
+    ).rejects.toThrow();
+  });
+
+  it('does not reveal whether an unknown phone exists, and rejects bad codes', async () => {
+    const service = new AuthService();
+    const requested = await service.requestPhoneOtp({ phone: '0700000000' });
+    expect(requested.requested).toBe(true);
+    expect(requested.developmentCode).toBeUndefined();
+
+    await expect(service.verifyPhoneOtp({ phone: '0700000000', code: '000000' })).rejects.toThrow();
+  });
+
   it('stores sessions by token hash and never presents the hash to callers', async () => {
     const repository = new InMemoryAuthRepository();
     const service = new AuthService(repository);

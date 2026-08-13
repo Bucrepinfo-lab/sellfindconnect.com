@@ -19,6 +19,7 @@ import {
   normalizeResourceScope,
   requiresMfa,
   roleHasPermission,
+  toE164,
   type AccessDecision,
   type AccessPermission,
   type AccessResourceScope,
@@ -45,6 +46,7 @@ import type {
   TenantMembershipRecord,
 } from './auth.records';
 import { AUTH_REPOSITORY, type AuthRepository } from './auth.repository';
+import { SMS_SENDER, type SmsSender } from './africastalking-sms';
 import { tenantInviteRoles } from './dto/auth.dto';
 import type {
   AcceptTenantInviteDto,
@@ -56,7 +58,9 @@ import type {
   RegisterTenantOwnerDto,
   RequestEmailVerificationDto,
   RequestPasswordResetDto,
+  RequestPhoneOtpDto,
   VerifyMfaDto,
+  VerifyPhoneOtpDto,
 } from './dto/auth.dto';
 import { InMemoryAuthRepository } from './in-memory-auth.repository';
 
@@ -64,6 +68,7 @@ const MFA_CHALLENGE_TTL_MS = 10 * 60 * 1000;
 const MFA_MAX_FAILED_ATTEMPTS = 5;
 const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 const PASSWORD_RESET_TTL_MS = 30 * 60 * 1000;
+const PHONE_OTP_TTL_MS = 10 * 60 * 1000;
 const TENANT_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 @Injectable()
@@ -72,6 +77,9 @@ export class AuthService {
     @Optional()
     @Inject(AUTH_REPOSITORY)
     private readonly repository: AuthRepository = new InMemoryAuthRepository(),
+    @Optional()
+    @Inject(SMS_SENDER)
+    private readonly smsSender?: SmsSender,
   ) {}
 
   async registerTenantOwner(input: RegisterTenantOwnerDto) {
@@ -237,6 +245,106 @@ export class AuthService {
 
     return {
       user: this.presentUser(user),
+      tenant: await this.repository.findTenantById(membership.tenantId),
+      session,
+    };
+  }
+
+  /**
+   * Phone-OTP login — request. Normalises the phone to E.164 and, if it belongs to
+   * an existing account, mints a 6-digit code, stores it as a PHONE_LOGIN challenge
+   * and sends it via SMS (Africa's Talking). Always returns `{ requested: true }`
+   * so callers cannot probe which numbers exist. In non-production the code is
+   * returned inline for testing.
+   */
+  async requestPhoneOtp(input: RequestPhoneOtpDto) {
+    const phone = toE164(input.phone);
+    if (!phone) {
+      throw new UnprocessableEntityException('Enter a valid phone number.');
+    }
+
+    const user = await this.repository.findUserByPhone(phone);
+    let developmentCode: string | undefined;
+
+    if (user) {
+      const code = await this.createPhoneOtpChallenge(user, phone);
+      developmentCode = this.isProductionRuntime() ? undefined : code;
+
+      if (this.smsSender) {
+        await this.smsSender
+          .sendSms(
+            phone,
+            `${code} is your Telpen Adverts login code. It expires in 10 minutes. Do not share it.`,
+          )
+          .catch(() => undefined);
+      }
+
+      const membership = await this.repository.findFirstMembershipForUser(user.id);
+      await this.recordAudit({
+        tenantId: membership?.tenantId,
+        actorUserId: user.id,
+        action: 'AUTH_PHONE_OTP_REQUESTED',
+        entityType: 'USER',
+        entityId: user.id,
+        metadata: { phoneHash: this.hashAuditIdentifier(phone) },
+      });
+    }
+
+    return { requested: true, developmentCode };
+  }
+
+  /**
+   * Phone-OTP login — verify. Validates the code, marks the phone verified, and
+   * issues the SAME session the email/password login issues (tenant + role + MFA
+   * challenge if required). The phone the user logs in with is also their M-Pesa
+   * number for payments.
+   */
+  async verifyPhoneOtp(input: VerifyPhoneOtpDto) {
+    const phone = toE164(input.phone);
+    if (!phone) {
+      throw new UnauthorizedException('Invalid or expired login code.');
+    }
+
+    const challenge = await this.repository.findAccountChallengeByTokenHash(
+      this.hashPhoneOtp(phone, input.code),
+    );
+    if (
+      !challenge ||
+      challenge.purpose !== 'PHONE_LOGIN' ||
+      challenge.consumedAt ||
+      Date.parse(challenge.expiresAt) <= Date.now()
+    ) {
+      throw new UnauthorizedException('Invalid or expired login code.');
+    }
+
+    const user = await this.repository.findUserById(challenge.userId);
+    if (!user) {
+      throw new UnauthorizedException('Invalid or expired login code.');
+    }
+
+    const membership = await this.repository.findFirstMembershipForUser(user.id);
+    if (!membership) {
+      throw new UnauthorizedException('No tenant membership is attached to this account.');
+    }
+
+    const now = new Date().toISOString();
+    await this.repository.updateAccountChallenge({ ...challenge, consumedAt: now });
+    if (!user.phoneVerifiedAt) {
+      await this.repository.markUserPhoneVerified(user.id, now);
+    }
+
+    const session = await this.createSession(user, membership.tenantId, membership.role);
+    await this.recordAudit({
+      tenantId: membership.tenantId,
+      actorUserId: user.id,
+      action: 'AUTH_PHONE_OTP_LOGIN_SUCCEEDED',
+      entityType: 'AUTH_SESSION',
+      entityId: session.id,
+      metadata: { role: membership.role, mfaRequired: session.mfaRequired },
+    });
+
+    return {
+      user: this.presentUser({ ...user, phoneVerifiedAt: user.phoneVerifiedAt ?? now }),
       tenant: await this.repository.findTenantById(membership.tenantId),
       session,
     };
@@ -938,6 +1046,29 @@ export class AuthService {
     return createHash('sha256').update(`${purpose}:${token}`).digest('base64url');
   }
 
+  /** Scope the OTP hash by phone so short 6-digit codes never collide across users. */
+  private hashPhoneOtp(phone: string, code: string): string {
+    return createHash('sha256').update(`PHONE_LOGIN:${phone}:${code}`).digest('base64url');
+  }
+
+  private async createPhoneOtpChallenge(user: AuthUserRecord, phone: string): Promise<string> {
+    const now = new Date().toISOString();
+    const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
+    const challenge: AuthAccountChallengeRecord = {
+      id: randomUUID(),
+      userId: user.id,
+      email: user.email,
+      phone,
+      purpose: 'PHONE_LOGIN',
+      tokenHash: this.hashPhoneOtp(phone, code),
+      expiresAt: new Date(Date.parse(now) + PHONE_OTP_TTL_MS).toISOString(),
+      createdAt: now,
+    };
+
+    await this.repository.createAccountChallenge(challenge);
+    return code;
+  }
+
   private hashTenantInviteToken(token: string): string {
     return createHash('sha256').update(`TENANT_INVITE:${token}`).digest('base64url');
   }
@@ -967,6 +1098,7 @@ export class AuthService {
       displayName: user.displayName,
       phone: user.phone,
       emailVerifiedAt: user.emailVerifiedAt,
+      phoneVerifiedAt: user.phoneVerifiedAt,
       mfaRequired: user.mfaRequired,
       mfaVerifiedAt: user.mfaVerifiedAt,
       createdAt: user.createdAt,

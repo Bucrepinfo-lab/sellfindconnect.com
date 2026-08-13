@@ -205,6 +205,7 @@ model User {
   passwordSalt            String?
   passwordIterations      Int?
   emailVerifiedAt         DateTime?
+  phoneVerifiedAt         DateTime?
   mfaRequired             Boolean                   @default(false)
   mfaEnrolledAt           DateTime?
   lastMfaVerifiedAt       DateTime?
@@ -346,6 +347,7 @@ model AuthAccountChallenge {
   id         String    @id @default(uuid())
   userId     String
   email      String    @db.VarChar(320)
+  phone      String?   @db.VarChar(80)
   purpose    String    @db.VarChar(40)
   tokenHash  String    @unique
   expiresAt  DateTime
@@ -1215,4 +1217,27 @@ model CountryPricing {
   display     String   @db.VarChar(40)
   mode        String   @db.VarChar(10)
   updatedAt   DateTime @updatedAt
+}
+// ─── Payments (M-Pesa / mobile money via Africa's Talking) ─────────────────────
+
+model PaymentTxn {
+  id            String    @id @default(uuid())
+  provider      String    @default("africastalking") @db.VarChar(40)
+  kind          String    @db.VarChar(20) // CHECKOUT | B2C | C2B
+  status        String    @default("REQUESTED") @db.VarChar(20) // REQUESTED|PENDING|SUCCESS|FAILED
+  providerTxnId String?   @unique @db.VarChar(120) // AT transactionId
+  phone         String    @db.VarChar(80) // E.164 — payer or payee M-Pesa number
+  amount        Decimal   @db.Decimal(12, 2)
+  currency      String    @default("KES") @db.VarChar(8)
+  reason        String?   @db.VarChar(200)
+  userId        String?
+  tenantId      String?
+  metadata      Json?
+  rawCallback   Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([tenantId, status])
 }

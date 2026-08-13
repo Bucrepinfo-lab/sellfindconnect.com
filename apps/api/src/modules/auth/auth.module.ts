@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import { AfricasTalkingSmsSender, SMS_SENDER } from './africastalking-sms';
 import { AuthController } from './auth.controller';
 import { AUTH_REPOSITORY } from './auth.repository';
 import { AuthService } from './auth.service';
@@ -10,6 +11,7 @@ import { InMemoryAuthRepository } from './in-memory-auth.repository';
   controllers: [AuthController],
   providers: [
     InMemoryAuthRepository,
+    { provide: SMS_SENDER, useClass: AfricasTalkingSmsSender },
     {
       provide: AUTH_REPOSITORY,
       inject: [ConfigService, InMemoryAuthRepository],

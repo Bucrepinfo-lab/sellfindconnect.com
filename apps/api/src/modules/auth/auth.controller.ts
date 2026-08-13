@@ -12,7 +12,9 @@ import {
   RegisterTenantOwnerDto,
   RequestEmailVerificationDto,
   RequestPasswordResetDto,
+  RequestPhoneOtpDto,
   VerifyMfaDto,
+  VerifyPhoneOtpDto,
 } from './dto/auth.dto';
 
 @ApiTags('auth')
@@ -28,6 +30,16 @@ export class AuthController {
   @Post('login')
   login(@Body() body: LoginDto) {
     return this.auth.login(body);
+  }
+
+  @Post('phone-otp/request')
+  requestPhoneOtp(@Body() body: RequestPhoneOtpDto) {
+    return this.auth.requestPhoneOtp(body);
+  }
+
+  @Post('phone-otp/verify')
+  verifyPhoneOtp(@Body() body: VerifyPhoneOtpDto) {
+    return this.auth.verifyPhoneOtp(body);
   }
 
   @Post('email-verification/request')

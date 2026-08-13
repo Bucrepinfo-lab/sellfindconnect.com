@@ -14,3 +14,5 @@ export * from './profiles';
 export * from './sanitization';
 export * from './safety';
 export * from './source-finder';
+export * from './phone';
+export * from './payments';
