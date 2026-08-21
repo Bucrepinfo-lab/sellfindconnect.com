@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isE164, toE164 } from './phone';
+import { isE164, toE164, toWhatsAppCloudRecipient } from './phone';
 
 describe('toE164', () => {
   it('normalizes common Kenyan formats to E.164', () => {
@@ -22,5 +22,13 @@ describe('isE164', () => {
   it('validates E.164', () => {
     expect(isE164('+254712345678')).toBe(true);
     expect(isE164('0712345678')).toBe(false);
+  });
+});
+
+describe('toWhatsAppCloudRecipient', () => {
+  it('strips the plus from a normalized E.164 number', () => {
+    expect(toWhatsAppCloudRecipient('0712345678')).toBe('254712345678');
+    expect(toWhatsAppCloudRecipient('+254712345678')).toBe('254712345678');
+    expect(toWhatsAppCloudRecipient('not-a-phone')).toBeNull();
   });
 });

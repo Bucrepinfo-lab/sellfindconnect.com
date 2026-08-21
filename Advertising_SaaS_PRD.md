@@ -546,8 +546,7 @@ Implementation progress on 2026-08-21:
   `GET /v1/source-finder/alerts`, `POST /v1/source-finder/alerts/run`, and the
   protected scheduler `POST /v1/operations/source-finder/alerts/run`.
 - Updated the web Saved Searches panel to save cadence-backed searches and run
-  opportunity alerts. Native mobile saved-search screens and provider-backed
-  push/SMS/WhatsApp delivery remain next.
+  opportunity alerts. Native mobile saved-search screens remain out of scope.
 - Added Source Finder outcome feedback: accept, save, dismiss, hide, and report
   actions persist per tenant, hide/report always suppress results, and accept/save
   ranking boosts apply only when behavioral matching consent is granted at both
@@ -568,7 +567,7 @@ Implementation progress on 2026-08-21:
   `KEYWORD_MATCH` without requiring live OpenAI embeddings. The `embedding`
   column is reserved for an optional later overlay.
 - Remaining hardening: native mobile screens are out of scope. Live object-storage
-  credentials, approved media scanners, and a WhatsApp provider remain next.
+  credentials and approved media scanners remain next.
 
 Implementation progress on 2026-06-20:
 
@@ -585,8 +584,8 @@ Implementation progress on 2026-06-20:
   downloads.
 - Added web/PWA saved-search UX with named searches, alert cadence, blocked
   search handling, restored-search controls, and previewable alert candidates.
-- Remaining hardening: live WhatsApp provider credentials. Native mobile
-  saved-search screens are out of scope.
+- Remaining hardening: live object-storage credentials and approved media
+  scanners. Native mobile saved-search screens are out of scope.
 
 ### 7.6 Precision Matching and Link Intelligence
 
@@ -783,9 +782,10 @@ Implementation progress on 2026-08-21:
 
 - Queued notification outbox records now dispatch through channel adapters.
   Memory adapters are the default for IN_APP, EMAIL, SMS, PUSH, and WHATSAPP.
-  Resend email, Africa's Talking SMS, and FCM push overlay when
-  `RESEND_API_KEY`, `AT_API_KEY`/`AT_USERNAME`, or `FCM_SERVICE_ACCOUNT_JSON`
-  are set. Missing destinations fail closed with a delivery attempt.
+  Resend email, Africa's Talking SMS, FCM push, and WhatsApp Cloud overlay when
+  `RESEND_API_KEY`, `AT_API_KEY`/`AT_USERNAME`, `FCM_SERVICE_ACCOUNT_JSON`, or
+  `WHATSAPP_TOKEN`/`WHATSAPP_PHONE_NUMBER_ID` are set. Missing destinations fail
+  closed with a delivery attempt.
 - Added `GET /v1/notifications/adapters`,
   `POST /v1/notifications/outbox/:id/dispatch`, and
   `POST /v1/operations/notifications/dispatch/run`.
@@ -812,7 +812,12 @@ Implementation progress on 2026-08-21:
   restarts when PostgreSQL is enabled.
 - The operations dispatch sweep retries queued or failed channels from that
   durable outbox. The Notification Delivery panel now shows Prisma persistence
-  readiness. Live WhatsApp provider credentials remain next.
+  readiness.
+- Added live WhatsApp notification adapters. Memory remains the default.
+  WhatsApp Cloud overlays when `WHATSAPP_TOKEN` and `WHATSAPP_PHONE_NUMBER_ID`
+  are set. `WHATSAPP_PROVIDER=meta` or `africastalking` fail-closes without
+  credentials. Destinations that are not E.164 numbers are rejected. An optional
+  approved `WHATSAPP_TEMPLATE_NAME` sends a template instead of free-form text.
 
 ### 7.9 Analytics and Monitoring
 
@@ -1052,8 +1057,8 @@ Implementation progress on 2026-06-17:
 - Continued implementation on 2026-08-21 with controlled post-lock tax-return corrections. Locked periods stay locked; finance admins can post signed correction entries with `PERIOD_CORRECTION` evidence, ledger impact, dual-control above 10,000 units, and product-audit events that omit notes and authority references.
 - Continued implementation on 2026-08-21 with live payment-provider adapters. Invoice capture stays on the manual development adapter by default. `PAYMENT_PROVIDER=stripe`, `africastalking`, or `live` selects Stripe PaymentIntents and/or Africa's Talking M-Pesa checkout, rejects raw card numbers, records `REQUIRES_CAPTURE` until `POST /v1/finance/payments/settle`, and fail-closes when credentials are missing.
 - Remaining hardening: app-store billing rails are out of scope while native
-  mobile is not in delivery. Live object-storage/media scanners, WhatsApp
-  provider credentials, and production identity remain next.
+  mobile is not in delivery. Live object-storage/media scanners and production
+  identity remain next.
 
 ### 7.11 Moderation, Trust, and Safety
 

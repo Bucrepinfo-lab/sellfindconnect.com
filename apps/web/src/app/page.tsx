@@ -2403,6 +2403,16 @@ export default function Home() {
                   </span>
                 </div>
               </div>
+              <div className="policy-box ok compact">
+                <ShieldCheck size={18} />
+                <div>
+                  <strong>WhatsApp adapter</strong>
+                  <span>
+                    Memory by default. WHATSAPP_PROVIDER=meta or africastalking overlays live
+                    credentials and rejects destinations that are not E.164 numbers.
+                  </span>
+                </div>
+              </div>
             </section>
 
             <section className="side-panel">

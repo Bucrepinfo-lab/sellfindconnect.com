@@ -5,6 +5,7 @@ import { FcmPushAdapter } from './adapters/push.adapter';
 import { InAppAdapter, type InAppPersistencePort } from './adapters/inapp.adapter';
 import { MemoryNotificationAdapter } from './adapters/memory.adapter';
 import { ResendEmailAdapter } from './adapters/email.adapter';
+import { registerWhatsAppAdapter } from './adapters/whatsapp.adapter';
 
 export const NOTIFICATION_ADAPTERS = 'NOTIFICATION_ADAPTERS';
 
@@ -36,6 +37,8 @@ export function createDefaultNotificationAdapters(
   if (env.FCM_SERVICE_ACCOUNT_JSON) {
     registry.register(new FcmPushAdapter(env, fetchImpl));
   }
+
+  registerWhatsAppAdapter((adapter) => registry.register(adapter), env, fetchImpl);
 
   return registry;
 }

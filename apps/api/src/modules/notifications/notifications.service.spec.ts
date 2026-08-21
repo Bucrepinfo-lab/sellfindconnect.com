@@ -170,4 +170,16 @@ describe('notification adapter factory', () => {
     expect(live.get('EMAIL')?.name).toBe('resend');
     expect(live.get('IN_APP')?.name).toBe('memory');
   });
+
+  it('overlays WhatsApp Cloud when credentials are present', () => {
+    const live = createDefaultNotificationAdapters({
+      WHATSAPP_TOKEN: 'eaak-test',
+      WHATSAPP_PHONE_NUMBER_ID: '123456789',
+    });
+    expect(live.get('WHATSAPP')?.name).toBe('whatsapp-cloud');
+    expect(live.get('SMS')?.name).toBe('memory');
+    expect(() =>
+      createDefaultNotificationAdapters({ WHATSAPP_PROVIDER: 'meta' }),
+    ).toThrow('WHATSAPP_TOKEN is required when WHATSAPP_PROVIDER=meta.');
+  });
 });

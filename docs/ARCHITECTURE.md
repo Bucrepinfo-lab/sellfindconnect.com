@@ -141,7 +141,8 @@ without validating it against the authenticated user's assignments.
   `/v1/conversations`; presence is in-process until Redis fan-out is required.
 - Notifications: tenant preferences, consent-aware channel planning, outbox
   records, adapter dispatch (memory by default; Resend email, Africa's Talking
-  SMS, and FCM push when credentials are set), delivery attempts, suppression
+  SMS, FCM push, and WhatsApp Cloud or Africa's Talking WhatsApp when
+  credentials are set), delivery attempts, suppression
   reasons, and scheduler jobs. Tenant notification routes require an
   MFA-verified tenant session. Opt-in Prisma persistence is selected with
   `NOTIFICATIONS_REPOSITORY=prisma` and stores preferences, destination,

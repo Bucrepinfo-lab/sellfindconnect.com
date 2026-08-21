@@ -308,8 +308,8 @@ Progress (2026-08-21):
   token overlap and Prisma `tsvector` search add `KEYWORD_MATCH` and report
   `searchMode` as `RULES`, `FTS`, or `HYBRID`. The `embedding` column is reserved
   for an optional later overlay and is not required for tests.
-- Native mobile saved-search screens remain out of scope. Provider-backed
-  WhatsApp delivery and live object-storage/media scanners remain next.
+- Native mobile saved-search screens remain out of scope. Live
+  object-storage/media scanners remain next.
 
 ## Epic 6: Matching and Lead Conversion
 
@@ -362,7 +362,8 @@ Progress:
   heartbeat/snapshot routes. Presence is in-process per API instance.
 - Wired notification outbox records through channel adapters. Memory adapters
   cover IN_APP, EMAIL, SMS, PUSH, and WHATSAPP by default; Resend, Africa's
-  Talking, and FCM overlay when credentials are set. Conversation SLA and
+  Talking SMS, FCM, and WhatsApp Cloud / Africa's Talking WhatsApp overlay when
+  credentials are set. Conversation SLA and
   Source Finder alerts now queue into the outbox. Dispatch retries run at
   `POST /v1/operations/notifications/dispatch/run`.
 - Added tenant product audit coverage for conversation and notification writes,
@@ -371,7 +372,13 @@ Progress:
 - Added in-memory and opt-in Prisma notification persistence through
   `NOTIFICATIONS_REPOSITORY=prisma`, covering tenant preferences, outbox
   destination/channel status, and delivery attempts. Dispatch retries read
-  that durable outbox. Live WhatsApp provider credentials remain next.
+  that durable outbox.
+- Added live WhatsApp notification adapters. Memory remains the default.
+  `WHATSAPP_TOKEN` + `WHATSAPP_PHONE_NUMBER_ID` overlay WhatsApp Cloud, and
+  `WHATSAPP_PROVIDER=africastalking` with `AT_WHATSAPP_FROM` overlays Africa's
+  Talking. Explicit `WHATSAPP_PROVIDER` values fail-close without credentials.
+  Destinations that are not E.164 phone numbers are rejected. Live
+  object-storage/media scanners remain next.
 
 ## Epic 7: Analytics
 

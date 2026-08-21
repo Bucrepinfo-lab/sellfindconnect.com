@@ -40,3 +40,9 @@ export function toE164(input: string, options: NormalizePhoneOptions = {}): stri
 export function isE164(input: string): boolean {
   return /^\+[1-9]\d{7,14}$/.test(input.trim());
 }
+
+/** WhatsApp Cloud API recipient digits (no `+`), or null when the input is not E.164-normalizable. */
+export function toWhatsAppCloudRecipient(input: string): string | null {
+  const e164 = toE164(input);
+  return e164 ? e164.slice(1) : null;
+}

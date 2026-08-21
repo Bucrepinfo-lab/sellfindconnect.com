@@ -316,7 +316,10 @@ GitHub source connection status on 2026-06-16:
   - `ANALYTICS_REPOSITORY=prisma` after migrations are deployed
   - Optional notification providers: `RESEND_API_KEY`, `EMAIL_FROM`,
     `AT_API_KEY`, `AT_USERNAME`, `AT_SENDER_ID`, `FCM_SERVICE_ACCOUNT_JSON`,
-    `FCM_PROJECT_ID`. Without these, memory adapters still record delivery
+    `FCM_PROJECT_ID`, and WhatsApp overlay via `WHATSAPP_TOKEN` /
+    `WHATSAPP_PHONE_NUMBER_ID` or `WHATSAPP_PROVIDER=africastalking` with
+    `AT_WHATSAPP_FROM`. `WHATSAPP_PROVIDER=meta` or `africastalking` fail-closes
+    without credentials. Without these, memory adapters still record delivery
     attempts.
   - Optional finance payment adapters: `PAYMENT_PROVIDER=manual` by default.
     `stripe`, `africastalking`, or `live` require `STRIPE_SECRET_KEY` and/or
