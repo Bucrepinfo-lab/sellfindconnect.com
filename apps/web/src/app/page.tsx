@@ -18,6 +18,7 @@ import {
   Inbox,
   Link2,
   MessageSquareText,
+  Radio,
   Search,
   Send,
   ShieldCheck,
@@ -40,11 +41,14 @@ import {
   calculateTaxSnapshotAmounts,
   calculateTrialSubscription,
   conversationStatuses,
+  conversationRealtimeNamespace,
   countUnreadMessagesForRole,
+  describeConversationPresenceStatus,
   describeMessageDeliveryStatus,
   isConversationTypingActive,
   markMessageDelivered,
   markMessageRead,
+  resolveConversationPresenceStatus,
   toConversationAttachment,
   defaultNotificationPreferences,
   evaluateAccess,
@@ -432,6 +436,7 @@ export default function Home() {
   const [outboundDeliveryStatus, setOutboundDeliveryStatus] =
     useState<MessageDeliveryStatus>('SENT');
   const [chatAttachment, setChatAttachment] = useState<ConversationMessageAttachment | null>(null);
+  const [chatLiveChannel, setChatLiveChannel] = useState(true);
   const [inboundReceipt, setInboundReceipt] = useState<ConversationMessage>({
     id: 'demo-inbound',
     conversationId: 'demo-conversation',
@@ -690,6 +695,11 @@ export default function Home() {
   );
   const chatTypingActive = isConversationTypingActive(chatTypingAt);
   const inboundUnreadCount = countUnreadMessagesForRole([inboundReceipt], 'TENANT_AGENT');
+  const chatPresenceStatus = resolveConversationPresenceStatus(
+    chatLiveChannel ? conversationDemoNow : undefined,
+    conversationDemoNow,
+    chatLiveChannel ? 1 : 0,
+  );
   const notificationPreferences = defaultNotificationPreferences.map((preference) => {
     if (preference.channel === 'PUSH') {
       return {
@@ -1817,6 +1827,10 @@ export default function Home() {
                 value={chatTypingActive ? 'Sales desk is typing' : 'Idle'}
               />
               <FinanceRow
+                label="Presence"
+                value={`${describeConversationPresenceStatus(chatPresenceStatus)} · ${conversationRealtimeNamespace}`}
+              />
+              <FinanceRow
                 label="Attachment"
                 value={
                   chatAttachment
@@ -1921,6 +1935,15 @@ export default function Home() {
                   className="secondary-button"
                   type="button"
                   disabled={!selectedMatch}
+                  onClick={() => setChatLiveChannel((current) => !current)}
+                >
+                  <Radio size={16} />
+                  {chatLiveChannel ? 'Leave live channel' : 'Go live'}
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={!selectedMatch}
                   onClick={() =>
                     setChatAttachment(
                       toConversationAttachment({
@@ -1944,7 +1967,7 @@ export default function Home() {
                   <strong>{canSendChat ? 'Messaging unlocked' : 'Messaging locked'}</strong>
                   <span>
                     {canSendChat
-                      ? `${conversationSla?.message ?? 'SLA active'}${chatAttachment ? ` · ${chatAttachment.fileName} ready` : ''}`
+                      ? `${conversationSla?.message ?? 'SLA active'}${chatAttachment ? ` · ${chatAttachment.fileName} ready` : ''}${chatLiveChannel ? ' · live channel on' : ''}`
                       : chatSafetyDecision.allowed
                         ? 'Accepted terms and an open safe match are required.'
                         : `Message blocked - ${chatSafetyDecision.policyCode}`}

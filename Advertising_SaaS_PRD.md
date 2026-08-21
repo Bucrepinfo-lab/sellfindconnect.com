@@ -640,7 +640,7 @@ Implementation progress on 2026-06-17:
 - Added consent-aware notification orchestration for in-app, email, SMS, push, and WhatsApp channels, with tenant preferences, an API outbox, and a web Notification Delivery readiness panel.
 - Added a protected internal conversation SLA sweep endpoint for scheduled response-time alerts: `POST /v1/operations/conversations/sla/run`.
 - Added HTTP delivery receipts, read receipts, typing indicators, unread counts, and opt-in Prisma conversation persistence through `CONVERSATIONS_REPOSITORY=prisma`.
-- Remaining hardening: live websocket delivery, online presence, provider adapters, and audit logs.
+- Remaining hardening: provider-backed notification adapters and audit logs.
 
 ### 7.7 Relationship Links
 
@@ -733,8 +733,7 @@ Implementation progress on 2026-08-21:
   `deliveredAt`, `readAt`, `readByRole`, `typingRole`, and `typingAt`.
 - Updated the web Conversation Workspace to preview inbound/outbound receipts,
   unread count, typing, mark-delivered, and mark-read.
-- Remaining: live websocket delivery, online presence, provider-backed
-  notification adapters, and audit logs.
+- Remaining: provider-backed notification adapters and audit logs.
 
 Implementation progress on 2026-08-21:
 
@@ -747,6 +746,21 @@ Implementation progress on 2026-08-21:
   `mediaAssetIds` on send-message.
 - Updated the Conversation Workspace preview with a scan-ready attachment
   control.
+
+Implementation progress on 2026-08-21:
+
+- Added a session-authenticated Socket.IO namespace at `/v1/conversations`
+  for live `conversation.message`, `conversation.typing`,
+  `conversation.receipt`, and `conversation.presence` events. Handshake auth
+  accepts MFA-verified `x-session-token` / tenant credentials from Socket.IO
+  `auth`, query, or headers.
+- Online presence is tracked in-process with a 45-second online window and a
+  60-second away window. HTTP fallback routes are
+  `GET /v1/conversations/:id/presence` and
+  `POST /v1/conversations/:id/presence`.
+- Conversation detail now includes a presence snapshot. The Conversation
+  Workspace preview shows live-channel status.
+- Remaining: provider-backed notification adapters and audit logs.
 
 ### 7.9 Analytics and Monitoring
 

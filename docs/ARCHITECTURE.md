@@ -126,9 +126,11 @@ without validating it against the authenticated user's assignments.
 - Conversations: inquiries, chat, RFQs, quotes, assignment, saved replies,
   response SLAs, message safety checks, delivery/read receipts, typing
   indicators, unread counts, tenant-only attachments with malware/moderation
-  gates, and notification alerts. Lead and conversation
+  gates, session-authenticated Socket.IO delivery, online presence, and
+  notification alerts. Lead and conversation
   routes require an MFA-verified tenant session. Opt-in Prisma persistence is
-  selected with `CONVERSATIONS_REPOSITORY=prisma`.
+  selected with `CONVERSATIONS_REPOSITORY=prisma`. The live chat namespace is
+  `/v1/conversations`; presence is in-process until Redis fan-out is required.
 - Notifications: tenant preferences, consent-aware channel planning, outbox
   records, provider delivery attempts, suppression reasons, and scheduler jobs.
   Tenant notification routes require an MFA-verified tenant session.
@@ -289,7 +291,7 @@ current proven fallback/staging deployment.
 - One Next.js web/PWA service.
 - One managed PostgreSQL database with strict tenant-aware repositories.
 - One Redis-compatible service for queues, rate limits, realtime fan-out, and
-  future chat presence.
+  multi-instance chat presence.
 - Scheduled jobs for advert lifecycle and conversation SLA sweeps.
 - Managed object storage/CDN.
 - External provider adapters behind internal interfaces.

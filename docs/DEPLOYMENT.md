@@ -314,7 +314,9 @@ GitHub source connection status on 2026-06-16:
 ### Data Services
 
 - PostgreSQL for application, tenant, safety, finance, and tax records.
-- Redis for caching, queues, rate limits, notifications, and later chat presence.
+- Redis for caching, queues, rate limits, notifications, and multi-instance
+  chat presence fan-out. The API process currently hosts Socket.IO on the same
+  HTTP port at `/v1/conversations` with in-memory presence.
 
 ## DNS Changes
 

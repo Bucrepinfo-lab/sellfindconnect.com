@@ -5,6 +5,7 @@ import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import helmet from "helmet";
 import { SanitizeInputPipe } from "./common/sanitize-input.pipe";
+import { ConversationsIoAdapter } from "./modules/conversations/conversations-io.adapter";
 import { AppModule } from "./modules/app.module";
 
 async function bootstrap() {
@@ -37,6 +38,7 @@ async function bootstrap() {
   SwaggerModule.setup("docs", app, SwaggerModule.createDocument(app, documentConfig));
 
   const port = Number(config.get<string>("PORT") ?? config.get<string>("API_PORT") ?? 4000);
+  app.useWebSocketAdapter(new ConversationsIoAdapter(app, webOrigin));
   // REQUIRED for DigitalOcean App Platform — must bind to 0.0.0.0
   await app.listen(port, "0.0.0.0");
   console.log(`API listening on 0.0.0.0:${port} [${process.env.NODE_ENV ?? "development"}]`);

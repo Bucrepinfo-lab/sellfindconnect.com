@@ -344,8 +344,10 @@ Progress:
   `CONVERSATIONS_REPOSITORY=prisma`.
 - Added conversation attachments that reuse media policy, malware-scan jobs,
   and moderation adapters. Blocked or still-pending files cannot be sent.
-- Live websocket delivery, online presence, actual provider adapters, and
-  audit logs remain next.
+- Added a session-authenticated Socket.IO namespace at `/v1/conversations`
+  for live message, typing, receipt, and presence events, plus HTTP presence
+  heartbeat/snapshot routes. Presence is in-process per API instance.
+- Actual provider adapters and audit logs remain next.
 
 ## Epic 7: Analytics
 

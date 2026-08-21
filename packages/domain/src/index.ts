@@ -8,6 +8,7 @@ export * from './industries';
 export * from './lead-conversion';
 export * from './lifecycle';
 export * from './messaging';
+export * from './conversation-realtime';
 export * from './media';
 export * from './notifications';
 export * from './onboarding';

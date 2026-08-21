@@ -62,7 +62,7 @@ flowchart LR
 - Managed PostgreSQL for tenant, auth, finance, analytics, moderation, and
   relationship graph data.
 - Redis-compatible service for queues, rate limits, chat fan-out, notification
-  state, and future presence.
+  state, and multi-instance presence.
 - Worker process for notifications, media moderation, analytics rollups, tax
   reminders, matching jobs, and search indexing.
 - Scheduler for advert lifecycle, day-35/day-39 renewal alerts, day-40

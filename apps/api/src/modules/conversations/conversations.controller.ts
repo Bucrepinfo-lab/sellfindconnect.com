@@ -1,11 +1,12 @@
 import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 
-import { TenantId } from '../tenant/tenant-context.decorator';
-import { TenantSessionGuard } from '../tenant/tenant-session.guard';
+import { TenantAuthSession, TenantId } from '../tenant/tenant-context.decorator';
+import { TenantSessionGuard, type TenantSessionDecision } from '../tenant/tenant-session.guard';
 import { ConversationsService } from './conversations.service';
 import {
   AssignConversationDto,
+  ConversationPresenceHeartbeatDto,
   ConversationReceiptDto,
   ConversationTypingDto,
   CreateConversationDto,
@@ -135,6 +136,25 @@ export class ConversationsController {
     @Body() body: ConversationTypingDto,
   ) {
     return this.conversations.recordTyping(tenantId, conversationId, body.typingRole);
+  }
+
+  @Get(':conversationId/presence')
+  getPresence(@TenantId() tenantId: string, @Param('conversationId') conversationId: string) {
+    return this.conversations.getPresence(tenantId, conversationId);
+  }
+
+  @Post(':conversationId/presence')
+  recordPresence(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Param('conversationId') conversationId: string,
+    @Body() body: ConversationPresenceHeartbeatDto,
+  ) {
+    return this.conversations.recordPresence(tenantId, conversationId, {
+      userId: session.userId,
+      participantRole: body.participantRole,
+      now: body.now,
+    });
   }
 
   @Patch(':conversationId/assignment')

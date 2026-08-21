@@ -4,7 +4,9 @@ import { ConfigService } from '@nestjs/config';
 import { AuthModule } from '../auth/auth.module';
 import { MediaModule } from '../media/media.module';
 import { ConversationsController } from './conversations.controller';
+import { ConversationsGateway } from './conversations.gateway';
 import { CONVERSATIONS_REPOSITORY } from './conversations.repository';
+import { ConversationsRealtimeService } from './conversations.realtime.service';
 import { ConversationsService } from './conversations.service';
 import { InMemoryConversationsRepository } from './in-memory-conversations.repository';
 
@@ -41,8 +43,10 @@ import { InMemoryConversationsRepository } from './in-memory-conversations.repos
         return new PrismaConversationsRepository(createConversationsPrismaClient(databaseUrl));
       },
     },
+    ConversationsRealtimeService,
+    ConversationsGateway,
     ConversationsService,
   ],
-  exports: [ConversationsService],
+  exports: [ConversationsService, ConversationsRealtimeService],
 })
 export class ConversationsModule {}

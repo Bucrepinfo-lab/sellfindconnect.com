@@ -21,6 +21,7 @@ import {
   markMessageDelivered,
   markMessageRead,
   mediaPolicy,
+  ConversationRealtimeError,
   pilotSourceFinderRecords,
   recordConversationTyping,
   searchSourceFinderRecords,
@@ -47,6 +48,7 @@ import type {
   UpdateConversationStatusDto,
 } from './dto/conversations.dto';
 import { CONVERSATIONS_REPOSITORY, type ConversationsRepository } from './conversations.repository';
+import { ConversationsRealtimeService } from './conversations.realtime.service';
 import { InMemoryConversationsRepository } from './in-memory-conversations.repository';
 import {
   MEDIA_ADAPTERS,
@@ -59,6 +61,7 @@ import {
 export class ConversationsService {
   private readonly repository: ConversationsRepository;
   private readonly mediaAdapters: MediaAdapters;
+  private readonly realtime: ConversationsRealtimeService;
 
   constructor(
     @Optional()
@@ -67,9 +70,12 @@ export class ConversationsService {
     @Optional()
     @Inject(MEDIA_ADAPTERS)
     mediaAdapters?: MediaAdapters,
+    @Optional()
+    realtime?: ConversationsRealtimeService,
   ) {
     this.repository = repository ?? new InMemoryConversationsRepository();
     this.mediaAdapters = mediaAdapters ?? createDefaultMediaAdapters();
+    this.realtime = realtime ?? new ConversationsRealtimeService();
   }
 
   async createConversation(tenantId: string, input: CreateConversationDto) {
@@ -201,6 +207,13 @@ export class ConversationsService {
     await this.repository.createMessage(message);
     await this.repository.updateConversation(updated);
     await this.createNotification(tenantId, updated, 'NEW_MESSAGE', now);
+    this.realtime.publishEvent({
+      type: 'conversation.message',
+      tenantId,
+      conversationId,
+      occurredAt: now,
+      payload: { message },
+    });
 
     return {
       conversation: this.presentConversation(updated, [
@@ -215,6 +228,12 @@ export class ConversationsService {
     const message = await this.requireMessage(tenantId, conversationId, messageId);
     const updated = this.runReceipt(() => markMessageDelivered(message));
     await this.repository.updateMessage(updated);
+    this.realtime.publishEvent({
+      type: 'conversation.receipt',
+      tenantId,
+      conversationId,
+      payload: { messages: [updated] },
+    });
     return updated;
   }
 
@@ -228,6 +247,12 @@ export class ConversationsService {
     const message = await this.requireMessage(tenantId, conversationId, messageId);
     const updated = this.runReceipt(() => markMessageRead(message, readerRole));
     await this.repository.updateMessage(updated);
+    this.realtime.publishEvent({
+      type: 'conversation.receipt',
+      tenantId,
+      conversationId,
+      payload: { readerRole, messages: [updated] },
+    });
     return updated;
   }
 
@@ -239,10 +264,61 @@ export class ConversationsService {
     const conversation = await this.requireConversation(tenantId, conversationId);
     const updated = this.runReceipt(() => recordConversationTyping(conversation, typingRole));
     await this.repository.updateConversation(updated);
+    this.realtime.publishEvent({
+      type: 'conversation.typing',
+      tenantId,
+      conversationId,
+      payload: {
+        typingRole,
+        typingAt: updated.typingAt ?? conversation.updatedAt,
+        typingActive: isConversationTypingActive(updated.typingAt),
+      },
+    });
     return this.presentConversation(
       updated,
       await this.repository.listMessages(tenantId, conversationId),
     );
+  }
+
+  async getPresence(tenantId: string, conversationId: string, nowIso?: string) {
+    await this.requireConversation(tenantId, conversationId);
+    return this.realtime.snapshot(tenantId, conversationId, nowIso);
+  }
+
+  async recordPresence(
+    tenantId: string,
+    conversationId: string,
+    input: {
+      userId: string;
+      participantRole?: ConversationParticipantRole;
+      now?: string;
+    },
+  ) {
+    await this.requireConversation(tenantId, conversationId);
+    const participantRole = input.participantRole ?? 'TENANT_AGENT';
+    const connectionId = this.realtime.httpConnectionId(input.userId, conversationId);
+
+    try {
+      this.realtime.heartbeat(connectionId, input.now);
+    } catch (error) {
+      if (!(error instanceof ConversationRealtimeError)) {
+        throw error;
+      }
+
+      this.realtime.connect({
+        connectionId,
+        userId: input.userId,
+        tenantId,
+        conversationId,
+        participantRole,
+        nowIso: input.now,
+      });
+    }
+
+    return {
+      connectionId,
+      presence: this.realtime.snapshot(tenantId, conversationId, input.now),
+    };
   }
 
   async prepareMediaUpload(
@@ -377,9 +453,17 @@ export class ConversationsService {
       updatedCount += 1;
     }
 
+    const deliveredMessages = await this.repository.listMessages(tenantId, conversationId);
+    this.realtime.publishEvent({
+      type: 'conversation.receipt',
+      tenantId,
+      conversationId,
+      payload: { messages: deliveredMessages },
+    });
+
     return {
       updatedCount,
-      messages: await this.repository.listMessages(tenantId, conversationId),
+      messages: deliveredMessages,
     };
   }
 
@@ -405,9 +489,17 @@ export class ConversationsService {
       updatedCount += 1;
     }
 
+    const readMessages = await this.repository.listMessages(tenantId, conversationId);
+    this.realtime.publishEvent({
+      type: 'conversation.receipt',
+      tenantId,
+      conversationId,
+      payload: { readerRole, messages: readMessages },
+    });
+
     return {
       updatedCount,
-      messages: await this.repository.listMessages(tenantId, conversationId),
+      messages: readMessages,
     };
   }
 
@@ -550,6 +642,7 @@ export class ConversationsService {
       savedReplies,
       unreadCount,
       typingActive: isConversationTypingActive(conversation.typingAt),
+      presence: this.realtime.snapshot(conversation.tenantId, conversation.id),
     };
   }
 

@@ -139,6 +139,18 @@ export class ConversationTypingDto {
   declare typingRole: ConversationParticipantRole;
 }
 
+export class ConversationPresenceHeartbeatDto {
+  @ApiPropertyOptional({ enum: ['REQUESTER', 'ADVERTISER', 'TENANT_AGENT'], example: 'TENANT_AGENT' })
+  @IsOptional()
+  @IsIn(['REQUESTER', 'ADVERTISER', 'TENANT_AGENT'])
+  declare participantRole?: Exclude<ConversationParticipantRole, 'SYSTEM'>;
+
+  @ApiPropertyOptional({ example: '2026-08-21T12:00:00.000Z' })
+  @IsOptional()
+  @IsISO8601()
+  declare now?: string;
+}
+
 export class PrepareConversationMediaUploadDto {
   @ApiProperty({ example: 'quote-sheet.jpg' })
   @IsString()

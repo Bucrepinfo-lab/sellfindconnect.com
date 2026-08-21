@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { ConversationsRealtimeService } from './conversations.realtime.service';
 import { ConversationsService } from './conversations.service';
 
 const tenantId = '11111111-1111-4111-8111-111111111111';
@@ -172,6 +173,43 @@ describe('ConversationsService', () => {
     const typing = await service.recordTyping(tenantId, conversation.id, 'TENANT_AGENT');
     expect(typing.typingRole).toBe('TENANT_AGENT');
     expect(typing.typingActive).toBe(true);
+  });
+
+  it('publishes websocket events and HTTP presence for an authenticated tenant agent', async () => {
+    const realtime = new ConversationsRealtimeService();
+    const events: Array<{ type: string; conversationId?: string }> = [];
+    realtime.attachEmitter({
+      emitToRoom: (_room, event, payload) => {
+        const body = payload as { type?: string; conversationId?: string };
+        events.push({ type: body.type ?? event, conversationId: body.conversationId });
+      },
+    });
+    const service = new ConversationsService(undefined, undefined, realtime);
+    const conversation = await service.createConversation(tenantId, opener);
+
+    const now = new Date().toISOString();
+    const presence = await service.recordPresence(tenantId, conversation.id, {
+      userId: 'agent-1',
+      participantRole: 'TENANT_AGENT',
+      now,
+    });
+    expect(presence.presence.onlineCount).toBe(1);
+    expect((await service.getConversation(tenantId, conversation.id)).presence.onlineCount).toBe(1);
+
+    await service.sendMessage(tenantId, conversation.id, {
+      senderRole: 'TENANT_AGENT',
+      body: 'Thank you. Please share delivery coverage and price terms.',
+      acceptedTerms: true,
+    });
+    await service.recordTyping(tenantId, conversation.id, 'TENANT_AGENT');
+
+    expect(events.some((event) => event.type === 'conversation.presence')).toBe(true);
+    expect(events.some((event) => event.type === 'conversation.message')).toBe(true);
+    expect(events.some((event) => event.type === 'conversation.typing')).toBe(true);
+    expect(
+      (await service.getPresence(tenantId, conversation.id, now)).participants[0]
+        ?.userId,
+    ).toBe('agent-1');
   });
 
   it('marks inbound thread receipts in bulk when a conversation is opened', async () => {
