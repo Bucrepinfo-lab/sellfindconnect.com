@@ -1662,7 +1662,7 @@ export default function Home() {
                   </strong>
                   <span>
                     {canCreateTenantOwner
-                      ? 'Safe owner tenant can enter trial with MFA required.'
+                      ? 'Safe owner tenant can enter trial with MFA required. Verification, password-reset, invite, and email MFA overlay through Resend when credentials are present.'
                       : !termsAccepted
                         ? 'Terms acceptance is required before signup.'
                         : !onboardingSafety.allowed
@@ -1670,6 +1670,16 @@ export default function Home() {
                           : ownerPasswordPolicy.allowed
                             ? 'Review signup details.'
                             : ownerPasswordPolicy.missing.join(' ')}
+                  </span>
+                </div>
+              </div>
+              <div className="policy-box ok compact">
+                <ShieldCheck size={16} />
+                <div>
+                  <strong>Auth email</strong>
+                  <span>
+                    Resend overlays verification, password-reset, invite, and email MFA delivery.
+                    AUTH_EMAIL_PROVIDER=resend fail-closes without keys.
                   </span>
                 </div>
               </div>

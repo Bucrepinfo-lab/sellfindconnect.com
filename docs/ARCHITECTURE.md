@@ -72,7 +72,8 @@ without validating it against the authenticated user's assignments.
   generated time-limited MFA challenges, hashed email verification and password
   reset challenges, tenant invite tokens, tenant auth audit lookup, terms
   acceptance evidence, in-memory and Prisma repository adapters, tenant session
-  guard, and future identity-provider adapter boundary.
+  guard, Resend overlay for verification/reset/invite/email-MFA delivery, and
+  future identity-provider adapter boundary.
 - Profiles: draft, preview, publish, profile completeness, enriched contacts,
   service-area coverage, profile media display metadata, live version
   preservation, and publish audit evidence. Profile write/preview/publish/media

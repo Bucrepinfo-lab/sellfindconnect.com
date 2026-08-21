@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { InMemoryAuthRepository } from './in-memory-auth.repository';
 import { AuthService } from './auth.service';
+import type { AuthEmailMessage, AuthEmailSender } from './resend-email';
 
 const strongPassword = 'Strong-owner#2026';
 
@@ -521,5 +522,144 @@ describe('AuthService', () => {
         acceptedTerms: true,
       }),
     ).rejects.toThrow();
+  });
+
+  it('keeps development tokens when no live auth email sender is configured', async () => {
+    const service = new AuthService();
+    const result = await service.registerTenantOwner({
+      email: 'owner@example.com',
+      password: strongPassword,
+      displayName: 'Mary Owner',
+      tenantDisplayName: 'Nairobi Fresh Produce Cooperative',
+      countryCode: 'KE',
+      industryCode: 'AGRICULTURE',
+      primaryRole: 'SUPPLIER',
+      userType: 'ADVERTISER',
+      acceptedTerms: true,
+    });
+
+    expect(result.emailVerificationChallenge.developmentToken).toBeTruthy();
+    expect(result.session.mfaChallenge?.developmentCode).toMatch(/^\d{6}$/);
+  });
+
+  it('delivers verification, reset, invite, and MFA mail and hides development secrets', async () => {
+    const sent: AuthEmailMessage[] = [];
+    const sender: AuthEmailSender = {
+      async sendAuthEmail(message) {
+        sent.push(message);
+        return { ok: true, providerRef: 're_test' };
+      },
+    };
+    const repository = new InMemoryAuthRepository();
+    const service = new AuthService(repository, undefined, sender);
+    const registered = await service.registerTenantOwner({
+      email: 'owner@example.com',
+      password: strongPassword,
+      displayName: 'Mary Owner',
+      tenantDisplayName: 'Nairobi Fresh Produce Cooperative',
+      countryCode: 'KE',
+      industryCode: 'AGRICULTURE',
+      primaryRole: 'SUPPLIER',
+      userType: 'ADVERTISER',
+      acceptedTerms: true,
+    });
+
+    expect(registered.emailVerificationChallenge.developmentToken).toBeUndefined();
+    expect(registered.session.mfaChallenge?.developmentCode).toBeUndefined();
+    expect(registered.session.mfaChallenge?.deliveryChannel).toBe('EMAIL');
+
+    const verification = sent.find((message) => message.purpose === 'EMAIL_VERIFICATION');
+    const mfa = sent.find((message) => message.purpose === 'MFA');
+    const verificationToken = verification?.text.match(/verification token: (\S+)/)?.[1] ?? '';
+    const mfaCode = mfa?.text.match(/^(\d{6}) /)?.[1] ?? '';
+
+    expect(verification?.to).toBe('owner@example.com');
+    expect(verificationToken).toBeTruthy();
+    expect(mfaCode).toMatch(/^\d{6}$/);
+    await expect(service.confirmEmailVerification({ token: verificationToken })).resolves.toMatchObject({
+      verified: true,
+    });
+    await expect(
+      service.verifyMfa({ sessionToken: registered.session.token, code: mfaCode }),
+    ).resolves.toMatchObject({ session: { mfaVerified: true } });
+
+    sent.length = 0;
+    const reset = await service.requestPasswordReset({ email: 'OWNER@example.com' });
+    expect(reset.passwordResetChallenge?.developmentToken).toBeUndefined();
+    const resetMail = sent.find((message) => message.purpose === 'PASSWORD_RESET');
+    const resetToken = resetMail?.text.match(/reset token: (\S+)/)?.[1] ?? '';
+    expect(resetToken).toBeTruthy();
+    await expect(
+      service.confirmPasswordReset({ token: resetToken, newPassword: 'New-owner#2026' }),
+    ).resolves.toMatchObject({ reset: true });
+
+    const relogin = await service.login({ email: 'owner@example.com', password: 'New-owner#2026' });
+    const reloginCode =
+      sent
+        .find(
+          (message) =>
+            message.purpose === 'MFA' && message.idempotencyKey === relogin.session.mfaChallenge?.id,
+        )
+        ?.text.match(/^(\d{6}) /)?.[1] ?? '';
+    expect(reloginCode).toMatch(/^\d{6}$/);
+    await service.verifyMfa({ sessionToken: relogin.session.token, code: reloginCode });
+
+    sent.length = 0;
+    const invite = await service.createTenantInvite({
+      sessionToken: relogin.session.token,
+      tenantId: registered.tenant.id,
+      email: 'agent@example.com',
+      role: 'SALES_CHAT_AGENT',
+    });
+    expect(invite.invite.developmentToken).toBeUndefined();
+    const inviteMail = sent.find((message) => message.purpose === 'TENANT_INVITE');
+    const inviteToken = inviteMail?.text.match(/invite token: (\S+)/)?.[1] ?? '';
+    expect(inviteToken).toBeTruthy();
+    expect(inviteMail?.to).toBe('agent@example.com');
+    expect(inviteMail?.text).toContain('Nairobi Fresh Produce Cooperative');
+    await expect(
+      service.acceptTenantInvite({
+        token: inviteToken,
+        displayName: 'Grace Agent',
+        password: 'Invited-agent#2026',
+        acceptedTerms: true,
+      }),
+    ).resolves.toMatchObject({ membership: { role: 'SALES_CHAT_AGENT' } });
+
+    const audit = await service.listTenantAuditLogs({
+      sessionToken: relogin.session.token,
+      tenantId: registered.tenant.id,
+    });
+    const auditBlob = JSON.stringify(audit.auditLogs);
+    expect(auditBlob).not.toContain(verificationToken);
+    expect(auditBlob).not.toContain(resetToken);
+    expect(auditBlob).not.toContain(inviteToken);
+    expect(auditBlob).not.toContain(mfaCode);
+    expect(auditBlob).not.toContain('owner@example.com');
+    expect(auditBlob).not.toContain('re_test');
+  });
+
+  it('keeps development tokens when live auth email delivery fails', async () => {
+    const sender: AuthEmailSender = {
+      async sendAuthEmail() {
+        throw new Error('provider unavailable');
+      },
+    };
+    const service = new AuthService(new InMemoryAuthRepository(), undefined, sender);
+    const result = await service.registerTenantOwner({
+      email: 'owner@example.com',
+      password: strongPassword,
+      displayName: 'Mary Owner',
+      tenantDisplayName: 'Nairobi Fresh Produce Cooperative',
+      countryCode: 'KE',
+      industryCode: 'AGRICULTURE',
+      primaryRole: 'SUPPLIER',
+      userType: 'ADVERTISER',
+      acceptedTerms: true,
+    });
+
+    expect(result.emailVerificationChallenge.developmentToken).toBeTruthy();
+    expect(result.session.mfaChallenge?.developmentCode).toMatch(/^\d{6}$/);
+    expect(result.session.mfaChallenge?.deliveryChannel).toBe('DEVELOPMENT');
   });
 });

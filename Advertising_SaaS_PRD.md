@@ -297,6 +297,7 @@ Implementation progress on 2026-06-18:
 - Added database support for password metadata, auth sessions, tenant onboarding attributes, and policy acceptance evidence.
 - Added a checked-in baseline Prisma migration plus repeatable database seed workflow for continents, pilot country setup, and industry categories.
 - Added a web Owner Onboarding panel showing password strength, trial end date, next billing amount, current terms versions, and signup lock state.
+- Added Resend overlay for email verification, password reset, tenant invites, and email MFA. Development tokens stay in non-production responses when no live sender is configured; `AUTH_EMAIL_PROVIDER=resend` fail-closes without credentials.
 
 Acceptance criteria:
 
@@ -1244,8 +1245,8 @@ Implementation progress on 2026-06-18:
 - Added web Hierarchy Access controls showing role, scope, permission, MFA, and grant/block state.
 - Added database fields and models for MFA state, access assignments, and access decision audit records.
 - Added owner registration and login session groundwork so tenants can be created with an owner membership and first-month-free trial state.
-- Added generated, expiring MFA challenge records for tenant-owner sessions; provider-backed email/SMS/authenticator delivery remains a production hardening step.
-- Added hashed account challenge records for email verification and password reset; provider-backed email delivery remains a production hardening step.
+- Added generated, expiring MFA challenge records for tenant-owner sessions; email MFA overlays through Resend when credentials are present. Authenticator/TOTP enrollment remains a production hardening step.
+- Added hashed account challenge records for email verification and password reset; verification, password-reset, and tenant-invite mail overlay through Resend when `RESEND_API_KEY` and `EMAIL_FROM` are set.
 - Added tenant invite tokens for non-owner tenant roles.
 - Added audit evidence for registration, login, MFA, email verification, password reset, tenant invite creation, and invite acceptance.
 - Added existing-user invite linking with same-account session verification before tenant membership is created.

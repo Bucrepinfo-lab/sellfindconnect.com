@@ -321,6 +321,10 @@ GitHub source connection status on 2026-06-16:
     `AT_WHATSAPP_FROM`. `WHATSAPP_PROVIDER=meta` or `africastalking` fail-closes
     without credentials. Without these, memory adapters still record delivery
     attempts.
+  - Optional auth email delivery uses the same Resend keys. Verification,
+    password-reset, tenant-invite, and email MFA overlay when `RESEND_API_KEY`
+    and `EMAIL_FROM` are set. `AUTH_EMAIL_PROVIDER=resend` fail-closes without
+    credentials; `AUTH_EMAIL_PROVIDER=development` keeps in-process tokens.
   - Optional finance payment adapters: `PAYMENT_PROVIDER=manual` by default.
     `stripe`, `africastalking`, or `live` require `STRIPE_SECRET_KEY` and/or
     `AT_API_KEY` / `AT_USERNAME` / `AT_PAYMENTS_PRODUCT_NAME`. Raw card numbers

@@ -48,6 +48,13 @@ import type {
 } from './auth.records';
 import { AUTH_REPOSITORY, type AuthRepository } from './auth.repository';
 import { SMS_SENDER, type SmsSender } from './africastalking-sms';
+import {
+  EMAIL_SENDER,
+  buildAuthEmailMessage,
+  type AuthEmailMessage,
+  type AuthEmailPurpose,
+  type AuthEmailSender,
+} from './resend-email';
 import { tenantInviteRoles } from './dto/auth.dto';
 import type {
   AcceptTenantInviteDto,
@@ -74,6 +81,8 @@ const TENANT_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class AuthService {
+  private readonly emailSender?: AuthEmailSender;
+
   constructor(
     @Optional()
     @Inject(AUTH_REPOSITORY)
@@ -81,7 +90,12 @@ export class AuthService {
     @Optional()
     @Inject(SMS_SENDER)
     private readonly smsSender?: SmsSender,
-  ) {}
+    @Optional()
+    @Inject(EMAIL_SENDER)
+    emailSender?: AuthEmailSender | null,
+  ) {
+    this.emailSender = emailSender ?? undefined;
+  }
 
   async registerTenantOwner(input: RegisterTenantOwnerDto) {
     this.assertSafe(input, 'Registration contains blocked content.');
@@ -501,6 +515,7 @@ export class AuthService {
 
     const invite = await this.createTenantInviteRecord({
       tenantId: tenant.id,
+      tenantDisplayName: tenant.displayName,
       email,
       role: input.role,
       invitedByUserId: session.userId,
@@ -1127,20 +1142,41 @@ export class AuthService {
 
     const now = new Date().toISOString();
     const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
-    const challenge: AuthMfaChallengeRecord = {
-      id: randomUUID(),
+    const challengeId = randomUUID();
+    const expiresAt = new Date(Date.parse(now) + MFA_CHALLENGE_TTL_MS).toISOString();
+    let challenge: AuthMfaChallengeRecord = {
+      id: challengeId,
       sessionId: session.id,
       userId: session.userId,
       tenantId: session.tenantId,
       codeHash: this.hashMfaCode(session.id, code),
       deliveryChannel: this.isProductionRuntime() ? 'EMAIL' : 'DEVELOPMENT',
-      expiresAt: new Date(Date.parse(now) + MFA_CHALLENGE_TTL_MS).toISOString(),
+      expiresAt,
       failedAttempts: 0,
       createdAt: now,
     };
 
     await this.repository.createMfaChallenge(challenge);
-    return this.presentMfaChallenge(challenge, code);
+
+    const user = await this.repository.findUserById(session.userId);
+    const delivered = user
+      ? await this.deliverAuthEmail(
+          buildAuthEmailMessage({
+            purpose: 'MFA',
+            to: user.email,
+            code,
+            expiresAt,
+            idempotencyKey: challengeId,
+            tenantId: session.tenantId,
+          }),
+        )
+      : false;
+    if (delivered && challenge.deliveryChannel !== 'EMAIL') {
+      challenge = { ...challenge, deliveryChannel: 'EMAIL' };
+      await this.repository.updateMfaChallenge(challenge);
+    }
+
+    return this.presentMfaChallenge(challenge, code, delivered);
   }
 
   private async createAccountChallenge(
@@ -1150,41 +1186,83 @@ export class AuthService {
   ): Promise<PresentedAccountChallenge> {
     const now = new Date().toISOString();
     const token = randomBytes(32).toString('base64url');
+    const challengeId = randomUUID();
+    const expiresAt = new Date(Date.parse(now) + ttlMs).toISOString();
     const challenge: AuthAccountChallengeRecord = {
-      id: randomUUID(),
+      id: challengeId,
       userId: user.id,
       email: user.email,
       purpose,
       tokenHash: this.hashAccountChallengeToken(purpose, token),
-      expiresAt: new Date(Date.parse(now) + ttlMs).toISOString(),
+      expiresAt,
       createdAt: now,
     };
 
     await this.repository.createAccountChallenge(challenge);
-    return this.presentAccountChallenge(challenge, token);
+    const emailPurpose: AuthEmailPurpose | undefined =
+      purpose === 'EMAIL_VERIFICATION' || purpose === 'PASSWORD_RESET' ? purpose : undefined;
+    const delivered = emailPurpose
+      ? await this.deliverAuthEmail(
+          buildAuthEmailMessage({
+            purpose: emailPurpose,
+            to: user.email,
+            token,
+            expiresAt,
+            idempotencyKey: challengeId,
+          }),
+        )
+      : false;
+    return this.presentAccountChallenge(challenge, token, delivered);
   }
 
   private async createTenantInviteRecord(input: {
     tenantId: string;
+    tenantDisplayName: string;
     email: string;
     role: Exclude<TenantAccessRole, 'OWNER'>;
     invitedByUserId: string;
   }): Promise<PresentedTenantInvite> {
     const now = new Date().toISOString();
     const token = randomBytes(32).toString('base64url');
+    const inviteId = randomUUID();
+    const expiresAt = new Date(Date.parse(now) + TENANT_INVITE_TTL_MS).toISOString();
     const invite: AuthTenantInviteRecord = {
-      id: randomUUID(),
+      id: inviteId,
       tenantId: input.tenantId,
       email: input.email,
       role: input.role,
       tokenHash: this.hashTenantInviteToken(token),
       invitedByUserId: input.invitedByUserId,
-      expiresAt: new Date(Date.parse(now) + TENANT_INVITE_TTL_MS).toISOString(),
+      expiresAt,
       createdAt: now,
     };
 
     await this.repository.createTenantInvite(invite);
-    return this.presentTenantInvite(invite, token);
+    const delivered = await this.deliverAuthEmail(
+      buildAuthEmailMessage({
+        purpose: 'TENANT_INVITE',
+        to: input.email,
+        token,
+        tenantDisplayName: input.tenantDisplayName,
+        expiresAt,
+        idempotencyKey: inviteId,
+        tenantId: input.tenantId,
+      }),
+    );
+    return this.presentTenantInvite(invite, token, delivered);
+  }
+
+  private async deliverAuthEmail(message: AuthEmailMessage): Promise<boolean> {
+    if (!this.emailSender) {
+      return false;
+    }
+
+    try {
+      const result = await this.emailSender.sendAuthEmail(message);
+      return result.ok === true;
+    } catch {
+      return false;
+    }
   }
 
   private presentSession(session: AuthSessionRecord): PresentedAuthSession;
@@ -1219,6 +1297,7 @@ export class AuthService {
   private presentMfaChallenge(
     challenge: AuthMfaChallengeRecord,
     developmentCode?: string,
+    delivered = false,
   ): PresentedMfaChallenge {
     const presented: PresentedMfaChallenge = {
       id: challenge.id,
@@ -1227,7 +1306,7 @@ export class AuthService {
       createdAt: challenge.createdAt,
     };
 
-    if (challenge.deliveryChannel === 'DEVELOPMENT' && !this.isProductionRuntime()) {
+    if (!delivered && !this.isProductionRuntime() && developmentCode) {
       return { ...presented, developmentCode };
     }
 
@@ -1237,6 +1316,7 @@ export class AuthService {
   private presentAccountChallenge(
     challenge: AuthAccountChallengeRecord,
     developmentToken?: string,
+    delivered = false,
   ): PresentedAccountChallenge {
     const presented: PresentedAccountChallenge = {
       id: challenge.id,
@@ -1245,7 +1325,7 @@ export class AuthService {
       createdAt: challenge.createdAt,
     };
 
-    if (!this.isProductionRuntime()) {
+    if (!delivered && !this.isProductionRuntime()) {
       return { ...presented, developmentToken };
     }
 
@@ -1255,6 +1335,7 @@ export class AuthService {
   private presentTenantInvite(
     invite: AuthTenantInviteRecord,
     developmentToken?: string,
+    delivered = false,
   ): PresentedTenantInvite {
     const presented: PresentedTenantInvite = {
       id: invite.id,
@@ -1265,7 +1346,7 @@ export class AuthService {
       createdAt: invite.createdAt,
     };
 
-    if (!this.isProductionRuntime()) {
+    if (!delivered && !this.isProductionRuntime()) {
       return { ...presented, developmentToken };
     }
 
