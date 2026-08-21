@@ -221,8 +221,12 @@ Progress:
   and evidence payload for blocked or final-failed media processing.
 - Wired DigitalOcean Spaces credentials (`SPACES_*`) into the S3-compatible
   upload signer and added approved ClamAV/Sightengine scanner overlays.
-  Named providers fail-close without credentials. CDN publication verification
-  and country/legal escalation playbooks remain next.
+  Named providers fail-close without credentials.
+- Added CDN publication verification on `IMAGE_TRANSFORM` and `VIDEO_TRANSCODE`
+  results. HTTPS Range GET checks overlay when a public CDN origin is set.
+  `MEDIA_CDN_VERIFICATION_PROVIDER=live` fail-closes without that origin.
+  Unreachable objects fail closed; 5xx stays retryable. Country/legal
+  escalation playbooks remain next.
 
 ## Epic 4: Listing and Media Vertical Slice
 
@@ -266,8 +270,9 @@ Progress:
 - Added scheduled advert publishing: future `publishedAt` values create
   `SCHEDULED` listings that are hidden from public discovery until the
   lifecycle sweep promotes them to `LIVE`.
-- A durable advert lifecycle scheduler, live storage credentials, approved
-  media vendors, and richer moderator review-case actions remain next.
+- Added CDN publication verification shared by advert and profile transform
+  jobs. Country/legal escalation playbooks and user-facing review status
+  remain next.
 
 ## Epic 5: Source Finder and Relationship Graph
 
@@ -318,8 +323,8 @@ Progress (2026-08-21):
   token overlap and Prisma `tsvector` search add `KEYWORD_MATCH` and report
   `searchMode` as `RULES`, `FTS`, or `HYBRID`. The `embedding` column is reserved
   for an optional later overlay and is not required for tests.
-- Native mobile saved-search screens remain out of scope. CDN publication
-  verification remains next.
+- Native mobile saved-search screens remain out of scope. Country/legal
+  escalation playbooks and user-facing media review status remain next.
 
 ## Epic 6: Matching and Lead Conversion
 

@@ -9,6 +9,7 @@ import type {
 import { createHash, createHmac, randomUUID } from 'node:crypto';
 
 import { overlayApprovedMediaJobProcessors } from './media-scanners';
+import { overlayCdnPublicationVerification } from './media-cdn-verification';
 
 export type MediaModerationResult =
   | {
@@ -721,7 +722,10 @@ export function createConfiguredMediaJobProcessors(
     });
   }
 
-  return overlayApprovedMediaJobProcessors(processors, config);
+  return overlayCdnPublicationVerification(
+    overlayApprovedMediaJobProcessors(processors, config),
+    config,
+  );
 }
 
 export function hasLiveObjectStorageConfig(config?: MediaAdapterConfigReader): boolean {

@@ -405,10 +405,14 @@ Implementation progress on 2026-06-19:
   aliases, plus approved ClamAV malware and Sightengine visual-moderation
   scanners. Named providers fail-close without credentials. Scanner results
   omit API secrets.
-- Remaining hardening: CDN publication verification, legal/reporting
-  escalation playbooks, richer review case management, and user-facing review
-  status in web/mobile clients. Live Spaces credentials and ClamAV/Sightengine
-  scanners overlay when configured.
+- Added CDN publication verification on image and video transform jobs.
+  Public CDN URLs are checked with an HTTPS Range GET before the job succeeds.
+  `MEDIA_CDN_VERIFICATION_PROVIDER=live` fail-closes without a public origin.
+  Unreachable objects fail closed; 5xx/timeouts stay retryable.
+- Remaining hardening: legal/reporting escalation playbooks, richer review
+  case management, and user-facing review status in web clients. Live Spaces
+  credentials, ClamAV/Sightengine scanners, and CDN verification overlay when
+  configured. Native mobile clients remain out of scope.
 
 ### 7.3 Media Display Area
 
@@ -572,8 +576,9 @@ Implementation progress on 2026-08-21:
   Search responses include `searchMode` (`RULES` | `FTS` | `HYBRID`) and
   `KEYWORD_MATCH` without requiring live OpenAI embeddings. The `embedding`
   column is reserved for an optional later overlay.
-- Remaining hardening: native mobile screens are out of scope. CDN publication
-  verification and production identity remain next.
+- Remaining hardening: native mobile screens are out of scope. Legal/reporting
+  escalation playbooks, user-facing media review status, and production
+  identity remain next.
 
 Implementation progress on 2026-06-20:
 
@@ -590,8 +595,9 @@ Implementation progress on 2026-06-20:
   downloads.
 - Added web/PWA saved-search UX with named searches, alert cadence, blocked
   search handling, restored-search controls, and previewable alert candidates.
-- Remaining hardening: CDN publication verification and production identity.
-  Native mobile saved-search screens are out of scope.
+- Remaining hardening: legal/reporting escalation playbooks, user-facing media
+  review status, and production identity. Native mobile saved-search screens
+  are out of scope.
 
 ### 7.6 Precision Matching and Link Intelligence
 

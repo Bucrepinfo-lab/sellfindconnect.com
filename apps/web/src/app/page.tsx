@@ -2305,7 +2305,8 @@ export default function Home() {
                   <strong>Live media storage</strong>
                   <span>
                     SPACES_* credentials overlay DigitalOcean Spaces uploads. ClamAV and Sightengine
-                    scanners overlay when their keys are set.
+                    scanners overlay when their keys are set. Transform jobs verify public CDN URLs
+                    before marking READY.
                   </span>
                 </div>
               </div>

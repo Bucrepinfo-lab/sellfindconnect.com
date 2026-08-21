@@ -26,9 +26,12 @@ Last updated: 2026-08-21
 - Unsafe or final-failed media processing can create durable
   `MediaReviewCase` records with severity, reason, provider, job evidence, and
   source media references for moderation follow-up.
-- Production still needs CDN publication verification, legal/reporting
-  escalation playbooks, and user-facing review status. Live Spaces credentials
-  and approved ClamAV/Sightengine scanners overlay when configured.
+- Image and video transform jobs verify public CDN URLs with an HTTPS Range
+  GET before succeeding. Unreachable objects fail closed; 5xx/timeouts stay
+  retryable. Live Spaces credentials, approved ClamAV/Sightengine scanners,
+  and CDN publication verification overlay when configured.
+- Production still needs legal/reporting escalation playbooks and user-facing
+  review status.
 
 ## Storage Modes
 
@@ -145,6 +148,22 @@ fail-close without credentials. Present `CLAMAV_SCAN_URL` or Sightengine keys
 overlay those processors without requiring the named provider flag. Scanner
 results store verdicts only; API secrets are not copied into job metadata.
 
+CDN publication verification:
+
+```text
+MEDIA_CDN_VERIFICATION_PROVIDER=
+MEDIA_CDN_ALLOWED_ORIGINS=
+SPACES_CDN_ENDPOINT=https://sellfindconnect-media.fra1.cdn.digitaloceanspaces.com
+```
+
+Present `SPACES_CDN_ENDPOINT` or `MEDIA_S3_PUBLIC_BASE_URL` overlays HTTPS
+Range GET checks on `IMAGE_TRANSFORM` and `VIDEO_TRANSCODE` results. Allowed
+origins also include `SPACES_ENDPOINT` / `MEDIA_S3_ENDPOINT` and optional
+comma-separated `MEDIA_CDN_ALLOWED_ORIGINS`. `MEDIA_CDN_VERIFICATION_PROVIDER=live`
+fail-closes without a public origin. `development` / `off` skips the overlay
+even when CDN origins exist. Verification accepts HTTP 200, 204, or 206, does
+not download full objects, and omits extra URLs from success metadata.
+
 Provider responses should return JSON:
 
 ```json
@@ -182,8 +201,8 @@ explicitly configured. Publication behavior:
 - Clean malware scan: records `MALWARE_SCAN_PASSED` as the interim moderation reason.
 - Passed content moderation: sets moderation status to `PASSED`.
 - Blocked scan/moderation: sets media status and moderation status to `BLOCKED`.
-- Image/video transform success: writes transform status, CDN URL, thumbnail URL, and variants.
-- Final transform failure: sets transform status to `FAILED`.
+- Image/video transform success: writes transform status, CDN URL, thumbnail URL, and variants after CDN publication verification succeeds.
+- Final transform failure: sets transform status to `FAILED`, including unreachable CDN objects.
 
 Unsafe/final-failed publication also opens a `MediaReviewCase`:
 
@@ -227,8 +246,7 @@ Workers should:
    final to move it to `FAILED`.
 
 Job states are `QUEUED`, `RUNNING`, `SUCCEEDED`, and `FAILED`. Remaining
-hardening is CDN publication verification, country/legal escalation playbooks,
-and user-facing review status.
+hardening is country/legal escalation playbooks and user-facing review status.
 
 Internal batch runner:
 

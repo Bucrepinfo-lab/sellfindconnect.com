@@ -104,8 +104,9 @@ without validating it against the authenticated user's assignments.
   `MediaReviewCase` records with severity, reason, source job, provider, and
   evidence. DigitalOcean Spaces credentials overlay live object storage through
   `SPACES_*` aliases. ClamAV and Sightengine overlay malware and visual
-  moderation when configured. CDN publication verification and legal/reporting
-  escalation remain production readiness work.
+  moderation when configured. Transform jobs verify public CDN URLs with an
+  HTTPS Range GET before succeeding. Legal/reporting escalation remains
+  production readiness work.
 - Listings: draft, preview, publish, scheduled go-live, media, lifecycle, and visibility. Advert
   listing, lifecycle, and media routes require an MFA-verified tenant session.
   Advert media uses shared `MediaAsset` metadata, the ten-item display cap,
