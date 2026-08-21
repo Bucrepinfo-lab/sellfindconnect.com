@@ -1,3 +1,4 @@
+import { UnprocessableEntityException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 
 import { InMemoryAuthRepository } from './in-memory-auth.repository';
@@ -818,5 +819,87 @@ describe('AuthService', () => {
       expect(blob).not.toContain(code);
       expect(blob).not.toContain(code.replaceAll('-', ''));
     }
+  });
+
+  it('exchanges a verified hosted-identity token for an MFA-verified tenant session', async () => {
+    const repository = new InMemoryAuthRepository();
+    const verifier = {
+      verifyIdToken: async () => ({
+        issuer: 'https://auth.sellfindconnect.test',
+        audience: 'https://api.sellfindconnect.test/v1',
+        subject: 'oidc|user-1',
+        email: 'owner@example.com',
+        emailVerified: true as const,
+      }),
+    };
+    const service = new AuthService(repository, undefined, undefined, verifier);
+    const registered = await service.registerTenantOwner({
+      email: 'owner@example.com',
+      password: strongPassword,
+      displayName: 'Mary Owner',
+      tenantDisplayName: 'Nairobi Fresh Produce Cooperative',
+      countryCode: 'KE',
+      industryCode: 'AGRICULTURE',
+      primaryRole: 'SUPPLIER',
+      userType: 'ADVERTISER',
+      acceptedTerms: true,
+    });
+
+    const exchanged = await service.exchangeHostedIdentity({ idToken: 'hosted-id-token' });
+
+    expect(exchanged.session.mfaVerified).toBe(true);
+    expect(exchanged.session.mfaChallenge).toBeUndefined();
+    expect(exchanged.user.emailVerifiedAt).toBeTruthy();
+    expect(exchanged.tenant?.id).toBe(registered.tenant.id);
+
+    const audit = await service.listTenantAuditLogs({
+      sessionToken: exchanged.session.token,
+      tenantId: registered.tenant.id,
+    });
+    expect(audit.auditLogs.map((record) => record.action)).toContain(
+      'AUTH_HOSTED_IDENTITY_LOGIN_SUCCEEDED',
+    );
+    expect(JSON.stringify(audit.auditLogs)).not.toContain('hosted-id-token');
+    expect(JSON.stringify(audit.auditLogs)).not.toContain('owner@example.com');
+  });
+
+  it('fail-closes hosted identity when the overlay is missing, the token is invalid, or no account exists', async () => {
+    const service = new AuthService();
+    await expect(service.exchangeHostedIdentity({ idToken: 'hosted-id-token' })).rejects.toThrow(
+      UnprocessableEntityException,
+    );
+
+    const unknownAccount = new AuthService(new InMemoryAuthRepository(), undefined, undefined, {
+      verifyIdToken: async () => ({
+        issuer: 'https://auth.sellfindconnect.test',
+        audience: 'https://api.sellfindconnect.test/v1',
+        subject: 'oidc|missing',
+        email: 'missing@example.com',
+        emailVerified: true as const,
+      }),
+    });
+    await expect(unknownAccount.exchangeHostedIdentity({ idToken: 'hosted-id-token' })).rejects.toThrow(
+      'No matching tenant account.',
+    );
+
+    const registeredService = new AuthService(new InMemoryAuthRepository(), undefined, undefined, {
+      verifyIdToken: async () => {
+        throw new Error('INVALID_SIGNATURE');
+      },
+    });
+    await registeredService.registerTenantOwner({
+      email: 'owner@example.com',
+      password: strongPassword,
+      displayName: 'Mary Owner',
+      tenantDisplayName: 'Nairobi Fresh Produce Cooperative',
+      countryCode: 'KE',
+      industryCode: 'AGRICULTURE',
+      primaryRole: 'SUPPLIER',
+      userType: 'ADVERTISER',
+      acceptedTerms: true,
+    });
+    await expect(
+      registeredService.exchangeHostedIdentity({ idToken: 'hosted-id-token' }),
+    ).rejects.toThrow('Invalid identity token.');
   });
 });

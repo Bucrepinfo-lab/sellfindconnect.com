@@ -147,13 +147,18 @@ Progress:
 - Added hashed single-use recovery codes at TOTP confirmation (10 codes, shown
   once). Login MFA accepts a recovery code when TOTP is enrolled; reuse and
   regenerate both invalidate prior codes. Audit metadata omits the codes.
+- Added hosted identity overlay for Auth0, Clerk, or generic OIDC. Verified
+  RS256 ID tokens with `email_verified` exchange for an existing tenant
+  session at `POST /v1/auth/identity/session`. Named providers fail-close
+  without `AUTH_OIDC_ISSUER` and `AUTH_OIDC_AUDIENCE`. New tenants still
+  register through terms-gated owner signup. Audit stores issuer and subject
+  hash only.
 - Added database fields/models for password metadata, auth sessions, tenant
   onboarding attributes, and terms acceptance evidence.
 - Added the initial Prisma migration and seed workflow required before enabling
   production Prisma persistence against a hosted PostgreSQL database.
-- Production identity provider, broader non-auth product audit coverage, hosted
-  database migration/seed execution, and production Prisma enablement remain
-  next.
+- Production Prisma enablement against hosted PostgreSQL, broader non-auth
+  product audit coverage, and optional Source Finder embeddings remain next.
 
 ## Epic 3: Advertiser Profile Vertical Slice
 
@@ -337,8 +342,8 @@ Progress (2026-08-21):
   token overlap and Prisma `tsvector` search add `KEYWORD_MATCH` and report
   `searchMode` as `RULES`, `FTS`, or `HYBRID`. The `embedding` column is reserved
   for an optional later overlay and is not required for tests.
-- Native mobile saved-search screens remain out of scope. Production identity
-  remains next.
+- Native mobile saved-search screens remain out of scope. Hosted Prisma
+  enablement remains next.
 
 ## Epic 6: Matching and Lead Conversion
 

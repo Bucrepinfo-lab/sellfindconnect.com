@@ -299,6 +299,7 @@ Implementation progress on 2026-06-18:
 - Added a web Owner Onboarding panel showing password strength, trial end date, next billing amount, current terms versions, and signup lock state.
 - Added Resend overlay for email verification, password reset, tenant invites, and email MFA. Development tokens stay in non-production responses when no live sender is configured; `AUTH_EMAIL_PROVIDER=resend` fail-closes without credentials.
 - Added RFC 6238 authenticator TOTP enrollment. MFA-verified owners can start and confirm enrollment, later logins use `AUTHENTICATOR` delivery, and reused time-steps are rejected. Confirmation issues 10 hashed single-use recovery codes; regenerate invalidates the prior set.
+- Added hosted identity overlay for Auth0, Clerk, or generic OIDC. `POST /v1/auth/identity/session` verifies an RS256 ID token via JWKS and issues a first-party session for an existing tenant account. `AUTH_IDENTITY_PROVIDER=auth0|clerk|oidc|live` fail-closes without issuer and audience. Unverified emails and unknown accounts are rejected. New tenants still accept terms through owner signup.
 
 Acceptance criteria:
 
@@ -420,7 +421,7 @@ Implementation progress on 2026-06-19:
   HIGH 72h, MEDIUM 168h), GET by id, job-type and overdue filters,
   mistaken-classification gates for HIGH/CRITICAL restore or dismiss, and
   reopen of dismissed cases only. Escalated cases stay closed.
-- Remaining hardening: production identity. Native mobile clients
+- Remaining hardening: hosted Prisma enablement. Native mobile clients
   remain out of scope.
 
 ### 7.3 Media Display Area
@@ -588,8 +589,8 @@ Implementation progress on 2026-08-21:
   Search responses include `searchMode` (`RULES` | `FTS` | `HYBRID`) and
   `KEYWORD_MATCH` without requiring live OpenAI embeddings. The `embedding`
   column is reserved for an optional later overlay.
-- Remaining hardening: native mobile screens are out of scope. Production
-  identity remains next.
+- Remaining hardening: native mobile screens are out of scope. Hosted Prisma
+  enablement remains next.
 
 Implementation progress on 2026-06-20:
 
@@ -606,7 +607,7 @@ Implementation progress on 2026-06-20:
   downloads.
 - Added web/PWA saved-search UX with named searches, alert cadence, blocked
   search handling, restored-search controls, and previewable alert candidates.
-- Remaining hardening: production identity. Native mobile saved-search screens
+- Remaining hardening: hosted Prisma enablement. Native mobile saved-search screens
   are out of scope.
 
 ### 7.6 Precision Matching and Link Intelligence
@@ -1079,7 +1080,7 @@ Implementation progress on 2026-06-17:
 - Continued implementation on 2026-08-21 with controlled post-lock tax-return corrections. Locked periods stay locked; finance admins can post signed correction entries with `PERIOD_CORRECTION` evidence, ledger impact, dual-control above 10,000 units, and product-audit events that omit notes and authority references.
 - Continued implementation on 2026-08-21 with live payment-provider adapters. Invoice capture stays on the manual development adapter by default. `PAYMENT_PROVIDER=stripe`, `africastalking`, or `live` selects Stripe PaymentIntents and/or Africa's Talking M-Pesa checkout, rejects raw card numbers, records `REQUIRES_CAPTURE` until `POST /v1/finance/payments/settle`, and fail-closes when credentials are missing.
 - Remaining hardening: app-store billing rails are out of scope while native
-  mobile is not in delivery. Production identity remains next.
+  mobile is not in delivery. Hosted Prisma enablement remains next.
 
 ### 7.11 Moderation, Trust, and Safety
 

@@ -74,7 +74,9 @@ without validating it against the authenticated user's assignments.
   acceptance evidence, in-memory and Prisma repository adapters, tenant session
   guard, Resend overlay for verification/reset/invite/email-MFA delivery,
   authenticator TOTP enrollment (RFC 6238 SHA-1, 6 digits, 30s, ±1 window),
-  hashed single-use recovery codes, and future identity-provider adapter boundary.
+  hashed single-use recovery codes, and an OIDC hosted-identity overlay
+  (Auth0/Clerk/generic) that exchanges a verified ID token for an existing
+  tenant session.
 - Profiles: draft, preview, publish, profile completeness, enriched contacts,
   service-area coverage, profile media display metadata, live version
   preservation, and publish audit evidence. Profile write/preview/publish/media

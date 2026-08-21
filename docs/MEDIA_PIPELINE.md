@@ -40,7 +40,7 @@ Last updated: 2026-08-21
   MEDIUM 168h), GET by id, job-type and overdue filters, and reopen of
   dismissed cases only. HIGH/CRITICAL restore or dismiss requires an explicit
   mistaken-classification confirmation plus a reviewer note.
-- Remaining production hardening is hosted identity. Native mobile remains
+- Remaining production hardening is hosted Prisma enablement. Native mobile remains
   out of scope.
 
 ## Storage Modes

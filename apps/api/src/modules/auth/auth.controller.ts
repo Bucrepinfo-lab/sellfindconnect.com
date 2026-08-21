@@ -8,6 +8,7 @@ import {
   ConfirmEmailVerificationDto,
   ConfirmPasswordResetDto,
   CreateTenantInviteDto,
+  ExchangeHostedIdentityDto,
   LoginDto,
   RegisterTenantOwnerDto,
   RequestEmailVerificationDto,
@@ -33,6 +34,11 @@ export class AuthController {
   @Post('login')
   login(@Body() body: LoginDto) {
     return this.auth.login(body);
+  }
+
+  @Post('identity/session')
+  exchangeHostedIdentity(@Body() body: ExchangeHostedIdentityDto) {
+    return this.auth.exchangeHostedIdentity(body);
   }
 
   @Post('phone-otp/request')

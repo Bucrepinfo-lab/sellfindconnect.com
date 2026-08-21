@@ -78,9 +78,14 @@ import type {
   VerifyPhoneOtpDto,
   EnrollTotpDto,
   ConfirmTotpDto,
+  ExchangeHostedIdentityDto,
   RegenerateRecoveryCodesDto,
 } from './dto/auth.dto';
 import { InMemoryAuthRepository } from './in-memory-auth.repository';
+import {
+  HOSTED_IDENTITY_VERIFIER,
+  type HostedIdentityVerifier,
+} from './oidc-identity';
 
 const MFA_CHALLENGE_TTL_MS = 10 * 60 * 1000;
 const MFA_MAX_FAILED_ATTEMPTS = 5;
@@ -92,6 +97,7 @@ const TENANT_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 @Injectable()
 export class AuthService {
   private readonly emailSender?: AuthEmailSender;
+  private readonly identityVerifier?: HostedIdentityVerifier;
 
   constructor(
     @Optional()
@@ -103,8 +109,12 @@ export class AuthService {
     @Optional()
     @Inject(EMAIL_SENDER)
     emailSender?: AuthEmailSender | null,
+    @Optional()
+    @Inject(HOSTED_IDENTITY_VERIFIER)
+    identityVerifier?: HostedIdentityVerifier | null,
   ) {
     this.emailSender = emailSender ?? undefined;
+    this.identityVerifier = identityVerifier ?? undefined;
   }
 
   async registerTenantOwner(input: RegisterTenantOwnerDto) {
@@ -274,6 +284,79 @@ export class AuthService {
 
     return {
       user: this.presentUser(user),
+      tenant: await this.repository.findTenantById(membership.tenantId),
+      session,
+    };
+  }
+
+  async exchangeHostedIdentity(input: ExchangeHostedIdentityDto) {
+    if (!this.identityVerifier) {
+      throw new UnprocessableEntityException('Hosted identity is not configured.');
+    }
+
+    let claims;
+    try {
+      claims = await this.identityVerifier.verifyIdToken(input.idToken);
+    } catch {
+      await this.recordAudit({
+        action: 'AUTH_HOSTED_IDENTITY_FAILED',
+        entityType: 'AUTH',
+        metadata: { reason: 'INVALID_TOKEN' },
+      });
+      throw new UnauthorizedException('Invalid identity token.');
+    }
+
+    const email = claims.email.trim().toLowerCase();
+    const user = await this.repository.findUserByEmail(email);
+    if (!user) {
+      await this.recordAudit({
+        action: 'AUTH_HOSTED_IDENTITY_FAILED',
+        entityType: 'AUTH',
+        metadata: {
+          reason: 'NO_ACCOUNT',
+          emailHash: this.hashAuditIdentifier(email),
+          issuer: claims.issuer,
+        },
+      });
+      throw new UnauthorizedException('No matching tenant account.');
+    }
+
+    const membership = await this.repository.findFirstMembershipForUser(user.id);
+    if (!membership) {
+      await this.recordAudit({
+        actorUserId: user.id,
+        action: 'AUTH_HOSTED_IDENTITY_FAILED',
+        entityType: 'USER',
+        entityId: user.id,
+        metadata: { reason: 'NO_TENANT_MEMBERSHIP' },
+      });
+      throw new UnauthorizedException('No tenant membership is attached to this account.');
+    }
+
+    const now = new Date().toISOString();
+    if (!user.emailVerifiedAt) {
+      await this.repository.markUserEmailVerified(user.id, now);
+    }
+
+    const session = await this.createSession(user, membership.tenantId, membership.role, {
+      mfaVerified: true,
+    });
+    await this.recordAudit({
+      tenantId: membership.tenantId,
+      actorUserId: user.id,
+      action: 'AUTH_HOSTED_IDENTITY_LOGIN_SUCCEEDED',
+      entityType: 'AUTH_SESSION',
+      entityId: session.id,
+      metadata: {
+        role: membership.role,
+        issuer: claims.issuer,
+        subjectHash: this.hashAuditIdentifier(claims.subject),
+        mfaVerified: true,
+      },
+    });
+
+    return {
+      user: this.presentUser({ ...user, emailVerifiedAt: user.emailVerifiedAt ?? now }),
       tenant: await this.repository.findTenantById(membership.tenantId),
       session,
     };
@@ -1032,6 +1115,7 @@ export class AuthService {
     user: AuthUserRecord,
     tenantId: string,
     role: TenantAccessRole,
+    options?: { mfaVerified?: boolean },
   ): Promise<IssuedAuthSession> {
     const now = new Date().toISOString();
     const expiresAt = new Date(Date.parse(now) + 8 * 60 * 60 * 1000).toISOString();
@@ -1043,7 +1127,7 @@ export class AuthService {
       tenantId,
       role,
       mfaRequired: user.mfaRequired,
-      mfaVerified: !user.mfaRequired,
+      mfaVerified: options?.mfaVerified ?? !user.mfaRequired,
       expiresAt,
       createdAt: now,
     };

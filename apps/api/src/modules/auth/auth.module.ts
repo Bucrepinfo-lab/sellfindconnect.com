@@ -7,6 +7,10 @@ import { AUTH_REPOSITORY } from './auth.repository';
 import { AuthService } from './auth.service';
 import { InMemoryAuthRepository } from './in-memory-auth.repository';
 import { EMAIL_SENDER, createAuthEmailSender } from './resend-email';
+import {
+  HOSTED_IDENTITY_VERIFIER,
+  createConfiguredHostedIdentityVerifier,
+} from './oidc-identity';
 
 @Module({
   controllers: [AuthController],
@@ -25,6 +29,11 @@ import { EMAIL_SENDER, createAuthEmailSender } from './resend-email';
           WEB_ORIGIN: config.get<string>('WEB_ORIGIN'),
           APP_URL: config.get<string>('APP_URL'),
         }),
+    },
+    {
+      provide: HOSTED_IDENTITY_VERIFIER,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => createConfiguredHostedIdentityVerifier(config),
     },
     {
       provide: AUTH_REPOSITORY,

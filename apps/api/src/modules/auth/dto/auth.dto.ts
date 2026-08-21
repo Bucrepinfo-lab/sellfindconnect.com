@@ -242,3 +242,12 @@ export class CheckTenantSessionDto {
   @Length(8, 120)
   declare tenantId: string;
 }
+
+export class ExchangeHostedIdentityDto {
+  @ApiProperty({
+    example: 'eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3Qta2V5In0.eyJzdWIiOiJvaWRjfHVzZXIifQ.signature',
+  })
+  @IsString()
+  @Length(32, 8192)
+  declare idToken: string;
+}
