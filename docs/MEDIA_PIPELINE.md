@@ -40,10 +40,9 @@ Last updated: 2026-08-21
   MEDIUM 168h), GET by id, job-type and overdue filters, and reopen of
   dismissed cases only. HIGH/CRITICAL restore or dismiss requires an explicit
   mistaken-classification confirmation plus a reviewer note.
-- Remaining production hardening is broader non-auth product audit coverage.
-  Native mobile remains out of scope. Hosted Prisma enablement uses
-  `PERSISTENCE_DRIVER=prisma` with `DATABASE_URL`; media queue and review-case
-  keys still override.
+- Remaining production hardening is native mobile, which remains out of scope.
+  Product audit now covers analytics exports, privacy jobs, invoices, and
+  checkout writes.
 
 ## Storage Modes
 

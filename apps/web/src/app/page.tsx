@@ -863,6 +863,22 @@ export default function Home() {
       createdAt: conversationDemoNow,
       metadata: { sentCount: 1, failedCount: 1 },
     }),
+    buildProductAuditRecord({
+      action: 'ANALYTICS_REPORT_EXPORTED',
+      entityType: 'ANALYTICS_REPORT',
+      entityId: 'demo-analytics-export',
+      tenantId,
+      createdAt: conversationDemoNow,
+      metadata: { format: 'CSV', note: 'private buyer note' },
+    }),
+    buildProductAuditRecord({
+      action: 'PAYMENT_CHECKOUT_REQUESTED',
+      entityType: 'PAYMENT',
+      entityId: 'demo-checkout',
+      tenantId,
+      createdAt: conversationDemoNow,
+      metadata: { amount: 1500, phone: '+254700000001', ok: true },
+    }),
   ];
   const accessDecision = evaluateAccess({
     subject: {
@@ -1789,7 +1805,7 @@ export default function Home() {
                 <h2>Product Audit</h2>
                 <span>{canViewProductAudit ? `${productAuditPreview.length} events` : 'Restricted'}</span>
               </div>
-              <FinanceRow label="Lookup" value="GET /v1/audit" />
+              <FinanceRow label="Lookup" value="GET /v1/audit?action=&entityType=" />
               <FinanceRow
                 label="Viewer"
                 value={canViewProductAudit ? 'Owner or admin' : 'Hidden from this role'}
@@ -1808,7 +1824,11 @@ export default function Home() {
                     <ClipboardList size={18} />
                     <div>
                       <strong>Trail visible</strong>
-                      <span>Chat copy, emails, and session secrets stay out of audit metadata.</span>
+                      <span>
+                        Chat copy, emails, phones, invoice numbers, and session secrets stay out of
+                        audit metadata. Analytics exports, privacy jobs, invoices, and checkout
+                        writes are on the same trail.
+                      </span>
                     </div>
                   </div>
                 </>

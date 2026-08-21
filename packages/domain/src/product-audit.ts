@@ -20,11 +20,42 @@ export const productAuditActions = [
   'TAX_REPORT_EXPORTED',
   'SOURCE_FINDER_OUTCOME_RECORDED',
   'SOURCE_FINDER_INDEX_REBUILT',
+  'ANALYTICS_REPORT_EXPORTED',
+  'ANALYTICS_PRIVACY_REQUEST_RUN',
+  'ANALYTICS_RETENTION_RUN',
+  'ANALYTICS_ROLLUP_REFRESHED',
+  'INVOICE_CREATED',
+  'INVOICE_RECEIPT_ISSUED',
+  'INVOICE_PAYMENT_CAPTURED',
+  'INVOICE_REFUNDED',
+  'PAYMENT_CAPTURE_SETTLED',
+  'PAYMENT_CHECKOUT_REQUESTED',
+  'PAYMENT_PAYOUT_REQUESTED',
 ] as const;
 
 export type ProductAuditAction = (typeof productAuditActions)[number];
 
 export type ProductAuditMetadata = Record<string, string | number | boolean | null>;
+
+export type ProductAuditQuery = {
+  action?: string;
+  entityType?: string;
+};
+
+export function matchesProductAuditQuery(
+  record: { action: string; entityType: string },
+  query?: ProductAuditQuery,
+): boolean {
+  const action = query?.action?.trim();
+  const entityType = query?.entityType?.trim();
+  if (action && record.action !== action) {
+    return false;
+  }
+  if (entityType && record.entityType !== entityType) {
+    return false;
+  }
+  return true;
+}
 
 export type ProductAuditRecord = {
   action: ProductAuditAction;
@@ -58,6 +89,12 @@ const deniedExactKeys = new Set([
   'totpsecret',
   'totppendingsecret',
   'recoverycode',
+  'receiptnumber',
+  'invoicenumber',
+  'paymentreference',
+  'billingreference',
+  'customerreference',
+  'authorityreference',
 ]);
 
 export function canViewTenantAuditLogs(role: TenantAccessRole): boolean {
@@ -104,6 +141,28 @@ export function describeProductAuditAction(action: string): string {
       return 'Source Finder outcome recorded';
     case 'SOURCE_FINDER_INDEX_REBUILT':
       return 'Source Finder index rebuilt';
+    case 'ANALYTICS_REPORT_EXPORTED':
+      return 'Analytics report exported';
+    case 'ANALYTICS_PRIVACY_REQUEST_RUN':
+      return 'Analytics privacy request run';
+    case 'ANALYTICS_RETENTION_RUN':
+      return 'Analytics retention run';
+    case 'ANALYTICS_ROLLUP_REFRESHED':
+      return 'Analytics rollups refreshed';
+    case 'INVOICE_CREATED':
+      return 'Invoice created';
+    case 'INVOICE_RECEIPT_ISSUED':
+      return 'Invoice receipt issued';
+    case 'INVOICE_PAYMENT_CAPTURED':
+      return 'Invoice payment captured';
+    case 'INVOICE_REFUNDED':
+      return 'Invoice refunded';
+    case 'PAYMENT_CAPTURE_SETTLED':
+      return 'Provider payment capture settled';
+    case 'PAYMENT_CHECKOUT_REQUESTED':
+      return 'Mobile checkout requested';
+    case 'PAYMENT_PAYOUT_REQUESTED':
+      return 'Mobile payout requested';
     default:
       return action.replaceAll('_', ' ').toLowerCase();
   }

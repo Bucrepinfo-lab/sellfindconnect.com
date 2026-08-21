@@ -84,6 +84,21 @@ export class PaymentsService {
       updatedAt: new Date().toISOString(),
     });
 
+    await this.auth.recordTenantAudit({
+      tenantId: context.session.tenantId,
+      actorUserId: context.session.userId,
+      action: 'PAYMENT_CHECKOUT_REQUESTED',
+      entityType: 'PAYMENT',
+      entityId: txn.id,
+      metadata: {
+        kind: 'CHECKOUT',
+        amount: input.amount,
+        currency: 'KES',
+        ok: result.ok,
+        status: result.ok ? 'PENDING' : 'FAILED',
+      },
+    });
+
     return result.ok
       ? { ok: true, txnId: txn.id, providerTxnId: result.transactionId }
       : { ok: false, reason: 'provider_error', txnId: txn.id };
@@ -123,6 +138,21 @@ export class PaymentsService {
       status: result.ok ? 'PENDING' : 'FAILED',
       rawCallback: result.raw,
       updatedAt: new Date().toISOString(),
+    });
+
+    await this.auth.recordTenantAudit({
+      tenantId: context.session.tenantId,
+      actorUserId: context.session.userId,
+      action: 'PAYMENT_PAYOUT_REQUESTED',
+      entityType: 'PAYMENT',
+      entityId: txn.id,
+      metadata: {
+        kind: 'B2C',
+        amount: input.amount,
+        currency: 'KES',
+        ok: result.ok,
+        status: result.ok ? 'PENDING' : 'FAILED',
+      },
     });
 
     return result.ok ? { ok: true, txnId: txn.id } : { ok: false, reason: 'provider_error', txnId: txn.id };

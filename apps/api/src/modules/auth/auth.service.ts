@@ -20,6 +20,7 @@ import {
   requiresMfa,
   roleHasPermission,
   sanitizeProductAuditMetadata,
+  matchesProductAuditQuery,
   toE164,
   buildOtpauthUri,
   generateRecoveryCodes,
@@ -31,6 +32,7 @@ import {
   type AccessDecision,
   type AccessPermission,
   type AccessResourceScope,
+  type ProductAuditQuery,
   type TenantAccessRole,
 } from '@telpen/domain';
 import { createHash, pbkdf2Sync, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
@@ -1085,14 +1087,16 @@ export class AuthService {
     return this.listAuditLogsForTenant(input.tenantId);
   }
 
-  async listAuditLogsForTenant(tenantId: string) {
+  async listAuditLogsForTenant(tenantId: string, query?: ProductAuditQuery) {
     const auditLogs = await this.repository.listAuditLogsForTenant(tenantId);
     return {
       tenantId,
-      auditLogs: auditLogs.map((record) => ({
-        ...record,
-        metadata: sanitizeProductAuditMetadata(record.metadata),
-      })),
+      auditLogs: auditLogs
+        .filter((record) => matchesProductAuditQuery(record, query))
+        .map((record) => ({
+          ...record,
+          metadata: sanitizeProductAuditMetadata(record.metadata),
+        })),
     };
   }
 

@@ -301,7 +301,7 @@ Implementation progress on 2026-06-18:
 - Added RFC 6238 authenticator TOTP enrollment. MFA-verified owners can start and confirm enrollment, later logins use `AUTHENTICATOR` delivery, and reused time-steps are rejected. Confirmation issues 10 hashed single-use recovery codes; regenerate invalidates the prior set.
 - Added hosted identity overlay for Auth0, Clerk, or generic OIDC. `POST /v1/auth/identity/session` verifies an RS256 ID token via JWKS and issues a first-party session for an existing tenant account. `AUTH_IDENTITY_PROVIDER=auth0|clerk|oidc|live` fail-closes without issuer and audience. Unverified emails and unknown accounts are rejected. New tenants still accept terms through owner signup.
 - Added `PERSISTENCE_DRIVER=prisma` overlay so production can select Prisma for all repositories and media queues with one env var when `DATABASE_URL` is set. Named `live` fail-closes without the URL. Per-repository `memory` overrides still win. Unset driver keeps the in-memory default even if `DATABASE_URL` exists. `GET /v1/health` reports driver, mode, and `databaseConfigured` without the URL.
-- Remaining hardening: broader non-auth product audit coverage. Native mobile clients remain out of scope.
+- Remaining hardening: native mobile clients remain out of scope.
 
 Acceptance criteria:
 
@@ -426,8 +426,7 @@ Implementation progress on 2026-06-19:
 - Added `PERSISTENCE_DRIVER=prisma` overlay for media review cases, job queues,
   and result publication. Named `live` fail-closes without `DATABASE_URL`.
   Per-driver `memory` overrides still win.
-- Remaining hardening: broader non-auth product audit coverage. Native mobile
-  clients remain out of scope.
+- Remaining hardening: native mobile clients remain out of scope.
 
 ### 7.3 Media Display Area
 
@@ -600,8 +599,7 @@ Implementation progress on 2026-08-21:
 - Added `PERSISTENCE_DRIVER=prisma` overlay so Source Finder catalog, embeddings,
   and hierarchy persistence can follow the hosted PostgreSQL driver without
   setting every `*_REPOSITORY` key. Per-repository `memory` overrides still win.
-- Remaining hardening: native mobile screens are out of scope. Broader non-auth
-  product audit coverage remains next.
+- Remaining hardening: native mobile screens are out of scope.
 
 Implementation progress on 2026-06-20:
 
@@ -618,8 +616,7 @@ Implementation progress on 2026-06-20:
   downloads.
 - Added web/PWA saved-search UX with named searches, alert cadence, blocked
   search handling, restored-search controls, and previewable alert candidates.
-- Remaining hardening: broader non-auth product audit coverage. Native mobile
-  saved-search screens are out of scope.
+- Remaining hardening: native mobile saved-search screens are out of scope.
 
 ### 7.6 Precision Matching and Link Intelligence
 
@@ -840,6 +837,15 @@ Implementation progress on 2026-08-21:
 
 Implementation progress on 2026-08-21:
 
+- Extended tenant product audit coverage to analytics exports, privacy/retention/
+  rollup jobs, invoice create/receipt/capture/refund, provider capture
+  settlement, and Africa's Talking checkout/payout requests. Metadata omits
+  chat copy, emails, phones, invoice numbers, payment references, and secrets.
+- `GET /v1/audit` accepts optional `action` and `entityType` filters for owner
+  or admin lookup.
+
+Implementation progress on 2026-08-21:
+
 - Added an in-memory notification repository plus opt-in Prisma persistence
   through `NOTIFICATIONS_REPOSITORY=prisma`. Tenant preferences, outbox
   destination, channel statuses, and delivery attempts survive process
@@ -971,6 +977,9 @@ Implementation progress on 2026-06-20:
   retention-day overrides.
 - Remaining follow-up: obtain and record external legal approvals for each
   country schedule before changing pending policy status to approved.
+- Added product-audit events for tenant analytics exports, privacy requests,
+  retention runs, and rollup refreshes. Export content and raw event metadata
+  stay out of the trail. `GET /v1/audit` can filter by action or entity type.
 
 ### 7.10 Subscription and Billing
 
@@ -1091,8 +1100,9 @@ Implementation progress on 2026-06-17:
 - Continued implementation on 2026-08-21 with controlled post-lock tax-return corrections. Locked periods stay locked; finance admins can post signed correction entries with `PERIOD_CORRECTION` evidence, ledger impact, dual-control above 10,000 units, and product-audit events that omit notes and authority references.
 - Continued implementation on 2026-08-21 with live payment-provider adapters. Invoice capture stays on the manual development adapter by default. `PAYMENT_PROVIDER=stripe`, `africastalking`, or `live` selects Stripe PaymentIntents and/or Africa's Talking M-Pesa checkout, rejects raw card numbers, records `REQUIRES_CAPTURE` until `POST /v1/finance/payments/settle`, and fail-closes when credentials are missing.
 - Continued implementation on 2026-08-21 with `PERSISTENCE_DRIVER=prisma` overlay for finance and payment repositories. Named `live` fail-closes without `DATABASE_URL`; `FINANCE_REPOSITORY=memory` still wins.
+- Continued implementation on 2026-08-21 with product-audit events for invoice create/receipt/capture/refund, provider capture settlement, and mobile checkout/payout. Metadata stores amounts and status only.
 - Remaining hardening: app-store billing rails are out of scope while native
-  mobile is not in delivery. Broader non-auth product audit coverage remains next.
+  mobile is not in delivery.
 
 ### 7.11 Moderation, Trust, and Safety
 

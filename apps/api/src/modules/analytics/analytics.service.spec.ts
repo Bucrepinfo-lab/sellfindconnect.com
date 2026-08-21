@@ -159,6 +159,47 @@ describe('AnalyticsService', () => {
     expect(pdfText).not.toContain('private buyer note');
   });
 
+  it('records product audit evidence for exports and privacy jobs without raw metadata', async () => {
+    const audits: Array<{ action: string; metadata?: Record<string, unknown> }> = [];
+    const service = new AnalyticsService(undefined, {
+      recordTenantAudit: async (record: { action: string; metadata?: Record<string, unknown> }) => {
+        audits.push(record);
+      },
+    } as AuthService);
+
+    await service.recordEvent(tenantId, {
+      eventType: 'VIEW',
+      entityType: 'LISTING',
+      entityId: 'advert_1',
+      countryCode: 'KE',
+      industryCode: 'AGRICULTURE',
+      consentState: 'GRANTED',
+      occurredAt: '2026-06-16T10:00:00.000Z',
+      metadata: { note: 'private buyer note' },
+    });
+
+    await service.exportTenantReport(tenantId, {
+      from: '2026-06-16T00:00:00.000Z',
+      to: '2026-06-17T00:00:00.000Z',
+      format: 'CSV',
+    });
+    await service.runPrivacyRequest({
+      requestId: 'dsr_audit',
+      requestType: 'ACCESS',
+      tenantId,
+      countryCode: 'KE',
+      from: '2026-06-16T00:00:00.000Z',
+      to: '2026-06-17T00:00:00.000Z',
+    });
+
+    expect(audits.map((record) => record.action)).toEqual([
+      'ANALYTICS_REPORT_EXPORTED',
+      'ANALYTICS_PRIVACY_REQUEST_RUN',
+    ]);
+    expect(audits[0]?.metadata).toMatchObject({ format: 'CSV' });
+    expect(JSON.stringify(audits)).not.toContain('private buyer note');
+  });
+
   it('supports dry-run retention before pruning old events', async () => {
     const service = new AnalyticsService();
 

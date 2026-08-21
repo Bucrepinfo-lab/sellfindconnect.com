@@ -18,6 +18,7 @@ import {
   type AnalyticsEntityType,
   type AnalyticsEvent,
   type AnalyticsEventType,
+  type ProductAuditAction,
   type TenantAnalyticsSummary,
 } from '@telpen/domain';
 import { Buffer } from 'node:buffer';
@@ -316,40 +317,50 @@ export class AnalyticsService {
     const format = query.format ?? 'CSV';
     const report = await this.buildTenantReport(tenantId, query);
     const fileName = `analytics-${this.safeFileSegment(tenantId)}-${report.periodStart.slice(0, 10)}-${report.periodEnd.slice(0, 10)}.${format.toLowerCase()}`;
+    const exported = format === 'JSON'
+      ? {
+          format,
+          fileName,
+          contentType: 'application/json' as const,
+          encoding: 'utf8' as const,
+          content: JSON.stringify(report, null, 2),
+          generatedAt: report.generatedAt,
+        }
+      : format === 'PDF'
+        ? {
+            format,
+            fileName,
+            contentType: 'application/pdf' as const,
+            encoding: 'base64' as const,
+            content: this.reportLinesToPdfBase64(
+              'Tenant Analytics Report',
+              this.tenantReportToPdfLines(report),
+            ),
+            generatedAt: report.generatedAt,
+          }
+        : {
+            format,
+            fileName,
+            contentType: 'text/csv' as const,
+            encoding: 'utf8' as const,
+            content: this.reportToCsv(report),
+            generatedAt: report.generatedAt,
+          };
 
-    if (format === 'JSON') {
-      return {
-        format,
-        fileName,
-        contentType: 'application/json',
-        encoding: 'utf8',
-        content: JSON.stringify(report, null, 2),
-        generatedAt: report.generatedAt,
-      };
-    }
+    await this.auditProduct({
+      tenantId,
+      action: 'ANALYTICS_REPORT_EXPORTED',
+      entityType: 'ANALYTICS_REPORT',
+      entityId: fileName,
+      metadata: {
+        format: exported.format,
+        periodStart: report.periodStart,
+        periodEnd: report.periodEnd,
+        dataSource: report.warehouse.dataSource,
+      },
+    });
 
-    if (format === 'PDF') {
-      return {
-        format,
-        fileName,
-        contentType: 'application/pdf',
-        encoding: 'base64',
-        content: this.reportLinesToPdfBase64(
-          'Tenant Analytics Report',
-          this.tenantReportToPdfLines(report),
-        ),
-        generatedAt: report.generatedAt,
-      };
-    }
-
-    return {
-      format,
-      fileName,
-      contentType: 'text/csv',
-      encoding: 'utf8',
-      content: this.reportToCsv(report),
-      generatedAt: report.generatedAt,
-    };
+    return exported;
   }
 
   async buildHierarchyReport(
@@ -442,40 +453,52 @@ export class AnalyticsService {
       report.scope.tenantId ??
       report.scope.label;
     const fileName = `platform-analytics-${report.scope.scopeLevel.toLowerCase()}-${this.safeFileSegment(scopeSegment)}-${report.periodStart.slice(0, 10)}-${report.periodEnd.slice(0, 10)}.${format.toLowerCase()}`;
+    const exported =
+      format === 'JSON'
+        ? {
+            format,
+            fileName,
+            contentType: 'application/json' as const,
+            encoding: 'utf8' as const,
+            content: JSON.stringify(report, null, 2),
+            generatedAt: report.generatedAt,
+          }
+        : format === 'PDF'
+          ? {
+              format,
+              fileName,
+              contentType: 'application/pdf' as const,
+              encoding: 'base64' as const,
+              content: this.reportLinesToPdfBase64(
+                'Platform Hierarchy Analytics Report',
+                this.hierarchyReportToPdfLines(report),
+              ),
+              generatedAt: report.generatedAt,
+            }
+          : {
+              format,
+              fileName,
+              contentType: 'text/csv' as const,
+              encoding: 'utf8' as const,
+              content: this.hierarchyReportToCsv(report),
+              generatedAt: report.generatedAt,
+            };
 
-    if (format === 'JSON') {
-      return {
-        format,
-        fileName,
-        contentType: 'application/json',
-        encoding: 'utf8',
-        content: JSON.stringify(report, null, 2),
-        generatedAt: report.generatedAt,
-      };
-    }
+    await this.auditProduct({
+      tenantId: report.scope.tenantId,
+      action: 'ANALYTICS_REPORT_EXPORTED',
+      entityType: 'ANALYTICS_REPORT',
+      entityId: fileName,
+      metadata: {
+        format: exported.format,
+        scopeLevel: report.scope.scopeLevel,
+        periodStart: report.periodStart,
+        periodEnd: report.periodEnd,
+        dataSource: report.warehouse.dataSource,
+      },
+    });
 
-    if (format === 'PDF') {
-      return {
-        format,
-        fileName,
-        contentType: 'application/pdf',
-        encoding: 'base64',
-        content: this.reportLinesToPdfBase64(
-          'Platform Hierarchy Analytics Report',
-          this.hierarchyReportToPdfLines(report),
-        ),
-        generatedAt: report.generatedAt,
-      };
-    }
-
-    return {
-      format,
-      fileName,
-      contentType: 'text/csv',
-      encoding: 'utf8',
-      content: this.hierarchyReportToCsv(report),
-      generatedAt: report.generatedAt,
-    };
+    return exported;
   }
 
   async runRetention(input: RunAnalyticsRetentionDto = {}): Promise<AnalyticsRetentionRunResult> {
@@ -511,7 +534,7 @@ export class AnalyticsService {
           countryCode,
         });
 
-    return {
+    const result = {
       before,
       retentionDays,
       tenantId: input.tenantId,
@@ -528,6 +551,20 @@ export class AnalyticsService {
       eventsDeleted,
       completedAt: new Date().toISOString(),
     };
+    await this.auditProduct({
+      tenantId: result.tenantId,
+      action: 'ANALYTICS_RETENTION_RUN',
+      entityType: 'ANALYTICS_RETENTION',
+      entityId: result.tenantId ?? result.countryCode ?? 'platform',
+      metadata: {
+        dryRun: result.dryRun,
+        eventsMatched: result.eventsMatched,
+        eventsDeleted: result.eventsDeleted,
+        retentionDays: result.retentionDays,
+        overrideApplied,
+      },
+    });
+    return result;
   }
 
   async runRollupRefresh(input: RunAnalyticsRollupDto = {}): Promise<AnalyticsRollupRefreshResult> {
@@ -570,7 +607,7 @@ export class AnalyticsService {
           rollups,
         });
 
-    return {
+    const result = {
       periodStart,
       periodEnd,
       tenantId: input.tenantId,
@@ -588,6 +625,20 @@ export class AnalyticsService {
       },
       completedAt,
     };
+    await this.auditProduct({
+      tenantId: result.tenantId,
+      action: 'ANALYTICS_ROLLUP_REFRESHED',
+      entityType: 'ANALYTICS_ROLLUP',
+      entityId: result.tenantId ?? result.countryCode ?? 'platform',
+      metadata: {
+        dryRun: result.dryRun,
+        sourceEvents: result.sourceEvents,
+        rollupsBuilt: result.rollupsBuilt,
+        rollupsDeleted: result.rollupsDeleted,
+        rollupsUpserted: result.rollupsUpserted,
+      },
+    });
+    return result;
   }
 
   async runPrivacyRequest(
@@ -652,7 +703,7 @@ export class AnalyticsService {
           })
         : { deleted: 0, upserted: 0 };
 
-    return {
+    const result = {
       requestId: input.requestId,
       requestType,
       tenantId: input.tenantId,
@@ -685,6 +736,21 @@ export class AnalyticsService {
       },
       completedAt,
     };
+    await this.auditProduct({
+      tenantId: result.tenantId,
+      action: 'ANALYTICS_PRIVACY_REQUEST_RUN',
+      entityType: 'ANALYTICS_PRIVACY_REQUEST',
+      entityId: result.requestId ?? result.tenantId ?? result.countryCode ?? 'platform',
+      metadata: {
+        requestType: result.requestType,
+        dryRun: result.dryRun,
+        eventsMatched: result.eventsMatched,
+        eventsDeleted: result.eventsDeleted,
+        rollupsDeleted: result.rollupsDeleted,
+        rollupRebuildPerformed: result.rollupRebuild.performed,
+      },
+    });
+    return result;
   }
 
   private summarizeEvents(
@@ -1418,6 +1484,28 @@ export class AnalyticsService {
 
   private safeFileSegment(value: string): string {
     return value.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80);
+  }
+
+  private async auditProduct(input: {
+    tenantId?: string;
+    actorUserId?: string;
+    action: ProductAuditAction;
+    entityType: string;
+    entityId: string;
+    metadata?: Record<string, string | number | boolean | null>;
+  }): Promise<void> {
+    if (!input.tenantId) {
+      return;
+    }
+
+    await this.auth?.recordTenantAudit({
+      tenantId: input.tenantId,
+      actorUserId: input.actorUserId,
+      action: input.action,
+      entityType: input.entityType,
+      entityId: input.entityId,
+      metadata: input.metadata,
+    });
   }
 
   private assertValidIsoDate(value: string): void {

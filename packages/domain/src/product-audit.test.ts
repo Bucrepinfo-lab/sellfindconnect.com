@@ -4,6 +4,7 @@ import {
   buildProductAuditRecord,
   canViewTenantAuditLogs,
   describeProductAuditAction,
+  matchesProductAuditQuery,
   sanitizeProductAuditMetadata,
 } from './product-audit';
 
@@ -84,5 +85,39 @@ describe('product audit helpers', () => {
     expect(describeProductAuditAction('SOURCE_FINDER_INDEX_REBUILT')).toBe(
       'Source Finder index rebuilt',
     );
+    expect(describeProductAuditAction('ANALYTICS_REPORT_EXPORTED')).toBe(
+      'Analytics report exported',
+    );
+    expect(describeProductAuditAction('PAYMENT_CHECKOUT_REQUESTED')).toBe(
+      'Mobile checkout requested',
+    );
+  });
+
+  it('filters tenant audit lookups by action and entity type', () => {
+    expect(
+      matchesProductAuditQuery(
+        { action: 'ANALYTICS_REPORT_EXPORTED', entityType: 'ANALYTICS_REPORT' },
+        { action: 'ANALYTICS_REPORT_EXPORTED' },
+      ),
+    ).toBe(true);
+    expect(
+      matchesProductAuditQuery(
+        { action: 'INVOICE_CREATED', entityType: 'INVOICE' },
+        { entityType: 'ANALYTICS_REPORT' },
+      ),
+    ).toBe(false);
+  });
+
+  it('redacts invoice numbers and payment references from audit metadata', () => {
+    expect(
+      sanitizeProductAuditMetadata({
+        totalAmount: 1160,
+        invoiceNumber: 'KE-INV-1',
+        paymentReference: 'MPESA-123',
+        customerEmail: 'billing@example.com',
+      }),
+    ).toEqual({
+      totalAmount: 1160,
+    });
   });
 });

@@ -162,10 +162,11 @@ without validating it against the authenticated user's assignments.
   `NOTIFICATIONS_REPOSITORY=prisma` and stores preferences, destination,
   channel statuses, and delivery attempts. `POST /v1/operations/notifications/dispatch/run`
   retries queued or failed outbox channels.
-- Audit: tenant-scoped product audit logs for conversation and notification
-  writes, with secret/contact/message-body redaction. Owner/admin lookup is
-  `GET /v1/audit`. Auth, profile, advert, and safety events continue to use the
-  same `AuditLog` trail.
+- Audit: tenant-scoped product audit logs for conversation, notification,
+  analytics export/privacy, invoice, and payment writes, with secret/contact/
+  message-body/invoice-number redaction. Owner/admin lookup is `GET /v1/audit`
+  with optional `action` and `entityType` filters. Auth, profile, advert, and
+  safety events continue to use the same `AuditLog` trail.
 - Billing: trial, subscription, invoice, payment, refund, and chargeback.
 - Finance: country tax profiles, tax snapshots, ledger, reconciliation, returns,
   remittances, alerts, approvals, and evidence. Tenant finance routes require

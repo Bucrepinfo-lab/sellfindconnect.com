@@ -162,7 +162,10 @@ Progress:
   without `DATABASE_URL`. Per-repository `memory` overrides still win. Tests
   stay on the in-memory default. `GET /v1/health` reports driver and
   `databaseConfigured` without the URL.
-- Broader non-auth product audit coverage remains next.
+- Broader non-auth product audit coverage now includes analytics exports,
+  privacy/retention/rollup jobs, invoices, and payment checkout/payout.
+  `GET /v1/audit` filters by action or entity type. Native mobile and app-store
+  billing remain out of scope.
 
 ## Epic 3: Advertiser Profile Vertical Slice
 
@@ -411,6 +414,9 @@ Progress:
 - Added tenant product audit coverage for conversation and notification writes,
   metadata redaction for chat copy and secrets, and `GET /v1/audit` for owner
   or admin lookup.
+- Extended product audit coverage to analytics exports, privacy/retention/rollup
+  jobs, invoices, and payment checkout/payout, with `action`/`entityType`
+  filters on `GET /v1/audit`.
 - Added in-memory and opt-in Prisma notification persistence through
   `NOTIFICATIONS_REPOSITORY=prisma`, covering tenant preferences, outbox
   destination/channel status, and delivery attempts. Dispatch retries read

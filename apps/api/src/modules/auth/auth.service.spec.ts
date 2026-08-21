@@ -274,6 +274,11 @@ describe('AuthService', () => {
     expect(actions).toContain('AUTH_TENANT_OWNER_REGISTERED');
     expect(actions).toContain('AUTH_MFA_VERIFIED');
     expect(result.auditLogs.some((record) => JSON.stringify(record).includes('developmentToken'))).toBe(false);
+
+    const filtered = await service.listAuditLogsForTenant(registered.tenant.id, {
+      action: 'AUTH_MFA_VERIFIED',
+    });
+    expect(filtered.auditLogs.map((record) => record.action)).toEqual(['AUTH_MFA_VERIFIED']);
   });
 
   it('rejects an invalid MFA challenge code before accepting the issued code', async () => {

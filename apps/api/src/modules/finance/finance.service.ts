@@ -595,6 +595,19 @@ export class FinanceService {
         )
       : undefined;
 
+    this.auditProduct({
+      tenantId,
+      action: 'INVOICE_CREATED',
+      entityType: 'INVOICE',
+      entityId: invoice.id,
+      metadata: {
+        countryCode: invoice.countryCode,
+        totalAmount: invoice.totalAmount,
+        paymentStatus: invoice.paymentStatus,
+        receiptIssued: Boolean(receipt),
+      },
+    });
+
     return { invoice, receipt, taxCalculation };
   }
 
@@ -614,6 +627,16 @@ export class FinanceService {
 
     const now = new Date().toISOString();
     const receipt = await this.createReceiptForInvoice(invoice, input, now);
+    this.auditProduct({
+      tenantId,
+      action: 'INVOICE_RECEIPT_ISSUED',
+      entityType: 'INVOICE',
+      entityId: invoice.id,
+      metadata: {
+        amountPaid: receipt.amountPaid,
+        paymentProvider: receipt.paymentProvider,
+      },
+    });
     return { invoice, receipt };
   }
 
@@ -959,6 +982,18 @@ export class FinanceService {
     }
 
     if (result.status === 'REQUIRES_CAPTURE') {
+      this.auditProduct({
+        tenantId,
+        action: 'INVOICE_PAYMENT_CAPTURED',
+        entityType: 'INVOICE',
+        entityId: invoice.id,
+        metadata: {
+          amount: payment.amount,
+          currencyCode: payment.currencyCode,
+          provider: payment.provider,
+          status: payment.status,
+        },
+      });
       return { invoice, payment, receipt: null, idempotentReplay: false };
     }
 
@@ -983,6 +1018,19 @@ export class FinanceService {
     };
     await this.repository.savePaymentReceipt(receipt);
 
+    this.auditProduct({
+      tenantId,
+      action: 'INVOICE_PAYMENT_CAPTURED',
+      entityType: 'INVOICE',
+      entityId: invoice.id,
+      metadata: {
+        amount: payment.amount,
+        currencyCode: payment.currencyCode,
+        provider: payment.provider,
+        status: payment.status,
+        receiptIssued: true,
+      },
+    });
     return { invoice: paidInvoice, payment, receipt, idempotentReplay: false };
   }
 
@@ -1041,6 +1089,18 @@ export class FinanceService {
     };
     await this.repository.savePaymentInvoice(refundedInvoice);
 
+    this.auditProduct({
+      tenantId,
+      action: 'INVOICE_REFUNDED',
+      entityType: 'INVOICE',
+      entityId: invoice.id,
+      metadata: {
+        amount: roundMoney(result.refundedAmount || requested),
+        currencyCode: invoice.currencyCode,
+        provider: result.provider,
+        status: refundPayment.status,
+      },
+    });
     return { invoice: refundedInvoice, refund: refundPayment };
   }
 
@@ -1075,6 +1135,18 @@ export class FinanceService {
         failureReason: input.failureReason ?? 'Provider capture failed.',
       };
       await this.repository.savePayment(failed);
+      this.auditProduct({
+        tenantId,
+        action: 'PAYMENT_CAPTURE_SETTLED',
+        entityType: 'PAYMENT',
+        entityId: failed.id,
+        metadata: {
+          amount: failed.amount,
+          currencyCode: failed.currencyCode,
+          provider: failed.provider,
+          status: failed.status,
+        },
+      });
       return { invoice, payment: failed, receipt: null, idempotentReplay: false };
     }
 
@@ -1113,6 +1185,19 @@ export class FinanceService {
     };
     await this.repository.savePaymentReceipt(receipt);
 
+    this.auditProduct({
+      tenantId,
+      action: 'PAYMENT_CAPTURE_SETTLED',
+      entityType: 'PAYMENT',
+      entityId: captured.id,
+      metadata: {
+        amount: captured.amount,
+        currencyCode: captured.currencyCode,
+        provider: captured.provider,
+        status: captured.status,
+        receiptIssued: true,
+      },
+    });
     return { invoice: paidInvoice, payment: captured, receipt, idempotentReplay: false };
   }
 
@@ -1752,6 +1837,7 @@ export class FinanceService {
     tenantId?: string;
     actorUserId?: string;
     action: ProductAuditAction;
+    entityType?: string;
     entityId: string;
     metadata?: Record<string, string | number | boolean | null>;
   }): void {
@@ -1759,7 +1845,7 @@ export class FinanceService {
       tenantId: input.tenantId,
       actorUserId: input.actorUserId,
       action: input.action,
-      entityType: 'TAX_RETURN',
+      entityType: input.entityType ?? 'TAX_RETURN',
       entityId: input.entityId,
       metadata: input.metadata,
     });

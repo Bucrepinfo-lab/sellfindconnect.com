@@ -144,6 +144,56 @@ describe('FinanceService', () => {
     expect(await service.listReceipts(tenantId)).toHaveLength(1);
   });
 
+  it('records invoice product audit evidence without customer or receipt references', async () => {
+    const audits: Array<{ action: string; metadata?: Record<string, unknown> }> = [];
+    const service = new FinanceService(undefined, {
+      recordTenantAudit: async (record: { action: string; metadata?: Record<string, unknown> }) => {
+        audits.push(record);
+      },
+    } as never);
+
+    await service.configureCountryTaxProfile({
+      countryCode: 'KE',
+      taxAuthorityName: 'Pilot Tax Authority',
+      taxRegistrationStatus: 'REGISTERED',
+      localFinanceOwner: 'Country Finance Admin',
+      filingFrequency: 'MONTHLY',
+      recordRetentionYears: 7,
+      taxInclusivePricing: true,
+      approvedBy: 'global-finance-admin',
+    });
+    await service.createTaxRule({
+      countryCode: 'KE',
+      taxType: 'VAT',
+      taxRate: 0.16,
+      productTaxCode: 'SFC_SUBSCRIPTION',
+      effectiveFrom: '2026-01-01T00:00:00.000Z',
+    });
+
+    await service.createInvoice(tenantId, {
+      countryCode: 'KE',
+      grossAmount: 10,
+      presentmentCurrency: 'KES',
+      productTaxCode: 'SFC_SUBSCRIPTION',
+      provider: 'MANUAL',
+      providerReference: 'checkout-session-123',
+      customerEvidence: { billingCountry: 'KE', customerType: 'BUSINESS' },
+      customerName: 'Acme Supplies Ltd',
+      customerEmail: 'billing@example.com',
+      billingReference: 'billing-123',
+      lineItemDescription: 'Sell Find Connect monthly subscription',
+      issueReceipt: true,
+      paymentProvider: 'MANUAL',
+      paymentReference: 'manual-payment-123',
+      paidAt: '2026-06-23T12:05:00.000Z',
+    });
+
+    expect(audits.map((record) => record.action)).toContain('INVOICE_CREATED');
+    expect(JSON.stringify(audits)).not.toContain('billing@example.com');
+    expect(JSON.stringify(audits)).not.toContain('manual-payment-123');
+    expect(JSON.stringify(audits)).not.toContain('Acme Supplies');
+  });
+
   it('issues receipts against an existing invoice until the balance is paid', async () => {
     const service = await configuredService();
     const invoiceResult = await service.createInvoice(tenantId, {
@@ -596,6 +646,7 @@ describe('FinanceService', () => {
     expect(corrected.ledgerEntry.entryType).toBe('TAX_PERIOD_CORRECTION');
     expect(corrected.taxReturn.evidence.map((item) => item.kind)).toContain('PERIOD_CORRECTION');
     expect(audits.map((record) => record.action)).toEqual([
+      'INVOICE_PAYMENT_CAPTURED',
       'TAX_RETURN_GENERATED',
       'TAX_RETURN_SUBMITTED',
       'TAX_RETURN_APPROVED',
