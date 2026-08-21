@@ -583,3 +583,7 @@ Progress:
 3. Turn on scheduled jobs against `https://api.sellfindconnect.com/v1`.
 4. Durable account-deletion worker (Play User Data) before any Play listing.
 5. Do not start a native Play app until Play Billing exists.
+6. Sibling products are not in this cloud workspace. Owner Desktop map:
+   InsurOS=`insurance`, Telpen Edu=`telpen-edu`, Stawi=`Mvendoh`. Push those
+   folders to GitHub (and grant Stawi write) before asking this agent to
+   audit/fix/merge them.

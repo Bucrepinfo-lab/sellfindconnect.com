@@ -75,6 +75,20 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - Recommended market domain portfolio: buy `SellFindConnect.com` first; also buy `SellFindConnect.app`, `FindSellConnect.com`, and `FindSellConnect.app` as defensive/app companions if budget allows. Campaign line: "Sell it. Find it. Connect."
 - SEO/growth direction: position Sell Find Connect around supplier finder, buyer-seller connection, business advertising app, source finder, local business directory, B2B marketplace, and country/industry business matching. Growth should combine organic SEO, country/industry landing pages, app-store optimization, social video demos, partnerships, referrals, opportunity digests, and safety/trust positioning.
 - GitHub repository: use `https://github.com/Bucrepinfo-lab/sellfindconnect.com.git` as the source repository for the Sell Find Connect codebase and future production deployments after the final platform decision.
+- Owner portfolio (five products, five Desktop folders). This cloud agent
+  only mounts `sellfindconnect.com`. The owner's Windows Desktop is not
+  visible here. Folder names as given on 2026-08-21:
+
+  | Product | Desktop folder | GitHub today |
+  | --- | --- | --- |
+  | Sell Find Connect / Telpen Adverts | this repo | `Bucrepinfo-lab/sellfindconnect.com` (write works) |
+  | InsurOS | `insurance` | `Bucrepinfo-lab/InsurOS` exists but is a stub README only |
+  | Telpen Edu | `telpen-edu` | no GitHub repo under `Bucrepinfo-lab` |
+  | Stawi | `Mvendoh` | `Bucrepinfo-lab/Stawi` exists; Cursor push is 403. An older Desktop `Chamaa App` snapshot was already consolidated into that repo. |
+
+  Do not invent remotes for `telpen-edu` or `Mvendoh`. Audit/fix/merge those
+  products only after the Desktop folders are pushed to GitHub with write
+  access, or a Cursor Desktop agent is started inside those folders.
 
 ## Open Decisions
 
@@ -226,3 +240,4 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - 2026-08-21: Continued hosted Prisma enablement. `PERSISTENCE_DRIVER=prisma` overlays PostgreSQL for repositories and media queues when `DATABASE_URL` is set, and fail-closes without it. Per-repository `memory` overrides still win. Unset driver keeps the in-memory default even if `DATABASE_URL` exists. `GET /v1/health` reports driver and `databaseConfigured` without the URL. Broader non-auth product audit coverage remains next.
 - 2026-08-21: Continued broader non-auth product audit coverage. Analytics exports, privacy/retention/rollup jobs, invoice create/receipt/capture/refund, provider capture settlement, and mobile checkout/payout now append tenant audit records. Metadata omits emails, phones, invoice numbers, payment references, and secrets. `GET /v1/audit` filters by action or entity type. Native mobile and app-store billing remain out of scope.
 - 2026-08-21: Reviewed live deployment and Google Play constraints. Fly.io Frankfurt serves `sellfindconnect.com` / `www` (HTTP 200) and `api.sellfindconnect.com/v1/health` (HTTP 200). The live API image still reports `telpen-api` without persistence health, and `/privacy` plus `/account/delete` 404 until web is redeployed. Railway URLs 404; `adverts.telpen.net` does not resolve. CORS now pairs apex and www. Privacy routes are mounted at `/v1/privacy` behind the tenant session guard. Locked rule: the verified login phone is the only STK Push destination; a Play Android listing would need Google Play Billing for the SaaS subscription and must not request `READ_SMS` or `READ_CALL_LOG`. See `docs/FLY_DEPLOYMENT.md` and `docs/PLAY_STORE.md`.
+- 2026-08-21: Owner mapped the other Desktop folders: InsurOS → `insurance`, Telpen Edu → `telpen-edu`, Stawi → `Mvendoh`. This cloud VM cannot see the Windows Desktop, Google Drive is unauthenticated, and the environment repo list is only `sellfindconnect.com`. GitHub under `Bucrepinfo-lab` still has only this repo, Stawi (push 403), and an InsurOS stub. Sibling audits stay blocked until those folders are opened in Cursor Desktop or pushed to GitHub with write access.
