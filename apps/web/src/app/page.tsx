@@ -2306,7 +2306,7 @@ export default function Home() {
                   <span>
                     SPACES_* credentials overlay DigitalOcean Spaces uploads. ClamAV and Sightengine
                     scanners overlay when their keys are set. Transform jobs verify public CDN URLs
-                    before marking READY.
+                    before marking READY. Kenya reporting playbooks attach on escalate.
                   </span>
                 </div>
               </div>

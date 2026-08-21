@@ -5,13 +5,20 @@ import {
   Optional,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { evaluateSafetyFields, getCountry } from '@telpen/domain';
+import {
+  evaluateSafetyFields,
+  getCountry,
+  mediaEscalationRequiresPlaybook,
+  resolveMediaEscalationPlaybook,
+  toMediaEscalationAuditMetadata,
+} from '@telpen/domain';
 
 import { AuthService } from '../auth/auth.service';
 import type { AuthTenantRecord, PlatformAccessSession } from '../auth/auth.records';
 import type {
   AssignMediaReviewCaseDto,
   ListMediaReviewCasesDto,
+  PreviewMediaEscalationPlaybookDto,
   ResolveMediaReviewCaseDto,
 } from './dto/media-review.dto';
 import { InMemoryMediaReviewCaseRepository } from './in-memory-media-review-case.repository';
@@ -84,11 +91,13 @@ export class MediaReviewService {
       'MODERATE_CONTENT',
       this.caseAccessResource(existing, tenantCountryMap),
     );
+    const escalation = this.playbookForResolution(existing, input.resolution, tenantCountryMap);
     const resolved = await this.repository.resolveCase({
       id,
       resolvedBy: session.userId,
       resolution: input.resolution,
       notes: input.notes?.trim(),
+      escalation,
     });
 
     if (!resolved) {
@@ -110,6 +119,7 @@ export class MediaReviewService {
         resolution: resolved.resolution ?? input.resolution,
         role: decision?.role ?? 'GLOBAL_MODERATOR_LEAD',
         notesProvided: Boolean(input.notes),
+        ...(resolved.escalation ? toMediaEscalationAuditMetadata(resolved.escalation) : {}),
       },
     });
 
@@ -177,6 +187,51 @@ export class MediaReviewService {
       ...assigned,
       reviewerRole: decision?.role,
     };
+  }
+
+  async previewEscalationPlaybook(
+    input: PreviewMediaEscalationPlaybookDto,
+    session: PlatformAccessSession,
+  ) {
+    const country = getCountry(input.countryCode);
+    await this.auth?.requirePlatformAccess(session, 'MODERATE_CONTENT', {
+      countryCode: input.countryCode.trim().toUpperCase(),
+      continentCode: country?.continentCode,
+    });
+
+    const decision = resolveMediaEscalationPlaybook({
+      countryCode: input.countryCode,
+      severity: input.severity,
+      jobType: input.jobType,
+      reason: input.reason,
+    });
+    if (!decision.ok) {
+      throw new UnprocessableEntityException(decision.reason);
+    }
+
+    return decision.snapshot;
+  }
+
+  private playbookForResolution(
+    reviewCase: MediaReviewCaseRecord,
+    resolution: string,
+    tenantCountryMap: Map<string, string>,
+  ) {
+    if (!mediaEscalationRequiresPlaybook(resolution, reviewCase.severity)) {
+      return undefined;
+    }
+
+    const decision = resolveMediaEscalationPlaybook({
+      countryCode: tenantCountryMap.get(reviewCase.tenantId),
+      severity: reviewCase.severity,
+      jobType: reviewCase.jobType,
+      reason: reviewCase.reason,
+    });
+    if (!decision.ok) {
+      throw new UnprocessableEntityException(decision.reason);
+    }
+
+    return decision.snapshot;
   }
 
   private async tenantCountryMap(): Promise<Map<string, string>> {

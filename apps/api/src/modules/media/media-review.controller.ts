@@ -7,6 +7,7 @@ import type { PlatformAccessSession } from '../auth/auth.records';
 import {
   AssignMediaReviewCaseDto,
   ListMediaReviewCasesDto,
+  PreviewMediaEscalationPlaybookDto,
   ResolveMediaReviewCaseDto,
 } from './dto/media-review.dto';
 import { MediaReviewService } from './media-review.service';
@@ -28,6 +29,14 @@ export class MediaReviewController {
     @Query() query: ListMediaReviewCasesDto,
   ) {
     return this.reviews.listCases(query, session);
+  }
+
+  @Get('escalation-playbooks')
+  previewEscalationPlaybook(
+    @PlatformAuthSession() session: PlatformAccessSession,
+    @Query() query: PreviewMediaEscalationPlaybookDto,
+  ) {
+    return this.reviews.previewEscalationPlaybook(query, session);
   }
 
   @Post('reviews/:id/resolve')

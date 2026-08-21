@@ -10,6 +10,7 @@ export * from './lifecycle';
 export * from './messaging';
 export * from './conversation-realtime';
 export * from './media';
+export * from './media-escalation';
 export * from './notifications';
 export * from './notification-dispatch';
 export * from './onboarding';

@@ -1,3 +1,4 @@
+import type { MediaEscalationSnapshot } from '@telpen/domain';
 import { PrismaPg } from '@prisma/adapter-pg';
 import {
   Prisma,
@@ -52,6 +53,7 @@ export class PrismaMediaReviewCaseRepository implements MediaReviewCaseRepositor
         notes: input.notes,
         createdAt: input.createdAt ? new Date(input.createdAt) : now,
         updatedAt: input.updatedAt ? new Date(input.updatedAt) : now,
+        escalationPlaybook: this.mapOptionalJsonToPrisma(input.escalation),
       },
     });
 
@@ -117,6 +119,7 @@ export class PrismaMediaReviewCaseRepository implements MediaReviewCaseRepositor
         resolution: input.resolution,
         notes: input.notes,
         updatedAt: resolvedAt,
+        escalationPlaybook: this.mapOptionalJsonToPrisma(input.escalation),
       },
     });
 
@@ -149,6 +152,7 @@ export class PrismaMediaReviewCaseRepository implements MediaReviewCaseRepositor
       resolvedBy: record.resolvedBy ?? undefined,
       resolution: this.mapResolution(record.resolution),
       notes: record.notes ?? undefined,
+      escalation: this.mapEscalation(record.escalationPlaybook),
       createdAt: record.createdAt.toISOString(),
       updatedAt: record.updatedAt.toISOString(),
     };
@@ -173,6 +177,66 @@ export class PrismaMediaReviewCaseRepository implements MediaReviewCaseRepositor
     }
 
     return undefined;
+  }
+
+  private mapEscalation(value: unknown): MediaEscalationSnapshot | undefined {
+    if (!this.isRecord(value)) {
+      return undefined;
+    }
+
+    const playbookCode = typeof value.playbookCode === 'string' ? value.playbookCode : undefined;
+    const countryCode = typeof value.countryCode === 'string' ? value.countryCode : undefined;
+    const kind = value.kind;
+    const reportDueAt = typeof value.reportDueAt === 'string' ? value.reportDueAt : undefined;
+    const legalHoldUntil = typeof value.legalHoldUntil === 'string' ? value.legalHoldUntil : undefined;
+    if (
+      !playbookCode ||
+      !countryCode ||
+      !reportDueAt ||
+      !legalHoldUntil ||
+      (kind !== 'CHILD_SAFETY' &&
+        kind !== 'CYBER_INCIDENT' &&
+        kind !== 'CONTENT_ABUSE' &&
+        kind !== 'INTERNAL')
+    ) {
+      return undefined;
+    }
+
+    const channelCodes = Array.isArray(value.channelCodes)
+      ? value.channelCodes.filter((item): item is MediaEscalationSnapshot['channelCodes'][number] =>
+          typeof item === 'string',
+        )
+      : [];
+    const requiredActions = Array.isArray(value.requiredActions)
+      ? value.requiredActions.filter((item): item is string => typeof item === 'string')
+      : [];
+    const channels = Array.isArray(value.channels)
+      ? value.channels.flatMap((item) => {
+          if (!this.isRecord(item) || typeof item.code !== 'string' || typeof item.label !== 'string') {
+            return [];
+          }
+          const channel: MediaEscalationSnapshot['channels'][number] = {
+            code: item.code as MediaEscalationSnapshot['channels'][number]['code'],
+            label: item.label,
+          };
+          if (typeof item.reportUrl === 'string') {
+            channel.reportUrl = item.reportUrl;
+          }
+          return [channel];
+        })
+      : [];
+
+    return {
+      playbookCode,
+      countryCode,
+      kind,
+      channelCodes,
+      channels,
+      reportDueAt,
+      legalHoldUntil,
+      preserveEvidence: true,
+      requiredActions,
+    };
   }
 
   private mapMetadata(value: unknown): MediaProcessingJobMetadata | undefined {

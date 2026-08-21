@@ -78,6 +78,7 @@ export class InMemoryMediaReviewCaseRepository implements MediaReviewCaseReposit
       resolvedBy: input.resolvedBy,
       resolution: input.resolution,
       notes: input.notes,
+      escalation: input.escalation,
       updatedAt: resolvedAt,
     };
     this.cases.set(resolved.id, resolved);

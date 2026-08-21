@@ -409,10 +409,14 @@ Implementation progress on 2026-06-19:
   Public CDN URLs are checked with an HTTPS Range GET before the job succeeds.
   `MEDIA_CDN_VERIFICATION_PROVIDER=live` fail-closes without a public origin.
   Unreachable objects fail closed; 5xx/timeouts stay retryable.
-- Remaining hardening: legal/reporting escalation playbooks, richer review
-  case management, and user-facing review status in web clients. Live Spaces
-  credentials, ClamAV/Sightengine scanners, and CDN verification overlay when
-  configured. Native mobile clients remain out of scope.
+- Added Kenya legal/reporting escalation playbooks. Escalated cases and
+  HIGH/CRITICAL confirmed blocks require an approved country playbook, persist
+  reporting channels and legal-hold deadlines, and fail closed for other
+  countries. Audit metadata stores playbook codes only.
+- Remaining hardening: richer review case management and user-facing review
+  status in web clients. Live Spaces credentials, ClamAV/Sightengine scanners,
+  CDN verification, and Kenya reporting playbooks overlay when configured.
+  Native mobile clients remain out of scope.
 
 ### 7.3 Media Display Area
 
@@ -576,9 +580,8 @@ Implementation progress on 2026-08-21:
   Search responses include `searchMode` (`RULES` | `FTS` | `HYBRID`) and
   `KEYWORD_MATCH` without requiring live OpenAI embeddings. The `embedding`
   column is reserved for an optional later overlay.
-- Remaining hardening: native mobile screens are out of scope. Legal/reporting
-  escalation playbooks, user-facing media review status, and production
-  identity remain next.
+- Remaining hardening: native mobile screens are out of scope. User-facing
+  media review status and production identity remain next.
 
 Implementation progress on 2026-06-20:
 
@@ -595,9 +598,8 @@ Implementation progress on 2026-06-20:
   downloads.
 - Added web/PWA saved-search UX with named searches, alert cadence, blocked
   search handling, restored-search controls, and previewable alert candidates.
-- Remaining hardening: legal/reporting escalation playbooks, user-facing media
-  review status, and production identity. Native mobile saved-search screens
-  are out of scope.
+- Remaining hardening: user-facing media review status and production identity.
+  Native mobile saved-search screens are out of scope.
 
 ### 7.6 Precision Matching and Link Intelligence
 
@@ -1728,7 +1730,10 @@ Risk register status: updated. Each risk below has required controls that must b
 3. Which payment methods are mandatory for launch countries?
 4. Will advertisers only subscribe, or will buyers/searchers also have paid plans later?
 5. Will the platform allow public reviews in MVP?
-6. Which launch countries require specific legal reporting channels, safety contacts, or law-enforcement escalation rules for zero-tolerance violations?
+6. Kenya pilot reporting uses KE-CIRT incident and youth-protection forms, the
+   NCMEC CyberTipline, hosting-provider abuse, and an internal legal hold.
+   Other countries fail closed until an approved playbook is added. Counsel must
+   still confirm named contacts before paid launch.
 7. Is the initial mobile app required on day one, or can the first launch use web + PWA while native apps are built?
 8. Which tax provider or combination of providers will be used for each launch country?
 9. Which accounting system must the finance module export to or integrate with?

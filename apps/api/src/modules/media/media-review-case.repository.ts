@@ -1,3 +1,5 @@
+import type { MediaEscalationSnapshot } from '@telpen/domain';
+
 import type { MediaProcessingJobMetadata } from './media.adapters';
 
 export const MEDIA_REVIEW_CASE_REPOSITORY = Symbol('MEDIA_REVIEW_CASE_REPOSITORY');
@@ -36,6 +38,7 @@ export type MediaReviewCaseRecord = {
   resolvedBy?: string;
   resolution?: MediaReviewResolution;
   notes?: string;
+  escalation?: MediaEscalationSnapshot;
   createdAt: string;
   updatedAt: string;
 };
@@ -71,6 +74,7 @@ export type ResolveMediaReviewCaseInput = {
   resolution: MediaReviewResolution;
   notes?: string;
   resolvedAt?: string;
+  escalation?: MediaEscalationSnapshot;
 };
 
 export interface MediaReviewCaseRepository {

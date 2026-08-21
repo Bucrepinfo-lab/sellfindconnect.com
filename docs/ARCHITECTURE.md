@@ -105,8 +105,11 @@ without validating it against the authenticated user's assignments.
   evidence. DigitalOcean Spaces credentials overlay live object storage through
   `SPACES_*` aliases. ClamAV and Sightengine overlay malware and visual
   moderation when configured. Transform jobs verify public CDN URLs with an
-  HTTPS Range GET before succeeding. Legal/reporting escalation remains
-  production readiness work.
+  HTTPS Range GET before succeeding. Kenya legal/reporting playbooks attach
+  KE-CIRT, NCMEC CyberTipline, and hosting-abuse channels on escalate and
+  severe confirmed-block decisions. Other countries fail closed until a
+  playbook is approved. User-facing review status remains production
+  readiness work.
 - Listings: draft, preview, publish, scheduled go-live, media, lifecycle, and visibility. Advert
   listing, lifecycle, and media routes require an MFA-verified tenant session.
   Advert media uses shared `MediaAsset` metadata, the ten-item display cap,

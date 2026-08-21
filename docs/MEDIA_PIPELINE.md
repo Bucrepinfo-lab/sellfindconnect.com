@@ -30,8 +30,10 @@ Last updated: 2026-08-21
   GET before succeeding. Unreachable objects fail closed; 5xx/timeouts stay
   retryable. Live Spaces credentials, approved ClamAV/Sightengine scanners,
   and CDN publication verification overlay when configured.
-- Production still needs legal/reporting escalation playbooks and user-facing
-  review status.
+- Kenya media review escalate and HIGH/CRITICAL confirmed-block decisions
+  attach an approved reporting playbook. Other countries fail closed until a
+  playbook is approved.
+- Production still needs user-facing review status.
 
 ## Storage Modes
 
@@ -213,6 +215,21 @@ Unsafe/final-failed publication also opens a `MediaReviewCase`:
 The case preserves job ID, job type, attempts, object key, source URL, provider
 result metadata, last error, and the exact media patch applied by publication.
 
+Kenya reporting playbooks apply when a moderator escalates a case or confirms a
+HIGH/CRITICAL block:
+
+```text
+GET /v1/platform/media/escalation-playbooks?countryCode=KE&severity=CRITICAL&jobType=MALWARE_SCAN
+POST /v1/platform/media/reviews/:id/resolve
+```
+
+Playbook `KE-MEDIA-2026-08` routes scanner-blocked uploads to KE-CIRT incident
+reporting and the hosting abuse desk, youth-protection cases to NCMEC
+CyberTipline plus the KE-CIRT youth-protection form, and transform failures to
+an internal legal hold. Report URLs are returned to the moderator; audit
+metadata stores playbook and channel codes only. Countries without an approved
+playbook cannot escalate.
+
 ## Upload Contract
 
 The API returns:
@@ -246,7 +263,7 @@ Workers should:
    final to move it to `FAILED`.
 
 Job states are `QUEUED`, `RUNNING`, `SUCCEEDED`, and `FAILED`. Remaining
-hardening is country/legal escalation playbooks and user-facing review status.
+hardening is user-facing review status.
 
 Internal batch runner:
 

@@ -225,8 +225,11 @@ Progress:
 - Added CDN publication verification on `IMAGE_TRANSFORM` and `VIDEO_TRANSCODE`
   results. HTTPS Range GET checks overlay when a public CDN origin is set.
   `MEDIA_CDN_VERIFICATION_PROVIDER=live` fail-closes without that origin.
-  Unreachable objects fail closed; 5xx stays retryable. Country/legal
-  escalation playbooks remain next.
+  Unreachable objects fail closed; 5xx stays retryable.
+- Added Kenya legal/reporting escalation playbooks. `ESCALATED` resolutions and
+  HIGH/CRITICAL confirmed blocks require an approved country playbook, persist
+  a reporting snapshot, and fail closed for countries without one. User-facing
+  review status remains next.
 
 ## Epic 4: Listing and Media Vertical Slice
 
@@ -271,8 +274,9 @@ Progress:
   `SCHEDULED` listings that are hidden from public discovery until the
   lifecycle sweep promotes them to `LIVE`.
 - Added CDN publication verification shared by advert and profile transform
-  jobs. Country/legal escalation playbooks and user-facing review status
-  remain next.
+  jobs.
+- Added Kenya legal/reporting playbooks on media review escalate and severe
+  confirmed-block decisions. User-facing review status remains next.
 
 ## Epic 5: Source Finder and Relationship Graph
 
@@ -323,8 +327,8 @@ Progress (2026-08-21):
   token overlap and Prisma `tsvector` search add `KEYWORD_MATCH` and report
   `searchMode` as `RULES`, `FTS`, or `HYBRID`. The `embedding` column is reserved
   for an optional later overlay and is not required for tests.
-- Native mobile saved-search screens remain out of scope. Country/legal
-  escalation playbooks and user-facing media review status remain next.
+- Native mobile saved-search screens remain out of scope. User-facing media
+  review status remains next.
 
 ## Epic 6: Matching and Lead Conversion
 
@@ -524,6 +528,9 @@ Progress:
   clients.
 - Limited recursive safety-field traversal to avoid crashes on hostile nested
   or cyclic payloads.
+- Added Kenya media reporting playbooks with KE-CIRT, NCMEC CyberTipline, and
+  hosting-abuse channels. Other countries fail closed until a playbook is
+  approved.
 
 ## Immediate Sprint
 

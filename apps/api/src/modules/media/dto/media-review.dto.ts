@@ -67,9 +67,32 @@ export class ResolveMediaReviewCaseDto {
   @IsIn(mediaReviewResolutions)
   declare resolution: MediaReviewResolution;
 
-  @ApiPropertyOptional({ example: 'Confirmed malicious upload and left the media blocked.' })
+  @ApiPropertyOptional({ example: 'Confirmed unsafe upload and left the media blocked.' })
   @IsOptional()
   @IsString()
   @MaxLength(1000)
   declare notes?: string;
+}
+
+export class PreviewMediaEscalationPlaybookDto {
+  @ApiProperty({ example: 'KE' })
+  @IsString()
+  @MaxLength(8)
+  declare countryCode: string;
+
+  @ApiProperty({ example: 'CRITICAL' })
+  @IsString()
+  @MaxLength(40)
+  declare severity: string;
+
+  @ApiProperty({ example: 'MALWARE_SCAN' })
+  @IsString()
+  @MaxLength(40)
+  declare jobType: string;
+
+  @ApiPropertyOptional({ example: 'SCAN_BLOCKED' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  declare reason?: string;
 }

@@ -44,6 +44,13 @@ describe('MediaReviewService', () => {
       resolvedBy: 'country-mod-1',
       resolution: 'CONFIRMED_BLOCK',
       reviewerRole: 'COUNTRY_MODERATOR',
+      escalation: {
+        playbookCode: 'KE-MEDIA-2026-08',
+        countryCode: 'KE',
+        kind: 'CYBER_INCIDENT',
+        channelCodes: ['INTERNAL_LEGAL_HOLD', 'KE_CIRT_INCIDENT', 'HOSTING_ABUSE'],
+        preserveEvidence: true,
+      },
     });
     expect(auditLogs).toEqual([
       expect.objectContaining({
@@ -57,9 +64,14 @@ describe('MediaReviewService', () => {
           resolution: 'CONFIRMED_BLOCK',
           role: 'COUNTRY_MODERATOR',
           notesProvided: true,
+          playbookCode: 'KE-MEDIA-2026-08',
+          kind: 'CYBER_INCIDENT',
+          channelCodes: 'INTERNAL_LEGAL_HOLD,KE_CIRT_INCIDENT,HOSTING_ABUSE',
         }),
       }),
     ]);
+    expect(JSON.stringify(auditLogs)).not.toContain('http');
+    expect(JSON.stringify(auditLogs)).not.toContain('@');
   });
 
   it('assigns open media review cases to the moderator queue and records audit context', async () => {
@@ -138,6 +150,75 @@ describe('MediaReviewService', () => {
       resolvedAt: undefined,
     });
   });
+
+  it('attaches the Kenya reporting playbook when a case is escalated', async () => {
+    const auditLogs: unknown[] = [];
+    const repository = new InMemoryMediaReviewCaseRepository();
+    repository.createCase(
+      reviewCase({
+        id: 'case-ke',
+        tenantId: 'tenant-ke',
+        jobType: 'CONTENT_MODERATION',
+        reason: 'ZT-CHILD-001',
+      }),
+    );
+    const service = new MediaReviewService(repository, authService(auditLogs));
+
+    const resolved = await service.resolveCase(
+      'case-ke',
+      { resolution: 'ESCALATED', notes: 'Escalated to the approved Kenya reporting path.' },
+      platformSession(),
+    );
+
+    expect(resolved).toMatchObject({
+      status: 'ESCALATED',
+      resolution: 'ESCALATED',
+      escalation: {
+        playbookCode: 'KE-MEDIA-2026-08',
+        kind: 'CHILD_SAFETY',
+        channelCodes: [
+          'INTERNAL_LEGAL_HOLD',
+          'NCMEC_CYBERTIPLINE',
+          'KE_CIRT_CHILD_RELATED',
+          'HOSTING_ABUSE',
+        ],
+      },
+    });
+    expect(JSON.stringify(auditLogs)).toContain('NCMEC_CYBERTIPLINE');
+    expect(JSON.stringify(auditLogs)).not.toContain('http');
+  });
+
+  it('fail-closes escalation when the tenant country has no approved playbook', async () => {
+    const repository = new InMemoryMediaReviewCaseRepository();
+    repository.createCase(reviewCase({ id: 'case-ug', tenantId: 'tenant-ug' }));
+    const service = new MediaReviewService(repository, globalAuthService());
+
+    await expect(
+      service.resolveCase('case-ug', { resolution: 'ESCALATED' }, globalSession()),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    await expect(repository.findCase('case-ug')).toMatchObject({ status: 'OPEN' });
+  });
+
+  it('previews the Kenya playbook for in-scope moderators', async () => {
+    const service = new MediaReviewService(new InMemoryMediaReviewCaseRepository(), authService());
+
+    await expect(
+      service.previewEscalationPlaybook(
+        { countryCode: 'KE', severity: 'CRITICAL', jobType: 'MALWARE_SCAN' },
+        platformSession(),
+      ),
+    ).resolves.toMatchObject({
+      playbookCode: 'KE-MEDIA-2026-08',
+      kind: 'CYBER_INCIDENT',
+      channelCodes: ['INTERNAL_LEGAL_HOLD', 'KE_CIRT_INCIDENT', 'HOSTING_ABUSE'],
+    });
+    await expect(
+      service.previewEscalationPlaybook(
+        { countryCode: 'UG', severity: 'CRITICAL', jobType: 'MALWARE_SCAN' },
+        platformSession(),
+      ),
+    ).rejects.toThrow('scope denied');
+  });
 });
 
 function reviewCase(input: Partial<MediaReviewCaseRecord>): MediaReviewCaseRecord {
@@ -188,6 +269,46 @@ function platformSession(): PlatformAccessSession {
       },
     ],
   };
+}
+
+function globalSession(): PlatformAccessSession {
+  return {
+    sessionId: 'session-global',
+    sessionTenantId: 'platform-home-tenant',
+    userId: 'global-mod-1',
+    mfaVerified: true,
+    assignments: [
+      {
+        id: 'assignment-global',
+        userId: 'global-mod-1',
+        role: 'GLOBAL_MODERATOR_LEAD',
+        scopeLevel: 'GLOBAL',
+        mfaRequired: true,
+        assignedBy: 'global-admin',
+        createdAt: '2026-06-20T08:00:00.000Z',
+        updatedAt: '2026-06-20T08:00:00.000Z',
+      },
+    ],
+  };
+}
+
+function globalAuthService(): AuthService {
+  const base = authService();
+  return {
+    listTenants: base.listTenants.bind(base),
+    recordTenantAudit: base.recordTenantAudit.bind(base),
+    canPlatformAccess: () => true,
+    requirePlatformAccess: async () => ({
+      allowed: true,
+      permission: 'MODERATE_CONTENT',
+      role: 'GLOBAL_MODERATOR_LEAD',
+      scopeLevel: 'GLOBAL',
+      reason: 'ACCESS_GRANTED',
+    }),
+  } as Pick<
+    AuthService,
+    'listTenants' | 'canPlatformAccess' | 'requirePlatformAccess' | 'recordTenantAudit'
+  > as AuthService;
 }
 
 function authService(auditLogs: unknown[] = []): AuthService {
