@@ -1680,7 +1680,8 @@ export default function Home() {
                   <span>
                     Resend overlays verification, password-reset, invite, and email MFA delivery.
                     AUTH_EMAIL_PROVIDER=resend fail-closes without keys. Authenticator TOTP
-                    enrollment is available after the first MFA-verified session.
+                    enrollment is available after the first MFA-verified session. Confirmation
+                    issues 10 hashed recovery codes once.
                   </span>
                 </div>
               </div>

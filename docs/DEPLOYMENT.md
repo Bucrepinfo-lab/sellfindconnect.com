@@ -328,7 +328,9 @@ GitHub source connection status on 2026-06-16:
   - Optional authenticator MFA: after the first email/dev MFA verification,
     `POST /v1/auth/mfa/totp/enroll` returns an otpauth URI and secret once;
     `POST /v1/auth/mfa/totp/confirm` activates TOTP. `MFA_ISSUER` labels the
-    authenticator account. Recovery codes remain future work.
+    authenticator account. Confirmation returns 10 hashed recovery codes once;
+    `POST /v1/auth/mfa/recovery-codes/regenerate` replaces the set. A hosted
+    identity provider remains future work.
   - Optional finance payment adapters: `PAYMENT_PROVIDER=manual` by default.
     `stripe`, `africastalking`, or `live` require `STRIPE_SECRET_KEY` and/or
     `AT_API_KEY` / `AT_USERNAME` / `AT_PAYMENTS_PRODUCT_NAME`. Raw card numbers

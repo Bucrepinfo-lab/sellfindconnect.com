@@ -57,6 +57,7 @@ const deniedExactKeys = new Set([
   'otpauthuri',
   'totpsecret',
   'totppendingsecret',
+  'recoverycode',
 ]);
 
 export function canViewTenantAuditLogs(role: TenantAccessRole): boolean {

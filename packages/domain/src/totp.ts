@@ -11,7 +11,34 @@ export const totpDefaults = {
   digits: TOTP_DIGITS,
   periodSeconds: TOTP_PERIOD_SECONDS,
   window: TOTP_WINDOW,
+  recoveryCodeCount: 10,
 } as const;
+
+export function formatRecoveryCode(normalized: string): string {
+  const compact = normalizeRecoveryCode(normalized);
+  return [compact.slice(0, 4), compact.slice(4, 8), compact.slice(8, 12), compact.slice(12, 16)]
+    .filter(Boolean)
+    .join('-');
+}
+
+export function normalizeRecoveryCode(code: string): string {
+  return code.toUpperCase().replace(/[^A-Z2-7]/g, '');
+}
+
+export function generateRecoveryCodes(count = totpDefaults.recoveryCodeCount): string[] {
+  const codes = new Set<string>();
+  while (codes.size < count) {
+    const compact = encodeBase32(randomBytes(10)).slice(0, 16);
+    if (compact.length === 16) {
+      codes.add(formatRecoveryCode(compact));
+    }
+  }
+  return [...codes];
+}
+
+export function isTotpMfaCode(code: string): boolean {
+  return /^\d{6}$/.test(code);
+}
 
 export function encodeBase32(bytes: Uint8Array): string {
   let bits = 0;

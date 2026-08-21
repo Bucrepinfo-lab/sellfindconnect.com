@@ -212,6 +212,7 @@ model User {
   totpSecret              String?                   @db.VarChar(64)
   totpPendingSecret       String?                   @db.VarChar(64)
   totpLastUsedStep        Int?
+  totpRecoveryCodeHashes  String[]                  @default([])
   createdAt               DateTime                  @default(now())
   updatedAt               DateTime                  @updatedAt
   memberships             TenantMembership[]

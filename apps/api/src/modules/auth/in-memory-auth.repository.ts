@@ -208,6 +208,10 @@ export class InMemoryAuthRepository implements AuthRepository {
         enrollment.totpLastUsedStep === null
           ? undefined
           : (enrollment.totpLastUsedStep ?? user.totpLastUsedStep),
+      totpRecoveryCodeHashes:
+        enrollment.totpRecoveryCodeHashes === null
+          ? undefined
+          : (enrollment.totpRecoveryCodeHashes ?? user.totpRecoveryCodeHashes),
     });
   }
 

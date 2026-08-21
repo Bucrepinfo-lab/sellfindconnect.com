@@ -4,9 +4,13 @@ import {
   buildOtpauthUri,
   decodeBase32,
   encodeBase32,
+  formatRecoveryCode,
+  generateRecoveryCodes,
   generateTotpCode,
   generateTotpCodeFromSecret,
   generateTotpSecret,
+  isTotpMfaCode,
+  normalizeRecoveryCode,
   verifyTotpCode,
 } from './totp';
 
@@ -60,5 +64,18 @@ describe('TOTP helpers', () => {
     expect(uri).not.toContain('algorithm=');
     expect(uri).not.toContain('digits=');
     expect(uri).not.toContain('period=');
+  });
+
+  it('generates unique grouped recovery codes that normalize dashes and case', () => {
+    const codes = generateRecoveryCodes();
+    expect(codes).toHaveLength(10);
+    expect(new Set(codes).size).toBe(10);
+    for (const code of codes) {
+      expect(code).toMatch(/^[A-Z2-7]{4}-[A-Z2-7]{4}-[A-Z2-7]{4}-[A-Z2-7]{4}$/);
+      expect(normalizeRecoveryCode(code)).toHaveLength(16);
+      expect(formatRecoveryCode(code.toLowerCase().replaceAll('-', ''))).toBe(code);
+    }
+    expect(isTotpMfaCode('492817')).toBe(true);
+    expect(isTotpMfaCode(codes[0] ?? '')).toBe(false);
   });
 });

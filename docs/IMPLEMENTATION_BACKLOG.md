@@ -143,15 +143,17 @@ Progress:
   when no live sender is configured.
 - Added RFC 6238 authenticator TOTP enrollment for MFA-verified sessions.
   Later logins use `AUTHENTICATOR` delivery, replay of the same time-step is
-  rejected, and audit metadata omits secrets and otpauth URIs. Recovery codes
-  remain next.
+  rejected, and audit metadata omits secrets and otpauth URIs.
+- Added hashed single-use recovery codes at TOTP confirmation (10 codes, shown
+  once). Login MFA accepts a recovery code when TOTP is enrolled; reuse and
+  regenerate both invalidate prior codes. Audit metadata omits the codes.
 - Added database fields/models for password metadata, auth sessions, tenant
   onboarding attributes, and terms acceptance evidence.
 - Added the initial Prisma migration and seed workflow required before enabling
   production Prisma persistence against a hosted PostgreSQL database.
-- Production identity provider, recovery codes, broader non-auth product audit
-  coverage, hosted database migration/seed execution, and production Prisma
-  enablement remain next.
+- Production identity provider, broader non-auth product audit coverage, hosted
+  database migration/seed execution, and production Prisma enablement remain
+  next.
 
 ## Epic 3: Advertiser Profile Vertical Slice
 

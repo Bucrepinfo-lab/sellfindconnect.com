@@ -197,10 +197,10 @@ export class VerifyMfaDto {
   @Length(16, 256)
   declare sessionToken: string;
 
-  @ApiProperty({ example: '492817' })
+  @ApiProperty({ example: '492817', description: 'Six-digit TOTP or grouped recovery code.' })
   @IsString()
-  @Length(6, 6)
-  @Matches(/^\d{6}$/)
+  @Length(6, 32)
+  @Matches(/^[A-Za-z0-9-]{6,32}$/)
   declare code: string;
 }
 
@@ -222,6 +222,13 @@ export class ConfirmTotpDto {
   @Length(6, 6)
   @Matches(/^\d{6}$/)
   declare code: string;
+}
+
+export class RegenerateRecoveryCodesDto {
+  @ApiProperty({ example: 'session-token' })
+  @IsString()
+  @Length(16, 256)
+  declare sessionToken: string;
 }
 
 export class CheckTenantSessionDto {

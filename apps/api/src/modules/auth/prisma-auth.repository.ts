@@ -444,6 +444,10 @@ export class PrismaAuthRepository implements AuthRepository {
           enrollment.totpPendingSecret === undefined ? undefined : enrollment.totpPendingSecret,
         totpLastUsedStep:
           enrollment.totpLastUsedStep === undefined ? undefined : enrollment.totpLastUsedStep,
+        totpRecoveryCodeHashes:
+          enrollment.totpRecoveryCodeHashes === undefined
+            ? undefined
+            : (enrollment.totpRecoveryCodeHashes ?? []),
         mfaEnrolledAt:
           enrollment.totpEnrolledAt === undefined
             ? undefined
@@ -533,6 +537,7 @@ export class PrismaAuthRepository implements AuthRepository {
       totpPendingSecret: user.totpPendingSecret ?? undefined,
       totpEnrolledAt: user.mfaEnrolledAt?.toISOString(),
       totpLastUsedStep: user.totpLastUsedStep ?? undefined,
+      totpRecoveryCodeHashes: user.totpRecoveryCodeHashes ?? [],
       createdAt: user.createdAt.toISOString(),
     };
   }

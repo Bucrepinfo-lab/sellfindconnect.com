@@ -22,7 +22,10 @@ import {
   sanitizeProductAuditMetadata,
   toE164,
   buildOtpauthUri,
+  generateRecoveryCodes,
   generateTotpSecret,
+  isTotpMfaCode,
+  normalizeRecoveryCode,
   totpDefaults,
   verifyTotpCode,
   type AccessDecision,
@@ -75,6 +78,7 @@ import type {
   VerifyPhoneOtpDto,
   EnrollTotpDto,
   ConfirmTotpDto,
+  RegenerateRecoveryCodesDto,
 } from './dto/auth.dto';
 import { InMemoryAuthRepository } from './in-memory-auth.repository';
 
@@ -719,7 +723,10 @@ export class AuthService {
     const user = await this.repository.findUserById(session.userId);
     const challenge = await this.repository.findMfaChallengeBySessionId(session.id);
     if (user?.totpSecret) {
-      return this.verifyAuthenticatorMfa(session, user, challenge, input.code);
+      if (isTotpMfaCode(input.code)) {
+        return this.verifyAuthenticatorMfa(session, user, challenge, input.code);
+      }
+      return this.verifyRecoveryCodeMfa(session, user, challenge, input.code);
     }
 
     if (!challenge || challenge.consumedAt || Date.parse(challenge.expiresAt) <= Date.now()) {
@@ -837,11 +844,13 @@ export class AuthService {
     }
 
     const now = new Date().toISOString();
+    const recoveryCodes = generateRecoveryCodes();
     await this.repository.updateUserTotpEnrollment(user.id, {
       totpSecret: user.totpPendingSecret,
       totpPendingSecret: null,
       totpEnrolledAt: now,
       totpLastUsedStep: verified.step ?? null,
+      totpRecoveryCodeHashes: recoveryCodes.map((code) => this.hashRecoveryCode(user.id, code)),
     });
     await this.recordAudit({
       tenantId: session.tenantId,
@@ -849,13 +858,48 @@ export class AuthService {
       action: 'AUTH_TOTP_ENROLLED',
       entityType: 'USER',
       entityId: user.id,
-      metadata: { deliveryChannel: 'AUTHENTICATOR' },
+      metadata: {
+        deliveryChannel: 'AUTHENTICATOR',
+        recoveryCodeCount: recoveryCodes.length,
+      },
     });
 
     return {
       enrolled: true,
       enrolledAt: now,
       deliveryChannel: 'AUTHENTICATOR' as const,
+      recoveryCodes,
+      recoveryCodesRemaining: recoveryCodes.length,
+    };
+  }
+
+  async regenerateRecoveryCodes(input: RegenerateRecoveryCodesDto) {
+    const session = await this.requireSession(input.sessionToken);
+    if (!session.mfaVerified) {
+      throw new UnauthorizedException('MFA verification is required before regenerating recovery codes.');
+    }
+
+    const user = await this.repository.findUserById(session.userId);
+    if (!user?.totpSecret) {
+      throw new UnprocessableEntityException('Enroll an authenticator before regenerating recovery codes.');
+    }
+
+    const recoveryCodes = generateRecoveryCodes();
+    await this.repository.updateUserTotpEnrollment(user.id, {
+      totpRecoveryCodeHashes: recoveryCodes.map((code) => this.hashRecoveryCode(user.id, code)),
+    });
+    await this.recordAudit({
+      tenantId: session.tenantId,
+      actorUserId: user.id,
+      action: 'AUTH_RECOVERY_CODES_REGENERATED',
+      entityType: 'USER',
+      entityId: user.id,
+      metadata: { recoveryCodeCount: recoveryCodes.length },
+    });
+
+    return {
+      recoveryCodes,
+      recoveryCodesRemaining: recoveryCodes.length,
     };
   }
 
@@ -1183,10 +1227,20 @@ export class AuthService {
     return createHash('sha256').update(`${sessionId}:${code}`).digest('base64url');
   }
 
-  private verifyMfaCode(sessionId: string, code: string, expectedHash: string): boolean {
-    const actual = Buffer.from(this.hashMfaCode(sessionId, code));
-    const expected = Buffer.from(expectedHash);
+  private hashRecoveryCode(userId: string, code: string): string {
+    return createHash('sha256')
+      .update(`RECOVERY:${userId}:${normalizeRecoveryCode(code)}`)
+      .digest('base64url');
+  }
+
+  private equalSecret(left: string, right: string): boolean {
+    const actual = Buffer.from(left);
+    const expected = Buffer.from(right);
     return actual.length === expected.length && timingSafeEqual(actual, expected);
+  }
+
+  private verifyMfaCode(sessionId: string, code: string, expectedHash: string): boolean {
+    return this.equalSecret(this.hashMfaCode(sessionId, code), expectedHash);
   }
 
   private verifyPassword(password: string, user: AuthUserRecord): boolean {
@@ -1208,6 +1262,7 @@ export class AuthService {
       mfaRequired: user.mfaRequired,
       mfaVerifiedAt: user.mfaVerifiedAt,
       totpEnrolled: Boolean(user.totpSecret && user.totpEnrolledAt),
+      recoveryCodesRemaining: user.totpRecoveryCodeHashes?.length ?? 0,
       createdAt: user.createdAt,
     };
   }
@@ -1260,10 +1315,69 @@ export class AuthService {
     return this.completeMfaVerification(session, challenge, 'AUTHENTICATOR');
   }
 
+  private async verifyRecoveryCodeMfa(
+    session: AuthSessionRecord,
+    user: AuthUserRecord,
+    challenge: AuthMfaChallengeRecord | undefined,
+    code: string,
+  ) {
+    if (challenge && challenge.failedAttempts >= MFA_MAX_FAILED_ATTEMPTS) {
+      await this.recordAudit({
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        action: 'AUTH_MFA_FAILED',
+        entityType: 'AUTH_SESSION',
+        entityId: session.id,
+        metadata: { reason: 'CHALLENGE_LOCKED', method: 'RECOVERY_CODE', challengeId: challenge.id },
+      });
+      throw new UnauthorizedException('MFA challenge locked after too many attempts.');
+    }
+
+    const remaining = [...(user.totpRecoveryCodeHashes ?? [])];
+    const presented = this.hashRecoveryCode(user.id, code);
+    const matchIndex = remaining.findIndex((stored) => this.equalSecret(stored, presented));
+    if (matchIndex < 0) {
+      if (challenge) {
+        await this.repository.updateMfaChallenge({
+          ...challenge,
+          failedAttempts: challenge.failedAttempts + 1,
+        });
+      }
+      await this.recordAudit({
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        action: 'AUTH_MFA_FAILED',
+        entityType: 'AUTH_SESSION',
+        entityId: session.id,
+        metadata: {
+          reason: 'INVALID_CODE',
+          method: 'RECOVERY_CODE',
+          ...(challenge ? { challengeId: challenge.id } : {}),
+          failedAttempts: (challenge?.failedAttempts ?? 0) + 1,
+        },
+      });
+      throw new UnauthorizedException('Invalid MFA code.');
+    }
+
+    remaining.splice(matchIndex, 1);
+    await this.repository.updateUserTotpEnrollment(user.id, {
+      totpRecoveryCodeHashes: remaining,
+    });
+    await this.recordAudit({
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: 'AUTH_RECOVERY_CODE_USED',
+      entityType: 'USER',
+      entityId: user.id,
+      metadata: { recoveryCodesRemaining: remaining.length },
+    });
+    return this.completeMfaVerification(session, challenge, 'RECOVERY_CODE');
+  }
+
   private async completeMfaVerification(
     session: AuthSessionRecord,
     challenge: AuthMfaChallengeRecord | undefined,
-    method: AuthMfaChallengeRecord['deliveryChannel'] = challenge?.deliveryChannel ?? 'EMAIL',
+    method: AuthMfaChallengeRecord['deliveryChannel'] | 'RECOVERY_CODE' = challenge?.deliveryChannel ?? 'EMAIL',
   ) {
     const now = new Date().toISOString();
     const updated: AuthSessionRecord = {

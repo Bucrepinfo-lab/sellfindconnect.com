@@ -23,6 +23,7 @@ export type AuthUserRecord = {
   totpPendingSecret?: string;
   totpEnrolledAt?: string;
   totpLastUsedStep?: number;
+  totpRecoveryCodeHashes?: string[];
   createdAt: string;
 };
 
@@ -216,4 +217,5 @@ export type TotpEnrollmentUpdateRecord = {
   totpPendingSecret?: string | null;
   totpEnrolledAt?: string | null;
   totpLastUsedStep?: number | null;
+  totpRecoveryCodeHashes?: string[] | null;
 };

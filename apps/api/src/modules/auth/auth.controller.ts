@@ -17,6 +17,7 @@ import {
   VerifyPhoneOtpDto,
   EnrollTotpDto,
   ConfirmTotpDto,
+  RegenerateRecoveryCodesDto,
 } from './dto/auth.dto';
 
 @ApiTags('auth')
@@ -87,6 +88,11 @@ export class AuthController {
   @Post('mfa/totp/confirm')
   confirmTotpEnrollment(@Body() body: ConfirmTotpDto) {
     return this.auth.confirmTotpEnrollment(body);
+  }
+
+  @Post('mfa/recovery-codes/regenerate')
+  regenerateRecoveryCodes(@Body() body: RegenerateRecoveryCodesDto) {
+    return this.auth.regenerateRecoveryCodes(body);
   }
 
   @Post('tenant-session/check')

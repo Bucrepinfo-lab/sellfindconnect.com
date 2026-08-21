@@ -741,4 +741,82 @@ describe('AuthService', () => {
       vi.useRealTimers();
     }
   });
+
+  it('issues hashed recovery codes and consumes them once during MFA', async () => {
+    const service = new AuthService();
+    const registered = await service.registerTenantOwner({
+      email: 'owner@example.com',
+      password: strongPassword,
+      displayName: 'Mary Owner',
+      tenantDisplayName: 'Nairobi Fresh Produce Cooperative',
+      countryCode: 'KE',
+      industryCode: 'AGRICULTURE',
+      primaryRole: 'SUPPLIER',
+      userType: 'ADVERTISER',
+      acceptedTerms: true,
+    });
+    await service.verifyMfa({
+      sessionToken: registered.session.token,
+      code: registered.session.mfaChallenge?.developmentCode ?? '',
+    });
+    const enrollment = await service.enrollTotp({ sessionToken: registered.session.token });
+    const confirmed = await service.confirmTotpEnrollment({
+      sessionToken: registered.session.token,
+      code: generateTotpCode(enrollment.enrollment.secret),
+    });
+    expect(confirmed.recoveryCodes).toHaveLength(10);
+    expect(new Set(confirmed.recoveryCodes).size).toBe(10);
+
+    const lookup = await service.getSession(registered.session.token);
+    expect(lookup.user?.recoveryCodesRemaining).toBe(10);
+    expect(JSON.stringify(lookup.user)).not.toContain(confirmed.recoveryCodes[0]);
+
+    const login = await service.login({ email: 'owner@example.com', password: strongPassword });
+    const recoveryCode = confirmed.recoveryCodes[0] ?? '';
+    await expect(
+      service.verifyMfa({
+        sessionToken: login.session.token,
+        code: recoveryCode.toLowerCase(),
+      }),
+    ).resolves.toMatchObject({ session: { mfaVerified: true } });
+
+    const afterUse = await service.getSession(login.session.token);
+    expect(afterUse.user?.recoveryCodesRemaining).toBe(9);
+
+    const replayLogin = await service.login({ email: 'owner@example.com', password: strongPassword });
+    await expect(
+      service.verifyMfa({ sessionToken: replayLogin.session.token, code: recoveryCode }),
+    ).rejects.toThrow();
+
+    const regenerated = await service.regenerateRecoveryCodes({ sessionToken: login.session.token });
+    expect(regenerated.recoveryCodes).toHaveLength(10);
+    expect(regenerated.recoveryCodes).not.toContain(confirmed.recoveryCodes[1]);
+
+    const afterRegen = await service.login({ email: 'owner@example.com', password: strongPassword });
+    await expect(
+      service.verifyMfa({
+        sessionToken: afterRegen.session.token,
+        code: confirmed.recoveryCodes[1] ?? '',
+      }),
+    ).rejects.toThrow();
+    await expect(
+      service.verifyMfa({
+        sessionToken: afterRegen.session.token,
+        code: regenerated.recoveryCodes[0] ?? '',
+      }),
+    ).resolves.toMatchObject({ session: { mfaVerified: true } });
+
+    const audit = await service.listTenantAuditLogs({
+      sessionToken: afterRegen.session.token,
+      tenantId: registered.tenant.id,
+    });
+    const blob = JSON.stringify(audit.auditLogs);
+    expect(audit.auditLogs.map((record) => record.action)).toEqual(
+      expect.arrayContaining(['AUTH_RECOVERY_CODE_USED', 'AUTH_RECOVERY_CODES_REGENERATED']),
+    );
+    for (const code of [...confirmed.recoveryCodes, ...regenerated.recoveryCodes]) {
+      expect(blob).not.toContain(code);
+      expect(blob).not.toContain(code.replaceAll('-', ''));
+    }
+  });
 });
