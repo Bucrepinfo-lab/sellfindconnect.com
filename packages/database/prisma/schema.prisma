@@ -1116,7 +1116,6 @@ model CreditNote {
   currency  String   @db.VarChar(3)
   reason    String
   createdAt DateTime @default(now())
-tenantId       String?
   idempotencyKey String?
   @@index([tenantId])
 }
@@ -1128,7 +1127,6 @@ model Refund {
   currency  String   @db.VarChar(3)
   reason    String
   createdAt DateTime @default(now())
-tenantId       String?
   idempotencyKey String?
   @@index([tenantId])
 }
