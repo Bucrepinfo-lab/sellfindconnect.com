@@ -607,7 +607,7 @@ export class AnalyticsService {
           rollups,
         });
 
-    const result = {
+    const result: AnalyticsRollupRefreshResult = {
       periodStart,
       periodEnd,
       tenantId: input.tenantId,
@@ -703,7 +703,7 @@ export class AnalyticsService {
           })
         : { deleted: 0, upserted: 0 };
 
-    const result = {
+    const result: AnalyticsPrivacyRequestRunResult = {
       requestId: input.requestId,
       requestType,
       tenantId: input.tenantId,

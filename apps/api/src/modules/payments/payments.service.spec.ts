@@ -19,7 +19,7 @@ describe('PaymentsService product audit', () => {
         recordTenantAudit: async (record: { action: string; metadata?: Record<string, unknown> }) => {
           audits.push(record);
         },
-      } as Pick<AuthService, 'getSession' | 'recordTenantAudit'> as AuthService,
+      } as unknown as AuthService,
       repository,
       {
         mobileCheckout: async () => ({

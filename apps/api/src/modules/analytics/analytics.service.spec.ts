@@ -165,7 +165,7 @@ describe('AnalyticsService', () => {
       recordTenantAudit: async (record: { action: string; metadata?: Record<string, unknown> }) => {
         audits.push(record);
       },
-    } as AuthService);
+    } as unknown as AuthService);
 
     await service.recordEvent(tenantId, {
       eventType: 'VIEW',
