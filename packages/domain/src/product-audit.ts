@@ -1,0 +1,134 @@
+import type { TenantAccessRole } from './access-control';
+
+export const productAuditActions = [
+  'CONVERSATION_CREATED',
+  'CONVERSATION_MESSAGE_SENT',
+  'CONVERSATION_ASSIGNED',
+  'CONVERSATION_STATUS_CHANGED',
+  'CONVERSATION_RECEIPT_RECORDED',
+  'CONVERSATION_MEDIA_ATTACHED',
+  'NOTIFICATION_PLANNED',
+  'NOTIFICATION_DISPATCHED',
+] as const;
+
+export type ProductAuditAction = (typeof productAuditActions)[number];
+
+export type ProductAuditMetadata = Record<string, string | number | boolean | null>;
+
+export type ProductAuditRecord = {
+  action: ProductAuditAction;
+  entityType: string;
+  entityId: string;
+  tenantId: string;
+  actorUserId?: string;
+  metadata?: ProductAuditMetadata;
+  createdAt: string;
+};
+
+const deniedExactKeys = new Set([
+  'password',
+  'token',
+  'sessiontoken',
+  'mfacode',
+  'code',
+  'invitetoken',
+  'email',
+  'phone',
+  'body',
+  'message',
+  'authorization',
+  'apikey',
+  'pushtoken',
+  'rawemail',
+  'developmenttoken',
+  'developmentcode',
+]);
+
+export function canViewTenantAuditLogs(role: TenantAccessRole): boolean {
+  return role === 'OWNER' || role === 'ADMIN';
+}
+
+export function describeProductAuditAction(action: string): string {
+  switch (action) {
+    case 'CONVERSATION_CREATED':
+      return 'Conversation created';
+    case 'CONVERSATION_MESSAGE_SENT':
+      return 'Chat message sent';
+    case 'CONVERSATION_ASSIGNED':
+      return 'Conversation assigned';
+    case 'CONVERSATION_STATUS_CHANGED':
+      return 'Conversation status changed';
+    case 'CONVERSATION_RECEIPT_RECORDED':
+      return 'Chat receipt recorded';
+    case 'CONVERSATION_MEDIA_ATTACHED':
+      return 'Chat media attached';
+    case 'NOTIFICATION_PLANNED':
+      return 'Notification planned';
+    case 'NOTIFICATION_DISPATCHED':
+      return 'Notification dispatched';
+    default:
+      return action.replaceAll('_', ' ').toLowerCase();
+  }
+}
+
+export function isDeniedProductAuditMetadataKey(key: string): boolean {
+  const normalized = key.toLowerCase().replace(/[_-]/g, '');
+  if (deniedExactKeys.has(normalized)) {
+    return true;
+  }
+
+  return (
+    normalized.endsWith('token') ||
+    normalized.endsWith('secret') ||
+    normalized.endsWith('password') ||
+    normalized.includes('email')
+  );
+}
+
+export function sanitizeProductAuditMetadata(
+  metadata?: Record<string, unknown>,
+): ProductAuditMetadata | undefined {
+  if (!metadata) {
+    return undefined;
+  }
+
+  const sanitized: ProductAuditMetadata = {};
+  for (const [key, value] of Object.entries(metadata)) {
+    if (isDeniedProductAuditMetadataKey(key)) {
+      continue;
+    }
+
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null) {
+      sanitized[key] = value;
+    }
+  }
+
+  return Object.keys(sanitized).length > 0 ? sanitized : undefined;
+}
+
+export function buildProductAuditRecord(input: {
+  action: ProductAuditAction;
+  entityType: string;
+  entityId: string;
+  tenantId: string;
+  actorUserId?: string;
+  metadata?: Record<string, unknown>;
+  createdAt?: string;
+}): ProductAuditRecord {
+  const tenantId = input.tenantId.trim();
+  const entityId = input.entityId.trim();
+  const entityType = input.entityType.trim();
+  if (!tenantId || !entityId || !entityType) {
+    throw new Error('Product audit records require a tenant, entity type, and entity id.');
+  }
+
+  return {
+    action: input.action,
+    entityType,
+    entityId,
+    tenantId,
+    actorUserId: input.actorUserId?.trim() || undefined,
+    metadata: sanitizeProductAuditMetadata(input.metadata),
+    createdAt: input.createdAt ?? new Date().toISOString(),
+  };
+}

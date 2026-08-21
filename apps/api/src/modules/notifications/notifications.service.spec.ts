@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import type { AuthService } from '../auth/auth.service';
 import { createDefaultNotificationAdapters } from './notification-adapters';
 import { NotificationsService } from './notifications.service';
 
@@ -82,6 +83,30 @@ describe('NotificationsService', () => {
         message: 'Can you arrange ammunition delivery?',
       }),
     ).rejects.toThrow();
+  });
+
+  it('records dispatch audit without storing notification copy', async () => {
+    const auditLogs: Array<{ action: string }> = [];
+    const service = new NotificationsService(undefined, undefined, {
+      recordTenantAudit: async (record) => {
+        auditLogs.push(record);
+      },
+    } as Pick<AuthService, 'recordTenantAudit'> as AuthService);
+    const copy = 'A high-priority conversation has missed its response SLA.';
+    await service.planAndQueue(tenantId, {
+      eventType: 'CONVERSATION_SLA_BREACHED',
+      severity: 'CRITICAL',
+      title: 'SLA breached',
+      message: copy,
+      entityType: 'conversation',
+      entityId: 'conversation-123',
+    });
+
+    expect(auditLogs.map((record) => record.action)).toEqual([
+      'NOTIFICATION_PLANNED',
+      'NOTIFICATION_DISPATCHED',
+    ]);
+    expect(JSON.stringify(auditLogs)).not.toContain(copy);
   });
 });
 

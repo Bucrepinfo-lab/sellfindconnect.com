@@ -21,6 +21,7 @@ import type {
 } from './dto/notifications.dto';
 import { createDefaultNotificationAdapters } from './notification-adapters';
 import { NotificationDispatchService } from './notification-dispatch.service';
+import { AuthService } from '../auth/auth.service';
 
 export type NotificationChannelStatus = {
   channel: NotificationChannel;
@@ -58,6 +59,7 @@ export class NotificationsService {
   private readonly preferences = new Map<string, NotificationPreference[]>();
   private readonly outbox = new Map<string, NotificationOutboxRecord>();
   private readonly dispatch: NotificationDispatchService;
+  private readonly auth?: AuthService;
 
   constructor(
     @Optional()
@@ -65,9 +67,12 @@ export class NotificationsService {
     registry?: NotificationAdapterRegistry,
     @Optional()
     dispatch?: NotificationDispatchService,
+    @Optional()
+    auth?: AuthService,
   ) {
     const adapters = registry ?? createDefaultNotificationAdapters();
     this.dispatch = dispatch ?? new NotificationDispatchService(adapters);
+    this.auth = auth;
   }
 
   getPreferences(tenantId: string): NotificationPreference[] {
@@ -143,7 +148,31 @@ export class NotificationsService {
     };
 
     this.outbox.set(this.key(tenantId, record.id), record);
-    return this.dispatchRecord(record);
+    const dispatched = await this.dispatchRecord(record);
+    await this.auditProduct({
+      tenantId,
+      actorUserId: input.recipientUserId,
+      action: 'NOTIFICATION_PLANNED',
+      entityId: dispatched.id,
+      metadata: {
+        eventType: dispatched.plan.eventType,
+        severity: dispatched.plan.severity,
+        selectedCount: dispatched.plan.selectedChannels.length,
+        suppressedCount: dispatched.plan.suppressedChannels.length,
+      },
+    });
+    await this.auditProduct({
+      tenantId,
+      actorUserId: input.recipientUserId,
+      action: 'NOTIFICATION_DISPATCHED',
+      entityId: dispatched.id,
+      metadata: {
+        sentCount: dispatched.channelStatuses.filter((item) => item.status === 'SENT').length,
+        failedCount: dispatched.channelStatuses.filter((item) => item.status === 'FAILED').length,
+        adapterCount: this.availableAdapters().length,
+      },
+    });
+    return dispatched;
   }
 
   listOutbox(tenantId: string): NotificationOutboxRecord[] {
@@ -265,5 +294,22 @@ export class NotificationsService {
 
   private key(tenantId: string, id: string): string {
     return `${tenantId}:${id}`;
+  }
+
+  private async auditProduct(input: {
+    tenantId: string;
+    actorUserId?: string;
+    action: 'NOTIFICATION_PLANNED' | 'NOTIFICATION_DISPATCHED';
+    entityId: string;
+    metadata?: Record<string, string | number | boolean | null>;
+  }) {
+    await this.auth?.recordTenantAudit({
+      tenantId: input.tenantId,
+      actorUserId: input.actorUserId,
+      action: input.action,
+      entityType: 'NOTIFICATION',
+      entityId: input.entityId,
+      metadata: input.metadata,
+    });
   }
 }

@@ -137,6 +137,10 @@ without validating it against the authenticated user's assignments.
   reasons, and scheduler jobs. Tenant notification routes require an
   MFA-verified tenant session. `POST /v1/operations/notifications/dispatch/run`
   retries queued or failed outbox channels.
+- Audit: tenant-scoped product audit logs for conversation and notification
+  writes, with secret/contact/message-body redaction. Owner/admin lookup is
+  `GET /v1/audit`. Auth, profile, advert, and safety events continue to use the
+  same `AuditLog` trail.
 - Billing: trial, subscription, invoice, payment, refund, and chargeback.
 - Finance: country tax profiles, tax snapshots, ledger, reconciliation, returns,
   remittances, alerts, approvals, and evidence. Tenant finance routes require
@@ -195,7 +199,8 @@ evidence, period locks, and exports remain future hardening work.
 - Cursor pagination for large lists.
 - Structured error codes suitable for web and mobile localization.
 - OpenAPI documentation generated from the API.
-- Audit logs for sensitive administration, finance, safety, and access actions.
+- Audit logs for sensitive administration, finance, safety, access, conversation,
+  and notification actions.
 - Auth audit metadata must avoid raw secrets, raw tokens, MFA codes, invite
   links, and raw email addresses; hash identifiers where evidence needs
   correlation without exposing the submitted value.

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import type { AuthService } from '../auth/auth.service';
 import { ConversationsRealtimeService } from './conversations.realtime.service';
 import { ConversationsService } from './conversations.service';
 
@@ -290,5 +291,30 @@ describe('ConversationsService', () => {
         fileSizeBytes: 800_000,
       }),
     ).rejects.toThrow(/malware scan or moderation/);
+  });
+
+  it('records product audit evidence without storing chat text', async () => {
+    const auditLogs: Array<{ action: string; metadata?: Record<string, unknown> }> = [];
+    const service = new ConversationsService(undefined, undefined, undefined, undefined, {
+      recordTenantAudit: async (record) => {
+        auditLogs.push(record);
+      },
+    } as Pick<AuthService, 'recordTenantAudit'> as AuthService);
+    const conversation = await service.createConversation(tenantId, opener, 'actor-1');
+    await service.sendMessage(
+      tenantId,
+      conversation.id,
+      {
+        senderRole: 'TENANT_AGENT',
+        body: 'Thank you. Please share delivery coverage and price terms.',
+        acceptedTerms: true,
+      },
+      'actor-1',
+    );
+
+    expect(auditLogs.some((record) => record.action === 'CONVERSATION_CREATED')).toBe(true);
+    expect(auditLogs.some((record) => record.action === 'CONVERSATION_MESSAGE_SENT')).toBe(true);
+    expect(JSON.stringify(auditLogs)).not.toContain(opener.message);
+    expect(JSON.stringify(auditLogs)).not.toContain('Please share delivery coverage');
   });
 });

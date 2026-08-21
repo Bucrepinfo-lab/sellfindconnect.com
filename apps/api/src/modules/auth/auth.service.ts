@@ -19,6 +19,7 @@ import {
   normalizeResourceScope,
   requiresMfa,
   roleHasPermission,
+  sanitizeProductAuditMetadata,
   toE164,
   type AccessDecision,
   type AccessPermission,
@@ -861,9 +862,17 @@ export class AuthService {
       throw new UnauthorizedException('MFA verification is required before viewing audit logs.');
     }
 
+    return this.listAuditLogsForTenant(input.tenantId);
+  }
+
+  async listAuditLogsForTenant(tenantId: string) {
+    const auditLogs = await this.repository.listAuditLogsForTenant(tenantId);
     return {
-      tenantId: input.tenantId,
-      auditLogs: await this.repository.listAuditLogsForTenant(input.tenantId),
+      tenantId,
+      auditLogs: auditLogs.map((record) => ({
+        ...record,
+        metadata: sanitizeProductAuditMetadata(record.metadata),
+      })),
     };
   }
 
@@ -1271,6 +1280,7 @@ export class AuthService {
     await this.repository.createAuditLog({
       id: randomUUID(),
       ...input,
+      metadata: sanitizeProductAuditMetadata(input.metadata),
       createdAt: new Date().toISOString(),
     });
   }

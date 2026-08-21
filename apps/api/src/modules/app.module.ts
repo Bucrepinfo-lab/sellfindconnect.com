@@ -5,6 +5,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { AccessModule } from './access/access.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AdvertsModule } from './adverts/adverts.module';
+import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { ConversationsModule } from './conversations/conversations.module';
@@ -25,6 +26,7 @@ import { SourceFinderModule } from './source-finder/source-finder.module';
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     AccessModule,
     AuthModule,
+    AuditModule,
     HealthModule,
     CatalogModule,
     SafetyModule,

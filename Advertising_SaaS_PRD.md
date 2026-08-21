@@ -640,7 +640,6 @@ Implementation progress on 2026-06-17:
 - Added consent-aware notification orchestration for in-app, email, SMS, push, and WhatsApp channels, with tenant preferences, an API outbox, and a web Notification Delivery readiness panel.
 - Added a protected internal conversation SLA sweep endpoint for scheduled response-time alerts: `POST /v1/operations/conversations/sla/run`.
 - Added HTTP delivery receipts, read receipts, typing indicators, unread counts, and opt-in Prisma conversation persistence through `CONVERSATIONS_REPOSITORY=prisma`.
-- Remaining hardening: audit logs.
 
 ### 7.7 Relationship Links
 
@@ -733,7 +732,6 @@ Implementation progress on 2026-08-21:
   `deliveredAt`, `readAt`, `readByRole`, `typingRole`, and `typingAt`.
 - Updated the web Conversation Workspace to preview inbound/outbound receipts,
   unread count, typing, mark-delivered, and mark-read.
-- Remaining: audit logs.
 
 Implementation progress on 2026-08-21:
 
@@ -775,7 +773,16 @@ Implementation progress on 2026-08-21:
   outbox records and dispatch selected channels.
 - The Notification Delivery panel previews adapter send vs missing-destination
   skips.
-- Remaining: product audit logs.
+
+Implementation progress on 2026-08-21:
+
+- Tenant product audit logs now record conversation create/send/assign/status/
+  receipt/media events and notification plan/dispatch events. Chat copy,
+  emails, tokens, and secrets are stripped from metadata.
+- Owner and admin lookup is `GET /v1/audit` behind the MFA tenant session
+  guard. `POST /v1/auth/audit/tenant` still lists the same trail.
+- The Product Audit workspace panel previews redacted events and the owner/
+  admin gate.
 
 ### 7.9 Analytics and Monitoring
 

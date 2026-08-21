@@ -352,7 +352,9 @@ Progress:
   Talking, and FCM overlay when credentials are set. Conversation SLA and
   Source Finder alerts now queue into the outbox. Dispatch retries run at
   `POST /v1/operations/notifications/dispatch/run`.
-- Product audit logs remain next.
+- Added tenant product audit coverage for conversation and notification writes,
+  metadata redaction for chat copy and secrets, and `GET /v1/audit` for owner
+  or admin lookup.
 
 ## Epic 7: Analytics
 

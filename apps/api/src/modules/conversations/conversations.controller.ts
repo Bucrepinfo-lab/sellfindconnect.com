@@ -32,8 +32,12 @@ export class ConversationsController {
   constructor(private readonly conversations: ConversationsService) {}
 
   @Post()
-  createConversation(@TenantId() tenantId: string, @Body() body: CreateConversationDto) {
-    return this.conversations.createConversation(tenantId, body);
+  createConversation(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Body() body: CreateConversationDto,
+  ) {
+    return this.conversations.createConversation(tenantId, body, session.userId);
   }
 
   @Get()
@@ -87,29 +91,38 @@ export class ConversationsController {
   @Post(':conversationId/messages')
   sendMessage(
     @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
     @Param('conversationId') conversationId: string,
     @Body() body: SendConversationMessageDto,
   ) {
-    return this.conversations.sendMessage(tenantId, conversationId, body);
+    return this.conversations.sendMessage(tenantId, conversationId, body, session.userId);
   }
 
   @Post(':conversationId/messages/:messageId/delivered')
   markDelivered(
     @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
     @Param('conversationId') conversationId: string,
     @Param('messageId') messageId: string,
   ) {
-    return this.conversations.markDelivered(tenantId, conversationId, messageId);
+    return this.conversations.markDelivered(tenantId, conversationId, messageId, session.userId);
   }
 
   @Post(':conversationId/messages/:messageId/read')
   markRead(
     @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
     @Param('conversationId') conversationId: string,
     @Param('messageId') messageId: string,
     @Body() body: ConversationReceiptDto,
   ) {
-    return this.conversations.markRead(tenantId, conversationId, messageId, body.readerRole);
+    return this.conversations.markRead(
+      tenantId,
+      conversationId,
+      messageId,
+      body.readerRole,
+      session.userId,
+    );
   }
 
   @Post(':conversationId/receipts/delivered')

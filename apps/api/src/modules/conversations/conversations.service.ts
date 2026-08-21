@@ -34,6 +34,7 @@ import {
   type ConversationParticipantRole,
   type ConversationRecord,
   type MediaAsset,
+  type ProductAuditAction,
   type SourceFinderSearchResult,
 } from '@telpen/domain';
 import { randomUUID } from 'node:crypto';
@@ -47,6 +48,7 @@ import type {
   SendConversationMessageDto,
   UpdateConversationStatusDto,
 } from './dto/conversations.dto';
+import { AuthService } from '../auth/auth.service';
 import { CONVERSATIONS_REPOSITORY, type ConversationsRepository } from './conversations.repository';
 import { ConversationsRealtimeService } from './conversations.realtime.service';
 import { InMemoryConversationsRepository } from './in-memory-conversations.repository';
@@ -64,6 +66,7 @@ export class ConversationsService {
   private readonly mediaAdapters: MediaAdapters;
   private readonly realtime: ConversationsRealtimeService;
   private readonly notifications?: NotificationsService;
+  private readonly auth?: AuthService;
 
   constructor(
     @Optional()
@@ -76,14 +79,17 @@ export class ConversationsService {
     realtime?: ConversationsRealtimeService,
     @Optional()
     notifications?: NotificationsService,
+    @Optional()
+    auth?: AuthService,
   ) {
     this.repository = repository ?? new InMemoryConversationsRepository();
     this.mediaAdapters = mediaAdapters ?? createDefaultMediaAdapters();
     this.realtime = realtime ?? new ConversationsRealtimeService();
     this.notifications = notifications;
+    this.auth = auth;
   }
 
-  async createConversation(tenantId: string, input: CreateConversationDto) {
+  async createConversation(tenantId: string, input: CreateConversationDto, actorUserId?: string) {
     this.requireTerms(input.acceptedTerms);
     this.assertSafe(input, 'Conversation contains blocked content.');
 
@@ -131,6 +137,18 @@ export class ConversationsService {
       await this.createNotification(tenantId, conversation, 'ASSIGNMENT', now);
     }
 
+    await this.auditProduct({
+      tenantId,
+      actorUserId,
+      action: 'CONVERSATION_CREATED',
+      entityId: conversation.id,
+      metadata: {
+        inquiryType: input.inquiryType,
+        sourceRecordId: conversation.sourceRecordId,
+        messageLength: input.message.length,
+      },
+    });
+
     return this.presentConversation(conversation, [opener]);
   }
 
@@ -159,7 +177,12 @@ export class ConversationsService {
     return this.repository.listMessages(tenantId, conversationId);
   }
 
-  async sendMessage(tenantId: string, conversationId: string, input: SendConversationMessageDto) {
+  async sendMessage(
+    tenantId: string,
+    conversationId: string,
+    input: SendConversationMessageDto,
+    actorUserId?: string,
+  ) {
     this.requireTerms(input.acceptedTerms);
     this.assertSafe(input, 'Message contains blocked content.');
 
@@ -219,6 +242,17 @@ export class ConversationsService {
       occurredAt: now,
       payload: { message },
     });
+    await this.auditProduct({
+      tenantId,
+      actorUserId,
+      action: 'CONVERSATION_MESSAGE_SENT',
+      entityId: conversationId,
+      metadata: {
+        senderRole: input.senderRole,
+        messageLength: input.body.length,
+        attachmentCount: attachments.length,
+      },
+    });
 
     return {
       conversation: this.presentConversation(updated, [
@@ -228,7 +262,12 @@ export class ConversationsService {
     };
   }
 
-  async markDelivered(tenantId: string, conversationId: string, messageId: string) {
+  async markDelivered(
+    tenantId: string,
+    conversationId: string,
+    messageId: string,
+    actorUserId?: string,
+  ) {
     await this.requireConversation(tenantId, conversationId);
     const message = await this.requireMessage(tenantId, conversationId, messageId);
     const updated = this.runReceipt(() => markMessageDelivered(message));
@@ -239,6 +278,13 @@ export class ConversationsService {
       conversationId,
       payload: { messages: [updated] },
     });
+    await this.auditProduct({
+      tenantId,
+      actorUserId,
+      action: 'CONVERSATION_RECEIPT_RECORDED',
+      entityId: conversationId,
+      metadata: { receipt: 'DELIVERED', messageId },
+    });
     return updated;
   }
 
@@ -247,6 +293,7 @@ export class ConversationsService {
     conversationId: string,
     messageId: string,
     readerRole: ConversationParticipantRole,
+    actorUserId?: string,
   ) {
     await this.requireConversation(tenantId, conversationId);
     const message = await this.requireMessage(tenantId, conversationId, messageId);
@@ -257,6 +304,13 @@ export class ConversationsService {
       tenantId,
       conversationId,
       payload: { readerRole, messages: [updated] },
+    });
+    await this.auditProduct({
+      tenantId,
+      actorUserId,
+      action: 'CONVERSATION_RECEIPT_RECORDED',
+      entityId: conversationId,
+      metadata: { receipt: 'READ', messageId, readerRole },
     });
     return updated;
   }
@@ -430,6 +484,16 @@ export class ConversationsService {
     };
     await this.repository.createMediaAsset(media);
     const processingJobs = await enqueueMediaProcessingJobs(this.mediaAdapters, media);
+    await this.auditProduct({
+      tenantId,
+      action: 'CONVERSATION_MEDIA_ATTACHED',
+      entityId: conversationId,
+      metadata: {
+        mediaId: media.id,
+        kind: media.kind,
+        moderationStatus: media.moderationStatus,
+      },
+    });
 
     return {
       media,
@@ -464,6 +528,12 @@ export class ConversationsService {
       tenantId,
       conversationId,
       payload: { messages: deliveredMessages },
+    });
+    await this.auditProduct({
+      tenantId,
+      action: 'CONVERSATION_RECEIPT_RECORDED',
+      entityId: conversationId,
+      metadata: { receipt: 'DELIVERED', updatedCount },
     });
 
     return {
@@ -501,6 +571,12 @@ export class ConversationsService {
       conversationId,
       payload: { readerRole, messages: readMessages },
     });
+    await this.auditProduct({
+      tenantId,
+      action: 'CONVERSATION_RECEIPT_RECORDED',
+      entityId: conversationId,
+      metadata: { receipt: 'READ', readerRole, updatedCount },
+    });
 
     return {
       updatedCount,
@@ -523,6 +599,14 @@ export class ConversationsService {
 
     await this.repository.updateConversation(updated);
     await this.createNotification(tenantId, updated, 'ASSIGNMENT', now);
+    await this.auditProduct({
+      tenantId,
+      action: 'CONVERSATION_ASSIGNED',
+      entityId: conversationId,
+      metadata: {
+        assigneeUserId: input.assigneeUserId,
+      },
+    });
     return this.presentConversation(
       updated,
       await this.repository.listMessages(tenantId, conversationId),
@@ -541,6 +625,15 @@ export class ConversationsService {
     };
 
     await this.repository.updateConversation(updated);
+    await this.auditProduct({
+      tenantId,
+      action: 'CONVERSATION_STATUS_CHANGED',
+      entityId: conversationId,
+      metadata: {
+        fromStatus: conversation.status,
+        toStatus: input.status,
+      },
+    });
     return this.presentConversation(
       updated,
       await this.repository.listMessages(tenantId, conversationId),
@@ -797,6 +890,23 @@ export class ConversationsService {
     }
 
     return this.runReceipt(() => assertConversationAttachmentsSendable(attachments));
+  }
+
+  private async auditProduct(input: {
+    tenantId: string;
+    actorUserId?: string;
+    action: ProductAuditAction;
+    entityId: string;
+    metadata?: Record<string, string | number | boolean | null>;
+  }) {
+    await this.auth?.recordTenantAudit({
+      tenantId: input.tenantId,
+      actorUserId: input.actorUserId,
+      action: input.action,
+      entityType: 'CONVERSATION',
+      entityId: input.entityId,
+      metadata: input.metadata,
+    });
   }
 
   private requireTerms(acceptedTerms: boolean): void {

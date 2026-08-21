@@ -6,6 +6,7 @@ import {
   Ban,
   Bell,
   CheckCheck,
+  ClipboardList,
   Building2,
   ChartNoAxesCombined,
   ChevronRight,
@@ -46,6 +47,7 @@ import {
   describeConversationPresenceStatus,
   describeMessageDeliveryStatus,
   describeNotificationDispatchAttemptStatus,
+  describeProductAuditAction,
   isConversationTypingActive,
   markMessageDelivered,
   markMessageRead,
@@ -63,6 +65,8 @@ import {
   operationalRegions,
   attachApprovedRelationshipClaims,
   buildOpportunityAlert,
+  buildProductAuditRecord,
+  canViewTenantAuditLogs,
   createRelationshipClaim,
   createSavedSourceFinderSearch,
   decideRelationshipClaim,
@@ -754,6 +758,27 @@ export default function Home() {
       pushToken: pushConsent ? 'demo-fcm-token' : undefined,
     },
   });
+  const canViewProductAudit = canViewTenantAuditLogs(
+    accessRole === 'ADMIN' ? 'ADMIN' : accessRole === 'OWNER' ? 'OWNER' : 'READ_ONLY_VIEWER',
+  );
+  const productAuditPreview = [
+    buildProductAuditRecord({
+      action: 'CONVERSATION_CREATED',
+      entityType: 'CONVERSATION',
+      entityId: 'demo-conversation',
+      tenantId,
+      createdAt: conversationDemoOpenedAt,
+      metadata: { inquiryType: 'RFQ', messageLength: 64, body: inboundReceipt.body },
+    }),
+    buildProductAuditRecord({
+      action: 'NOTIFICATION_DISPATCHED',
+      entityType: 'NOTIFICATION',
+      entityId: 'demo-outbox',
+      tenantId,
+      createdAt: conversationDemoNow,
+      metadata: { sentCount: 1, failedCount: 1 },
+    }),
+  ];
   const accessDecision = evaluateAccess({
     subject: {
       userId: 'country-admin-1',
@@ -1582,6 +1607,45 @@ export default function Home() {
                   </span>
                 </div>
               </div>
+            </section>
+
+            <section className="side-panel">
+              <div className="panel-heading tight">
+                <h2>Product Audit</h2>
+                <span>{canViewProductAudit ? `${productAuditPreview.length} events` : 'Restricted'}</span>
+              </div>
+              <FinanceRow label="Lookup" value="GET /v1/audit" />
+              <FinanceRow
+                label="Viewer"
+                value={canViewProductAudit ? 'Owner or admin' : 'Hidden from this role'}
+              />
+              {canViewProductAudit ? (
+                <>
+                  <div className="lead-actions-list" aria-label="Product audit events">
+                    {productAuditPreview.map((record) => (
+                      <Signal
+                        key={`${record.action}-${record.createdAt}`}
+                        text={`${describeProductAuditAction(record.action)} · ${record.entityType.toLowerCase()}`}
+                      />
+                    ))}
+                  </div>
+                  <div className="policy-box ok compact">
+                    <ClipboardList size={18} />
+                    <div>
+                      <strong>Trail visible</strong>
+                      <span>Chat copy, emails, and session secrets stay out of audit metadata.</span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="policy-box block compact">
+                  <CircleAlert size={18} />
+                  <div>
+                    <strong>Audit locked</strong>
+                    <span>Only a tenant owner or admin can read the tenant audit trail.</span>
+                  </div>
+                </div>
+              )}
             </section>
 
             <section className="side-panel">
