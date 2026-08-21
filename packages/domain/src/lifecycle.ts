@@ -3,7 +3,11 @@ export const advertLifecyclePolicy = {
   renewalAlertDays: [35, 39],
 } as const;
 
-export type AdvertLifecycleStatus = 'LIVE' | 'RENEWAL_DUE' | 'EXPIRED_FOR_DELETION';
+export type AdvertLifecycleStatus =
+  | 'SCHEDULED'
+  | 'LIVE'
+  | 'RENEWAL_DUE'
+  | 'EXPIRED_FOR_DELETION';
 
 export type AdvertLifecycleState = {
   publishedAt: string;
@@ -13,6 +17,7 @@ export type AdvertLifecycleState = {
   status: AdvertLifecycleStatus;
   renewalAlertDaysDue: number[];
   shouldAutoDelete: boolean;
+  isScheduled: boolean;
 };
 
 const dayMs = 24 * 60 * 60 * 1000;
@@ -31,22 +36,26 @@ export function calculateAdvertLifecycle(
   const rawDaysLive = Math.floor((now.getTime() - publishedAt.getTime()) / dayMs);
   const daysLive = Math.max(0, rawDaysLive);
   const daysRemaining = Math.max(0, advertLifecyclePolicy.liveDays - daysLive);
-  const shouldAutoDelete = now.getTime() >= expiresAt.getTime();
-  const renewalAlertDaysDue = advertLifecyclePolicy.renewalAlertDays.filter(
-    (day) => daysLive >= day && !shouldAutoDelete,
-  );
+  const isScheduled = now.getTime() < publishedAt.getTime();
+  const shouldAutoDelete = !isScheduled && now.getTime() >= expiresAt.getTime();
+  const renewalAlertDaysDue = isScheduled
+    ? []
+    : advertLifecyclePolicy.renewalAlertDays.filter((day) => daysLive >= day && !shouldAutoDelete);
 
   return {
     publishedAt: publishedAt.toISOString(),
     expiresAt: expiresAt.toISOString(),
-    daysLive,
+    daysLive: isScheduled ? 0 : daysLive,
     daysRemaining,
-    status: shouldAutoDelete
-      ? 'EXPIRED_FOR_DELETION'
-      : renewalAlertDaysDue.length > 0
-        ? 'RENEWAL_DUE'
-        : 'LIVE',
+    status: isScheduled
+      ? 'SCHEDULED'
+      : shouldAutoDelete
+        ? 'EXPIRED_FOR_DELETION'
+        : renewalAlertDaysDue.length > 0
+          ? 'RENEWAL_DUE'
+          : 'LIVE',
     renewalAlertDaysDue,
     shouldAutoDelete,
+    isScheduled,
   };
 }

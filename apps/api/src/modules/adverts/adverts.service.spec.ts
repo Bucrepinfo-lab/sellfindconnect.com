@@ -43,6 +43,46 @@ describe('AdvertsService', () => {
     expect(advert.expiresAt).toBe('2026-07-11T00:00:00.000Z');
   });
 
+  it('schedules a future publish date and promotes it to live on the lifecycle sweep', async () => {
+    const service = new AdvertsService();
+    const draft = await service.createDraft(tenantId, {
+      title: 'Weekend hotel produce run',
+      displayName: 'Nairobi Fresh Produce',
+      industryCode: 'AGRICULTURE',
+      role: 'SUPPLIER',
+      description: 'We supply fresh vegetables to hotels and retailers in Nairobi.',
+      countryCode: 'KE',
+    });
+
+    const scheduled = await service.publishDraft(tenantId, draft.id, {
+      acceptedTerms: true,
+      publishedAt: '2026-06-08T00:00:00.000Z',
+    });
+
+    expect(scheduled.status).toBe('SCHEDULED');
+    expect(scheduled.publishedAt).toBe('2026-06-08T00:00:00.000Z');
+    expect(scheduled.expiresAt).toBe('2026-07-18T00:00:00.000Z');
+
+    const beforeGoLive = await service.searchPublicAdverts({
+      q: 'weekend hotel produce',
+      countryCode: 'KE',
+      now: '2026-06-01T00:00:00.000Z',
+    });
+    expect(beforeGoLive.results.some((item) => item.id === scheduled.id)).toBe(false);
+
+    const sweep = await service.runLifecycle(tenantId, { now: '2026-06-08T00:00:00.000Z' });
+    expect(sweep.activatedScheduled).toHaveLength(1);
+    expect(sweep.activatedScheduled[0]?.id).toBe(scheduled.id);
+    expect(sweep.activatedScheduled[0]?.status).toBe('LIVE');
+
+    const afterGoLive = await service.searchPublicAdverts({
+      q: 'weekend hotel produce',
+      countryCode: 'KE',
+      now: '2026-06-08T00:00:00.000Z',
+    });
+    expect(afterGoLive.results.some((item) => item.id === scheduled.id)).toBe(true);
+  });
+
   it('supports persisted draft preview and publish flow', async () => {
     const service = new AdvertsService();
     const draft = await service.createDraft(tenantId, {

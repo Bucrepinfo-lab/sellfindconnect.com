@@ -35,6 +35,7 @@ export type {
 } from './privacy';
 export * from './search';
 export * from './profiles';
+export * from './relationships';
 export * from './sanitization';
 export * from './safety';
 export * from './source-finder';

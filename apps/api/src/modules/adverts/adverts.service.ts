@@ -285,11 +285,13 @@ export class AdvertsService {
       id: randomUUID(),
       sourceDraftId: draft.id,
       status:
-        lifecycle.status === 'RENEWAL_DUE'
-          ? 'RENEWAL_DUE'
-          : lifecycle.shouldAutoDelete
-            ? 'AUTO_DELETED'
-            : 'LIVE',
+        lifecycle.isScheduled
+          ? 'SCHEDULED'
+          : lifecycle.status === 'RENEWAL_DUE'
+            ? 'RENEWAL_DUE'
+            : lifecycle.shouldAutoDelete
+              ? 'AUTO_DELETED'
+              : 'LIVE',
       version: await this.nextVersion(tenantId),
       publishedAt: lifecycle.publishedAt,
       expiresAt: lifecycle.expiresAt,
@@ -322,7 +324,9 @@ export class AdvertsService {
       published,
       publishedMediaAssets,
     });
-    await this.syncDiscoveryIndex(published);
+    if (published.status !== 'SCHEDULED') {
+      await this.syncDiscoveryIndex(published);
+    }
     await this.auth?.recordTenantAudit({
       tenantId,
       actorUserId,
@@ -841,12 +845,27 @@ export class AdvertsService {
     const now = input.now ?? new Date().toISOString();
     const alerts: AdvertNotification[] = [];
     const deleted: AdvertPost[] = [];
+    const activated: AdvertPost[] = [];
     const adverts = await this.repository.listPublishedAdverts(tenantId);
 
     for (const advert of adverts) {
       if (advert.status === 'AUTO_DELETED' || advert.status === 'ARCHIVED') continue;
 
       const lifecycle = calculateAdvertLifecycle(advert.publishedAt, now);
+      if (advert.status === 'SCHEDULED' || lifecycle.isScheduled) {
+        if (lifecycle.isScheduled) continue;
+
+        const liveAdvert: AdvertPost = {
+          ...advert,
+          status: 'LIVE',
+          updatedAt: now,
+        };
+        await this.repository.updatePublishedAdvert(liveAdvert);
+        await this.syncDiscoveryIndex(liveAdvert);
+        activated.push(liveAdvert);
+        continue;
+      }
+
       if (lifecycle.shouldAutoDelete) {
         const deletedAdvert: AdvertPost = {
           ...advert,
@@ -887,6 +906,7 @@ export class AdvertsService {
       checkedAt: now,
       alertsCreated: alerts,
       autoDeleted: deleted,
+      activatedScheduled: activated,
       activeAdverts: await this.listAdverts(tenantId),
     };
   }
@@ -1317,7 +1337,11 @@ export class AdvertsService {
   }
 
   private async syncDiscoveryIndex(advert: AdvertPost): Promise<void> {
-    if (advert.status === 'AUTO_DELETED' || advert.status === 'ARCHIVED') {
+    if (
+      advert.status === 'AUTO_DELETED' ||
+      advert.status === 'ARCHIVED' ||
+      advert.status === 'SCHEDULED'
+    ) {
       await this.repository.deleteDiscoveryIndex(advert.tenantId, advert.id);
       return;
     }

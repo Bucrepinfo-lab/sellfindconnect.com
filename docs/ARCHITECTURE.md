@@ -102,18 +102,23 @@ without validating it against the authenticated user's assignments.
   `MediaReviewCase` records with severity, reason, source job, provider, and
   evidence. Approved live vendors, CDN publication verification, moderator case
   actions, and legal/reporting escalation remain production readiness work.
-- Listings: draft, preview, publish, media, lifecycle, and visibility. Advert
+- Listings: draft, preview, publish, scheduled go-live, media, lifecycle, and visibility. Advert
   listing, lifecycle, and media routes require an MFA-verified tenant session.
   Advert media uses shared `MediaAsset` metadata, the ten-item display cap,
   recursive safety checks, upload preparation, and the same
-  storage/moderation/CDN transform adapter hooks as profile media. The MVP
-  advert store remains in memory until the persisted advert repository lands.
+  storage/moderation/CDN transform adapter hooks as profile media. A future
+  `publishedAt` keeps the listing `SCHEDULED` and out of public discovery until
+  the lifecycle sweep promotes it to `LIVE`.
   See `docs/MEDIA_PIPELINE.md` for storage mode and worker queue configuration.
 - Safety: blocked categories, policy decisions, moderation cases, and reports.
 - Discovery: Source Finder, search, filters, reason codes, and saved searches.
   Tenant-scoped discovery routes require an MFA-verified tenant session.
-- Relationships: producer, supplier, consumer, distributor, installer, logistics,
-  financier, and certifier links.
+- Relationships: structured claims (`SUPPLIES_TO`, `BUYS_FROM`, `PRODUCES`,
+  `DISTRIBUTES`, `CONSUMES`, `INSTALLS`, `REPAIRS`, `FINANCES`, `CERTIFIES`,
+  `SHIPS`, `WHOLESALES`, `RETAILS`, `PARTNERS_WITH`) with public, private,
+  request-only, and verified visibility. Public/verified claims stay off the
+  graph until the counterpart or a moderator approves them. Tenant relationship
+  routes require an MFA-verified tenant session.
 - Matching: rules first, then semantic and graph ranking.
 - Conversations: inquiries, chat, RFQs, quotes, assignment, saved replies,
   response SLAs, message safety checks, and notification alerts. Lead and

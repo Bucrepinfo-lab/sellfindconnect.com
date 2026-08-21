@@ -15,6 +15,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { OperationsModule } from './operations/operations.module';
 import { PaymentsModule } from './payments/payments.module';
 import { ProfilesModule } from './profiles/profiles.module';
+import { RelationshipsModule } from './relationships/relationships.module';
 import { SafetyModule } from './safety/safety.module';
 import { SourceFinderModule } from './source-finder/source-finder.module';
 
@@ -28,6 +29,7 @@ import { SourceFinderModule } from './source-finder/source-finder.module';
     CatalogModule,
     SafetyModule,
     ProfilesModule,
+    RelationshipsModule,
     AnalyticsModule,
     AdvertsModule,
     OperationsModule,

@@ -48,6 +48,15 @@ import {
   getCountry,
   industryCategories,
   operationalRegions,
+  attachApprovedRelationshipClaims,
+  createRelationshipClaim,
+  decideRelationshipClaim,
+  isPublicGraphClaim,
+  relationshipKinds,
+  relationshipVisibilities,
+  type RelationshipClaim,
+  type RelationshipKind,
+  type RelationshipVisibility,
   pilotSourceFinderRecords,
   prohibitedCategorySummaries,
   searchSourceFinderRecords,
@@ -69,6 +78,7 @@ import {
 } from '@telpen/domain';
 
 const tenantId = '11111111-1111-4111-8111-111111111111';
+const counterpartTenantId = '22222222-2222-4222-8222-222222222222';
 const lifecycleDemoNow = new Date(Date.UTC(2026, 6, 10, 0, 0, 0)).toISOString();
 const conversationDemoOpenedAt = '2026-06-17T08:00:00.000Z';
 const conversationDemoNow = '2026-06-17T11:15:00.000Z';
@@ -404,6 +414,14 @@ export default function Home() {
     'We supply fresh vegetables to hotels, restaurants and retailers in Nairobi.',
   );
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [relationshipKind, setRelationshipKind] = useState<RelationshipKind>('SHIPS');
+  const [relationshipVisibility, setRelationshipVisibility] =
+    useState<RelationshipVisibility>('PUBLIC');
+  const [relationshipNote, setRelationshipNote] = useState(
+    'Weekly cold-chain delivery for hotel produce.',
+  );
+  const [relationshipError, setRelationshipError] = useState('');
+  const [relationshipClaims, setRelationshipClaims] = useState<RelationshipClaim[]>([]);
 
   const country = getCountry('KE') ?? countries[0]!;
   const countryCode = country.code;
@@ -427,6 +445,10 @@ export default function Home() {
       ? 'Publishing is disabled until the advertiser accepts the terms'
       : 'Publish draft';
 
+  const graphRecords = attachApprovedRelationshipClaims(
+    pilotSourceFinderRecords,
+    relationshipClaims,
+  );
   const filteredResults: SourceFinderSearchResult[] = querySafetyDecision.allowed
     ? searchSourceFinderRecords(
         {
@@ -436,7 +458,7 @@ export default function Home() {
           countryCode,
           sortBy,
         },
-        pilotSourceFinderRecords,
+        graphRecords,
       )
     : [];
   const canSaveSearch = querySafetyDecision.allowed && query.trim().length >= 2;
@@ -506,6 +528,51 @@ export default function Home() {
   const selectedMatch = filteredResults[0];
   const leadIntelligence = selectedMatch ? buildLeadConversionIntelligence(selectedMatch) : null;
   const canCreateLead = Boolean(termsAccepted && querySafetyDecision.allowed && selectedMatch);
+  const relationshipSafety = evaluateSafetyText(
+    `${tenantDisplayName} ${relationshipNote} Rift Valley Cold Chain Logistics`,
+  );
+  const canCreateRelationship = Boolean(termsAccepted && relationshipSafety.allowed);
+  const pendingRelationshipClaims = relationshipClaims.filter((claim) => claim.status === 'PENDING');
+  const graphRelationshipClaims = relationshipClaims.filter(isPublicGraphClaim);
+  const submitRelationshipClaim = () => {
+    try {
+      const claim = createRelationshipClaim(
+        {
+          sourceLabel: tenantDisplayName,
+          sourceRole: 'SUPPLIER',
+          counterpartLabel: 'Rift Valley Cold Chain Logistics',
+          counterpartRole: 'LOGISTICS_PROVIDER',
+          counterpartTenantId,
+          relationship: relationshipKind,
+          visibility: relationshipVisibility,
+          note: relationshipNote,
+          acceptedTerms: true,
+        },
+        { tenantId, userId: 'owner-demo' },
+        `claim-${Date.now()}`,
+      );
+      setRelationshipClaims((current) => [claim, ...current]);
+      setRelationshipError('');
+    } catch (error) {
+      setRelationshipError(error instanceof Error ? error.message : 'Relationship claim blocked');
+    }
+  };
+  const approveRelationshipClaim = (claimId: string) => {
+    const existing = relationshipClaims.find((claim) => claim.id === claimId);
+    if (!existing) return;
+    try {
+      const approved = decideRelationshipClaim(existing, 'APPROVED', {
+        tenantId: counterpartTenantId,
+        userId: 'counterpart-demo',
+      });
+      setRelationshipClaims((current) =>
+        current.map((claim) => (claim.id === claimId ? approved : claim)),
+      );
+      setRelationshipError('');
+    } catch (error) {
+      setRelationshipError(error instanceof Error ? error.message : 'Relationship decision blocked');
+    }
+  };
   const chatSafetyDecision = evaluateSafetyText(chatMessage);
   const conversationSla =
     leadIntelligence && selectedMatch
@@ -950,7 +1017,12 @@ export default function Home() {
             <MessageSquareText size={18} />
             <span>Messages</span>
           </button>
-          <button className="nav-item" title="Relationships">
+          <button
+            className="nav-item"
+            title="Relationships"
+            type="button"
+            onClick={() => document.getElementById('relationship-graph')?.scrollIntoView({ behavior: 'smooth' })}
+          >
             <Link2 size={18} />
             <span>Graph</span>
           </button>
@@ -1447,6 +1519,107 @@ export default function Home() {
                     : 'Calendar clear'
                 }
               />
+            </section>
+
+            <section className="side-panel" id="relationship-graph">
+              <div className="panel-heading tight">
+                <h2>Relationship Graph</h2>
+                <span>{graphRelationshipClaims.length} live</span>
+              </div>
+              <label className="lead-select-row">
+                <span>Link type</span>
+                <select
+                  value={relationshipKind}
+                  onChange={(event) =>
+                    setRelationshipKind(event.target.value as RelationshipKind)
+                  }
+                >
+                  {relationshipKinds.map((kind) => (
+                    <option key={kind} value={kind}>
+                      {codeLabel(kind)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="lead-select-row">
+                <span>Visibility</span>
+                <select
+                  value={relationshipVisibility}
+                  onChange={(event) =>
+                    setRelationshipVisibility(event.target.value as RelationshipVisibility)
+                  }
+                >
+                  {relationshipVisibilities.map((visibility) => (
+                    <option key={visibility} value={visibility}>
+                      {codeLabel(visibility)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>Claim note</span>
+                <textarea
+                  value={relationshipNote}
+                  onChange={(event) => setRelationshipNote(event.target.value)}
+                  rows={3}
+                />
+              </label>
+              <div className="terms-actions">
+                <button
+                  className="primary-button"
+                  type="button"
+                  disabled={!canCreateRelationship}
+                  onClick={submitRelationshipClaim}
+                >
+                  <Link2 size={16} />
+                  Claim link
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={pendingRelationshipClaims.length === 0}
+                  onClick={() => {
+                    const pending = pendingRelationshipClaims[0];
+                    if (pending) approveRelationshipClaim(pending.id);
+                  }}
+                >
+                  <BadgeCheck size={16} />
+                  Approve
+                </button>
+              </div>
+              <div
+                className={
+                  canCreateRelationship ? 'policy-box ok compact' : 'policy-box block compact'
+                }
+              >
+                {canCreateRelationship ? <ShieldCheck size={18} /> : <CircleAlert size={18} />}
+                <div>
+                  <strong>
+                    {canCreateRelationship ? 'Claim unlocked' : 'Claim locked'}
+                  </strong>
+                  <span>
+                    {relationshipError
+                      ? relationshipError
+                      : canCreateRelationship
+                        ? 'Public and verified links stay off the graph until the counterpart or a moderator approves.'
+                        : 'Accepted terms and a safe note are required before a relationship can be claimed.'}
+                  </span>
+                </div>
+              </div>
+              <div className="lead-actions-list">
+                {pendingRelationshipClaims.slice(0, 3).map((claim) => (
+                  <Signal
+                    key={claim.id}
+                    text={`${claim.sourceLabel} ${codeLabel(claim.relationship).toLowerCase()} ${claim.counterpartLabel} · pending`}
+                  />
+                ))}
+                {graphRelationshipClaims.slice(0, 3).map((claim) => (
+                  <Signal
+                    key={`${claim.id}-live`}
+                    text={`${claim.sourceLabel} ${codeLabel(claim.relationship).toLowerCase()} ${claim.counterpartLabel} · ${codeLabel(claim.visibility).toLowerCase()}`}
+                  />
+                ))}
+              </div>
             </section>
 
             <section className="side-panel">
@@ -2061,6 +2234,7 @@ export default function Home() {
               </div>
               <AnalyticsRow label="Renewal alert 1" value="Day 35" />
               <AnalyticsRow label="Renewal alert 2" value="Day 39" />
+              <AnalyticsRow label="Scheduled publish" value="Goes live at start time" />
               <AnalyticsRow label="Auto-delete" value="Day 40" />
               <div className="lifecycle-list">
                 {renewalQueue.length > 0 ? (
@@ -2103,7 +2277,13 @@ export default function Home() {
               </div>
               <Signal text="Fresh produce has 3 high-fit buyers and 2 logistics links." />
               <Signal text="Packaging demand is rising in Nairobi and Kiambu." />
-              <Signal text="2 relationship claims need counterparty approval." />
+              <Signal
+                text={
+                  pendingRelationshipClaims.length > 0
+                    ? `${pendingRelationshipClaims.length} relationship claims need counterparty approval.`
+                    : 'Approved supplier, logistics, and buyer links can now rank in Source Finder.'
+                }
+              />
             </section>
           </aside>
         </section>

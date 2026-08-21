@@ -1,20 +1,23 @@
 # Product Requirements Document: Multi-Tenant Advertising SaaS
 
 Date: 2026-06-15
-Last updated: 2026-06-23
+Last updated: 2026-08-21
 Owner: Telpen Adverts
 Working name: Telpen Adverts Platform
 Status: Draft for validation
 
-> Implementation status (2026-06-23): MVP vertical slices are in place across
+> Implementation status (2026-08-21): MVP vertical slices are in place across
 > auth/tenancy, advertiser profiles, listings + media pipeline, Source Finder,
 > matching/lead conversion, conversations, analytics (with daily rollups and
-> hierarchy reports), and finance/tax. The finance engine now also covers a
-> provider-neutral payment adapter, invoices/receipts, refunds, and
-> provider/bank reconciliation. An AI-native agent system (Research, Operation,
-> Support, Sales, Finance, Legal) operates the platform from `.agents/`. See
-> `docs/IMPLEMENTATION_BACKLOG.md` for per-epic progress and `Product_Memory.md`
-> for the dated decision log.
+> hierarchy reports), and finance/tax. Relationship claims now support structured
+> supplier/buyer/logistics links with counterpart or moderator approval before
+> they enter the public graph. Advert publish can be scheduled for a future
+> go-live time, then promoted by the existing 40-day lifecycle sweep. The
+> finance engine also covers a provider-neutral payment adapter, invoices/
+> receipts, refunds, and provider/bank reconciliation. An AI-native agent
+> system (Research, Operation, Support, Sales, Finance, Legal) operates the
+> platform from `.agents/`. See `docs/IMPLEMENTATION_BACKLOG.md` for per-epic
+> progress and `Product_Memory.md` for the dated decision log.
 
 ## 1. Executive Summary
 
@@ -492,6 +495,10 @@ Implementation progress:
 - Added typo-tolerant query expansion, synonym dictionaries, saved-search
   analytics events, discovery interaction counters, and web/PWA saved-search
   controls.
+- Added scheduled advert publishing: a future `publishedAt` creates a
+  `SCHEDULED` listing that stays out of public discovery until the lifecycle
+  sweep promotes it to `LIVE` at the start time. The 40-day expiry window still
+  starts at go-live.
 - Live storage credentials, approved media vendors, production-grade search
   provider hardening, persisted analytics rollups, external alert delivery, and
   native mobile saved-search screens remain next.
@@ -631,6 +638,23 @@ Requirements:
 - Linked parties can approve or reject public relationship claims.
 - Relationship graph powers search and matching.
 - Admin/moderator can remove fraudulent relationship links.
+
+Implementation progress on 2026-08-21:
+
+- Added shared relationship-claim helpers for the 13 PRD relationship kinds,
+  public/private/request-only/verified visibility, pending counterpart
+  approval, moderator removal, and zero-tolerance/terms gating.
+- Private claims auto-approve for the claiming tenant and stay off the public
+  graph. Public and verified claims stay pending until the counterpart or a
+  `MODERATE_CONTENT` moderator decides them.
+- Added tenant-session protected relationship APIs for claim create, inbox,
+  graph listing, counterpart decide, and owner/counterpart remove, plus
+  platform moderation decide/remove routes.
+- Added in-memory and opt-in Prisma relationship persistence through
+  `RELATIONSHIPS_REPOSITORY=prisma`.
+- Approved public/verified claims now attach to Source Finder records and rank
+  through existing `RELATIONSHIP_LINKS` scoring. The web Graph panel can claim,
+  approve, and preview live links.
 
 ### 7.8 Messaging, Chat, and Inquiries
 

@@ -244,6 +244,7 @@ model Tenant {
   publishedProfiles            PublishedProfile[]
   advertDrafts                 AdvertDraft[]
   publishedAdverts             PublishedAdvert[]
+  relationshipClaims           RelationshipClaim[]
   advertLifecycleNotifications AdvertLifecycleNotification[]
   advertDiscoveryIndexes       AdvertDiscoveryIndex[]
   savedAdvertSearches          SavedAdvertSearch[]
@@ -640,6 +641,34 @@ model AdvertDiscoveryAlert {
 
   @@unique([savedSearchId, advertId])
   @@index([tenantId, createdAt])
+}
+
+model RelationshipClaim {
+  id                   String    @id @default(uuid())
+  tenantId             String
+  sourceLabel          String    @db.VarChar(160)
+  sourceRole           String    @db.VarChar(80)
+  counterpartLabel     String    @db.VarChar(160)
+  counterpartRole      String    @db.VarChar(80)
+  counterpartTenantId  String?   @db.VarChar(120)
+  relationship         String    @db.VarChar(40)
+  visibility           String    @db.VarChar(40)
+  status               String    @db.VarChar(40)
+  note                 String?
+  createdByUserId      String    @db.VarChar(120)
+  decidedByUserId      String?   @db.VarChar(120)
+  decidedAt            DateTime?
+  decisionNote         String?
+  removedByUserId      String?   @db.VarChar(120)
+  removedAt            DateTime?
+  removalReason        String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  tenant               Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([counterpartTenantId, status])
+  @@index([status, visibility])
 }
 
 model MediaAsset {

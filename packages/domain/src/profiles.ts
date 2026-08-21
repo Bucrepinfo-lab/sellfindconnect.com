@@ -72,6 +72,7 @@ export const advertDraftStatuses = ['DRAFT', 'PUBLISHED'] as const;
 export type AdvertDraftStatus = (typeof advertDraftStatuses)[number];
 
 export const advertStatuses = [
+  'SCHEDULED',
   'LIVE',
   'RENEWAL_DUE',
   'PAUSED',

@@ -1,5 +1,6 @@
-import { Injectable, UnprocessableEntityException } from '@nestjs/common';
+import { Injectable, Optional, UnprocessableEntityException } from '@nestjs/common';
 import {
+  attachApprovedRelationshipClaims,
   evaluateSafetyFields,
   evaluateSafetyText,
   getCountry,
@@ -9,13 +10,16 @@ import {
   type SourceFinderRecord,
 } from '@telpen/domain';
 
+import { RelationshipsService } from '../relationships/relationships.service';
 import type { SearchSourceFinderDto } from './dto/search-source-finder.dto';
 
 @Injectable()
 export class SourceFinderService {
   private readonly records: SourceFinderRecord[] = pilotSourceFinderRecords;
 
-  search(input: SearchSourceFinderDto) {
+  constructor(@Optional() private readonly relationships?: RelationshipsService) {}
+
+  async search(input: SearchSourceFinderDto) {
     const safety = evaluateSafetyText(input.query);
     if (!safety.allowed) {
       throw new UnprocessableEntityException({
@@ -44,7 +48,9 @@ export class SourceFinderService {
       throw new UnprocessableEntityException('Unsupported industry.');
     }
 
-    const results = searchSourceFinderRecords(input, this.records);
+    const graphClaims = this.relationships ? await this.relationships.listGraph() : [];
+    const records = attachApprovedRelationshipClaims(this.records, graphClaims);
+    const results = searchSourceFinderRecords(input, records);
 
     return {
       query: input.query,

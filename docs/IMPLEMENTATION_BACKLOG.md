@@ -2,7 +2,7 @@
 
 Status: Execution backlog
 Date: 2026-06-15
-Last updated: 2026-06-20
+Last updated: 2026-08-21
 
 ## Delivery Principles
 
@@ -253,9 +253,11 @@ Progress:
   advert and profile media worker output.
 - Added durable media review cases for unsafe or final-failed advert/profile
   media processing output.
-- A durable advert lifecycle scheduler, persisted advert repository, live
-  storage credentials, approved media vendors, and moderator review-case
-  actions remain next.
+- Added scheduled advert publishing: future `publishedAt` values create
+  `SCHEDULED` listings that are hidden from public discovery until the
+  lifecycle sweep promotes them to `LIVE`.
+- A durable advert lifecycle scheduler, live storage credentials, approved
+  media vendors, and richer moderator review-case actions remain next.
 
 ## Epic 5: Source Finder and Relationship Graph
 
@@ -281,6 +283,17 @@ Progress:
   show related supplier/buyer/service links.
 - Persistence, relationship claim approval, saved searches, opportunity alerts,
   search analytics feedback, and graph dashboards remain next.
+
+Progress (2026-08-21):
+
+- Added structured relationship claims with counterpart approve/reject,
+  moderator removal, public/private/request-only/verified visibility, and
+  zero-tolerance/terms gating.
+- Approved public/verified claims now attach to Source Finder results and the
+  web Graph panel. Opt-in Prisma persistence is available through
+  `RELATIONSHIPS_REPOSITORY=prisma`.
+- Saved searches, opportunity alert delivery, and native mobile graph screens
+  remain next.
 
 ## Epic 6: Matching and Lead Conversion
 

@@ -1,7 +1,7 @@
 # Telpen Adverts Product Memory
 
 Date started: 2026-06-15
-Last updated: 2026-06-24
+Last updated: 2026-08-21
 Purpose: Persistent decision log and strategic memory for the Telpen Adverts multi-tenant advertising SaaS.
 
 This file must be updated whenever product strategy, pricing, compliance, architecture, market positioning, or execution decisions change.
@@ -185,3 +185,4 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - 2026-06-23: Continued analytics retention approval hardening without deployment. Added legal approval status and review metadata to analytics retention policies, surfaced legal-approval-required state in retention results, and required `approvalReference` for emergency retention-day overrides. Remaining work is operational: obtain external legal approvals before marking country schedules approved.
 - 2026-06-23: Continued Epic 8 finance without deployment. Added shared invoice numbering and payment-balance helpers, protected tenant finance endpoints for invoice creation and receipt issuance, in-memory invoice/receipt records, and tests proving a paid transaction creates an invoice, receipt, tax snapshot, and ledger entries. Remaining work includes durable finance persistence, payment-provider adapters/idempotency, refunds, chargebacks, dunning, reconciliation, filing/remittance evidence, period locks, and exports.
 - 2026-06-24: Continued Epic 8 finance without deployment. Added shared credit-note numbering, proportional refund/chargeback reversal helpers, dunning stage selection, protected refund and chargeback endpoints, adjustment listing, duplicate-safe invoice dunning runs, and tests proving refund credit notes, reversal ledger entries, disputed-balance reopening, and overdue dunning notices. Remaining work includes durable finance persistence, payment-provider adapters/idempotency, reconciliation, approval workflow, evidence attachments, period locks, and exports.
+- 2026-08-21: Closed the remaining PRD 7.7 relationship-claim gap and PRD 7.4 scheduled-publish gap. Relationship claims now use structured kinds, visibility, counterpart or moderator approval, zero-tolerance/terms gating, opt-in Prisma persistence, and Source Finder graph attachment. Future advert `publishedAt` values stay `SCHEDULED` and out of public discovery until the lifecycle sweep promotes them to `LIVE`. The owner's local Desktop `Advert` folder was not present in this cloud workspace; product truth remains `Advertising_SaaS_PRD.md`.
