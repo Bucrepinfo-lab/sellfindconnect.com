@@ -16,6 +16,7 @@ import type {
   PasswordUpdateRecord,
   TenantMembershipWithTermsRecords,
   TenantMembershipRecord,
+  TotpEnrollmentUpdateRecord,
 } from './auth.records';
 import type { AuthRepository } from './auth.repository';
 
@@ -186,6 +187,28 @@ export class InMemoryAuthRepository implements AuthRepository {
     }
 
     this.saveUser({ ...user, mfaVerifiedAt });
+  }
+
+  updateUserTotpEnrollment(userId: string, enrollment: TotpEnrollmentUpdateRecord): void {
+    const user = this.usersById.get(userId);
+    if (!user) {
+      return;
+    }
+
+    this.saveUser({
+      ...user,
+      totpSecret: enrollment.totpSecret === null ? undefined : (enrollment.totpSecret ?? user.totpSecret),
+      totpPendingSecret:
+        enrollment.totpPendingSecret === null
+          ? undefined
+          : (enrollment.totpPendingSecret ?? user.totpPendingSecret),
+      totpEnrolledAt:
+        enrollment.totpEnrolledAt === null ? undefined : (enrollment.totpEnrolledAt ?? user.totpEnrolledAt),
+      totpLastUsedStep:
+        enrollment.totpLastUsedStep === null
+          ? undefined
+          : (enrollment.totpLastUsedStep ?? user.totpLastUsedStep),
+    });
   }
 
   revokeSessionsForUser(userId: string, revokedAt: string): void {

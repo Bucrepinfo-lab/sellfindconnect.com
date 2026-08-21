@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { InMemoryAuthRepository } from './in-memory-auth.repository';
 import { AuthService } from './auth.service';
 import type { AuthEmailMessage, AuthEmailSender } from './resend-email';
+import { generateTotpCode } from '@telpen/domain';
 
 const strongPassword = 'Strong-owner#2026';
 
@@ -661,5 +662,83 @@ describe('AuthService', () => {
     expect(result.emailVerificationChallenge.developmentToken).toBeTruthy();
     expect(result.session.mfaChallenge?.developmentCode).toMatch(/^\d{6}$/);
     expect(result.session.mfaChallenge?.deliveryChannel).toBe('DEVELOPMENT');
+  });
+
+  it('enrolls an authenticator and verifies later logins with TOTP', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-21T18:00:00.000Z'));
+    const repository = new InMemoryAuthRepository();
+    const service = new AuthService(repository);
+    try {
+      const registered = await service.registerTenantOwner({
+        email: 'owner@example.com',
+        password: strongPassword,
+        displayName: 'Mary Owner',
+        tenantDisplayName: 'Nairobi Fresh Produce Cooperative',
+        countryCode: 'KE',
+        industryCode: 'AGRICULTURE',
+        primaryRole: 'SUPPLIER',
+        userType: 'ADVERTISER',
+        acceptedTerms: true,
+      });
+
+      await expect(
+        service.enrollTotp({ sessionToken: registered.session.token }),
+      ).rejects.toThrow('MFA verification is required');
+
+      await service.verifyMfa({
+        sessionToken: registered.session.token,
+        code: registered.session.mfaChallenge?.developmentCode ?? '',
+      });
+
+      const enrollment = await service.enrollTotp({ sessionToken: registered.session.token });
+      expect(enrollment.enrollment.secret).toMatch(/^[A-Z2-7]+$/);
+      expect(enrollment.enrollment.otpauthUri).toContain('otpauth://totp/');
+      expect(enrollment.enrollment.otpauthUri).toContain(enrollment.enrollment.secret);
+      expect(registered.user.totpEnrolled).toBe(false);
+
+      const confirmCode = generateTotpCode(enrollment.enrollment.secret);
+      const confirmed = await service.confirmTotpEnrollment({
+        sessionToken: registered.session.token,
+        code: confirmCode,
+      });
+      expect(confirmed).toMatchObject({ enrolled: true, deliveryChannel: 'AUTHENTICATOR' });
+
+      const sessionLookup = await service.getSession(registered.session.token);
+      expect(sessionLookup.user?.totpEnrolled).toBe(true);
+      expect(JSON.stringify(sessionLookup.user)).not.toContain(enrollment.enrollment.secret);
+
+      vi.setSystemTime(new Date('2026-08-21T18:00:31.000Z'));
+      const login = await service.login({ email: 'owner@example.com', password: strongPassword });
+      expect(login.session.mfaChallenge?.deliveryChannel).toBe('AUTHENTICATOR');
+      expect(login.session.mfaChallenge?.developmentCode).toBeUndefined();
+      expect(login.user.totpEnrolled).toBe(true);
+
+      await expect(
+        service.verifyMfa({
+          sessionToken: login.session.token,
+          code: registered.session.mfaChallenge?.developmentCode ?? '000000',
+        }),
+      ).rejects.toThrow();
+
+      const totpCode = generateTotpCode(enrollment.enrollment.secret);
+      await expect(
+        service.verifyMfa({ sessionToken: login.session.token, code: totpCode }),
+      ).resolves.toMatchObject({ session: { mfaVerified: true } });
+
+      const audit = await service.listTenantAuditLogs({
+        sessionToken: login.session.token,
+        tenantId: registered.tenant.id,
+      });
+      const blob = JSON.stringify(audit.auditLogs);
+      expect(audit.auditLogs.map((record) => record.action)).toEqual(
+        expect.arrayContaining(['AUTH_TOTP_ENROLLMENT_STARTED', 'AUTH_TOTP_ENROLLED', 'AUTH_MFA_VERIFIED']),
+      );
+      expect(blob).not.toContain(enrollment.enrollment.secret);
+      expect(blob).not.toContain('otpauth://');
+      expect(blob).not.toContain('owner@example.com');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -325,6 +325,10 @@ GitHub source connection status on 2026-06-16:
     password-reset, tenant-invite, and email MFA overlay when `RESEND_API_KEY`
     and `EMAIL_FROM` are set. `AUTH_EMAIL_PROVIDER=resend` fail-closes without
     credentials; `AUTH_EMAIL_PROVIDER=development` keeps in-process tokens.
+  - Optional authenticator MFA: after the first email/dev MFA verification,
+    `POST /v1/auth/mfa/totp/enroll` returns an otpauth URI and secret once;
+    `POST /v1/auth/mfa/totp/confirm` activates TOTP. `MFA_ISSUER` labels the
+    authenticator account. Recovery codes remain future work.
   - Optional finance payment adapters: `PAYMENT_PROVIDER=manual` by default.
     `stripe`, `africastalking`, or `live` require `STRIPE_SECRET_KEY` and/or
     `AT_API_KEY` / `AT_USERNAME` / `AT_PAYMENTS_PRODUCT_NAME`. Raw card numbers

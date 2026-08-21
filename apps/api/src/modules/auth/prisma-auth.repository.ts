@@ -33,6 +33,7 @@ import type {
   PasswordUpdateRecord,
   TenantMembershipWithTermsRecords,
   TenantMembershipRecord,
+  TotpEnrollmentUpdateRecord,
 } from './auth.records';
 import type { AuthRepository } from './auth.repository';
 
@@ -434,6 +435,25 @@ export class PrismaAuthRepository implements AuthRepository {
     });
   }
 
+  async updateUserTotpEnrollment(userId: string, enrollment: TotpEnrollmentUpdateRecord): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        totpSecret: enrollment.totpSecret === undefined ? undefined : enrollment.totpSecret,
+        totpPendingSecret:
+          enrollment.totpPendingSecret === undefined ? undefined : enrollment.totpPendingSecret,
+        totpLastUsedStep:
+          enrollment.totpLastUsedStep === undefined ? undefined : enrollment.totpLastUsedStep,
+        mfaEnrolledAt:
+          enrollment.totpEnrolledAt === undefined
+            ? undefined
+            : enrollment.totpEnrolledAt
+              ? new Date(enrollment.totpEnrolledAt)
+              : null,
+      },
+    });
+  }
+
   async revokeSessionsForUser(userId: string, revokedAt: string): Promise<void> {
     await this.prisma.authSession.updateMany({
       where: { userId, revokedAt: null },
@@ -509,6 +529,10 @@ export class PrismaAuthRepository implements AuthRepository {
       phoneVerifiedAt: user.phoneVerifiedAt?.toISOString(),
       mfaRequired: user.mfaRequired,
       mfaVerifiedAt: user.lastMfaVerifiedAt?.toISOString(),
+      totpSecret: user.totpSecret ?? undefined,
+      totpPendingSecret: user.totpPendingSecret ?? undefined,
+      totpEnrolledAt: user.mfaEnrolledAt?.toISOString(),
+      totpLastUsedStep: user.totpLastUsedStep ?? undefined,
       createdAt: user.createdAt.toISOString(),
     };
   }

@@ -15,6 +15,7 @@ import type {
   PasswordUpdateRecord,
   TenantMembershipWithTermsRecords,
   TenantMembershipRecord,
+  TotpEnrollmentUpdateRecord,
 } from './auth.records';
 
 export const AUTH_REPOSITORY = Symbol('AUTH_REPOSITORY');
@@ -53,6 +54,7 @@ export interface AuthRepository {
   markUserPhoneVerified(userId: string, phoneVerifiedAt: string): RepositoryResult<void>;
   updateUserPassword(userId: string, password: PasswordUpdateRecord): RepositoryResult<void>;
   markUserMfaVerified(userId: string, mfaVerifiedAt: string): RepositoryResult<void>;
+  updateUserTotpEnrollment(userId: string, enrollment: TotpEnrollmentUpdateRecord): RepositoryResult<void>;
   revokeSessionsForUser(userId: string, revokedAt: string): RepositoryResult<void>;
   createAuditLog(record: AuthAuditRecord): RepositoryResult<void>;
   createAccessDecisionAudit(record: AccessDecisionAuditRecord): RepositoryResult<void>;

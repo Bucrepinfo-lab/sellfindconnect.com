@@ -1,0 +1,3 @@
+ALTER TABLE "User" ADD COLUMN "totpSecret" VARCHAR(64);
+ALTER TABLE "User" ADD COLUMN "totpPendingSecret" VARCHAR(64);
+ALTER TABLE "User" ADD COLUMN "totpLastUsedStep" INTEGER;

@@ -141,13 +141,17 @@ Progress:
   invites, and email MFA. `AUTH_EMAIL_PROVIDER=resend` fail-closes without
   `RESEND_API_KEY` and `EMAIL_FROM`. Development tokens stay in non-production
   when no live sender is configured.
+- Added RFC 6238 authenticator TOTP enrollment for MFA-verified sessions.
+  Later logins use `AUTHENTICATOR` delivery, replay of the same time-step is
+  rejected, and audit metadata omits secrets and otpauth URIs. Recovery codes
+  remain next.
 - Added database fields/models for password metadata, auth sessions, tenant
   onboarding attributes, and terms acceptance evidence.
 - Added the initial Prisma migration and seed workflow required before enabling
   production Prisma persistence against a hosted PostgreSQL database.
-- Production identity provider, authenticator/TOTP MFA enrollment, broader
-  non-auth product audit coverage, hosted database migration/seed execution,
-  and production Prisma enablement remain next.
+- Production identity provider, recovery codes, broader non-auth product audit
+  coverage, hosted database migration/seed execution, and production Prisma
+  enablement remain next.
 
 ## Epic 3: Advertiser Profile Vertical Slice
 

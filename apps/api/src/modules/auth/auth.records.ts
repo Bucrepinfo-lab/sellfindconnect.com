@@ -19,6 +19,10 @@ export type AuthUserRecord = {
   phoneVerifiedAt?: string;
   mfaRequired: boolean;
   mfaVerifiedAt?: string;
+  totpSecret?: string;
+  totpPendingSecret?: string;
+  totpEnrolledAt?: string;
+  totpLastUsedStep?: number;
   createdAt: string;
 };
 
@@ -206,3 +210,10 @@ export type PasswordUpdateRecord = Pick<
   AuthUserRecord,
   'passwordHash' | 'passwordSalt' | 'passwordIterations'
 >;
+
+export type TotpEnrollmentUpdateRecord = {
+  totpSecret?: string | null;
+  totpPendingSecret?: string | null;
+  totpEnrolledAt?: string | null;
+  totpLastUsedStep?: number | null;
+};

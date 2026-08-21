@@ -15,6 +15,8 @@ import {
   RequestPhoneOtpDto,
   VerifyMfaDto,
   VerifyPhoneOtpDto,
+  EnrollTotpDto,
+  ConfirmTotpDto,
 } from './dto/auth.dto';
 
 @ApiTags('auth')
@@ -75,6 +77,16 @@ export class AuthController {
   @Post('mfa/verify')
   verifyMfa(@Body() body: VerifyMfaDto) {
     return this.auth.verifyMfa(body);
+  }
+
+  @Post('mfa/totp/enroll')
+  enrollTotp(@Body() body: EnrollTotpDto) {
+    return this.auth.enrollTotp(body);
+  }
+
+  @Post('mfa/totp/confirm')
+  confirmTotpEnrollment(@Body() body: ConfirmTotpDto) {
+    return this.auth.confirmTotpEnrollment(body);
   }
 
   @Post('tenant-session/check')

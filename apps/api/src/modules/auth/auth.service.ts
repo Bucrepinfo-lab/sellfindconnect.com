@@ -21,6 +21,10 @@ import {
   roleHasPermission,
   sanitizeProductAuditMetadata,
   toE164,
+  buildOtpauthUri,
+  generateTotpSecret,
+  totpDefaults,
+  verifyTotpCode,
   type AccessDecision,
   type AccessPermission,
   type AccessResourceScope,
@@ -69,6 +73,8 @@ import type {
   RequestPhoneOtpDto,
   VerifyMfaDto,
   VerifyPhoneOtpDto,
+  EnrollTotpDto,
+  ConfirmTotpDto,
 } from './dto/auth.dto';
 import { InMemoryAuthRepository } from './in-memory-auth.repository';
 
@@ -710,7 +716,12 @@ export class AuthService {
       };
     }
 
+    const user = await this.repository.findUserById(session.userId);
     const challenge = await this.repository.findMfaChallengeBySessionId(session.id);
+    if (user?.totpSecret) {
+      return this.verifyAuthenticatorMfa(session, user, challenge, input.code);
+    }
+
     if (!challenge || challenge.consumedAt || Date.parse(challenge.expiresAt) <= Date.now()) {
       await this.recordAudit({
         tenantId: session.tenantId,
@@ -755,29 +766,96 @@ export class AuthService {
       throw new UnauthorizedException('Invalid MFA code.');
     }
 
-    const now = new Date().toISOString();
-    const updated: AuthSessionRecord = {
-      ...session,
-      mfaVerified: true,
-    };
-    await this.repository.updateMfaChallenge({
-      ...challenge,
-      consumedAt: now,
-    });
-    await this.repository.markUserMfaVerified(session.userId, now);
+    return this.completeMfaVerification(session, challenge);
+  }
 
-    await this.repository.updateSession(updated);
+  async enrollTotp(input: EnrollTotpDto) {
+    const session = await this.requireSession(input.sessionToken);
+    if (!session.mfaVerified) {
+      throw new UnauthorizedException('MFA verification is required before authenticator enrollment.');
+    }
+
+    const user = await this.repository.findUserById(session.userId);
+    if (!user) {
+      throw new UnauthorizedException('A valid active session is required.');
+    }
+
+    const secret = generateTotpSecret();
+    const issuer = process.env.MFA_ISSUER?.trim() || 'SellFindConnect';
+    await this.repository.updateUserTotpEnrollment(user.id, {
+      totpPendingSecret: secret,
+    });
     await this.recordAudit({
       tenantId: session.tenantId,
-      actorUserId: session.userId,
-      action: 'AUTH_MFA_VERIFIED',
-      entityType: 'AUTH_SESSION',
-      entityId: session.id,
-      metadata: { challengeId: challenge.id },
+      actorUserId: user.id,
+      action: 'AUTH_TOTP_ENROLLMENT_STARTED',
+      entityType: 'USER',
+      entityId: user.id,
+      metadata: {
+        rotating: Boolean(user.totpSecret),
+        issuer,
+      },
     });
+
     return {
-      session: this.presentSession(updated),
-      mfaVerifiedAt: now,
+      enrollment: {
+        issuer,
+        account: user.email,
+        secret,
+        otpauthUri: buildOtpauthUri({ issuer, account: user.email, secret }),
+        algorithm: totpDefaults.algorithm,
+        digits: totpDefaults.digits,
+        periodSeconds: totpDefaults.periodSeconds,
+      },
+    };
+  }
+
+  async confirmTotpEnrollment(input: ConfirmTotpDto) {
+    const session = await this.requireSession(input.sessionToken);
+    if (!session.mfaVerified) {
+      throw new UnauthorizedException('MFA verification is required before authenticator enrollment.');
+    }
+
+    const user = await this.repository.findUserById(session.userId);
+    if (!user?.totpPendingSecret) {
+      throw new UnprocessableEntityException('Start authenticator enrollment before confirming a code.');
+    }
+
+    const verified = verifyTotpCode(user.totpPendingSecret, input.code, {
+      lastUsedStep: user.totpLastUsedStep,
+    });
+    if (!verified.ok) {
+      await this.recordAudit({
+        tenantId: session.tenantId,
+        actorUserId: user.id,
+        action: 'AUTH_TOTP_ENROLLMENT_FAILED',
+        entityType: 'USER',
+        entityId: user.id,
+        metadata: { reason: 'INVALID_CODE' },
+      });
+      throw new UnauthorizedException('Invalid authenticator code.');
+    }
+
+    const now = new Date().toISOString();
+    await this.repository.updateUserTotpEnrollment(user.id, {
+      totpSecret: user.totpPendingSecret,
+      totpPendingSecret: null,
+      totpEnrolledAt: now,
+      totpLastUsedStep: verified.step ?? null,
+    });
+    await this.recordAudit({
+      tenantId: session.tenantId,
+      actorUserId: user.id,
+      action: 'AUTH_TOTP_ENROLLED',
+      entityType: 'USER',
+      entityId: user.id,
+      metadata: { deliveryChannel: 'AUTHENTICATOR' },
+    });
+
+    return {
+      enrolled: true,
+      enrolledAt: now,
+      deliveryChannel: 'AUTHENTICATOR' as const,
     };
   }
 
@@ -1129,7 +1207,91 @@ export class AuthService {
       phoneVerifiedAt: user.phoneVerifiedAt,
       mfaRequired: user.mfaRequired,
       mfaVerifiedAt: user.mfaVerifiedAt,
+      totpEnrolled: Boolean(user.totpSecret && user.totpEnrolledAt),
       createdAt: user.createdAt,
+    };
+  }
+
+  private async verifyAuthenticatorMfa(
+    session: AuthSessionRecord,
+    user: AuthUserRecord,
+    challenge: AuthMfaChallengeRecord | undefined,
+    code: string,
+  ) {
+    if (challenge && challenge.failedAttempts >= MFA_MAX_FAILED_ATTEMPTS) {
+      await this.recordAudit({
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        action: 'AUTH_MFA_FAILED',
+        entityType: 'AUTH_SESSION',
+        entityId: session.id,
+        metadata: { reason: 'CHALLENGE_LOCKED', method: 'AUTHENTICATOR', challengeId: challenge.id },
+      });
+      throw new UnauthorizedException('MFA challenge locked after too many attempts.');
+    }
+
+    const verified = verifyTotpCode(user.totpSecret, code, { lastUsedStep: user.totpLastUsedStep });
+    if (!verified.ok) {
+      if (challenge) {
+        await this.repository.updateMfaChallenge({
+          ...challenge,
+          failedAttempts: challenge.failedAttempts + 1,
+        });
+      }
+      await this.recordAudit({
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        action: 'AUTH_MFA_FAILED',
+        entityType: 'AUTH_SESSION',
+        entityId: session.id,
+        metadata: {
+          reason: 'INVALID_CODE',
+          method: 'AUTHENTICATOR',
+          ...(challenge ? { challengeId: challenge.id } : {}),
+          failedAttempts: (challenge?.failedAttempts ?? 0) + 1,
+        },
+      });
+      throw new UnauthorizedException('Invalid MFA code.');
+    }
+
+    await this.repository.updateUserTotpEnrollment(user.id, {
+      totpLastUsedStep: verified.step ?? null,
+    });
+    return this.completeMfaVerification(session, challenge, 'AUTHENTICATOR');
+  }
+
+  private async completeMfaVerification(
+    session: AuthSessionRecord,
+    challenge: AuthMfaChallengeRecord | undefined,
+    method: AuthMfaChallengeRecord['deliveryChannel'] = challenge?.deliveryChannel ?? 'EMAIL',
+  ) {
+    const now = new Date().toISOString();
+    const updated: AuthSessionRecord = {
+      ...session,
+      mfaVerified: true,
+    };
+    if (challenge) {
+      await this.repository.updateMfaChallenge({
+        ...challenge,
+        consumedAt: now,
+      });
+    }
+    await this.repository.markUserMfaVerified(session.userId, now);
+    await this.repository.updateSession(updated);
+    await this.recordAudit({
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: 'AUTH_MFA_VERIFIED',
+      entityType: 'AUTH_SESSION',
+      entityId: session.id,
+      metadata: {
+        ...(challenge ? { challengeId: challenge.id } : {}),
+        method,
+      },
+    });
+    return {
+      session: this.presentSession(updated),
+      mfaVerifiedAt: now,
     };
   }
 
@@ -1144,13 +1306,19 @@ export class AuthService {
     const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
     const challengeId = randomUUID();
     const expiresAt = new Date(Date.parse(now) + MFA_CHALLENGE_TTL_MS).toISOString();
+    const user = await this.repository.findUserById(session.userId);
+    const authenticatorEnrolled = Boolean(user?.totpSecret);
     let challenge: AuthMfaChallengeRecord = {
       id: challengeId,
       sessionId: session.id,
       userId: session.userId,
       tenantId: session.tenantId,
       codeHash: this.hashMfaCode(session.id, code),
-      deliveryChannel: this.isProductionRuntime() ? 'EMAIL' : 'DEVELOPMENT',
+      deliveryChannel: authenticatorEnrolled
+        ? 'AUTHENTICATOR'
+        : this.isProductionRuntime()
+          ? 'EMAIL'
+          : 'DEVELOPMENT',
       expiresAt,
       failedAttempts: 0,
       createdAt: now,
@@ -1158,7 +1326,10 @@ export class AuthService {
 
     await this.repository.createMfaChallenge(challenge);
 
-    const user = await this.repository.findUserById(session.userId);
+    if (authenticatorEnrolled) {
+      return this.presentMfaChallenge(challenge);
+    }
+
     const delivered = user
       ? await this.deliverAuthEmail(
           buildAuthEmailMessage({

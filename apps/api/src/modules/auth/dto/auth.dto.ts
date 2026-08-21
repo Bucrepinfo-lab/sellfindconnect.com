@@ -204,6 +204,26 @@ export class VerifyMfaDto {
   declare code: string;
 }
 
+export class EnrollTotpDto {
+  @ApiProperty({ example: 'session-token' })
+  @IsString()
+  @Length(16, 256)
+  declare sessionToken: string;
+}
+
+export class ConfirmTotpDto {
+  @ApiProperty({ example: 'session-token' })
+  @IsString()
+  @Length(16, 256)
+  declare sessionToken: string;
+
+  @ApiProperty({ example: '492817' })
+  @IsString()
+  @Length(6, 6)
+  @Matches(/^\d{6}$/)
+  declare code: string;
+}
+
 export class CheckTenantSessionDto {
   @ApiProperty({ example: 'session-token' })
   @IsString()
