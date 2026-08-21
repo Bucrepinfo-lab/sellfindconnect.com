@@ -4,11 +4,13 @@ import {
   filingFrequencies,
   paymentMethods,
   taxReportExportFormats,
+  taxReturnCorrectionReasons,
   taxReturnEvidenceKinds,
   type AccessRole,
   type FilingFrequency,
   type PaymentMethod,
   type TaxReportExportFormat,
+  type TaxReturnCorrectionReason,
   type TaxReturnEvidenceKind,
 } from '@telpen/domain';
 import { Type } from 'class-transformer';
@@ -639,6 +641,33 @@ export class RemitTaxReturnDto extends FinanceActorDto {
 }
 
 export class LockTaxReturnDto extends FinanceActorDto {}
+
+export class CorrectTaxReturnDto extends FinanceActorDto {
+  @ApiProperty({ example: 0.5 })
+  @IsNumber()
+  declare amount: number;
+
+  @ApiProperty({ enum: taxReturnCorrectionReasons, example: 'AUTHORITY_ASSESSMENT' })
+  @IsIn(taxReturnCorrectionReasons)
+  declare reason: TaxReturnCorrectionReason;
+
+  @ApiProperty({ example: 'KRA-ADJ-2026-06-01' })
+  @IsString()
+  @Length(2, 160)
+  declare reference: string;
+
+  @ApiPropertyOptional({ example: 'Authority assessment increased June VAT.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  declare note?: string;
+
+  @ApiPropertyOptional({ example: 10000 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  declare dualApprovalThresholdAmount?: number;
+}
 
 export class ExportTaxReturnQueryDto {
   @ApiPropertyOptional({ enum: taxReportExportFormats, example: 'CSV' })

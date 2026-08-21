@@ -1,6 +1,9 @@
 import { ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import {
+  applyTaxReturnCorrection,
   assertFilingApproverSeparation,
+  assertTaxReturnCorrectionAllowed,
+  assertTaxReturnCorrectionApproverSeparation,
   assertTaxReturnPeriodUnlocked,
   assertTaxReturnTransition,
   buildInvoiceNumber,
@@ -38,6 +41,7 @@ import type {
   AttachTaxReturnEvidenceDto,
   CalculateTaxDto,
   ConfigureCountryTaxProfileDto,
+  CorrectTaxReturnDto,
   CreateInvoiceDto,
   CreateTaxRuleDto,
   ExportTaxReturnQueryDto,
@@ -239,6 +243,7 @@ export class FinanceService {
       computedTaxDue: Math.round((computedTaxDue + Number.EPSILON) * 10000) / 10000,
       status: 'DRAFT',
       evidence: [],
+      corrections: [],
       createdAt: now,
       updatedAt: now,
     };
@@ -450,6 +455,76 @@ export class FinanceService {
       },
     });
     return taxReturn;
+  }
+
+  async correctTaxReturn(id: string, input: CorrectTaxReturnDto, context?: FinanceWorkbenchContext) {
+    const actor = this.requireWorkbenchOperator({ ...context, ...input });
+    this.assertSafe(input, 'Tax return correction contains blocked content.');
+    const taxReturn = await this.requireTaxReturn(id);
+    this.runWorkbench(() => assertTaxReturnCorrectionAllowed(taxReturn.status));
+    const approvedBy = this.actorName(input, actor);
+    this.runWorkbench(() =>
+      assertTaxReturnCorrectionApproverSeparation({
+        adjustmentAmount: input.amount,
+        filingApprovedBy: taxReturn.filingApprovedBy,
+        correctionApprovedBy: approvedBy,
+        thresholdAmount: input.dualApprovalThresholdAmount,
+      }),
+    );
+    const amounts = this.runWorkbench(() =>
+      applyTaxReturnCorrection({
+        computedTaxDue: taxReturn.computedTaxDue,
+        adjustmentAmount: input.amount,
+      }),
+    );
+    const now = new Date().toISOString();
+    const evidence = await this.addTaxReturnEvidence(
+      taxReturn,
+      {
+        kind: 'PERIOD_CORRECTION',
+        reference: input.reference,
+        note: input.note,
+      },
+      approvedBy,
+    );
+    const correction = {
+      id: randomUUID(),
+      amount: roundMoney(input.amount),
+      previousComputedTaxDue: amounts.previousComputedTaxDue,
+      nextComputedTaxDue: amounts.nextComputedTaxDue,
+      reason: input.reason,
+      reference: input.reference.trim(),
+      note: input.note?.trim() || undefined,
+      approvedBy,
+      createdAt: now,
+    };
+    taxReturn.computedTaxDue = amounts.nextComputedTaxDue;
+    taxReturn.corrections = [...taxReturn.corrections, correction];
+    taxReturn.updatedAt = now;
+    await this.repository.saveTaxReturn(taxReturn);
+    const ledgerEntry: TaxLedgerEntryRecord = {
+      id: randomUUID(),
+      entryType: 'TAX_PERIOD_CORRECTION',
+      amount: correction.amount,
+      currencyCode: taxReturn.filingCurrency,
+      occurredAt: now,
+      createdAt: now,
+    };
+    await this.repository.saveLedgerEntry(ledgerEntry);
+    this.auditProduct({
+      tenantId: context?.tenantId,
+      actorUserId: input.actorUserId ?? context?.actorUserId,
+      action: 'TAX_RETURN_CORRECTED',
+      entityId: taxReturn.id,
+      metadata: {
+        countryCode: taxReturn.countryCode,
+        status: taxReturn.status,
+        amount: correction.amount,
+        reason: correction.reason,
+        actorRole: actor,
+      },
+    });
+    return { taxReturn, correction, evidence, ledgerEntry };
   }
 
   async exportTaxReturn(id: string, query: ExportTaxReturnQueryDto = {}, context?: FinanceWorkbenchContext) {
@@ -1507,6 +1582,8 @@ export class FinanceService {
       throw new NotFoundException('Tax return not found.');
     }
 
+    taxReturn.corrections ??= [];
+    taxReturn.evidence ??= [];
     return taxReturn;
   }
 
@@ -1536,7 +1613,10 @@ export class FinanceService {
       attachedBy,
       attachedAt: new Date().toISOString(),
     };
-    taxReturn.evidence = [...taxReturn.evidence.filter((item) => item.kind !== evidence.kind), evidence];
+    taxReturn.evidence =
+      evidence.kind === 'PERIOD_CORRECTION'
+        ? [...taxReturn.evidence, evidence]
+        : [...taxReturn.evidence.filter((item) => item.kind !== evidence.kind), evidence];
     taxReturn.updatedAt = evidence.attachedAt;
     await this.repository.saveTaxReturn(taxReturn);
     return evidence;

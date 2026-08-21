@@ -554,6 +554,7 @@ export const taxReturnEvidenceKinds = [
   'AUTHORITY_REFERENCE',
   'ACCOUNTANT_NOTES',
   'BOARD_APPROVAL',
+  'PERIOD_CORRECTION',
 ] as const;
 
 export type TaxReturnEvidenceKind = (typeof taxReturnEvidenceKinds)[number];
@@ -587,6 +588,58 @@ export function assertTaxReturnPeriodUnlocked(status: TaxReturnStatus): void {
   if (isTaxReturnPeriodLocked(status)) {
     throw new Error(
       'Locked tax periods cannot be changed except through a controlled correction workflow.',
+    );
+  }
+}
+
+export const taxReturnCorrectionReasons = [
+  'UNDER_REMITTED',
+  'OVER_REMITTED',
+  'CLASSIFICATION',
+  'EXCHANGE_RATE',
+  'AUTHORITY_ASSESSMENT',
+] as const;
+
+export type TaxReturnCorrectionReason = (typeof taxReturnCorrectionReasons)[number];
+
+export function assertTaxReturnCorrectionAllowed(status: TaxReturnStatus): void {
+  if (status !== 'LOCKED') {
+    throw new Error('Correction entries are only allowed after the tax period is locked.');
+  }
+}
+
+export function applyTaxReturnCorrection(input: {
+  computedTaxDue: number;
+  adjustmentAmount: number;
+}): { previousComputedTaxDue: number; nextComputedTaxDue: number } {
+  if (!Number.isFinite(input.adjustmentAmount) || input.adjustmentAmount === 0) {
+    throw new Error('Correction amount must be a non-zero number.');
+  }
+
+  const previousComputedTaxDue = roundMoney(input.computedTaxDue);
+  const nextComputedTaxDue = roundMoney(previousComputedTaxDue + input.adjustmentAmount);
+  if (nextComputedTaxDue < 0) {
+    throw new Error('Correction would make computed tax due negative.');
+  }
+
+  return { previousComputedTaxDue, nextComputedTaxDue };
+}
+
+export function assertTaxReturnCorrectionApproverSeparation(input: {
+  adjustmentAmount: number;
+  filingApprovedBy?: string;
+  correctionApprovedBy: string;
+  thresholdAmount?: number;
+}): void {
+  if (!requiresSeparateFilingApprover(Math.abs(input.adjustmentAmount), input.thresholdAmount)) {
+    return;
+  }
+
+  const filingApprovedBy = input.filingApprovedBy?.trim().toLowerCase() ?? '';
+  const correctionApprovedBy = input.correctionApprovedBy.trim().toLowerCase();
+  if (!filingApprovedBy || filingApprovedBy === correctionApprovedBy) {
+    throw new Error(
+      'Post-lock corrections above the dual-control threshold require a different approver than filing.',
     );
   }
 }

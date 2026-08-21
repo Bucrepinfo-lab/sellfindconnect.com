@@ -16,6 +16,7 @@ export const productAuditActions = [
   'TAX_RETURN_FILED',
   'TAX_RETURN_REMITTED',
   'TAX_RETURN_LOCKED',
+  'TAX_RETURN_CORRECTED',
   'TAX_REPORT_EXPORTED',
   'SOURCE_FINDER_OUTCOME_RECORDED',
 ] as const;
@@ -90,6 +91,8 @@ export function describeProductAuditAction(action: string): string {
       return 'Tax return remitted';
     case 'TAX_RETURN_LOCKED':
       return 'Tax period locked';
+    case 'TAX_RETURN_CORRECTED':
+      return 'Tax period corrected';
     case 'TAX_REPORT_EXPORTED':
       return 'Tax report exported';
     case 'SOURCE_FINDER_OUTCOME_RECORDED':

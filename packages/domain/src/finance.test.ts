@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  applyTaxReturnCorrection,
   assertFilingApproverSeparation,
+  assertTaxReturnCorrectionAllowed,
+  assertTaxReturnCorrectionApproverSeparation,
   assertTaxReturnPeriodUnlocked,
   assertTaxReturnTransition,
   buildTaxReturnExport,
@@ -144,6 +147,35 @@ describe('finance domain helpers', () => {
     expect(() => assertTaxReturnPeriodUnlocked('LOCKED')).toThrow(
       'Locked tax periods cannot be changed except through a controlled correction workflow.',
     );
+    expect(() => assertTaxReturnCorrectionAllowed('REMITTED')).toThrow(
+      'Correction entries are only allowed after the tax period is locked.',
+    );
+    expect(() => assertTaxReturnCorrectionAllowed('LOCKED')).not.toThrow();
+    expect(
+      applyTaxReturnCorrection({ computedTaxDue: 1.3793, adjustmentAmount: 0.5 }),
+    ).toEqual({
+      previousComputedTaxDue: 1.3793,
+      nextComputedTaxDue: 1.8793,
+    });
+    expect(() =>
+      applyTaxReturnCorrection({ computedTaxDue: 1.3793, adjustmentAmount: -2 }),
+    ).toThrow('Correction would make computed tax due negative.');
+    expect(() =>
+      assertTaxReturnCorrectionApproverSeparation({
+        adjustmentAmount: 10_000,
+        filingApprovedBy: 'global-finance-admin',
+        correctionApprovedBy: 'global-finance-admin',
+      }),
+    ).toThrow(
+      'Post-lock corrections above the dual-control threshold require a different approver than filing.',
+    );
+    expect(() =>
+      assertTaxReturnCorrectionApproverSeparation({
+        adjustmentAmount: 10_000,
+        filingApprovedBy: 'global-finance-admin',
+        correctionApprovedBy: 'country-finance-admin',
+      }),
+    ).not.toThrow();
 
     expect(requiresSeparateFilingApprover(1.3793)).toBe(false);
     expect(requiresSeparateFilingApprover(10_000)).toBe(true);

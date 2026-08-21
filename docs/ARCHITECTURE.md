@@ -191,9 +191,10 @@ The current finance command API can generate tenant-scoped invoices, receipts,
 refund credit notes, chargeback records, dunning notices, and related tax or
 reversal ledger entries with country/year document numbers. Country tax returns
 move through review, reconciliation-gated approval, dual filing approval,
-evidence attachment, remittance, and period lock, with CSV/JSON exports and
-product-audit events. Durable finance persistence, payment adapter idempotency,
-and controlled post-lock corrections remain future hardening work.
+evidence attachment, remittance, period lock, and controlled post-lock
+corrections, with CSV/JSON exports and product-audit events. Opt-in Prisma
+persistence is selected with `FINANCE_REPOSITORY=prisma`. Live payment-provider
+adapters remain future hardening work.
 
 ## Data and API Conventions
 

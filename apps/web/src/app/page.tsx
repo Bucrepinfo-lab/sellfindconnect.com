@@ -1850,6 +1850,10 @@ export default function Home() {
                 label="Durable store"
                 value="FINANCE_REPOSITORY=prisma"
               />
+              <FinanceRow
+                label="Post-lock corrections"
+                value="Controlled adjustments"
+              />
               {canManageTaxReturn ? (
                 <div className="policy-box ok compact">
                   <FileCheck2 size={16} />

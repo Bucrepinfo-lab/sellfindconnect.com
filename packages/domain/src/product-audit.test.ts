@@ -76,6 +76,7 @@ describe('product audit helpers', () => {
     });
     expect(JSON.stringify(record)).not.toContain('Board approved');
     expect(describeProductAuditAction('TAX_RETURN_LOCKED')).toBe('Tax period locked');
+    expect(describeProductAuditAction('TAX_RETURN_CORRECTED')).toBe('Tax period corrected');
     expect(describeProductAuditAction('TAX_REPORT_EXPORTED')).toBe('Tax report exported');
     expect(describeProductAuditAction('SOURCE_FINDER_OUTCOME_RECORDED')).toBe(
       'Source Finder outcome recorded',

@@ -70,14 +70,15 @@ export type TaxCalculationSnapshotRecord = {
 
 export type TaxLedgerEntryRecord = {
   id: string;
-  taxCalculationSnapshotId: string;
+  taxCalculationSnapshotId?: string;
   entryType:
     | 'TAX_LIABILITY'
     | 'PLATFORM_REVENUE'
     | 'REFUND_TAX_REVERSAL'
     | 'REFUND_REVENUE_REVERSAL'
     | 'CHARGEBACK_TAX_REVERSAL'
-    | 'CHARGEBACK_REVENUE_REVERSAL';
+    | 'CHARGEBACK_REVENUE_REVERSAL'
+    | 'TAX_PERIOD_CORRECTION';
   amount: number;
   currencyCode: string;
   occurredAt: string;
@@ -93,6 +94,18 @@ export type TaxReturnEvidenceRecord = {
   attachedAt: string;
 };
 
+export type TaxReturnCorrectionRecord = {
+  id: string;
+  amount: number;
+  previousComputedTaxDue: number;
+  nextComputedTaxDue: number;
+  reason: string;
+  reference: string;
+  note?: string;
+  approvedBy: string;
+  createdAt: string;
+};
+
 export type TaxReturnRecord = {
   id: string;
   countryCode: string;
@@ -105,6 +118,7 @@ export type TaxReturnRecord = {
   computedTaxDue: number;
   status: TaxReturnStatus;
   evidence: TaxReturnEvidenceRecord[];
+  corrections: TaxReturnCorrectionRecord[];
   reviewApprovedBy?: string;
   reviewApprovedAt?: string;
   filingApprovedBy?: string;

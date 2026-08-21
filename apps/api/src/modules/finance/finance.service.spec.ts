@@ -509,6 +509,28 @@ describe('FinanceService', () => {
         reference: 'KRA-REF-99',
       }),
     ).rejects.toThrow(/Locked tax periods cannot be changed/);
+    await expect(
+      service.correctTaxReturn(id, {
+        amount: 10_000,
+        reason: 'AUTHORITY_ASSESSMENT',
+        reference: 'KRA-ADJ-2026-06',
+        note: 'Authority assessment increased June VAT.',
+        actorUserId: 'global-finance-admin',
+      }),
+    ).rejects.toThrow(/different approver than filing/);
+    const corrected = await service.correctTaxReturn(id, {
+      amount: 0.5,
+      reason: 'AUTHORITY_ASSESSMENT',
+      reference: 'KRA-ADJ-2026-06',
+      note: 'Authority assessment increased June VAT.',
+      actorRole: 'COUNTRY_FINANCE_ADMIN',
+      actorUserId: 'country-finance-admin',
+    });
+    expect(corrected.taxReturn.status).toBe('LOCKED');
+    expect(corrected.taxReturn.computedTaxDue).toBe(1.8793);
+    expect(corrected.correction.reason).toBe('AUTHORITY_ASSESSMENT');
+    expect(corrected.ledgerEntry.entryType).toBe('TAX_PERIOD_CORRECTION');
+    expect(corrected.taxReturn.evidence.map((item) => item.kind)).toContain('PERIOD_CORRECTION');
     expect(audits.map((record) => record.action)).toEqual([
       'TAX_RETURN_GENERATED',
       'TAX_RETURN_SUBMITTED',
@@ -517,8 +539,11 @@ describe('FinanceService', () => {
       'TAX_RETURN_REMITTED',
       'TAX_RETURN_LOCKED',
       'TAX_REPORT_EXPORTED',
+      'TAX_RETURN_CORRECTED',
     ]);
     expect(JSON.stringify(audits)).not.toContain('PAY-8891');
+    expect(JSON.stringify(audits)).not.toContain('KRA-ADJ-2026-06');
+    expect(JSON.stringify(audits)).not.toContain('Authority assessment');
   });
 
   it('blocks tax-return approval until reconciliation is clear', async () => {
@@ -638,6 +663,25 @@ describe('FinanceService', () => {
     await expect(
       service.submitTaxReturn(generated.taxReturn.id, {}, { sessionRole: 'BILLING_MANAGER' }),
     ).rejects.toThrow(/Country tax return workbench requires a finance admin role/);
+    await expect(
+      service.correctTaxReturn(
+        generated.taxReturn.id,
+        {
+          amount: 0.5,
+          reason: 'AUTHORITY_ASSESSMENT',
+          reference: 'KRA-ADJ-2026-06',
+        },
+        { sessionRole: 'BILLING_MANAGER' },
+      ),
+    ).rejects.toThrow(/Country tax return workbench requires a finance admin role/);
+    await expect(
+      service.correctTaxReturn(generated.taxReturn.id, {
+        amount: 0.5,
+        reason: 'AUTHORITY_ASSESSMENT',
+        reference: 'KRA-ADJ-2026-06',
+        actorRole: 'COUNTRY_FINANCE_ADMIN',
+      }),
+    ).rejects.toThrow(/Correction entries are only allowed after the tax period is locked/);
   });
 
   it('persists tax profiles, snapshots, and invoices through the repository boundary', async () => {

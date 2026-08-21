@@ -17,6 +17,7 @@ import {
   IssueReceiptDto,
   LockTaxReturnDto,
   OpenChargebackDto,
+  CorrectTaxReturnDto,
   PayInvoiceDto,
   ReconcileSettlementDto,
   RefundInvoiceDto,
@@ -193,6 +194,20 @@ export class FinanceController {
     @Body() body: LockTaxReturnDto,
   ) {
     return this.finance.lockTaxReturn(id, body, {
+      tenantId,
+      sessionRole: session.role,
+      actorUserId: session.userId,
+    });
+  }
+
+  @Post('tax-returns/:id/corrections')
+  correctTaxReturn(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Param('id') id: string,
+    @Body() body: CorrectTaxReturnDto,
+  ) {
+    return this.finance.correctTaxReturn(id, body, {
       tenantId,
       sessionRole: session.role,
       actorUserId: session.userId,
