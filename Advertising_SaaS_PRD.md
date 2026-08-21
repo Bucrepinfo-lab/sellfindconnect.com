@@ -640,7 +640,7 @@ Implementation progress on 2026-06-17:
 - Added consent-aware notification orchestration for in-app, email, SMS, push, and WhatsApp channels, with tenant preferences, an API outbox, and a web Notification Delivery readiness panel.
 - Added a protected internal conversation SLA sweep endpoint for scheduled response-time alerts: `POST /v1/operations/conversations/sla/run`.
 - Added HTTP delivery receipts, read receipts, typing indicators, unread counts, and opt-in Prisma conversation persistence through `CONVERSATIONS_REPOSITORY=prisma`.
-- Remaining hardening: provider-backed notification adapters and audit logs.
+- Remaining hardening: audit logs.
 
 ### 7.7 Relationship Links
 
@@ -733,7 +733,7 @@ Implementation progress on 2026-08-21:
   `deliveredAt`, `readAt`, `readByRole`, `typingRole`, and `typingAt`.
 - Updated the web Conversation Workspace to preview inbound/outbound receipts,
   unread count, typing, mark-delivered, and mark-read.
-- Remaining: provider-backed notification adapters and audit logs.
+- Remaining: audit logs.
 
 Implementation progress on 2026-08-21:
 
@@ -760,7 +760,22 @@ Implementation progress on 2026-08-21:
   `POST /v1/conversations/:id/presence`.
 - Conversation detail now includes a presence snapshot. The Conversation
   Workspace preview shows live-channel status.
-- Remaining: provider-backed notification adapters and audit logs.
+
+Implementation progress on 2026-08-21:
+
+- Queued notification outbox records now dispatch through channel adapters.
+  Memory adapters are the default for IN_APP, EMAIL, SMS, PUSH, and WHATSAPP.
+  Resend email, Africa's Talking SMS, and FCM push overlay when
+  `RESEND_API_KEY`, `AT_API_KEY`/`AT_USERNAME`, or `FCM_SERVICE_ACCOUNT_JSON`
+  are set. Missing destinations fail closed with a delivery attempt.
+- Added `GET /v1/notifications/adapters`,
+  `POST /v1/notifications/outbox/:id/dispatch`, and
+  `POST /v1/operations/notifications/dispatch/run`.
+- Conversation SLA alerts and Source Finder opportunity alerts now create
+  outbox records and dispatch selected channels.
+- The Notification Delivery panel previews adapter send vs missing-destination
+  skips.
+- Remaining: product audit logs.
 
 ### 7.9 Analytics and Monitoring
 

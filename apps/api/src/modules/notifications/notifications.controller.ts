@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 
 import { TenantId } from '../tenant/tenant-context.decorator';
@@ -30,6 +30,11 @@ export class NotificationsController {
     return this.notifications.updatePreferences(tenantId, body);
   }
 
+  @Get('adapters')
+  listAdapters() {
+    return { adapters: this.notifications.availableAdapters() };
+  }
+
   @Post('plan')
   planAndQueue(@TenantId() tenantId: string, @Body() body: CreateNotificationPlanDto) {
     return this.notifications.planAndQueue(tenantId, body);
@@ -38,5 +43,13 @@ export class NotificationsController {
   @Get('outbox')
   listOutbox(@TenantId() tenantId: string) {
     return this.notifications.listOutbox(tenantId);
+  }
+
+  @Post('outbox/:outboxId/dispatch')
+  dispatchOutbox(
+    @TenantId() tenantId: string,
+    @Param('outboxId') outboxId: string,
+  ) {
+    return this.notifications.dispatchOutbox(tenantId, outboxId);
   }
 }

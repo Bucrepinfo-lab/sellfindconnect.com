@@ -8,7 +8,7 @@ import {
   type NotificationPreference,
   type NotificationSeverity,
 } from '@telpen/domain';
-import { IsArray, IsBoolean, IsIn, IsOptional, IsString, Length, MaxLength, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Length, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 const notificationConsentStates = ['GRANTED', 'DENIED', 'REQUIRED', 'NOT_REQUIRED'] as const;
@@ -78,4 +78,44 @@ export class CreateNotificationPlanDto {
   @IsString()
   @MaxLength(120)
   declare entityId?: string;
+
+  @ApiPropertyOptional({ example: 'owner-user-1' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  declare recipientUserId?: string;
+
+  @ApiPropertyOptional({ example: 'owner@sellfindconnect.com' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  declare email?: string;
+
+  @ApiPropertyOptional({ example: '+254700000001' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  declare phone?: string;
+
+  @ApiPropertyOptional({ example: 'fcm-device-token' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(4096)
+  declare pushToken?: string;
+}
+
+export class RunNotificationDispatchDto {
+  @ApiPropertyOptional({ example: '11111111-1111-4111-8111-111111111111' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  declare tenantId?: string;
+
+  @ApiPropertyOptional({ example: 100 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  declare limit?: number;
 }

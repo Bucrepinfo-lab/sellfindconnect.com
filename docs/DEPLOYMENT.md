@@ -207,6 +207,10 @@ The production service settings were further optimized on 2026-06-16:
   `POST /v1/operations/source-finder/alerts/run` with the same
   `x-internal-job-key` header. Run it at least daily so DAILY/WEEKLY saved
   searches can emit de-duplicated match alerts.
+- The API exposes a protected notification dispatch retry:
+  `POST /v1/operations/notifications/dispatch/run` with the same
+  `x-internal-job-key` header. Run it with the frequent jobs so queued or
+  failed adapter deliveries are retried.
 - The API exposes a protected analytics retention endpoint for future
   scheduling: `POST /v1/operations/analytics/retention/run` with the same
   `x-internal-job-key` header. Start with `dryRun: true`; pass `countryCode`
@@ -310,6 +314,10 @@ GitHub source connection status on 2026-06-16:
   - `WEB_ORIGIN=https://adverts.telpen.net`
   - `DATABASE_URL` supplied by the production PostgreSQL service
   - `ANALYTICS_REPOSITORY=prisma` after migrations are deployed
+  - Optional notification providers: `RESEND_API_KEY`, `EMAIL_FROM`,
+    `AT_API_KEY`, `AT_USERNAME`, `AT_SENDER_ID`, `FCM_SERVICE_ACCOUNT_JSON`,
+    `FCM_PROJECT_ID`. Without these, memory adapters still record delivery
+    attempts.
 
 ### Data Services
 

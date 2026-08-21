@@ -5,6 +5,7 @@ import { AnalyticsModule } from '../analytics/analytics.module';
 import { ConversationsModule } from '../conversations/conversations.module';
 import { FinanceModule } from '../finance/finance.module';
 import { MediaModule } from '../media/media.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { SourceFinderModule } from '../source-finder/source-finder.module';
 import { InternalJobGuard } from './internal-job.guard';
 import { OperationsController } from './operations.controller';
@@ -16,6 +17,7 @@ import { OperationsController } from './operations.controller';
     ConversationsModule,
     FinanceModule,
     MediaModule,
+    NotificationsModule,
     SourceFinderModule,
   ],
   controllers: [OperationsController],

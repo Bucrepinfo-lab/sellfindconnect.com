@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { AuthModule } from '../auth/auth.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { RelationshipsModule } from '../relationships/relationships.module';
 import { InMemorySourceFinderRepository } from './in-memory-source-finder.repository';
 import { SourceFinderController } from './source-finder.controller';
@@ -9,7 +10,7 @@ import { SOURCE_FINDER_REPOSITORY } from './source-finder.repository';
 import { SourceFinderService } from './source-finder.service';
 
 @Module({
-  imports: [AuthModule, RelationshipsModule],
+  imports: [AuthModule, RelationshipsModule, NotificationsModule],
   controllers: [SourceFinderController],
   providers: [
     InMemorySourceFinderRepository,

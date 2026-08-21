@@ -11,6 +11,7 @@ export * from './messaging';
 export * from './conversation-realtime';
 export * from './media';
 export * from './notifications';
+export * from './notification-dispatch';
 export * from './onboarding';
 export {
   NotificationAdapterRegistry,

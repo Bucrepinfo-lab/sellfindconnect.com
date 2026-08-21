@@ -45,9 +45,11 @@ import {
   countUnreadMessagesForRole,
   describeConversationPresenceStatus,
   describeMessageDeliveryStatus,
+  describeNotificationDispatchAttemptStatus,
   isConversationTypingActive,
   markMessageDelivered,
   markMessageRead,
+  planNotificationDispatchAttempts,
   resolveConversationPresenceStatus,
   toConversationAttachment,
   defaultNotificationPreferences,
@@ -741,6 +743,15 @@ export default function Home() {
       locale: country.locale,
       timezone: country.timezone,
       preferences: notificationPreferences,
+    },
+  });
+  const notificationDispatchPreview = planNotificationDispatchAttempts({
+    tenantId,
+    selectedChannels: notificationPlan.selectedChannels,
+    destination: {
+      email: ownerEmail,
+      phone: smsConsent ? '+254700000001' : undefined,
+      pushToken: pushConsent ? 'demo-fcm-token' : undefined,
     },
   });
   const accessDecision = evaluateAccess({
@@ -2026,6 +2037,22 @@ export default function Home() {
                   {notificationPlan.selectedChannels.map((channel) => (
                     <span className="channel-pill ok" key={channel}>
                       {codeLabel(channel)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className="channel-block">
+                <span>Dispatch</span>
+                <div className="channel-list">
+                  {notificationDispatchPreview.map((item) => (
+                    <span
+                      className={item.action === 'SEND' ? 'channel-pill ok' : 'channel-pill muted'}
+                      key={`dispatch-${item.channel}`}
+                    >
+                      {codeLabel(item.channel)} ·{' '}
+                      {item.action === 'SEND'
+                        ? describeNotificationDispatchAttemptStatus('QUEUED')
+                        : 'No destination'}
                     </span>
                   ))}
                 </div>

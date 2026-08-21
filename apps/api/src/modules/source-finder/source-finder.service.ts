@@ -27,6 +27,7 @@ import {
 import { randomUUID } from 'node:crypto';
 
 import type { AuthService } from '../auth/auth.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { RelationshipsService } from '../relationships/relationships.service';
 import type {
   CreateSavedSourceFinderSearchDto,
@@ -47,6 +48,7 @@ export class SourceFinderService {
     repository?: SourceFinderRepository,
     @Optional() private readonly relationships?: RelationshipsService,
     @Optional() private readonly auth?: AuthService,
+    @Optional() private readonly notifications?: NotificationsService,
   ) {
     this.repository = repository ?? new InMemorySourceFinderRepository();
   }
@@ -179,7 +181,24 @@ export class SourceFinderService {
       checkedAt: now,
       savedSearchesChecked: searches.length,
       alertsCreated,
-      deliveryPlans: alertsCreated.map((alert) => this.planDelivery(alert)),
+      deliveryPlans: await Promise.all(
+        alertsCreated.map(async (alert) => {
+          const plan = this.planDelivery(alert);
+          const outbox = await this.notifications?.planAndQueue(tenantId, {
+            eventType: 'SOURCE_FINDER_OPPORTUNITY',
+            severity: alert.score >= 80 ? 'HIGH' : 'MEDIUM',
+            title: alert.title,
+            message: alert.message,
+            entityType: 'source-finder-alert',
+            entityId: alert.id,
+          });
+          return {
+            ...plan,
+            outboxId: outbox?.id,
+            dispatchStatuses: outbox?.channelStatuses,
+          };
+        }),
+      ),
     };
   }
 

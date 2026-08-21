@@ -56,12 +56,14 @@ import {
   enqueueMediaProcessingJobs,
   type MediaAdapters,
 } from '../media/media.adapters';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class ConversationsService {
   private readonly repository: ConversationsRepository;
   private readonly mediaAdapters: MediaAdapters;
   private readonly realtime: ConversationsRealtimeService;
+  private readonly notifications?: NotificationsService;
 
   constructor(
     @Optional()
@@ -72,10 +74,13 @@ export class ConversationsService {
     mediaAdapters?: MediaAdapters,
     @Optional()
     realtime?: ConversationsRealtimeService,
+    @Optional()
+    notifications?: NotificationsService,
   ) {
     this.repository = repository ?? new InMemoryConversationsRepository();
     this.mediaAdapters = mediaAdapters ?? createDefaultMediaAdapters();
     this.realtime = realtime ?? new ConversationsRealtimeService();
+    this.notifications = notifications;
   }
 
   async createConversation(tenantId: string, input: CreateConversationDto) {
@@ -681,7 +686,40 @@ export class ConversationsService {
     };
 
     await this.repository.createNotification(notification);
+    await this.queueOutboundNotification(conversation, type, notification);
     return notification;
+  }
+
+  private async queueOutboundNotification(
+    conversation: ConversationRecord,
+    type: ConversationNotification['type'],
+    notification: ConversationNotification,
+  ) {
+    if (!this.notifications) {
+      return;
+    }
+
+    const eventType =
+      type === 'SLA_BREACHED'
+        ? 'CONVERSATION_SLA_BREACHED'
+        : type === 'SLA_DUE_SOON'
+          ? 'CONVERSATION_SLA_DUE_SOON'
+          : type === 'NEW_CONVERSATION'
+            ? 'CONVERSATION_NEW'
+            : type === 'ASSIGNMENT'
+              ? 'CONVERSATION_ASSIGNMENT'
+              : 'CONVERSATION_MESSAGE';
+    const severity =
+      type === 'SLA_BREACHED' ? 'CRITICAL' : type === 'SLA_DUE_SOON' ? 'HIGH' : 'MEDIUM';
+
+    await this.notifications.planAndQueue(conversation.tenantId, {
+      eventType,
+      severity,
+      title: notification.title,
+      message: notification.message,
+      entityType: 'conversation',
+      entityId: conversation.id,
+    });
   }
 
   private getSourceResult(sourceRecordId: string, query?: string): SourceFinderSearchResult {

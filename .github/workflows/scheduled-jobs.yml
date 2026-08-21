@@ -54,6 +54,14 @@ jobs:
             -H "x-internal-job-key: $INTERNAL_JOB_KEY" \
             -H "content-type: application/json" -d '{}'
 
+      - name: Notification dispatch retry
+        if: env.FREQUENT == 'true'
+        run: |
+          curl -fsS --retry 3 --retry-delay 5 -X POST \
+            "$API_BASE_URL/operations/notifications/dispatch/run" \
+            -H "x-internal-job-key: $INTERNAL_JOB_KEY" \
+            -H "content-type: application/json" -d '{}'
+
       - name: Media processing tick
         if: env.FREQUENT == 'true'
         run: |

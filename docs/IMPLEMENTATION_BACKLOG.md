@@ -347,7 +347,12 @@ Progress:
 - Added a session-authenticated Socket.IO namespace at `/v1/conversations`
   for live message, typing, receipt, and presence events, plus HTTP presence
   heartbeat/snapshot routes. Presence is in-process per API instance.
-- Actual provider adapters and audit logs remain next.
+- Wired notification outbox records through channel adapters. Memory adapters
+  cover IN_APP, EMAIL, SMS, PUSH, and WHATSAPP by default; Resend, Africa's
+  Talking, and FCM overlay when credentials are set. Conversation SLA and
+  Source Finder alerts now queue into the outbox. Dispatch retries run at
+  `POST /v1/operations/notifications/dispatch/run`.
+- Product audit logs remain next.
 
 ## Epic 7: Analytics
 

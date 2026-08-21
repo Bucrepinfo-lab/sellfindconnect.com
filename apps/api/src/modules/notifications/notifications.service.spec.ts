@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { createDefaultNotificationAdapters } from './notification-adapters';
 import { NotificationsService } from './notifications.service';
 
 const tenantId = '11111111-1111-4111-8111-111111111111';
@@ -28,12 +29,13 @@ describe('NotificationsService', () => {
     });
 
     expect(result.preferences).toHaveLength(2);
+    expect(result.adapters).toEqual(['IN_APP', 'EMAIL', 'SMS', 'PUSH', 'WHATSAPP']);
     expect(service.getPreferences(tenantId)[1]?.enabled).toBe(false);
   });
 
-  it('plans and queues consent-aware delivery attempts', () => {
+  it('plans and queues consent-aware delivery attempts', async () => {
     const service = new NotificationsService();
-    const record = service.planAndQueue(tenantId, {
+    const record = await service.planAndQueue(tenantId, {
       eventType: 'CONVERSATION_SLA_BREACHED',
       severity: 'CRITICAL',
       title: 'SLA breached',
@@ -44,19 +46,56 @@ describe('NotificationsService', () => {
 
     expect(record.plan.selectedChannels).toEqual(['IN_APP', 'EMAIL']);
     expect(record.channelStatuses.some((item) => item.status === 'SUPPRESSED')).toBe(true);
+    expect(record.channelStatuses.find((item) => item.channel === 'IN_APP')?.status).toBe('SENT');
+    expect(record.channelStatuses.find((item) => item.channel === 'EMAIL')?.status).toBe('FAILED');
     expect(service.listOutbox(tenantId)).toHaveLength(1);
   });
 
-  it('blocks prohibited notification content before queueing', () => {
+  it('dispatches selected channels through adapters when destinations exist', async () => {
+    const service = new NotificationsService();
+    const record = await service.planAndQueue(tenantId, {
+      eventType: 'CONVERSATION_MESSAGE',
+      severity: 'HIGH',
+      title: 'New message',
+      message: 'A matched inquiry has a new reply.',
+      email: 'owner@sellfindconnect.com',
+      phone: '+254700000001',
+      pushToken: 'fcm-device-token',
+    });
+
+    expect(record.channelStatuses.find((item) => item.channel === 'IN_APP')?.provider).toBe('memory');
+    expect(record.channelStatuses.find((item) => item.channel === 'EMAIL')?.status).toBe('SENT');
+    expect(record.deliveryAttempts.some((item) => item.channel === 'EMAIL' && item.status === 'SENT')).toBe(
+      true,
+    );
+    expect((await service.runAllDispatch({ tenantId })).dispatched).toBe(0);
+  });
+
+  it('blocks prohibited notification content before queueing', async () => {
     const service = new NotificationsService();
 
-    expect(() =>
+    await expect(
       service.planAndQueue(tenantId, {
         eventType: 'CONVERSATION_MESSAGE',
         severity: 'HIGH',
         title: 'Blocked',
         message: 'Can you arrange ammunition delivery?',
       }),
-    ).toThrow();
+    ).rejects.toThrow();
+  });
+});
+
+describe('notification adapter factory', () => {
+  it('uses memory adapters by default and overlays Resend when configured', () => {
+    const memory = createDefaultNotificationAdapters({});
+    expect(memory.get('EMAIL')?.name).toBe('memory');
+    expect(memory.available()).toEqual(['IN_APP', 'EMAIL', 'SMS', 'PUSH', 'WHATSAPP']);
+
+    const live = createDefaultNotificationAdapters({
+      RESEND_API_KEY: 're_test',
+      EMAIL_FROM: 'alerts@sellfindconnect.com',
+    });
+    expect(live.get('EMAIL')?.name).toBe('resend');
+    expect(live.get('IN_APP')?.name).toBe('memory');
   });
 });

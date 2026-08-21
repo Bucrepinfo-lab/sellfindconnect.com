@@ -1,5 +1,6 @@
-﻿export type NotificationChannel = "EMAIL"|"SMS"|"PUSH"|"WHATSAPP"|"IN_APP";
-export type DeliveryStatus = "SENT"|"FAILED"|"SUPPRESSED";
+﻿import type { NotificationChannel } from './notifications';
+
+export type DeliveryStatus = 'SENT' | 'FAILED' | 'SUPPRESSED';
 
 export interface NotificationPayload {
   to: string; subject?: string; title: string; body: string;

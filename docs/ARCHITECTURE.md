@@ -132,8 +132,11 @@ without validating it against the authenticated user's assignments.
   selected with `CONVERSATIONS_REPOSITORY=prisma`. The live chat namespace is
   `/v1/conversations`; presence is in-process until Redis fan-out is required.
 - Notifications: tenant preferences, consent-aware channel planning, outbox
-  records, provider delivery attempts, suppression reasons, and scheduler jobs.
-  Tenant notification routes require an MFA-verified tenant session.
+  records, adapter dispatch (memory by default; Resend email, Africa's Talking
+  SMS, and FCM push when credentials are set), delivery attempts, suppression
+  reasons, and scheduler jobs. Tenant notification routes require an
+  MFA-verified tenant session. `POST /v1/operations/notifications/dispatch/run`
+  retries queued or failed outbox channels.
 - Billing: trial, subscription, invoice, payment, refund, and chargeback.
 - Finance: country tax profiles, tax snapshots, ledger, reconciliation, returns,
   remittances, alerts, approvals, and evidence. Tenant finance routes require

@@ -168,6 +168,7 @@ jobs), so production scheduling runs from the checked-in GitHub Actions workflow
 endpoints with header `x-internal-job-key: $INTERNAL_JOB_KEY`:
 
 - `POST /v1/operations/conversations/sla/run` — every 15 min.
+- `POST /v1/operations/notifications/dispatch/run` — every 15 min.
 - `POST /v1/operations/source-finder/alerts/run` — daily.
 - `POST /v1/operations/media/processing/run` — every 15 min (scan/transform tick).
 - `POST /v1/operations/adverts/lifecycle/run` — daily (day-35/39 alerts, day-40 delete).
