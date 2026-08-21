@@ -9,8 +9,12 @@ import {
   CreateInvoiceDto,
   CreateTaxRuleDto,
   GenerateTaxReturnDto,
+  IssueInvoiceDto,
   IssueReceiptDto,
   OpenChargebackDto,
+  PayInvoiceDto,
+  ReconcileSettlementDto,
+  RefundInvoiceDto,
   RequestRefundDto,
   RunDunningDto,
   RunFinanceAlertsDto,
@@ -126,22 +130,22 @@ export class FinanceController {
     return this.finance.listFinanceAlerts();
   }
 
-  @Post('invoices')
+  @Post('payment-invoices')
   issueInvoice(@TenantId() tenantId: string, @Body() body: IssueInvoiceDto) {
     return this.finance.issueInvoice(tenantId, body);
   }
 
-  @Get('invoices')
-  listInvoices(@TenantId() tenantId: string) {
-    return this.finance.listInvoices(tenantId);
+  @Get('payment-invoices')
+  listPaymentInvoices(@TenantId() tenantId: string) {
+    return this.finance.listPaymentInvoices(tenantId);
   }
 
-  @Post('invoices/pay')
+  @Post('payment-invoices/pay')
   payInvoice(@TenantId() tenantId: string, @Body() body: PayInvoiceDto) {
     return this.finance.payInvoice(tenantId, body);
   }
 
-  @Post('invoices/refund')
+  @Post('payment-invoices/refund')
   refundInvoice(@TenantId() tenantId: string, @Body() body: RefundInvoiceDto) {
     return this.finance.refundInvoice(tenantId, body);
   }
@@ -151,18 +155,18 @@ export class FinanceController {
     return this.finance.listPayments(tenantId);
   }
 
-  @Get('receipts')
-  listReceipts(@TenantId() tenantId: string) {
-    return this.finance.listReceipts(tenantId);
+  @Get('payment-receipts')
+  listPaymentReceipts(@TenantId() tenantId: string) {
+    return this.finance.listPaymentReceipts(tenantId);
   }
 
   @Post('reconciliation/run')
-  reconcileSettlement(@Body() body: ReconcileSettlementDto) {
-    return this.finance.reconcileProviderSettlement(body);
+  reconcileSettlement(@TenantId() tenantId: string, @Body() body: ReconcileSettlementDto) {
+    return this.finance.reconcileProviderSettlement(tenantId, body);
   }
 
   @Get('reconciliation')
-  listReconciliationRuns() {
-    return this.finance.listReconciliationRuns();
+  listReconciliationRuns(@TenantId() tenantId: string) {
+    return this.finance.listReconciliationRuns(tenantId);
   }
 }

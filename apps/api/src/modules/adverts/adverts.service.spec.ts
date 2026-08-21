@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mediaPolicy } from '@telpen/domain';
 
 import { AnalyticsService } from '../analytics/analytics.service';
@@ -26,6 +26,15 @@ async function createService() {
 }
 
 describe('AdvertsService', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-01T00:00:00.000Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('creates a safe advert with a 40-day expiry date', async () => {
     const { advert } = await createService();
 

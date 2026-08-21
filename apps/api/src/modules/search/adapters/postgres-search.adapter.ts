@@ -1,5 +1,5 @@
-﻿import type { SearchAdapter, SearchQuery, SearchResult } from "../../../../domain/src/search";
-import { normaliseFtsRank, blendScores } from "../../../../domain/src/search";
+import type { SearchAdapter, SearchQuery, SearchResult } from "@telpen/domain";
+import { normaliseFtsRank, blendScores } from "@telpen/domain";
 
 interface Row { advertId:string; tenantId:string; title:string; displayName:string; description:string; countryCode:string; industryCode:string; role:string; publishedAt:string; boostedAt:string|null; boostWeight:number|null; ftsRank:number; similarity:number|null; }
 

@@ -1,5 +1,5 @@
-﻿import { Injectable, Logger } from "@nestjs/common";
-import type { SearchQuery, SearchResult, SearchAdapter } from "../../../domain/src/search";
+import { Injectable, Logger } from "@nestjs/common";
+import type { SearchQuery, SearchResult, SearchAdapter } from "@telpen/domain";
 import { EmbeddingService } from "./adapters/embedding.service";
 
 @Injectable()

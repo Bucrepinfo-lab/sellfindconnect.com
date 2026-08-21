@@ -1,4 +1,4 @@
-﻿import type { NotificationAdapter, NotificationPayload, DeliveryResult } from "../../../../domain/src/notification-adapter";
+import type { NotificationAdapter, NotificationPayload, DeliveryResult } from "@telpen/domain";
 
 export interface InAppPersistencePort {
   saveNotification(params: { tenantId:string; userId:string; title:string; message:string; entityType:string; entityId:string; channel:string; scheduledFor:Date }): Promise<{ id:string }>;

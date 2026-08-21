@@ -327,7 +327,7 @@ describe('FinanceService', () => {
     expect(paid.payment.status).toBe('CAPTURED');
     expect(paid.invoice.status).toBe('PAID');
     expect(paid.receipt?.amount).toBe(11.3793);
-    expect(service.listReceipts(tenantId)).toHaveLength(1);
+    expect(service.listPaymentReceipts(tenantId)).toHaveLength(1);
   });
 
   it('is idempotent when paying with the same idempotency key', async () => {
@@ -379,7 +379,7 @@ describe('FinanceService', () => {
     });
     const paid = await service.payInvoice(tenantId, { invoiceId: invoice.id, method: 'CARD' });
 
-    const reconciliation = service.reconcileProviderSettlement({
+    const reconciliation = service.reconcileProviderSettlement(tenantId, {
       statementReference: 'PROVIDER-2026-06',
       currencyCode: 'KES',
       settlementLines: [

@@ -1,4 +1,4 @@
-﻿import type { NotificationAdapter, NotificationPayload, DeliveryResult } from "../../../../domain/src/notification-adapter";
+import type { NotificationAdapter, NotificationPayload, DeliveryResult } from "@telpen/domain";
 
 export class ResendEmailAdapter implements NotificationAdapter {
   readonly channel = "EMAIL" as const;

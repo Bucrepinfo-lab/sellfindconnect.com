@@ -1,7 +1,7 @@
-﻿import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { DELETION_GRACE_DAYS, DATA_INVENTORY, addDays } from '../../../domain/src/privacy';
-import type { DeletionRequest, DataExportRequest } from '../../../domain/src/privacy';
+import { DELETION_GRACE_DAYS, DATA_INVENTORY, addDaysIso as addDays } from '@telpen/domain';
+import type { DeletionRequest, DataExportRequest } from '@telpen/domain';
 
 @Injectable()
 export class PrivacyService {

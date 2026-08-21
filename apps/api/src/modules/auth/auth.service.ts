@@ -94,6 +94,10 @@ export class AuthService {
     if (!country) {
       throw new UnprocessableEntityException('Unsupported country.');
     }
+    const phone = input.phone ? (toE164(input.phone) ?? undefined) : undefined;
+    if (input.phone && !phone) {
+      throw new UnprocessableEntityException('Enter a valid phone number.');
+    }
 
     if (!industryCategories.some((industry) => industry.code === input.industryCode)) {
       throw new UnprocessableEntityException('Unsupported industry.');
@@ -120,7 +124,7 @@ export class AuthService {
       id: userId,
       email,
       displayName: input.displayName,
-      phone: input.phone,
+      phone,
       passwordHash: password.hash,
       passwordSalt: password.salt,
       passwordIterations: password.iterations,

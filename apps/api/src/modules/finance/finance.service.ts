@@ -1,4 +1,6 @@
+import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import {
+  buildInvoiceNumber,
   calculateFinanceAdjustmentBreakdown,
   calculatePaymentBalance,
   calculateTaxSnapshotAmounts,
@@ -7,14 +9,21 @@ import {
   getDunningNoticeDecision,
   getCountry,
   getRemittanceAlertDecision,
+  reconcileSettlement,
   roundMoney,
+  summarizeInvoiceLines,
   type DunningNoticeStage,
   type FinanceAdjustmentStatus,
   type FinanceAdjustmentType,
   type FinanceDocumentType,
+  type FinancePaymentStatus,
   type FilingFrequency,
   type FinanceAlertType,
+  type InvoiceLine,
   type InvoicePaymentStatus,
+  type InvoiceStatus,
+  type PaymentMethod,
+  type ReconciliationSummary,
   type TaxProfileStatus,
 } from '@telpen/domain';
 import { randomUUID } from 'node:crypto';
@@ -25,8 +34,12 @@ import type {
   CreateInvoiceDto,
   CreateTaxRuleDto,
   GenerateTaxReturnDto,
+  IssueInvoiceDto,
   IssueReceiptDto,
   OpenChargebackDto,
+  PayInvoiceDto,
+  ReconcileSettlementDto,
+  RefundInvoiceDto,
   RequestRefundDto,
   RunDunningDto,
   RunFinanceAlertsDto,
@@ -259,7 +272,7 @@ type PaymentRecord = {
   provider: string;
   providerPaymentId: string;
   method: PaymentMethod;
-  status: PaymentStatus;
+  status: FinancePaymentStatus;
   amount: number;
   currencyCode: string;
   idempotencyKey: string;
@@ -281,6 +294,7 @@ type ReceiptRecord = {
 
 type ReconciliationRunRecord = {
   id: string;
+  tenantId: string;
   provider: string;
   statementReference: string;
   countryCode?: string;
@@ -302,6 +316,18 @@ export class FinanceService {
   private readonly dunningNotices = new Map<string, DunningNoticeRecord>();
   private readonly financeAlerts = new Map<string, FinanceAlertRecord>();
   private readonly documentSequences = new Map<string, number>();
+  private readonly paymentInvoices = new Map<string, InvoiceRecord>();
+  private readonly payments = new Map<string, PaymentRecord>();
+  private readonly paymentReceipts = new Map<string, ReceiptRecord>();
+  private readonly reconciliationRuns = new Map<string, ReconciliationRunRecord>();
+  private readonly paymentInvoiceSequences = new Map<string, number>();
+  private readonly paymentAdapter: PaymentAdapter;
+
+  constructor(paymentAdapter?: PaymentAdapter) {
+    this.paymentAdapter =
+      paymentAdapter ??
+      createConfiguredPaymentAdapter({ get: (key) => process.env[key] });
+  }
 
   configureCountryTaxProfile(input: ConfigureCountryTaxProfileDto): CountryTaxProfileRecord {
     this.assertSafe(input, 'Country tax profile contains blocked content.');
@@ -757,12 +783,12 @@ export class FinanceService {
       updatedAt: now,
     };
 
-    this.invoices.set(invoice.id, invoice);
+    this.paymentInvoices.set(invoice.id, invoice);
     return invoice;
   }
 
-  listInvoices(tenantId: string): InvoiceRecord[] {
-    return Array.from(this.invoices.values())
+  listPaymentInvoices(tenantId: string): InvoiceRecord[] {
+    return Array.from(this.paymentInvoices.values())
       .filter((invoice) => invoice.tenantId === tenantId)
       .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt));
   }
@@ -770,7 +796,7 @@ export class FinanceService {
   async payInvoice(tenantId: string, input: PayInvoiceDto) {
     this.assertSafe(input, 'Payment contains blocked content.');
 
-    const invoice = this.requireTenantInvoice(tenantId, input.invoiceId);
+    const invoice = this.requireTenantPaymentInvoice(tenantId, input.invoiceId);
 
     // Idempotency is checked first so a replay with the same key returns the
     // original result instead of tripping the "already paid" guard below.
@@ -783,7 +809,7 @@ export class FinanceService {
     );
     if (existing) {
       return {
-        invoice: this.invoices.get(existing.invoiceId) ?? invoice,
+        invoice: this.paymentInvoices.get(existing.invoiceId) ?? invoice,
         payment: existing,
         receipt: this.findReceiptForPayment(existing.id),
         idempotentReplay: true,
@@ -839,7 +865,7 @@ export class FinanceService {
       status: amountPaid >= invoice.total ? 'PAID' : invoice.status,
       updatedAt: now,
     };
-    this.invoices.set(invoice.id, paidInvoice);
+    this.paymentInvoices.set(invoice.id, paidInvoice);
 
     const receipt: ReceiptRecord = {
       id: randomUUID(),
@@ -851,7 +877,7 @@ export class FinanceService {
       currencyCode: invoice.currencyCode,
       issuedAt: now,
     };
-    this.receipts.set(receipt.id, receipt);
+    this.paymentReceipts.set(receipt.id, receipt);
 
     return { invoice: paidInvoice, payment, receipt, idempotentReplay: false };
   }
@@ -859,7 +885,7 @@ export class FinanceService {
   async refundInvoice(tenantId: string, input: RefundInvoiceDto) {
     this.assertSafe(input, 'Refund contains blocked content.');
 
-    const invoice = this.requireTenantInvoice(tenantId, input.invoiceId);
+    const invoice = this.requireTenantPaymentInvoice(tenantId, input.invoiceId);
     const capturedPayments = Array.from(this.payments.values()).filter(
       (payment) => payment.invoiceId === invoice.id && payment.status === 'CAPTURED',
     );
@@ -908,7 +934,7 @@ export class FinanceService {
       status: amountRefunded >= invoice.amountPaid ? 'REFUNDED' : 'PARTIALLY_REFUNDED',
       updatedAt: now,
     };
-    this.invoices.set(invoice.id, refundedInvoice);
+    this.paymentInvoices.set(invoice.id, refundedInvoice);
 
     return { invoice: refundedInvoice, refund: refundPayment };
   }
@@ -919,17 +945,18 @@ export class FinanceService {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
-  listReceipts(tenantId: string): ReceiptRecord[] {
-    return Array.from(this.receipts.values())
+  listPaymentReceipts(tenantId: string): ReceiptRecord[] {
+    return Array.from(this.paymentReceipts.values())
       .filter((receipt) => receipt.tenantId === tenantId)
       .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt));
   }
 
-  reconcileProviderSettlement(input: ReconcileSettlementDto) {
+  reconcileProviderSettlement(tenantId: string, input: ReconcileSettlementDto) {
     this.assertSafe(input, 'Reconciliation input contains blocked content.');
 
     const currencyFilter = input.currencyCode?.toUpperCase();
     const ledgerLines = Array.from(this.payments.values())
+      .filter((payment) => payment.tenantId === tenantId)
       .filter((payment) => payment.status === 'CAPTURED')
       .filter((payment) => !input.provider || payment.provider === input.provider)
       .filter((payment) => !currencyFilter || payment.currencyCode === currencyFilter)
@@ -948,6 +975,7 @@ export class FinanceService {
     const now = new Date().toISOString();
     const run: ReconciliationRunRecord = {
       id: randomUUID(),
+      tenantId,
       provider: input.provider ?? 'ALL_PROVIDERS',
       statementReference: input.statementReference,
       countryCode: input.countryCode,
@@ -959,6 +987,7 @@ export class FinanceService {
 
     if (summary.hasVariance) {
       this.createFinanceAlert({
+        tenantId,
         countryCode: input.countryCode ?? 'GLOBAL',
         alertType: 'RECONCILIATION_VARIANCE',
         message: `Settlement ${input.statementReference} has ${summary.varianceCount} amount variance(s), ${summary.missingInLedgerCount} missing in ledger, ${summary.missingInSettlementCount} missing in settlement. Total absolute variance: ${summary.totalVarianceAmount} ${currencyFilter ?? ''}.`.trim(),
@@ -972,14 +1001,14 @@ export class FinanceService {
     return { run, openAlerts: this.listFinanceAlerts() };
   }
 
-  listReconciliationRuns(): ReconciliationRunRecord[] {
-    return Array.from(this.reconciliationRuns.values()).sort((a, b) =>
-      b.createdAt.localeCompare(a.createdAt),
-    );
+  listReconciliationRuns(tenantId: string): ReconciliationRunRecord[] {
+    return Array.from(this.reconciliationRuns.values())
+      .filter((run) => run.tenantId === tenantId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
-  private requireTenantInvoice(tenantId: string, invoiceId: string): InvoiceRecord {
-    const invoice = this.invoices.get(invoiceId);
+  private requireTenantPaymentInvoice(tenantId: string, invoiceId: string): InvoiceRecord {
+    const invoice = this.paymentInvoices.get(invoiceId);
     if (!invoice || invoice.tenantId !== tenantId) {
       throw new NotFoundException('Invoice not found for this tenant.');
     }
@@ -987,8 +1016,8 @@ export class FinanceService {
   }
 
   private nextInvoiceSequence(countryCode: string): number {
-    const next = (this.invoiceSequences.get(countryCode) ?? 0) + 1;
-    this.invoiceSequences.set(countryCode, next);
+    const next = (this.paymentInvoiceSequences.get(countryCode) ?? 0) + 1;
+    this.paymentInvoiceSequences.set(countryCode, next);
     return next;
   }
 
@@ -1005,13 +1034,15 @@ export class FinanceService {
   }
 
   private countInvoiceReceipts(invoiceId: string): number {
-    return Array.from(this.receipts.values()).filter(
+    return Array.from(this.paymentReceipts.values()).filter(
       (receipt) => receipt.invoiceId === invoiceId,
     ).length;
   }
 
   private findReceiptForPayment(paymentId: string): ReceiptRecord | undefined {
-    return Array.from(this.receipts.values()).find((receipt) => receipt.paymentId === paymentId);
+    return Array.from(this.paymentReceipts.values()).find(
+      (receipt) => receipt.paymentId === paymentId,
+    );
   }
 
   private requireApprovedProfile(countryCode: string): CountryTaxProfileRecord {

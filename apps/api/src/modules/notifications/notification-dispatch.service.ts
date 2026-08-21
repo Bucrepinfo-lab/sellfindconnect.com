@@ -1,8 +1,6 @@
-﻿import { Injectable, Logger } from "@nestjs/common";
-import { NotificationAdapterRegistry } from "../../../domain/src/notification-adapter";
-import type { NotificationChannel } from "../../../domain/src/notification-adapter";
-import { resolveTemplate } from "../../../domain/src/notification-templates";
-import type { EventType } from "../../../domain/src/notification-templates";
+import { Injectable, Logger } from "@nestjs/common";
+import { NotificationAdapterRegistry, resolveTemplate } from "@telpen/domain";
+import type { NotificationChannel, EventType } from "@telpen/domain";
 
 export interface DispatchRequest {
   outboxRecordId: string; tenantId: string; userId?: string;

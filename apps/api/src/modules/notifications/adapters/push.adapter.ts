@@ -1,4 +1,4 @@
-﻿import type { NotificationAdapter, NotificationPayload, DeliveryResult } from "../../../../domain/src/notification-adapter";
+import type { NotificationAdapter, NotificationPayload, DeliveryResult } from "@telpen/domain";
 
 export class FcmPushAdapter implements NotificationAdapter {
   readonly channel = "PUSH" as const;

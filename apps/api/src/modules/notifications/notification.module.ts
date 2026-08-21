@@ -1,5 +1,5 @@
-﻿import { Module, Injectable } from "@nestjs/common";
-import { NotificationAdapterRegistry } from "../../../domain/src/notification-adapter";
+import { Module, Injectable } from "@nestjs/common";
+import { NotificationAdapterRegistry } from "@telpen/domain";
 import { ResendEmailAdapter } from "./adapters/email.adapter";
 import { AfricasTalkingSmsAdapter } from "./adapters/sms.adapter";
 import { FcmPushAdapter } from "./adapters/push.adapter";
@@ -9,7 +9,9 @@ import { NotificationDispatchService } from "./notification-dispatch.service";
 
 @Injectable()
 class PrismaInAppPersistence implements InAppPersistencePort {
-  async saveNotification(params: Parameters<InAppPersistencePort["saveNotification"]>[0]) {
+  async saveNotification(
+    _params: Parameters<InAppPersistencePort["saveNotification"]>[0],
+  ): Promise<{ id: string }> {
     // Wire to PrismaService.notification.create when merging into the NestJS app
     throw new Error("PrismaInAppPersistence: inject PrismaService and implement saveNotification");
   }

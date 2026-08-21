@@ -1,8 +1,8 @@
 ﻿"use client";
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { SELL_QUICK_STARTS, FIND_QUICK_INDUSTRIES } from "../../../domain/src/onboarding";
-import type { OnboardingIntent } from "../../../domain/src/onboarding";
+import { SELL_QUICK_STARTS, FIND_QUICK_INDUSTRIES } from "@telpen/domain";
+import type { OnboardingIntent } from "@telpen/domain";
 
 type Step = "INTENT"|"SELL_ROLE"|"FIND_INDUSTRY"|"LAUNCHING";
 
