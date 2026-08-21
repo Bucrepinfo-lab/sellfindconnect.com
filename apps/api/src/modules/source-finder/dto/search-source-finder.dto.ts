@@ -1,14 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   opportunityAlertFrequencies,
+  sourceFinderOutcomeActions,
   sourceFinderSortOptions,
   supplyChainRoles,
   type OpportunityAlertFrequency,
+  type SourceFinderOutcomeAction,
   type SourceFinderSortOption,
   type SupplyChainRole,
 } from '@telpen/domain';
 import { Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsIn,
   IsInt,
   IsISO8601,
@@ -49,6 +52,11 @@ export class SearchSourceFinderDto {
   @IsOptional()
   @IsIn(sourceFinderSortOptions)
   declare sortBy?: SourceFinderSortOption;
+
+  @ApiPropertyOptional({ example: false })
+  @IsOptional()
+  @IsBoolean()
+  declare behavioralMatchingConsent?: boolean;
 }
 
 export class CreateSavedSourceFinderSearchDto {
@@ -109,4 +117,32 @@ export class RunSourceFinderOpportunityAlertsDto {
   @Min(1)
   @Max(20)
   declare limit?: number;
+}
+
+export class RecordSourceFinderOutcomeDto {
+  @ApiProperty({ example: 'r1' })
+  @IsString()
+  @Length(2, 120)
+  declare sourceRecordId: string;
+
+  @ApiProperty({ enum: sourceFinderOutcomeActions, example: 'ACCEPT' })
+  @IsIn(sourceFinderOutcomeActions)
+  declare action: SourceFinderOutcomeAction;
+
+  @ApiPropertyOptional({ example: 'fresh produce' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  declare query?: string;
+
+  @ApiPropertyOptional({ example: 'Strong weekly hotel supply fit.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  declare note?: string;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  declare behavioralMatchingConsent?: boolean;
 }

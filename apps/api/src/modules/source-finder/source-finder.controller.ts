@@ -5,6 +5,7 @@ import { TenantAuthSession, TenantId } from '../tenant/tenant-context.decorator'
 import { TenantSessionGuard, type TenantSessionDecision } from '../tenant/tenant-session.guard';
 import {
   CreateSavedSourceFinderSearchDto,
+  RecordSourceFinderOutcomeDto,
   RunSourceFinderOpportunityAlertsDto,
   SearchSourceFinderDto,
 } from './dto/search-source-finder.dto';
@@ -26,8 +27,8 @@ export class SourceFinderController {
   constructor(private readonly sourceFinder: SourceFinderService) {}
 
   @Post('search')
-  search(@Body() body: SearchSourceFinderDto) {
-    return this.sourceFinder.search(body);
+  search(@TenantId() tenantId: string, @Body() body: SearchSourceFinderDto) {
+    return this.sourceFinder.search(body, tenantId);
   }
 
   @Post('saved-searches')
@@ -56,5 +57,19 @@ export class SourceFinderController {
     @Body() body: RunSourceFinderOpportunityAlertsDto,
   ) {
     return this.sourceFinder.runOpportunityAlerts(tenantId, body, session.userId);
+  }
+
+  @Post('outcomes')
+  recordOutcome(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Body() body: RecordSourceFinderOutcomeDto,
+  ) {
+    return this.sourceFinder.recordOutcome(tenantId, body, session.userId);
+  }
+
+  @Get('outcomes')
+  listOutcomeFeedback(@TenantId() tenantId: string) {
+    return this.sourceFinder.listOutcomeFeedback(tenantId);
   }
 }

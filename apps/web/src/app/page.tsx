@@ -67,12 +67,14 @@ import {
   industryCategories,
   operationalRegions,
   attachApprovedRelationshipClaims,
+  applySourceFinderOutcomes,
   buildOpportunityAlert,
   buildProductAuditRecord,
   buildTaxReturnExport,
   canViewTenantAuditLogs,
   createRelationshipClaim,
   createSavedSourceFinderSearch,
+  createSourceFinderOutcomeFeedback,
   decideRelationshipClaim,
   isOpportunityAlertDue,
   isPublicGraphClaim,
@@ -85,10 +87,12 @@ import {
   type RelationshipVisibility,
   type SavedSourceFinderSearch,
   type SourceFinderOpportunityAlert,
+  type SourceFinderOutcomeFeedback,
   selectOpportunityMatches,
   pilotSourceFinderRecords,
   prohibitedCategorySummaries,
   searchSourceFinderRecords,
+  sourceFinderOutcomeActions,
   sourceFinderSortOptions,
   leadStatuses,
   matchFeedbackActions,
@@ -105,6 +109,7 @@ import {
   type NotificationSeverity,
   type SourceFinderSearchResult,
   type SourceFinderSortOption,
+  type SourceFinderOutcomeAction,
   supplyChainRoles,
   type SupplyChainRole,
 } from '@telpen/domain';
@@ -412,6 +417,10 @@ export default function Home() {
   const [industryCode, setIndustryCode] = useState('ALL');
   const [sortBy, setSortBy] = useState<SourceFinderSortOption>('RELEVANCE');
   const [matchFeedback, setMatchFeedback] = useState<MatchFeedbackAction>('SAVE');
+  const [behavioralMatchingConsent, setBehavioralMatchingConsent] = useState(false);
+  const [sourceFinderOutcomes, setSourceFinderOutcomes] = useState<SourceFinderOutcomeFeedback[]>(
+    [],
+  );
   const [leadStatus, setLeadStatus] = useState<LeadStatus>('NEW');
   const [conversationStatus, setConversationStatus] = useState<ConversationStatus>('OPEN');
   const [conversationAssignee, setConversationAssignee] = useState('sales-desk');
@@ -545,7 +554,7 @@ export default function Home() {
     pilotSourceFinderRecords,
     relationshipClaims,
   );
-  const filteredResults: SourceFinderSearchResult[] = querySafetyDecision.allowed
+  const rankedResults: SourceFinderSearchResult[] = querySafetyDecision.allowed
     ? searchSourceFinderRecords(
         {
           query,
@@ -557,6 +566,9 @@ export default function Home() {
         graphRecords,
       )
     : [];
+  const filteredResults = applySourceFinderOutcomes(rankedResults, sourceFinderOutcomes, {
+    behavioralMatchingConsent,
+  });
   const canSaveSearch = querySafetyDecision.allowed && query.trim().length >= 2;
   const savedSearchAlerts: SavedSearchAlertPreview[] = savedSearches.flatMap(
     (savedSearch): SavedSearchAlertPreview[] => {
@@ -1327,6 +1339,80 @@ export default function Home() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <label className="lead-select-row">
+              <span>Behavioral matching</span>
+              <select
+                value={behavioralMatchingConsent ? 'GRANTED' : 'DENIED'}
+                onChange={(event) =>
+                  setBehavioralMatchingConsent(event.target.value === 'GRANTED')
+                }
+              >
+                <option value="DENIED">Consent denied</option>
+                <option value="GRANTED">Consent granted</option>
+              </select>
+            </label>
+            <label className="lead-select-row">
+              <span>Outcome</span>
+              <select
+                value={matchFeedback}
+                onChange={(event) =>
+                  setMatchFeedback(event.target.value as MatchFeedbackAction)
+                }
+              >
+                {sourceFinderOutcomeActions.map((action) => (
+                  <option key={action} value={action}>
+                    {codeLabel(action)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="terms-actions">
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={!querySafetyDecision.allowed || filteredResults.length === 0}
+                onClick={() => {
+                  const target = filteredResults[0];
+                  if (!target) return;
+                  const outcome = createSourceFinderOutcomeFeedback(
+                    {
+                      sourceRecordId: target.id,
+                      query,
+                      action: matchFeedback as SourceFinderOutcomeAction,
+                      behavioralMatchingConsent,
+                    },
+                    {
+                      tenantId,
+                      id: `outcome-${sourceFinderOutcomes.length + 1}-${target.id}`,
+                    },
+                    opportunityAlertDemoNow,
+                  );
+                  setSourceFinderOutcomes((current) => [outcome, ...current]);
+                }}
+              >
+                Record outcome
+              </button>
+            </div>
+            <div
+              className={
+                behavioralMatchingConsent ? 'policy-box ok compact' : 'policy-box block compact'
+              }
+            >
+              {behavioralMatchingConsent ? <ShieldCheck size={16} /> : <CircleAlert size={18} />}
+              <div>
+                <strong>
+                  {behavioralMatchingConsent
+                    ? 'Behavioral ranking on'
+                    : 'Personal hide/report only'}
+                </strong>
+                <span>
+                  {behavioralMatchingConsent
+                    ? 'Accepted and saved outcomes can raise Source Finder scores for this tenant.'
+                    : 'Hide and report still apply. Accept/save boosts need matching consent.'}
+                </span>
+              </div>
             </div>
 
             <div className="discovery-intel-row" aria-label="Discovery query intelligence">

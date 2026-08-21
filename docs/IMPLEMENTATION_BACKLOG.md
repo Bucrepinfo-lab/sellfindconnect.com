@@ -295,8 +295,11 @@ Progress (2026-08-21):
 - Added Source Finder saved searches, INSTANT/DAILY/WEEKLY cadence, de-duplicated
   opportunity alerts, consent-aware delivery plans, and opt-in Prisma
   persistence through `SOURCE_FINDER_REPOSITORY=prisma`.
-- Native mobile saved-search screens and provider-backed push/SMS/WhatsApp
-  delivery remain next.
+- Added Source Finder outcome feedback with accept/save/dismiss/hide/report
+  actions, hide/report suppression, consent-gated accept/save ranking boosts,
+  product-audit events without notes, and `POST/GET /v1/source-finder/outcomes`.
+- Native mobile saved-search screens, provider-backed push/SMS/WhatsApp
+  delivery, persisted search index, and hierarchy dashboards remain next.
 
 ## Epic 6: Matching and Lead Conversion
 

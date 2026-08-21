@@ -533,7 +533,7 @@ Implementation progress on 2026-06-17:
 - Added reason codes and human-readable match reasons so users understand why a producer, supplier, buyer, logistics provider, or related service appears.
 - Added a tenant-scoped Source Finder API endpoint with server-side zero-tolerance blocking for prohibited searches.
 - Updated the web Source Finder to use the shared ranking engine, expose sort modes, show match reasons, and display related commercial links.
-- Remaining hardening: persisted search index, outcome feedback, hierarchy dashboards, and privacy/consent controls for behavioral matching.
+- Remaining hardening: persisted search index and hierarchy dashboards.
 
 Implementation progress on 2026-08-21:
 
@@ -547,6 +547,12 @@ Implementation progress on 2026-08-21:
 - Updated the web Saved Searches panel to save cadence-backed searches and run
   opportunity alerts. Native mobile saved-search screens and provider-backed
   push/SMS/WhatsApp delivery remain next.
+- Added Source Finder outcome feedback: accept, save, dismiss, hide, and report
+  actions persist per tenant, hide/report always suppress results, and accept/save
+  ranking boosts apply only when behavioral matching consent is granted at both
+  record and search time. Routes: `POST/GET /v1/source-finder/outcomes`.
+- Remaining hardening: persisted search index, hierarchy dashboards, Postgres
+  full-text/pgvector or an external search provider, and native mobile screens.
 
 Implementation progress on 2026-06-20:
 
@@ -565,8 +571,8 @@ Implementation progress on 2026-06-20:
   search handling, restored-search controls, and previewable alert candidates.
 - Remaining hardening: Postgres full-text/pgvector or external search provider,
   analytics warehouse/aggregated rollups, external provider-backed
-  push/SMS/WhatsApp delivery, native mobile saved-search screens, hierarchy
-  dashboards, and privacy/consent controls for behavioral matching.
+  push/SMS/WhatsApp delivery, native mobile saved-search screens, and hierarchy
+  dashboards.
 
 ### 7.6 Precision Matching and Link Intelligence
 

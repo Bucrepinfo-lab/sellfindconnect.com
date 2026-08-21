@@ -247,6 +247,7 @@ model Tenant {
   relationshipClaims           RelationshipClaim[]
   savedSourceFinderSearches    SavedSourceFinderSearch[]
   sourceFinderOpportunityAlerts SourceFinderOpportunityAlert[]
+  sourceFinderOutcomeFeedback  SourceFinderOutcomeFeedback[]
   advertLifecycleNotifications AdvertLifecycleNotification[]
   advertDiscoveryIndexes       AdvertDiscoveryIndex[]
   savedAdvertSearches          SavedAdvertSearch[]
@@ -710,6 +711,21 @@ model SourceFinderOpportunityAlert {
   savedSearch    SavedSourceFinderSearch  @relation(fields: [savedSearchId], references: [id], onDelete: Cascade)
 
   @@unique([savedSearchId, sourceRecordId])
+  @@index([tenantId, createdAt])
+}
+
+model SourceFinderOutcomeFeedback {
+  id                        String   @id @default(uuid())
+  tenantId                  String
+  sourceRecordId            String   @db.VarChar(120)
+  query                     String?  @db.VarChar(200)
+  action                    String   @db.VarChar(40)
+  note                      String?  @db.VarChar(500)
+  behavioralMatchingConsent Boolean  @default(false)
+  createdAt                 DateTime @default(now())
+  tenant                    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, sourceRecordId])
   @@index([tenantId, createdAt])
 }
 

@@ -112,10 +112,11 @@ without validating it against the authenticated user's assignments.
   See `docs/MEDIA_PIPELINE.md` for storage mode and worker queue configuration.
 - Safety: blocked categories, policy decisions, moderation cases, and reports.
 - Discovery: Source Finder, search, filters, reason codes, saved searches,
-  and cadence-backed opportunity alerts. Tenant Source Finder routes require
-  an MFA-verified tenant session. Opt-in Prisma persistence is selected with
-  `SOURCE_FINDER_REPOSITORY=prisma`.
-  Tenant-scoped discovery routes require an MFA-verified tenant session.
+  cadence-backed opportunity alerts, and consent-gated outcome feedback.
+  Tenant Source Finder routes require an MFA-verified tenant session. Opt-in
+  Prisma persistence is selected with `SOURCE_FINDER_REPOSITORY=prisma`.
+  Hide/report always suppress a tenant's results; accept/save ranking boosts
+  require behavioral matching consent.
 - Relationships: structured claims (`SUPPLIES_TO`, `BUYS_FROM`, `PRODUCES`,
   `DISTRIBUTES`, `CONSUMES`, `INSTALLS`, `REPAIRS`, `FINANCES`, `CERTIFIES`,
   `SHIPS`, `WHOLESALES`, `RETAILS`, `PARTNERS_WITH`) with public, private,

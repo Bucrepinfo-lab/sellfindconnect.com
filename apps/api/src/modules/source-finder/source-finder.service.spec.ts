@@ -87,6 +87,60 @@ describe('SourceFinderService', () => {
     );
   });
 
+  it('records outcome feedback and applies consented ranking without exposing notes', async () => {
+    const audits: Array<{ action: string; metadata?: Record<string, unknown> }> = [];
+    const service = new SourceFinderService(undefined, undefined, {
+      recordTenantAudit: async (record: { action: string; metadata?: Record<string, unknown> }) => {
+        audits.push(record);
+      },
+    } as never);
+    const tenantId = '11111111-1111-4111-8111-111111111111';
+
+    const hidden = await service.recordOutcome(tenantId, {
+      sourceRecordId: 'r2',
+      action: 'HIDE',
+      note: 'Not a hotel-produce fit this week.',
+    });
+    await service.recordOutcome(tenantId, {
+      sourceRecordId: 'r3',
+      action: 'ACCEPT',
+      query: 'fresh produce',
+      behavioralMatchingConsent: true,
+    });
+
+    const consented = await service.search(
+      {
+        query: 'fresh produce',
+        countryCode: 'KE',
+        behavioralMatchingConsent: true,
+      },
+      tenantId,
+    );
+    const denied = await service.search(
+      {
+        query: 'fresh produce',
+        countryCode: 'KE',
+        behavioralMatchingConsent: false,
+      },
+      tenantId,
+    );
+
+    expect(hidden.note).toBe('Not a hotel-produce fit this week.');
+    expect(consented.results.map((result) => result.id)).not.toContain('r2');
+    expect(consented.results.find((result) => result.id === 'r3')?.reasonCodes).toContain(
+      'OUTCOME_FEEDBACK',
+    );
+    expect(denied.results.find((result) => result.id === 'r3')?.reasonCodes).not.toContain(
+      'OUTCOME_FEEDBACK',
+    );
+    expect(audits.map((record) => record.action)).toEqual([
+      'SOURCE_FINDER_OUTCOME_RECORDED',
+      'SOURCE_FINDER_OUTCOME_RECORDED',
+    ]);
+    expect(JSON.stringify(audits)).not.toContain('hotel-produce');
+    await expect(service.listOutcomeFeedback(tenantId)).resolves.toHaveLength(2);
+  });
+
   it('blocks prohibited saved-search queries', async () => {
     const service = new SourceFinderService();
 
@@ -95,6 +149,18 @@ describe('SourceFinderService', () => {
         name: 'Weapons sourcing',
         query: 'ammunition supplier',
         countryCode: 'KE',
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('blocks prohibited outcome notes', async () => {
+    const service = new SourceFinderService();
+
+    await expect(
+      service.recordOutcome('11111111-1111-4111-8111-111111111111', {
+        sourceRecordId: 'r1',
+        action: 'REPORT',
+        note: 'This seller is offering ammunition.',
       }),
     ).rejects.toThrow();
   });

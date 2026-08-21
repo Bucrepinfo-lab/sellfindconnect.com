@@ -59,6 +59,7 @@ export const sourceFinderReasonCodes = [
   'POPULAR_PROFILE',
   'FAST_RESPONSE',
   'RELATIONSHIP_LINKS',
+  'OUTCOME_FEEDBACK',
 ] as const;
 
 export type SourceFinderReasonCode = (typeof sourceFinderReasonCodes)[number];
@@ -291,6 +292,7 @@ function scoreRecord(
   if (reasonCodes.has('FAST_RESPONSE')) reasons.push('Fast response history.');
   if (reasonCodes.has('RELATIONSHIP_LINKS')) reasons.push('Related suppliers, buyers, or service links are attached.');
   if (reasonCodes.has('NAME_OR_LOCATION_MATCH')) reasons.push('Name or location matches the search.');
+  if (reasonCodes.has('OUTCOME_FEEDBACK')) reasons.push('Prior accepted or saved outcomes improved this match.');
 
   return {
     ...record,
@@ -477,4 +479,138 @@ export function buildOpportunityAlert(
 
 export function opportunityAlertKey(savedSearchId: string, sourceRecordId: string): string {
   return `${savedSearchId}:${sourceRecordId}`;
+}
+
+export const sourceFinderOutcomeActions = [
+  'ACCEPT',
+  'SAVE',
+  'DISMISS',
+  'HIDE',
+  'REPORT',
+] as const;
+
+export type SourceFinderOutcomeAction = (typeof sourceFinderOutcomeActions)[number];
+
+export type SourceFinderOutcomeFeedback = {
+  id: string;
+  tenantId: string;
+  sourceRecordId: string;
+  query?: string;
+  action: SourceFinderOutcomeAction;
+  note?: string;
+  behavioralMatchingConsent: boolean;
+  createdAt: string;
+};
+
+export type SourceFinderOutcomeFeedbackInput = {
+  sourceRecordId: string;
+  query?: string;
+  action: SourceFinderOutcomeAction;
+  note?: string;
+  behavioralMatchingConsent?: boolean;
+};
+
+export function createSourceFinderOutcomeFeedback(
+  input: SourceFinderOutcomeFeedbackInput,
+  context: { tenantId: string; id: string },
+  nowIso = new Date().toISOString(),
+): SourceFinderOutcomeFeedback {
+  const sourceRecordId = input.sourceRecordId.trim();
+  const query = input.query?.trim();
+  const note = input.note?.trim();
+
+  if (sourceRecordId.length < 2 || sourceRecordId.length > 120) {
+    throw new SourceFinderSearchError('Outcome feedback requires a valid source record.');
+  }
+
+  if (!sourceFinderOutcomeActions.includes(input.action)) {
+    throw new SourceFinderSearchError('Unsupported Source Finder outcome action.');
+  }
+
+  if (query && (query.length < 2 || query.length > 200)) {
+    throw new SourceFinderSearchError('Outcome feedback query must be between 2 and 200 characters.');
+  }
+
+  if (note && note.length > 500) {
+    throw new SourceFinderSearchError('Outcome feedback note must be 500 characters or fewer.');
+  }
+
+  return {
+    id: context.id,
+    tenantId: context.tenantId,
+    sourceRecordId,
+    query: query || undefined,
+    action: input.action,
+    note: note || undefined,
+    behavioralMatchingConsent: input.behavioralMatchingConsent === true,
+    createdAt: nowIso,
+  };
+}
+
+export function latestSourceFinderOutcomes(
+  feedback: readonly SourceFinderOutcomeFeedback[],
+): Map<string, SourceFinderOutcomeFeedback> {
+  const latest = new Map<string, SourceFinderOutcomeFeedback>();
+  const ordered = [...feedback].sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+
+  for (const item of ordered) {
+    latest.set(item.sourceRecordId, item);
+  }
+
+  return latest;
+}
+
+export function applySourceFinderOutcomes(
+  results: SourceFinderSearchResult[],
+  feedback: readonly SourceFinderOutcomeFeedback[],
+  options: { behavioralMatchingConsent?: boolean } = {},
+): SourceFinderSearchResult[] {
+  const latest = latestSourceFinderOutcomes(feedback);
+  if (latest.size === 0) {
+    return results;
+  }
+
+  const behavioralMatchingConsent = options.behavioralMatchingConsent === true;
+  const adjusted: SourceFinderSearchResult[] = [];
+
+  for (const result of results) {
+    const outcome = latest.get(result.id);
+    if (!outcome) {
+      adjusted.push(result);
+      continue;
+    }
+
+    if (outcome.action === 'HIDE' || outcome.action === 'REPORT') {
+      continue;
+    }
+
+    let score = result.score;
+    const reasonCodes = [...result.reasonCodes];
+    const reasons = [...result.reasons];
+
+    if (outcome.action === 'DISMISS') {
+      score = Math.max(0, score - 15);
+    }
+
+    if (
+      (outcome.action === 'ACCEPT' || outcome.action === 'SAVE') &&
+      behavioralMatchingConsent &&
+      outcome.behavioralMatchingConsent
+    ) {
+      score = Math.min(100, score + 10);
+      if (!reasonCodes.includes('OUTCOME_FEEDBACK')) {
+        reasonCodes.push('OUTCOME_FEEDBACK');
+        reasons.push('Prior accepted or saved outcomes improved this match.');
+      }
+    }
+
+    adjusted.push({
+      ...result,
+      score,
+      reasonCodes,
+      reasons,
+    });
+  }
+
+  return adjusted.sort((left, right) => right.score - left.score);
 }

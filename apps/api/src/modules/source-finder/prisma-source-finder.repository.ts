@@ -4,15 +4,19 @@ import {
   PrismaClient,
   type SavedSourceFinderSearch as PrismaSavedSearch,
   type SourceFinderOpportunityAlert as PrismaOpportunityAlert,
+  type SourceFinderOutcomeFeedback as PrismaOutcomeFeedback,
 } from '@prisma/client';
 import {
   opportunityAlertFrequencies,
+  sourceFinderOutcomeActions,
   sourceFinderReasonCodes,
   sourceFinderSortOptions,
   supplyChainRoles,
   type OpportunityAlertFrequency,
   type SavedSourceFinderSearch,
   type SourceFinderOpportunityAlert,
+  type SourceFinderOutcomeAction,
+  type SourceFinderOutcomeFeedback,
   type SourceFinderReasonCode,
   type SourceFinderSortOption,
   type SupplyChainRole,
@@ -95,6 +99,29 @@ export class PrismaSourceFinderRepository implements SourceFinderRepository {
     return records.map((record) => this.fromAlert(record));
   }
 
+  async createOutcomeFeedback(feedback: SourceFinderOutcomeFeedback): Promise<void> {
+    await this.prisma.sourceFinderOutcomeFeedback.create({
+      data: {
+        id: feedback.id,
+        tenantId: feedback.tenantId,
+        sourceRecordId: feedback.sourceRecordId,
+        query: feedback.query ?? null,
+        action: feedback.action,
+        note: feedback.note ?? null,
+        behavioralMatchingConsent: feedback.behavioralMatchingConsent,
+        createdAt: new Date(feedback.createdAt),
+      },
+    });
+  }
+
+  async listOutcomeFeedback(tenantId: string): Promise<SourceFinderOutcomeFeedback[]> {
+    const records = await this.prisma.sourceFinderOutcomeFeedback.findMany({
+      where: { tenantId },
+      orderBy: { createdAt: 'desc' },
+    });
+    return records.map((record) => this.fromOutcome(record));
+  }
+
   private toSearchData(search: SavedSourceFinderSearch) {
     return {
       id: search.id,
@@ -172,6 +199,21 @@ export class PrismaSourceFinderRepository implements SourceFinderRepository {
       message: record.message,
       score: record.score,
       reasonCodes,
+      createdAt: record.createdAt.toISOString(),
+    };
+  }
+
+  private fromOutcome(record: PrismaOutcomeFeedback): SourceFinderOutcomeFeedback {
+    return {
+      id: record.id,
+      tenantId: record.tenantId,
+      sourceRecordId: record.sourceRecordId,
+      query: record.query ?? undefined,
+      action: sourceFinderOutcomeActions.includes(record.action as SourceFinderOutcomeAction)
+        ? (record.action as SourceFinderOutcomeAction)
+        : 'SAVE',
+      note: record.note ?? undefined,
+      behavioralMatchingConsent: record.behavioralMatchingConsent,
       createdAt: record.createdAt.toISOString(),
     };
   }

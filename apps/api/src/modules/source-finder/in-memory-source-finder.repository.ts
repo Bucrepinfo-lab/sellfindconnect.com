@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import type { SavedSourceFinderSearch, SourceFinderOpportunityAlert } from '@telpen/domain';
+import type {
+  SavedSourceFinderSearch,
+  SourceFinderOpportunityAlert,
+  SourceFinderOutcomeFeedback,
+} from '@telpen/domain';
 import { opportunityAlertKey } from '@telpen/domain';
 
 import type { SourceFinderRepository } from './source-finder.repository';
@@ -8,6 +12,7 @@ import type { SourceFinderRepository } from './source-finder.repository';
 export class InMemorySourceFinderRepository implements SourceFinderRepository {
   private readonly savedSearches = new Map<string, SavedSourceFinderSearch>();
   private readonly alerts = new Map<string, SourceFinderOpportunityAlert>();
+  private readonly outcomes = new Map<string, SourceFinderOutcomeFeedback>();
 
   createSavedSearch(search: SavedSourceFinderSearch): void {
     this.savedSearches.set(this.key(search.tenantId, search.id), search);
@@ -46,6 +51,16 @@ export class InMemorySourceFinderRepository implements SourceFinderRepository {
   listOpportunityAlerts(tenantId: string): SourceFinderOpportunityAlert[] {
     return Array.from(this.alerts.values())
       .filter((alert) => alert.tenantId === tenantId)
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  }
+
+  createOutcomeFeedback(feedback: SourceFinderOutcomeFeedback): void {
+    this.outcomes.set(this.key(feedback.tenantId, feedback.id), feedback);
+  }
+
+  listOutcomeFeedback(tenantId: string): SourceFinderOutcomeFeedback[] {
+    return Array.from(this.outcomes.values())
+      .filter((item) => item.tenantId === tenantId)
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
   }
 

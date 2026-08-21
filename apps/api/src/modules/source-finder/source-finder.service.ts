@@ -7,10 +7,12 @@ import {
 } from '@nestjs/common';
 import {
   SourceFinderSearchError,
+  applySourceFinderOutcomes,
   attachApprovedRelationshipClaims,
   buildNotificationDeliveryPlan,
   buildOpportunityAlert,
   createSavedSourceFinderSearch,
+  createSourceFinderOutcomeFeedback,
   defaultNotificationPreferences,
   evaluateSafetyFields,
   evaluateSafetyText,
@@ -22,6 +24,7 @@ import {
   selectOpportunityMatches,
   type SavedSourceFinderSearch,
   type SourceFinderOpportunityAlert,
+  type SourceFinderOutcomeFeedback,
   type SourceFinderRecord,
 } from '@telpen/domain';
 import { randomUUID } from 'node:crypto';
@@ -31,6 +34,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { RelationshipsService } from '../relationships/relationships.service';
 import type {
   CreateSavedSourceFinderSearchDto,
+  RecordSourceFinderOutcomeDto,
   RunSourceFinderOpportunityAlertsDto,
   SearchSourceFinderDto,
 } from './dto/search-source-finder.dto';
@@ -53,13 +57,18 @@ export class SourceFinderService {
     this.repository = repository ?? new InMemorySourceFinderRepository();
   }
 
-  async search(input: SearchSourceFinderDto) {
+  async search(input: SearchSourceFinderDto, tenantId?: string) {
     const records = await this.safeRecords(input);
-    const results = searchSourceFinderRecords(input, records);
+    const ranked = searchSourceFinderRecords(input, records);
+    const feedback = tenantId ? await this.repository.listOutcomeFeedback(tenantId) : [];
+    const results = applySourceFinderOutcomes(ranked, feedback, {
+      behavioralMatchingConsent: input.behavioralMatchingConsent === true,
+    });
 
     return {
       query: input.query,
       sortBy: input.sortBy ?? 'RELEVANCE',
+      behavioralMatchingConsent: input.behavioralMatchingConsent === true,
       filters: {
         countryCode: input.countryCode ?? null,
         industryCode: input.industryCode ?? null,
@@ -68,6 +77,39 @@ export class SourceFinderService {
       total: results.length,
       results,
     };
+  }
+
+  async recordOutcome(
+    tenantId: string,
+    input: RecordSourceFinderOutcomeDto,
+    actorUserId?: string,
+  ): Promise<SourceFinderOutcomeFeedback> {
+    this.assertSafe(input, 'Source Finder outcome contains blocked content.');
+    this.requireSource(input.sourceRecordId);
+
+    const feedback = this.runDomain(() =>
+      createSourceFinderOutcomeFeedback(input, { tenantId, id: randomUUID() }),
+    );
+    await this.repository.createOutcomeFeedback(feedback);
+    await this.auth?.recordTenantAudit({
+      tenantId,
+      actorUserId,
+      action: 'SOURCE_FINDER_OUTCOME_RECORDED',
+      entityType: 'SOURCE_FINDER_OUTCOME',
+      entityId: feedback.id,
+      metadata: {
+        sourceRecordId: feedback.sourceRecordId,
+        action: feedback.action,
+        behavioralMatchingConsent: feedback.behavioralMatchingConsent,
+        noteLength: feedback.note?.length ?? 0,
+      },
+    });
+
+    return feedback;
+  }
+
+  async listOutcomeFeedback(tenantId: string): Promise<SourceFinderOutcomeFeedback[]> {
+    return this.repository.listOutcomeFeedback(tenantId);
   }
 
   async createSavedSearch(
@@ -233,6 +275,15 @@ export class SourceFinderService {
         preferences: defaultNotificationPreferences,
       },
     });
+  }
+
+  private requireSource(sourceRecordId: string): SourceFinderRecord {
+    const record = this.records.find((item) => item.id === sourceRecordId);
+    if (!record) {
+      throw new NotFoundException('Source Finder record not found.');
+    }
+
+    return record;
   }
 
   private async requireSavedSearch(
