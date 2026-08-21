@@ -18,6 +18,7 @@ import {
   evaluateTaxPeriodCompletion,
   getDunningNoticeDecision,
   getCountry,
+  looksLikeCardPan,
   getRemittanceAlertDecision,
   reconcileSettlement,
   roundMoney,
@@ -53,6 +54,7 @@ import type {
   OpenChargebackDto,
   PayInvoiceDto,
   ReconcileSettlementDto,
+  SettleProviderCaptureDto,
   RefundInvoiceDto,
   RemitTaxReturnDto,
   RequestRefundDto,
@@ -908,6 +910,17 @@ export class FinanceService {
     if (['VOID', 'UNCOLLECTIBLE', 'REFUNDED'].includes(invoice.status)) {
       throw new UnprocessableEntityException(`Invoice in ${invoice.status} state cannot be paid.`);
     }
+    const pendingCapture = (await this.repository.listPayments()).find(
+      (item) => item.invoiceId === invoice.id && item.status === 'REQUIRES_CAPTURE',
+    );
+    if (pendingCapture) {
+      throw new UnprocessableEntityException('Invoice already has a pending provider capture.');
+    }
+    if (input.customerReference && looksLikeCardPan(input.customerReference)) {
+      throw new UnprocessableEntityException(
+        'Card numbers must not be submitted. Use a provider payment-method token or mobile-money phone.',
+      );
+    }
 
     const outstanding = roundMoney(invoice.total - invoice.amountPaid);
     const result = await this.paymentAdapter.capture({
@@ -931,17 +944,22 @@ export class FinanceService {
       amount: result.status === 'CAPTURED' ? result.capturedAmount : outstanding,
       currencyCode: invoice.currencyCode,
       idempotencyKey,
+      customerReference: input.customerReference,
       failureReason: result.failureReason,
       capturedAt: result.status === 'CAPTURED' ? now : undefined,
       createdAt: now,
     };
     await this.repository.savePayment(payment);
 
-    if (result.status !== 'CAPTURED') {
+    if (result.status === 'FAILED') {
       throw new UnprocessableEntityException({
         message: 'Payment capture failed.',
         payment,
       });
+    }
+
+    if (result.status === 'REQUIRES_CAPTURE') {
+      return { invoice, payment, receipt: null, idempotentReplay: false };
     }
 
     const amountPaid = roundMoney(invoice.amountPaid + result.capturedAmount);
@@ -991,6 +1009,7 @@ export class FinanceService {
       amount: requested,
       currencyCode: invoice.currencyCode,
       reason: input.reason,
+      customerReference: source.customerReference,
     });
     const now = new Date().toISOString();
     const refundPayment: PaymentRecord = {
@@ -1023,6 +1042,78 @@ export class FinanceService {
     await this.repository.savePaymentInvoice(refundedInvoice);
 
     return { invoice: refundedInvoice, refund: refundPayment };
+  }
+
+  async settleProviderCapture(tenantId: string, input: SettleProviderCaptureDto) {
+    this.assertSafe(input, 'Payment settlement contains blocked content.');
+
+    const payment = (await this.repository.listPayments()).find(
+      (item) => item.tenantId === tenantId && item.providerPaymentId === input.providerPaymentId,
+    );
+    if (!payment) {
+      throw new NotFoundException('Pending provider payment was not found.');
+    }
+
+    const invoice = await this.requireTenantPaymentInvoice(tenantId, payment.invoiceId);
+    if (payment.status === 'CAPTURED' && input.status === 'CAPTURED') {
+      return {
+        invoice,
+        payment,
+        receipt: await this.findReceiptForPayment(payment.id),
+        idempotentReplay: true,
+      };
+    }
+    if (payment.status !== 'REQUIRES_CAPTURE') {
+      throw new UnprocessableEntityException('Only pending provider captures can be settled.');
+    }
+
+    const now = new Date().toISOString();
+    if (input.status === 'FAILED') {
+      const failed: PaymentRecord = {
+        ...payment,
+        status: 'FAILED',
+        failureReason: input.failureReason ?? 'Provider capture failed.',
+      };
+      await this.repository.savePayment(failed);
+      return { invoice, payment: failed, receipt: null, idempotentReplay: false };
+    }
+
+    const capturedAmount = roundMoney(input.capturedAmount ?? payment.amount);
+    if (capturedAmount <= 0) {
+      throw new UnprocessableEntityException('Settled capture amount must be greater than zero.');
+    }
+
+    const captured: PaymentRecord = {
+      ...payment,
+      status: 'CAPTURED',
+      amount: capturedAmount,
+      failureReason: undefined,
+      capturedAt: now,
+    };
+    await this.repository.savePayment(captured);
+
+    const amountPaid = roundMoney(invoice.amountPaid + capturedAmount);
+    const paidInvoice: InvoiceRecord = {
+      ...invoice,
+      amountPaid,
+      status: amountPaid >= invoice.total ? 'PAID' : invoice.status,
+      updatedAt: now,
+    };
+    await this.repository.savePaymentInvoice(paidInvoice);
+
+    const receipt: ReceiptRecord = {
+      id: randomUUID(),
+      tenantId,
+      invoiceId: invoice.id,
+      paymentId: captured.id,
+      receiptNumber: `${paidInvoice.invoiceNumber}-R${(await this.countInvoiceReceipts(invoice.id)) + 1}`,
+      amount: capturedAmount,
+      currencyCode: invoice.currencyCode,
+      issuedAt: now,
+    };
+    await this.repository.savePaymentReceipt(receipt);
+
+    return { invoice: paidInvoice, payment: captured, receipt, idempotentReplay: false };
   }
 
   async listPayments(tenantId: string): Promise<PaymentRecord[]> {

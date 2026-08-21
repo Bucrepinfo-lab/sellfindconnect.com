@@ -281,6 +281,7 @@ export type PaymentRecord = {
   amount: number;
   currencyCode: string;
   idempotencyKey: string;
+  customerReference?: string;
   failureReason?: string;
   capturedAt?: string;
   createdAt: string;

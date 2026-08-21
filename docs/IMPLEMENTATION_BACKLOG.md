@@ -449,8 +449,12 @@ Progress:
 - Added controlled post-lock tax-return corrections: locked periods stay
   locked, finance admins post signed `PERIOD_CORRECTION` entries with ledger
   impact and dual-control above 10,000 units, and product audit omits notes
-  and authority references. Live payment-provider adapters/idempotency remain
-  next.
+  and authority references.
+- Added live payment-provider adapters behind `PAYMENT_PROVIDER`. Manual
+  remains the default; `stripe`, `africastalking`, and `live` select Stripe
+  PaymentIntents and/or Africa's Talking M-Pesa checkout, reject raw card
+  numbers, keep pending captures as `REQUIRES_CAPTURE` until settlement, and
+  fail closed without credentials. App-store billing remains next.
 
 ## Epic 9: Mobile, Localization, and Launch
 

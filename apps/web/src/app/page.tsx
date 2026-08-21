@@ -1854,6 +1854,10 @@ export default function Home() {
                 label="Post-lock corrections"
                 value="Controlled adjustments"
               />
+              <FinanceRow
+                label="Payment adapter"
+                value="PAYMENT_PROVIDER=live"
+              />
               {canManageTaxReturn ? (
                 <div className="policy-box ok compact">
                   <FileCheck2 size={16} />

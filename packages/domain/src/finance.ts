@@ -343,6 +343,7 @@ export type PaymentRefundRequest = {
   amount: number;
   currencyCode: string;
   reason?: string;
+  customerReference?: string;
 };
 
 export type PaymentRefundResult = {
@@ -353,6 +354,108 @@ export type PaymentRefundResult = {
   currencyCode: string;
   failureReason?: string;
 };
+
+/** Stripe zero-decimal currencies — amounts are whole major units. */
+export const stripeZeroDecimalCurrencies = [
+  'BIF',
+  'CLP',
+  'DJF',
+  'GNF',
+  'JPY',
+  'KMF',
+  'KRW',
+  'MGA',
+  'PYG',
+  'RWF',
+  'UGX',
+  'VND',
+  'VUV',
+  'XAF',
+  'XOF',
+  'XPF',
+] as const;
+
+/** Stripe three-decimal currencies — amounts are thousandths of a major unit. */
+export const stripeThreeDecimalCurrencies = ['BHD', 'JOD', 'KWD', 'OMR', 'TND'] as const;
+
+export function paymentProviderMinorUnitExponent(currencyCode: string): 0 | 2 | 3 {
+  const currency = currencyCode.trim().toUpperCase();
+  if ((stripeZeroDecimalCurrencies as readonly string[]).includes(currency)) {
+    return 0;
+  }
+  if ((stripeThreeDecimalCurrencies as readonly string[]).includes(currency)) {
+    return 3;
+  }
+  return 2;
+}
+
+export function toPaymentProviderMinorUnits(amount: number, currencyCode: string): number {
+  const currency = currencyCode.trim().toUpperCase();
+  const rounded = roundMoney(amount);
+  if (!Number.isFinite(rounded) || rounded <= 0 || currency.length !== 3) {
+    throw new Error('Capture amount must be greater than zero with a 3-letter ISO currency.');
+  }
+
+  const exponent = paymentProviderMinorUnitExponent(currency);
+  return Math.round(rounded * 10 ** exponent);
+}
+
+export function fromPaymentProviderMinorUnits(minorUnits: number, currencyCode: string): number {
+  const exponent = paymentProviderMinorUnitExponent(currencyCode);
+  return roundMoney(minorUnits / 10 ** exponent);
+}
+
+export function mapStripePaymentIntentStatus(
+  status: string,
+): Extract<FinancePaymentStatus, 'CAPTURED' | 'REQUIRES_CAPTURE' | 'FAILED'> {
+  const value = status.trim().toLowerCase();
+  if (value === 'succeeded') {
+    return 'CAPTURED';
+  }
+  if (
+    value === 'requires_capture' ||
+    value === 'requires_action' ||
+    value === 'requires_confirmation' ||
+    value === 'requires_payment_method' ||
+    value === 'processing'
+  ) {
+    return 'REQUIRES_CAPTURE';
+  }
+  return 'FAILED';
+}
+
+export function mapStripeRefundStatus(
+  status: string,
+): Extract<FinancePaymentStatus, 'REFUNDED' | 'FAILED'> {
+  const value = status.trim().toLowerCase();
+  if (value === 'succeeded' || value === 'pending') {
+    return 'REFUNDED';
+  }
+  return 'FAILED';
+}
+
+export function mapAfricasTalkingCheckoutToFinanceStatus(
+  status: string,
+): Extract<FinancePaymentStatus, 'CAPTURED' | 'REQUIRES_CAPTURE' | 'FAILED'> {
+  const value = status.trim().toLowerCase().replace(/ /g, '');
+  if (value === 'success') {
+    return 'CAPTURED';
+  }
+  if (
+    value === 'pendingconfirmation' ||
+    value === 'pendingvalidation' ||
+    value === 'pending' ||
+    value === 'queued'
+  ) {
+    return 'REQUIRES_CAPTURE';
+  }
+  return 'FAILED';
+}
+
+export function looksLikeCardPan(value: string): boolean {
+  const digits = value.replace(/[\s-]/g, '');
+  return /^\d{13,19}$/.test(digits);
+}
 
 export const invoiceStatuses = [
   'DRAFT',

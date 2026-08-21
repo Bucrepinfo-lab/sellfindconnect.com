@@ -318,6 +318,10 @@ GitHub source connection status on 2026-06-16:
     `AT_API_KEY`, `AT_USERNAME`, `AT_SENDER_ID`, `FCM_SERVICE_ACCOUNT_JSON`,
     `FCM_PROJECT_ID`. Without these, memory adapters still record delivery
     attempts.
+  - Optional finance payment adapters: `PAYMENT_PROVIDER=manual` by default.
+    `stripe`, `africastalking`, or `live` require `STRIPE_SECRET_KEY` and/or
+    `AT_API_KEY` / `AT_USERNAME` / `AT_PAYMENTS_PRODUCT_NAME`. Raw card numbers
+    are rejected; pending captures settle via `POST /v1/finance/payments/settle`.
 
 ### Data Services
 

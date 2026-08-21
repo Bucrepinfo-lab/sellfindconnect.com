@@ -2,11 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { FinanceService } from './finance.service';
 import { InMemoryFinanceRepository } from './in-memory-finance.repository';
+import type { PaymentAdapter } from './payment.adapter';
 
 const tenantId = '11111111-1111-4111-8111-111111111111';
 
-async function configuredService() {
-  const service = new FinanceService();
+async function configuredService(paymentAdapter?: PaymentAdapter) {
+  const service = new FinanceService(paymentAdapter);
 
   await service.configureCountryTaxProfile({
     countryCode: 'KE',
@@ -328,6 +329,69 @@ describe('FinanceService', () => {
     expect(paid.payment.status).toBe('CAPTURED');
     expect(paid.invoice.status).toBe('PAID');
     expect(paid.receipt?.amount).toBe(11.3793);
+    expect(await service.listPaymentReceipts(tenantId)).toHaveLength(1);
+  });
+
+  it('keeps pending provider captures unpaid until settlement', async () => {
+    const adapter: PaymentAdapter = {
+      provider: 'africastalking',
+      capture: async () => ({
+        provider: 'africastalking',
+        providerPaymentId: 'ATX123',
+        status: 'REQUIRES_CAPTURE',
+        capturedAmount: 0,
+        currencyCode: 'KES',
+      }),
+      refund: async () => ({
+        provider: 'africastalking',
+        providerRefundId: 'unused',
+        status: 'FAILED',
+        refundedAmount: 0,
+        currencyCode: 'KES',
+        failureReason: 'unused',
+      }),
+    };
+    const service = await configuredService(adapter);
+    const invoice = await service.issueInvoice(tenantId, {
+      countryCode: 'KE',
+      currencyCode: 'KES',
+      lines: [{ description: 'Monthly subscription', quantity: 1, unitAmount: 10 }],
+    });
+
+    const pending = await service.payInvoice(tenantId, {
+      invoiceId: invoice.id,
+      method: 'MOBILE_MONEY',
+      customerReference: '+254712345678',
+    });
+
+    expect(pending.payment.status).toBe('REQUIRES_CAPTURE');
+    expect(pending.invoice.status).toBe('ISSUED');
+    expect(pending.receipt).toBeNull();
+
+    await expect(
+      service.payInvoice(tenantId, {
+        invoiceId: invoice.id,
+        method: 'MOBILE_MONEY',
+        customerReference: '+254712345678',
+        idempotencyKey: 'second-attempt',
+      }),
+    ).rejects.toThrow('Invoice already has a pending provider capture.');
+
+    const settled = await service.settleProviderCapture(tenantId, {
+      providerPaymentId: 'ATX123',
+      status: 'CAPTURED',
+    });
+
+    expect(settled.idempotentReplay).toBe(false);
+    expect(settled.payment.status).toBe('CAPTURED');
+    expect(settled.invoice.status).toBe('PAID');
+    expect(settled.receipt?.amount).toBe(invoice.total);
+
+    const replay = await service.settleProviderCapture(tenantId, {
+      providerPaymentId: 'ATX123',
+      status: 'CAPTURED',
+    });
+    expect(replay.idempotentReplay).toBe(true);
     expect(await service.listPaymentReceipts(tenantId)).toHaveLength(1);
   });
 

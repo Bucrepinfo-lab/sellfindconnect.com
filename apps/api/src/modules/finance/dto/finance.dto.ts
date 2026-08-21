@@ -506,6 +506,29 @@ export class PayInvoiceDto {
   declare customerReference?: string;
 }
 
+export class SettleProviderCaptureDto {
+  @ApiProperty({ example: 'ATX123456789' })
+  @IsString()
+  @Length(2, 160)
+  declare providerPaymentId: string;
+
+  @ApiProperty({ enum: ['CAPTURED', 'FAILED'], example: 'CAPTURED' })
+  @IsIn(['CAPTURED', 'FAILED'])
+  declare status: 'CAPTURED' | 'FAILED';
+
+  @ApiPropertyOptional({ example: 11.3793 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  declare capturedAmount?: number;
+
+  @ApiPropertyOptional({ example: 'Payer cancelled the STK prompt.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  declare failureReason?: string;
+}
+
 export class RefundInvoiceDto {
   @ApiProperty({ example: 'd3f1c2a4-0000-0000-0000-000000000000' })
   @IsString()

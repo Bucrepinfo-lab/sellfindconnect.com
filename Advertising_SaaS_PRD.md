@@ -1036,7 +1036,8 @@ Implementation progress on 2026-06-17:
 - Continued implementation on 2026-08-21 with the tax return workbench: review submission, reconciliation-gated approval, dual filing approval above 10,000 filing-currency units, filing/remittance evidence, period lock, CSV/JSON country tax exports, `COUNTRY_FINANCE_ADMIN` access, and product-audit events that omit notes and receipt references.
 - Continued implementation on 2026-08-21 with an in-memory finance repository plus opt-in Prisma persistence through `FINANCE_REPOSITORY=prisma`. Country tax profiles, rules, snapshots, ledger entries, invoices, receipts, adjustments, tax returns, payments, and reconciliation runs survive process restarts when PostgreSQL is enabled.
 - Continued implementation on 2026-08-21 with controlled post-lock tax-return corrections. Locked periods stay locked; finance admins can post signed correction entries with `PERIOD_CORRECTION` evidence, ledger impact, dual-control above 10,000 units, and product-audit events that omit notes and authority references.
-- Remaining hardening: live payment-provider adapters/idempotency.
+- Continued implementation on 2026-08-21 with live payment-provider adapters. Invoice capture stays on the manual development adapter by default. `PAYMENT_PROVIDER=stripe`, `africastalking`, or `live` selects Stripe PaymentIntents and/or Africa's Talking M-Pesa checkout, rejects raw card numbers, records `REQUIRES_CAPTURE` until `POST /v1/finance/payments/settle`, and fail-closes when credentials are missing.
+- Remaining hardening: app-store billing rails and a persisted Source Finder search index.
 
 ### 7.11 Moderation, Trust, and Safety
 

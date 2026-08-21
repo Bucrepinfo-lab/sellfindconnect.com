@@ -15,9 +15,15 @@ import {
   canOperateTaxReturnWorkbench,
   createFinanceDocumentNumber,
   evaluateTaxPeriodCompletion,
+  fromPaymentProviderMinorUnits,
   getDunningNoticeDecision,
   getRemittanceAlertDecision,
+  looksLikeCardPan,
+  mapAfricasTalkingCheckoutToFinanceStatus,
+  mapStripePaymentIntentStatus,
+  mapStripeRefundStatus,
   requiresSeparateFilingApprover,
+  toPaymentProviderMinorUnits,
 } from './finance';
 
 describe('finance domain helpers', () => {
@@ -267,5 +273,23 @@ describe('finance domain helpers', () => {
     expect(exported.content).toContain('FILING_CONFIRMATION|REMITTANCE_RECEIPT');
     expect(exported.content).toContain('KRA-VAT-2026-06|PAY-8891');
     expect(exported.content).not.toContain('accountant');
+  });
+
+  it('converts Stripe-style minor units and maps provider statuses', () => {
+    expect(toPaymentProviderMinorUnits(11.3793, 'KES')).toBe(1138);
+    expect(fromPaymentProviderMinorUnits(1138, 'kes')).toBe(11.38);
+    expect(toPaymentProviderMinorUnits(1500, 'JPY')).toBe(1500);
+    expect(toPaymentProviderMinorUnits(1.234, 'KWD')).toBe(1234);
+
+    expect(mapStripePaymentIntentStatus('succeeded')).toBe('CAPTURED');
+    expect(mapStripePaymentIntentStatus('requires_action')).toBe('REQUIRES_CAPTURE');
+    expect(mapStripePaymentIntentStatus('canceled')).toBe('FAILED');
+    expect(mapStripeRefundStatus('pending')).toBe('REFUNDED');
+    expect(mapAfricasTalkingCheckoutToFinanceStatus('PendingConfirmation')).toBe(
+      'REQUIRES_CAPTURE',
+    );
+    expect(mapAfricasTalkingCheckoutToFinanceStatus('Success')).toBe('CAPTURED');
+    expect(looksLikeCardPan('4242424242424242')).toBe(true);
+    expect(looksLikeCardPan('pm_card_visa')).toBe(false);
   });
 });

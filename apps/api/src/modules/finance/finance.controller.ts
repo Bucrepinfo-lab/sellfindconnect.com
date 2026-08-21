@@ -20,6 +20,7 @@ import {
   CorrectTaxReturnDto,
   PayInvoiceDto,
   ReconcileSettlementDto,
+  SettleProviderCaptureDto,
   RefundInvoiceDto,
   RemitTaxReturnDto,
   RequestRefundDto,
@@ -282,6 +283,11 @@ export class FinanceController {
   @Post('payment-invoices/pay')
   payInvoice(@TenantId() tenantId: string, @Body() body: PayInvoiceDto) {
     return this.finance.payInvoice(tenantId, body);
+  }
+
+  @Post('payments/settle')
+  settleProviderCapture(@TenantId() tenantId: string, @Body() body: SettleProviderCaptureDto) {
+    return this.finance.settleProviderCapture(tenantId, body);
   }
 
   @Post('payment-invoices/refund')

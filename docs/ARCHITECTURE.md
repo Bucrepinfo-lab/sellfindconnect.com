@@ -193,8 +193,10 @@ reversal ledger entries with country/year document numbers. Country tax returns
 move through review, reconciliation-gated approval, dual filing approval,
 evidence attachment, remittance, period lock, and controlled post-lock
 corrections, with CSV/JSON exports and product-audit events. Opt-in Prisma
-persistence is selected with `FINANCE_REPOSITORY=prisma`. Live payment-provider
-adapters remain future hardening work.
+persistence is selected with `FINANCE_REPOSITORY=prisma`. Invoice capture uses
+`PAYMENT_PROVIDER=manual` by default; `stripe`, `africastalking`, and `live`
+select Stripe PaymentIntents and/or Africa's Talking M-Pesa checkout. Pending
+provider captures stay `REQUIRES_CAPTURE` until `POST /v1/finance/payments/settle`.
 
 ## Data and API Conventions
 

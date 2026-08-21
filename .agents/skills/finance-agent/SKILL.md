@@ -13,8 +13,8 @@ The API `finance` module already provides, per tenant/country:
 - Approved **country tax profiles** + effective-dated **tax rules**.
 - Immutable **tax calculation snapshots** and a **finance ledger**.
 - **Invoices** (line items, totals, country-scoped numbering), **payments** via
-  a provider-neutral `PaymentAdapter` (manual/dev today; Stripe/mobile-money
-  behind the same interface), **receipts**, and **refunds**.
+  a provider-neutral `PaymentAdapter` (manual/dev by default; Stripe PaymentIntents
+  and Africa's Talking M-Pesa behind `PAYMENT_PROVIDER=stripe|africastalking|live`), **receipts**, and **refunds**.
 - **Provider/bank reconciliation** (`reconcileSettlement`) raising
   `RECONCILIATION_VARIANCE` alerts.
 - Draft **tax returns** and **T-30/T-14/T-7/T-3/T-1/due/overdue** remittance
