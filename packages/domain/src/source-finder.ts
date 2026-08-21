@@ -1,3 +1,4 @@
+import { buildDiscoveryIndexDocument, type DiscoveryVector } from './discovery';
 import type { SupplyChainRole } from './industries';
 
 export const sourceFinderSortOptions = [
@@ -69,6 +70,58 @@ export type SourceFinderSearchResult = SourceFinderRecord & {
   reasonCodes: SourceFinderReasonCode[];
   reasons: string[];
 };
+
+export type SourceFinderIndexDocument = SourceFinderRecord & {
+  searchText: string;
+  tokenVector: DiscoveryVector;
+  indexedAt: string;
+};
+
+export function buildSourceFinderIndexDocument(
+  record: SourceFinderRecord,
+  indexedAt = record.publishedAt,
+): SourceFinderIndexDocument {
+  const document = buildDiscoveryIndexDocument({
+    title: record.name,
+    displayName: record.location,
+    description: [...record.offers, ...record.needs].join(' '),
+    industryCode: record.industryCode,
+    countryCode: record.countryCode,
+    role: record.role,
+    tags: [...record.offers, ...record.needs],
+    relationshipSignals: record.relatedLinks.map((link) => ({
+      role: link.role,
+      relationship: link.relationship,
+      weight: link.confidence,
+      reason: link.label,
+    })),
+  });
+
+  return {
+    ...record,
+    searchText: document.searchText,
+    tokenVector: document.tokenVector,
+    indexedAt,
+  };
+}
+
+export function toSourceFinderRecord(document: SourceFinderIndexDocument): SourceFinderRecord {
+  return {
+    id: document.id,
+    name: document.name,
+    role: document.role,
+    industryCode: document.industryCode,
+    countryCode: document.countryCode,
+    location: document.location,
+    offers: document.offers,
+    needs: document.needs,
+    relatedLinks: document.relatedLinks,
+    verified: document.verified,
+    publishedAt: document.publishedAt,
+    responseTimeMinutes: document.responseTimeMinutes,
+    analytics: document.analytics,
+  };
+}
 
 export const pilotSourceFinderRecords: SourceFinderRecord[] = [
   {

@@ -17,7 +17,7 @@ import { RunMediaProcessingJobsDto } from '../media/dto/media-worker.dto';
 import { MediaWorkerService } from '../media/media-worker.service';
 import { RunNotificationDispatchDto } from '../notifications/dto/notifications.dto';
 import { NotificationsService } from '../notifications/notifications.service';
-import { RunSourceFinderOpportunityAlertsDto } from '../source-finder/dto/search-source-finder.dto';
+import { RunSourceFinderOpportunityAlertsDto, RebuildSourceFinderIndexDto } from '../source-finder/dto/search-source-finder.dto';
 import { SourceFinderService } from '../source-finder/source-finder.service';
 import { InternalJobGuard } from './internal-job.guard';
 
@@ -77,6 +77,11 @@ export class OperationsController {
   @Post('source-finder/alerts/run')
   runSourceFinderOpportunityAlerts(@Body() body: RunSourceFinderOpportunityAlertsDto) {
     return this.sourceFinder.runAllOpportunityAlerts(body);
+  }
+
+  @Post('source-finder/index/reindex')
+  rebuildSourceFinderIndex(@Body() body: RebuildSourceFinderIndexDto) {
+    return this.sourceFinder.rebuildIndex(body);
   }
 
   @Post('notifications/dispatch/run')

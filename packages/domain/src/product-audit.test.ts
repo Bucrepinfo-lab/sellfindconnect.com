@@ -81,5 +81,8 @@ describe('product audit helpers', () => {
     expect(describeProductAuditAction('SOURCE_FINDER_OUTCOME_RECORDED')).toBe(
       'Source Finder outcome recorded',
     );
+    expect(describeProductAuditAction('SOURCE_FINDER_INDEX_REBUILT')).toBe(
+      'Source Finder index rebuilt',
+    );
   });
 });

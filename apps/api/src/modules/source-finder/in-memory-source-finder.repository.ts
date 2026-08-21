@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type {
   SavedSourceFinderSearch,
+  SourceFinderIndexDocument,
   SourceFinderOpportunityAlert,
   SourceFinderOutcomeFeedback,
 } from '@telpen/domain';
@@ -13,6 +14,7 @@ export class InMemorySourceFinderRepository implements SourceFinderRepository {
   private readonly savedSearches = new Map<string, SavedSourceFinderSearch>();
   private readonly alerts = new Map<string, SourceFinderOpportunityAlert>();
   private readonly outcomes = new Map<string, SourceFinderOutcomeFeedback>();
+  private readonly index = new Map<string, SourceFinderIndexDocument>();
 
   createSavedSearch(search: SavedSourceFinderSearch): void {
     this.savedSearches.set(this.key(search.tenantId, search.id), search);
@@ -62,6 +64,27 @@ export class InMemorySourceFinderRepository implements SourceFinderRepository {
     return Array.from(this.outcomes.values())
       .filter((item) => item.tenantId === tenantId)
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  }
+
+  upsertIndexDocument(document: SourceFinderIndexDocument): void {
+    this.index.set(document.id, document);
+  }
+
+  replaceIndexDocuments(documents: SourceFinderIndexDocument[]): void {
+    this.index.clear();
+    for (const document of documents) {
+      this.index.set(document.id, document);
+    }
+  }
+
+  findIndexDocument(sourceRecordId: string): SourceFinderIndexDocument | undefined {
+    return this.index.get(sourceRecordId);
+  }
+
+  listIndexDocuments(): SourceFinderIndexDocument[] {
+    return Array.from(this.index.values()).sort((left, right) =>
+      right.indexedAt.localeCompare(left.indexedAt),
+    );
   }
 
   private key(tenantId: string, id: string): string {

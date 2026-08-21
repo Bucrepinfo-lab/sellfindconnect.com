@@ -5,9 +5,11 @@ import {
   createSavedSourceFinderSearch,
   createSourceFinderOutcomeFeedback,
   applySourceFinderOutcomes,
+  buildSourceFinderIndexDocument,
   isOpportunityAlertDue,
   searchSourceFinderRecords,
   selectOpportunityMatches,
+  toSourceFinderRecord,
 } from './source-finder';
 
 describe('source finder ranking', () => {
@@ -186,5 +188,21 @@ describe('source finder outcome feedback', () => {
     ]);
 
     expect(adjusted.map((result) => result.id)).not.toContain('r1');
+  });
+
+  it('builds a searchable index document from a Source Finder record', () => {
+    const record = searchSourceFinderRecords({ query: 'fresh produce', countryCode: 'KE' })[0];
+    expect(record).toBeDefined();
+    const indexed = buildSourceFinderIndexDocument(record!, '2026-08-21T12:00:00.000Z');
+
+    expect(indexed.searchText).toContain('nairobi');
+    expect(indexed.searchText).toContain('tomato');
+    expect(indexed.tokenVector.fresh).toBeGreaterThan(0);
+    expect(toSourceFinderRecord(indexed)).toMatchObject({
+      id: record!.id,
+      name: record!.name,
+      offers: record!.offers,
+    });
+    expect(toSourceFinderRecord(indexed)).not.toHaveProperty('searchText');
   });
 });

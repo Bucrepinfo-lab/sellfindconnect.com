@@ -59,6 +59,21 @@ export class SearchSourceFinderDto {
   declare behavioralMatchingConsent?: boolean;
 }
 
+export class RebuildSourceFinderIndexDto {
+  @ApiPropertyOptional({ example: '2026-08-21T12:00:00.000Z' })
+  @IsOptional()
+  @IsISO8601()
+  declare now?: string;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'When false, the index is cleared instead of rebuilt from the pilot catalog.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  declare includePilot?: boolean;
+}
+
 export class CreateSavedSourceFinderSearchDto {
   @ApiProperty({ example: 'Fresh produce buyers' })
   @IsString()

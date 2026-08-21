@@ -1,5 +1,6 @@
 import type {
   SavedSourceFinderSearch,
+  SourceFinderIndexDocument,
   SourceFinderOpportunityAlert,
   SourceFinderOutcomeFeedback,
 } from '@telpen/domain';
@@ -26,4 +27,11 @@ export interface SourceFinderRepository {
   listOpportunityAlerts(tenantId: string): RepositoryResult<SourceFinderOpportunityAlert[]>;
   createOutcomeFeedback(feedback: SourceFinderOutcomeFeedback): RepositoryResult<void>;
   listOutcomeFeedback(tenantId: string): RepositoryResult<SourceFinderOutcomeFeedback[]>;
+  upsertIndexDocument(document: SourceFinderIndexDocument, tenantId?: string): RepositoryResult<void>;
+  replaceIndexDocuments(
+    documents: SourceFinderIndexDocument[],
+    tenantId?: string,
+  ): RepositoryResult<void>;
+  findIndexDocument(sourceRecordId: string): RepositoryResult<SourceFinderIndexDocument | undefined>;
+  listIndexDocuments(): RepositoryResult<SourceFinderIndexDocument[]>;
 }

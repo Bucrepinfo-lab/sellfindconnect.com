@@ -2420,6 +2420,13 @@ export default function Home() {
                   </span>
                 </div>
               </div>
+              <div className="policy-box ok compact">
+                <Search size={16} />
+                <div>
+                  <strong>Search index</strong>
+                  <span>Catalog documents persist through SOURCE_FINDER_REPOSITORY=prisma.</span>
+                </div>
+              </div>
               <div className="saved-search-list">
                 {savedSearches.slice(0, 4).map((savedSearch) => (
                   <button

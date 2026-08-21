@@ -19,6 +19,7 @@ export const productAuditActions = [
   'TAX_RETURN_CORRECTED',
   'TAX_REPORT_EXPORTED',
   'SOURCE_FINDER_OUTCOME_RECORDED',
+  'SOURCE_FINDER_INDEX_REBUILT',
 ] as const;
 
 export type ProductAuditAction = (typeof productAuditActions)[number];
@@ -97,6 +98,8 @@ export function describeProductAuditAction(action: string): string {
       return 'Tax report exported';
     case 'SOURCE_FINDER_OUTCOME_RECORDED':
       return 'Source Finder outcome recorded';
+    case 'SOURCE_FINDER_INDEX_REBUILT':
+      return 'Source Finder index rebuilt';
     default:
       return action.replaceAll('_', ' ').toLowerCase();
   }

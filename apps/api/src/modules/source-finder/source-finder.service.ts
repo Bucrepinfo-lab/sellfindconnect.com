@@ -11,6 +11,7 @@ import {
   attachApprovedRelationshipClaims,
   buildNotificationDeliveryPlan,
   buildOpportunityAlert,
+  buildSourceFinderIndexDocument,
   createSavedSourceFinderSearch,
   createSourceFinderOutcomeFeedback,
   defaultNotificationPreferences,
@@ -22,7 +23,9 @@ import {
   pilotSourceFinderRecords,
   searchSourceFinderRecords,
   selectOpportunityMatches,
+  toSourceFinderRecord,
   type SavedSourceFinderSearch,
+  type SourceFinderIndexDocument,
   type SourceFinderOpportunityAlert,
   type SourceFinderOutcomeFeedback,
   type SourceFinderRecord,
@@ -35,6 +38,7 @@ import { RelationshipsService } from '../relationships/relationships.service';
 import type {
   CreateSavedSourceFinderSearchDto,
   RecordSourceFinderOutcomeDto,
+  RebuildSourceFinderIndexDto,
   RunSourceFinderOpportunityAlertsDto,
   SearchSourceFinderDto,
 } from './dto/search-source-finder.dto';
@@ -43,7 +47,6 @@ import { SOURCE_FINDER_REPOSITORY, type SourceFinderRepository } from './source-
 
 @Injectable()
 export class SourceFinderService {
-  private readonly records: SourceFinderRecord[] = pilotSourceFinderRecords;
   private readonly repository: SourceFinderRepository;
 
   constructor(
@@ -74,8 +77,50 @@ export class SourceFinderService {
         industryCode: input.industryCode ?? null,
         role: input.role ?? null,
       },
+      indexedDocuments: (await this.repository.listIndexDocuments()).length,
       total: results.length,
       results,
+    };
+  }
+
+  async rebuildIndex(
+    input: RebuildSourceFinderIndexDto = {},
+    actorUserId?: string,
+    tenantId?: string,
+  ) {
+    const now = input.now ?? new Date().toISOString();
+    const sources = input.includePilot === false ? [] : [...pilotSourceFinderRecords];
+    const documents = sources.map((record) => {
+      this.assertSafe(record, 'Source Finder index document contains blocked content.');
+      return buildSourceFinderIndexDocument(record, now);
+    });
+    await this.repository.replaceIndexDocuments(documents, tenantId);
+    if (tenantId) {
+      await this.auth?.recordTenantAudit({
+        tenantId,
+        actorUserId,
+        action: 'SOURCE_FINDER_INDEX_REBUILT',
+        entityType: 'SOURCE_FINDER_INDEX',
+        entityId: tenantId,
+        metadata: {
+          indexed: documents.length,
+          includePilot: input.includePilot !== false,
+        },
+      });
+    }
+
+    return {
+      indexedAt: now,
+      indexed: documents.length,
+      documents: documents.map((document) => this.indexSummary(document)),
+    };
+  }
+
+  async listIndex() {
+    const documents = await this.repository.listIndexDocuments();
+    return {
+      total: documents.length,
+      documents: documents.map((document) => this.indexSummary(document)),
     };
   }
 
@@ -85,7 +130,7 @@ export class SourceFinderService {
     actorUserId?: string,
   ): Promise<SourceFinderOutcomeFeedback> {
     this.assertSafe(input, 'Source Finder outcome contains blocked content.');
-    this.requireSource(input.sourceRecordId);
+    await this.requireSource(input.sourceRecordId);
 
     const feedback = this.runDomain(() =>
       createSourceFinderOutcomeFeedback(input, { tenantId, id: randomUUID() }),
@@ -277,8 +322,11 @@ export class SourceFinderService {
     });
   }
 
-  private requireSource(sourceRecordId: string): SourceFinderRecord {
-    const record = this.records.find((item) => item.id === sourceRecordId);
+  private async requireSource(sourceRecordId: string): Promise<SourceFinderRecord> {
+    const indexed = await this.repository.findIndexDocument(sourceRecordId);
+    const record =
+      (indexed ? toSourceFinderRecord(indexed) : undefined) ??
+      (await this.catalogRecords()).find((item) => item.id === sourceRecordId);
     if (!record) {
       throw new NotFoundException('Source Finder record not found.');
     }
@@ -314,7 +362,27 @@ export class SourceFinderService {
 
   private async graphRecords(): Promise<SourceFinderRecord[]> {
     const graphClaims = this.relationships ? await this.relationships.listGraph() : [];
-    return attachApprovedRelationshipClaims(this.records, graphClaims);
+    return attachApprovedRelationshipClaims(await this.catalogRecords(), graphClaims);
+  }
+
+  private async catalogRecords(): Promise<SourceFinderRecord[]> {
+    const indexed = await this.repository.listIndexDocuments();
+    if (indexed.length === 0) {
+      return pilotSourceFinderRecords;
+    }
+    return indexed.map((document) => toSourceFinderRecord(document));
+  }
+
+  private indexSummary(document: SourceFinderIndexDocument) {
+    return {
+      id: document.id,
+      name: document.name,
+      role: document.role,
+      industryCode: document.industryCode,
+      countryCode: document.countryCode,
+      location: document.location,
+      indexedAt: document.indexedAt,
+    };
   }
 
   private assertSupportedFilters(

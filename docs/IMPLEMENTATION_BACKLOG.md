@@ -298,8 +298,12 @@ Progress (2026-08-21):
 - Added Source Finder outcome feedback with accept/save/dismiss/hide/report
   actions, hide/report suppression, consent-gated accept/save ranking boosts,
   product-audit events without notes, and `POST/GET /v1/source-finder/outcomes`.
+- Added a persisted Source Finder search index with search text, sparse token
+  vectors, tenant and operations reindex commands, and Prisma persistence
+  through `SOURCE_FINDER_REPOSITORY=prisma`. Search uses indexed documents when
+  present and falls back to the in-memory catalog otherwise.
 - Native mobile saved-search screens, provider-backed push/SMS/WhatsApp
-  delivery, persisted search index, and hierarchy dashboards remain next.
+  delivery, Postgres full-text/pgvector, and hierarchy dashboards remain next.
 
 ## Epic 6: Matching and Lead Conversion
 

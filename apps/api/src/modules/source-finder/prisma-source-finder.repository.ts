@@ -3,6 +3,7 @@ import {
   Prisma,
   PrismaClient,
   type SavedSourceFinderSearch as PrismaSavedSearch,
+  type SourceFinderIndex as PrismaSourceFinderIndex,
   type SourceFinderOpportunityAlert as PrismaOpportunityAlert,
   type SourceFinderOutcomeFeedback as PrismaOutcomeFeedback,
 } from '@prisma/client';
@@ -14,6 +15,7 @@ import {
   supplyChainRoles,
   type OpportunityAlertFrequency,
   type SavedSourceFinderSearch,
+  type SourceFinderIndexDocument,
   type SourceFinderOpportunityAlert,
   type SourceFinderOutcomeAction,
   type SourceFinderOutcomeFeedback,
@@ -122,6 +124,65 @@ export class PrismaSourceFinderRepository implements SourceFinderRepository {
     return records.map((record) => this.fromOutcome(record));
   }
 
+  async upsertIndexDocument(
+    document: SourceFinderIndexDocument,
+    tenantId?: string,
+  ): Promise<void> {
+    const data = this.toIndexData(document, tenantId);
+    await this.prisma.sourceFinderIndex.upsert({
+      where: { sourceRecordId: document.id },
+      create: data,
+      update: {
+        tenantId: data.tenantId,
+        name: data.name,
+        role: data.role,
+        industryCode: data.industryCode,
+        countryCode: data.countryCode,
+        location: data.location,
+        offers: data.offers,
+        needs: data.needs,
+        relatedLinks: data.relatedLinks,
+        verified: data.verified,
+        publishedAt: data.publishedAt,
+        responseTimeMinutes: data.responseTimeMinutes,
+        analytics: data.analytics,
+        searchText: data.searchText,
+        tokenVector: data.tokenVector,
+        indexedAt: data.indexedAt,
+        updatedAt: new Date(),
+      },
+    });
+  }
+
+  async replaceIndexDocuments(
+    documents: SourceFinderIndexDocument[],
+    tenantId?: string,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.sourceFinderIndex.deleteMany();
+      if (documents.length === 0) {
+        return;
+      }
+      await tx.sourceFinderIndex.createMany({
+        data: documents.map((document) => this.toIndexData(document, tenantId)),
+      });
+    });
+  }
+
+  async findIndexDocument(sourceRecordId: string): Promise<SourceFinderIndexDocument | undefined> {
+    const record = await this.prisma.sourceFinderIndex.findUnique({
+      where: { sourceRecordId },
+    });
+    return record ? this.fromIndex(record) : undefined;
+  }
+
+  async listIndexDocuments(): Promise<SourceFinderIndexDocument[]> {
+    const records = await this.prisma.sourceFinderIndex.findMany({
+      orderBy: { indexedAt: 'desc' },
+    });
+    return records.map((record) => this.fromIndex(record));
+  }
+
   private toSearchData(search: SavedSourceFinderSearch) {
     return {
       id: search.id,
@@ -215,6 +276,113 @@ export class PrismaSourceFinderRepository implements SourceFinderRepository {
       note: record.note ?? undefined,
       behavioralMatchingConsent: record.behavioralMatchingConsent,
       createdAt: record.createdAt.toISOString(),
+    };
+  }
+
+  private toIndexData(document: SourceFinderIndexDocument, tenantId?: string) {
+    return {
+      id: document.id,
+      sourceRecordId: document.id,
+      tenantId: tenantId ?? null,
+      name: document.name,
+      role: document.role,
+      industryCode: document.industryCode,
+      countryCode: document.countryCode,
+      location: document.location,
+      offers: document.offers as Prisma.InputJsonValue,
+      needs: document.needs as Prisma.InputJsonValue,
+      relatedLinks: document.relatedLinks as Prisma.InputJsonValue,
+      verified: document.verified,
+      publishedAt: new Date(document.publishedAt),
+      responseTimeMinutes: document.responseTimeMinutes,
+      analytics: document.analytics as Prisma.InputJsonValue,
+      searchText: document.searchText,
+      tokenVector: document.tokenVector as Prisma.InputJsonValue,
+      indexedAt: new Date(document.indexedAt),
+      createdAt: new Date(document.publishedAt),
+      updatedAt: new Date(document.indexedAt),
+    };
+  }
+
+  private fromIndex(record: PrismaSourceFinderIndex): SourceFinderIndexDocument {
+    return {
+      id: record.sourceRecordId,
+      name: record.name,
+      role: supplyChainRoles.includes(record.role as SupplyChainRole)
+        ? (record.role as SupplyChainRole)
+        : 'SUPPLIER',
+      industryCode: record.industryCode,
+      countryCode: record.countryCode,
+      location: record.location,
+      offers: this.stringArray(record.offers),
+      needs: this.stringArray(record.needs),
+      relatedLinks: this.relatedLinks(record.relatedLinks),
+      verified: record.verified,
+      publishedAt: record.publishedAt.toISOString(),
+      responseTimeMinutes: record.responseTimeMinutes,
+      analytics: this.analytics(record.analytics),
+      searchText: record.searchText,
+      tokenVector:
+        record.tokenVector && typeof record.tokenVector === 'object' && !Array.isArray(record.tokenVector)
+          ? (record.tokenVector as SourceFinderIndexDocument['tokenVector'])
+          : {},
+      indexedAt: record.indexedAt.toISOString(),
+    };
+  }
+
+  private stringArray(value: Prisma.JsonValue): string[] {
+    return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+  }
+
+  private relatedLinks(value: Prisma.JsonValue): SourceFinderIndexDocument['relatedLinks'] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value.flatMap((item) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        return [];
+      }
+      const link = item as Record<string, unknown>;
+      const role = typeof link.role === 'string' && supplyChainRoles.includes(link.role as SupplyChainRole)
+        ? (link.role as SupplyChainRole)
+        : undefined;
+      const relationship = link.relationship;
+      if (
+        typeof link.id !== 'string' ||
+        typeof link.label !== 'string' ||
+        !role ||
+        (relationship !== 'SUPPLIES' &&
+          relationship !== 'BUYS_FROM' &&
+          relationship !== 'DISTRIBUTES' &&
+          relationship !== 'SERVES' &&
+          relationship !== 'FINANCES' &&
+          relationship !== 'CERTIFIES') ||
+        typeof link.confidence !== 'number'
+      ) {
+        return [];
+      }
+      return [
+        {
+          id: link.id,
+          label: link.label,
+          role,
+          relationship,
+          confidence: link.confidence,
+        },
+      ];
+    });
+  }
+
+  private analytics(value: Prisma.JsonValue): SourceFinderIndexDocument['analytics'] {
+    const record = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    const numbers = record as Record<string, unknown>;
+    return {
+      views: typeof numbers.views === 'number' ? numbers.views : 0,
+      clicks: typeof numbers.clicks === 'number' ? numbers.clicks : 0,
+      inquiries: typeof numbers.inquiries === 'number' ? numbers.inquiries : 0,
+      shares: typeof numbers.shares === 'number' ? numbers.shares : 0,
+      downloads: typeof numbers.downloads === 'number' ? numbers.downloads : 0,
     };
   }
 }

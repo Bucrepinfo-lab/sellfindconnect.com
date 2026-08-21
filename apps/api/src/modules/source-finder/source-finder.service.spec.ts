@@ -164,4 +164,39 @@ describe('SourceFinderService', () => {
       }),
     ).rejects.toThrow();
   });
+
+  it('rebuilds a persisted Source Finder index and searches indexed documents', async () => {
+    const audits: Array<{ action: string; metadata?: Record<string, unknown> }> = [];
+    const service = new SourceFinderService(undefined, undefined, {
+      recordTenantAudit: async (record: { action: string; metadata?: Record<string, unknown> }) => {
+        audits.push(record);
+      },
+    } as never);
+    const tenantId = '11111111-1111-4111-8111-111111111111';
+
+    const rebuilt = await service.rebuildIndex(
+      { now: '2026-08-21T12:00:00.000Z' },
+      'owner-1',
+      tenantId,
+    );
+    const listed = await service.listIndex();
+    const search = await service.search({ query: 'fresh produce', countryCode: 'KE' }, tenantId);
+
+    expect(rebuilt.indexed).toBe(4);
+    expect(listed.documents.map((document) => document.id)).toEqual(
+      expect.arrayContaining(['r1', 'r2', 'r3', 'r4']),
+    );
+    expect(search.indexedDocuments).toBe(4);
+    expect(search.results[0]?.id).toBe('r1');
+    expect(audits.map((record) => record.action)).toEqual(['SOURCE_FINDER_INDEX_REBUILT']);
+    expect(JSON.stringify(listed)).not.toContain('tokenVector');
+
+    const cleared = await service.rebuildIndex({ includePilot: false }, 'owner-1', tenantId);
+    expect(cleared.indexed).toBe(0);
+    await expect(
+      service.search({ query: 'fresh produce', countryCode: 'KE' }, tenantId),
+    ).resolves.toMatchObject({ indexedDocuments: 0, results: expect.arrayContaining([
+      expect.objectContaining({ id: 'r1' }),
+    ]) });
+  });
 });
