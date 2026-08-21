@@ -156,6 +156,7 @@ export class PrismaSourceFinderRepository implements SourceFinderRepository {
         updatedAt: new Date(),
       },
     });
+    await this.writeIndexEmbeddings([document]);
   }
 
   async replaceIndexDocuments(
@@ -171,20 +172,22 @@ export class PrismaSourceFinderRepository implements SourceFinderRepository {
         data: documents.map((document) => this.toIndexData(document, tenantId)),
       });
     });
+    await this.writeIndexEmbeddings(documents);
   }
 
   async findIndexDocument(sourceRecordId: string): Promise<SourceFinderIndexDocument | undefined> {
     const record = await this.prisma.sourceFinderIndex.findUnique({
       where: { sourceRecordId },
     });
-    return record ? this.fromIndex(record) : undefined;
+    return record ? this.withEmbedding(this.fromIndex(record), await this.loadIndexEmbeddings()) : undefined;
   }
 
   async listIndexDocuments(): Promise<SourceFinderIndexDocument[]> {
     const records = await this.prisma.sourceFinderIndex.findMany({
       orderBy: { indexedAt: 'desc' },
     });
-    return records.map((record) => this.fromIndex(record));
+    const embeddings = await this.loadIndexEmbeddings();
+    return records.map((record) => this.withEmbedding(this.fromIndex(record), embeddings));
   }
 
   async searchIndexDocuments(
@@ -372,6 +375,61 @@ export class PrismaSourceFinderRepository implements SourceFinderRepository {
           : {},
       indexedAt: this.toIso(record.indexedAt),
     };
+  }
+
+  private withEmbedding(
+    document: SourceFinderIndexDocument,
+    embeddings: Map<string, number[]>,
+  ): SourceFinderIndexDocument {
+    const embedding = embeddings.get(document.id);
+    return embedding?.length ? { ...document, embedding } : document;
+  }
+
+  private async writeIndexEmbeddings(documents: SourceFinderIndexDocument[]): Promise<void> {
+    for (const document of documents) {
+      if (!document.embedding?.length) {
+        continue;
+      }
+      try {
+        await this.prisma.$executeRawUnsafe(
+          `UPDATE "SourceFinderIndex" SET "embedding" = $1::vector WHERE "sourceRecordId" = $2`,
+          `[${document.embedding.join(',')}]`,
+          document.id,
+        );
+      } catch {
+        // pgvector is optional in local/dev databases; FTS ranking still works.
+      }
+    }
+  }
+
+  private async loadIndexEmbeddings(): Promise<Map<string, number[]>> {
+    try {
+      const rows = (await this.prisma.$queryRawUnsafe(
+        `SELECT "sourceRecordId", "embedding"::text AS embedding FROM "SourceFinderIndex" WHERE "embedding" IS NOT NULL`,
+      )) as Array<{ sourceRecordId: string; embedding: string | null }>;
+      const embeddings = new Map<string, number[]>();
+      for (const row of rows) {
+        const parsed = this.parseVector(row.embedding);
+        if (parsed) {
+          embeddings.set(row.sourceRecordId, parsed);
+        }
+      }
+      return embeddings;
+    } catch {
+      return new Map();
+    }
+  }
+
+  private parseVector(value: string | null | undefined): number[] | undefined {
+    if (!value) {
+      return undefined;
+    }
+    const inner = value.replace(/^\[/, '').replace(/\]$/, '');
+    if (!inner.trim()) {
+      return undefined;
+    }
+    const values = inner.split(',').map((part) => Number(part.trim()));
+    return values.every((item) => Number.isFinite(item)) ? values : undefined;
   }
 
   private toIso(value: Date | string): string {

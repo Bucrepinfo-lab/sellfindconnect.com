@@ -64,6 +64,7 @@ export const sourceFinderReasonCodes = [
   'RELATIONSHIP_LINKS',
   'OUTCOME_FEEDBACK',
   'KEYWORD_MATCH',
+  'SEMANTIC_MATCH',
 ] as const;
 
 export type SourceFinderReasonCode = (typeof sourceFinderReasonCodes)[number];
@@ -78,6 +79,7 @@ export type SourceFinderIndexDocument = SourceFinderRecord & {
   searchText: string;
   tokenVector: DiscoveryVector;
   indexedAt: string;
+  embedding?: number[];
 };
 
 export function buildSourceFinderIndexDocument(
@@ -149,11 +151,73 @@ export function scoreSourceFinderFullText(
   return Number((weight / tokens.length).toFixed(6));
 }
 
-export type SourceFinderSearchMode = 'RULES' | 'FTS' | 'HYBRID';
+export const sourceFinderEmbeddingMatchThreshold = 0.35;
+
+export function cosineSimilarity(left: number[] | undefined, right: number[] | undefined): number {
+  if (!left?.length || !right?.length || left.length !== right.length) {
+    return 0;
+  }
+
+  let dot = 0;
+  let leftNorm = 0;
+  let rightNorm = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    const leftValue = left[index] ?? 0;
+    const rightValue = right[index] ?? 0;
+    dot += leftValue * rightValue;
+    leftNorm += leftValue * leftValue;
+    rightNorm += rightValue * rightValue;
+  }
+  if (leftNorm === 0 || rightNorm === 0) {
+    return 0;
+  }
+  return Number((dot / (Math.sqrt(leftNorm) * Math.sqrt(rightNorm))).toFixed(6));
+}
+
+export function scoreSourceFinderEmbedding(
+  document: Pick<SourceFinderIndexDocument, 'embedding'>,
+  queryEmbedding?: number[],
+): number {
+  const similarity = cosineSimilarity(queryEmbedding, document.embedding);
+  return similarity >= sourceFinderEmbeddingMatchThreshold ? similarity : 0;
+}
+
+export function attachSourceFinderEmbeddingRanks(
+  hits: SourceFinderIndexSearchHit[],
+  documents: SourceFinderIndexDocument[],
+  queryEmbedding?: number[],
+): SourceFinderIndexSearchHit[] {
+  if (!queryEmbedding?.length) {
+    return hits;
+  }
+
+  const merged = new Map<string, SourceFinderIndexSearchHit>();
+  for (const hit of hits) {
+    merged.set(hit.document.id, hit);
+  }
+
+  for (const document of documents) {
+    const embeddingRank = scoreSourceFinderEmbedding(document, queryEmbedding);
+    if (embeddingRank <= 0) {
+      continue;
+    }
+    const existing = merged.get(document.id);
+    merged.set(document.id, {
+      document: existing?.document ?? document,
+      ftsRank: existing?.ftsRank ?? 0,
+      embeddingRank,
+    });
+  }
+
+  return [...merged.values()];
+}
+
+export type SourceFinderSearchMode = 'RULES' | 'FTS' | 'HYBRID' | 'SEMANTIC';
 
 export type SourceFinderIndexSearchHit = {
   document: SourceFinderIndexDocument;
   ftsRank: number;
+  embeddingRank?: number;
 };
 
 export function searchSourceFinderIndexDocuments(
@@ -187,15 +251,19 @@ export function resolveSourceFinderSearchMode(input: {
   indexedDocumentCount: number;
   query: string;
   ftsHitCount: number;
+  embeddingHitCount?: number;
 }): SourceFinderSearchMode {
   const hasQuery = tokenizeDiscoveryText(input.query).length > 0;
   if (input.indexedDocumentCount === 0 || !hasQuery) {
     return 'RULES';
   }
-  if (input.ftsHitCount === 0) {
+  if (input.ftsHitCount === 0 && (input.embeddingHitCount ?? 0) === 0) {
     return 'RULES';
   }
-  return 'HYBRID';
+  if (input.ftsHitCount > 0) {
+    return 'HYBRID';
+  }
+  return 'SEMANTIC';
 }
 
 export function rankSourceFinderWithFullText(
@@ -203,15 +271,24 @@ export function rankSourceFinderWithFullText(
   records: SourceFinderRecord[],
   hits: SourceFinderIndexSearchHit[] = [],
 ): SourceFinderSearchResult[] {
-  const matchingHits = hits.filter((hit) => hit.ftsRank > 0);
+  const matchingHits = hits.filter(
+    (hit) => hit.ftsRank > 0 || (hit.embeddingRank ?? 0) > 0,
+  );
   const catalog =
     matchingHits.length > 0
       ? records.filter((record) => matchingHits.some((hit) => hit.document.id === record.id))
       : records;
   const ranks = new Map(matchingHits.map((hit) => [hit.document.id, hit.ftsRank]));
-  return applySourceFinderFullTextRanking(
-    searchSourceFinderRecords(input, catalog),
-    ranks,
+  const embeddingRanks = new Map(
+    matchingHits.map((hit) => [hit.document.id, hit.embeddingRank ?? 0]),
+  );
+  return applySourceFinderEmbeddingRanking(
+    applySourceFinderFullTextRanking(
+      searchSourceFinderRecords(input, catalog),
+      ranks,
+      input.sortBy ?? 'RELEVANCE',
+    ),
+    embeddingRanks,
     input.sortBy ?? 'RELEVANCE',
   );
 }
@@ -237,6 +314,35 @@ export function applySourceFinderFullTextRanking(
     return {
       ...result,
       score: Math.min(100, result.score + Math.round(normaliseFtsRank(ftsRank) * 20)),
+      reasonCodes,
+      reasons,
+    };
+  });
+
+  return sortResults(boosted, sortBy);
+}
+
+export function applySourceFinderEmbeddingRanking(
+  results: SourceFinderSearchResult[],
+  ranks: Map<string, number>,
+  sortBy: SourceFinderSortOption = 'RELEVANCE',
+): SourceFinderSearchResult[] {
+  const boosted = results.map((result) => {
+    const embeddingRank = ranks.get(result.id) ?? 0;
+    if (embeddingRank <= 0) {
+      return result;
+    }
+
+    const reasonCodes = result.reasonCodes.includes('SEMANTIC_MATCH')
+      ? result.reasonCodes
+      : [...result.reasonCodes, 'SEMANTIC_MATCH' as const];
+    const reasons = result.reasons.includes('Semantic embedding matched the search intent.')
+      ? result.reasons
+      : [...result.reasons, 'Semantic embedding matched the search intent.'];
+
+    return {
+      ...result,
+      score: Math.min(100, result.score + Math.round(embeddingRank * 18)),
       reasonCodes,
       reasons,
     };

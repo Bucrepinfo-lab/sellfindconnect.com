@@ -157,8 +157,8 @@ Progress:
   onboarding attributes, and terms acceptance evidence.
 - Added the initial Prisma migration and seed workflow required before enabling
   production Prisma persistence against a hosted PostgreSQL database.
-- Production Prisma enablement against hosted PostgreSQL, broader non-auth
-  product audit coverage, and optional Source Finder embeddings remain next.
+- Production Prisma enablement against hosted PostgreSQL and broader non-auth
+  product audit coverage remain next.
 
 ## Epic 3: Advertiser Profile Vertical Slice
 
@@ -342,6 +342,10 @@ Progress (2026-08-21):
   token overlap and Prisma `tsvector` search add `KEYWORD_MATCH` and report
   `searchMode` as `RULES`, `FTS`, or `HYBRID`. The `embedding` column is reserved
   for an optional later overlay and is not required for tests.
+- Added optional OpenAI embedding overlay for Source Finder. `OPENAI_API_KEY`
+  enables `text-embedding-3-small` on reindex and search; named
+  `SOURCE_FINDER_EMBEDDING_PROVIDER=openai` fail-closes without the key.
+  Matches add `SEMANTIC_MATCH`. Tests do not require live OpenAI credentials.
 - Native mobile saved-search screens remain out of scope. Hosted Prisma
   enablement remains next.
 

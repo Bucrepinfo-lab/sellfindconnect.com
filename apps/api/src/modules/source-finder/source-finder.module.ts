@@ -5,8 +5,12 @@ import { AuthModule } from '../auth/auth.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { RelationshipsModule } from '../relationships/relationships.module';
 import { InMemorySourceFinderRepository } from './in-memory-source-finder.repository';
-import { SourceFinderController } from './source-finder.controller';
+import {
+  SOURCE_FINDER_EMBEDDER,
+  createConfiguredSourceFinderEmbedder,
+} from './openai-embeddings';
 import { SOURCE_FINDER_REPOSITORY } from './source-finder.repository';
+import { SourceFinderController } from './source-finder.controller';
 import { SourceFinderService } from './source-finder.service';
 
 @Module({
@@ -40,6 +44,11 @@ import { SourceFinderService } from './source-finder.service';
         );
         return new PrismaSourceFinderRepository(createSourceFinderPrismaClient(databaseUrl));
       },
+    },
+    {
+      provide: SOURCE_FINDER_EMBEDDER,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => createConfiguredSourceFinderEmbedder(config),
     },
     SourceFinderService,
   ],

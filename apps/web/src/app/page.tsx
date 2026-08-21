@@ -2508,7 +2508,12 @@ export default function Home() {
                 <Search size={16} />
                 <div>
                   <strong>Full-text search</strong>
-                  <span>Postgres FTS + token rank. Indexed catalogs report HYBRID; the pilot catalog stays RULES.</span>
+                  <span>
+                    Postgres FTS + token rank. OpenAI embeddings overlay when OPENAI_API_KEY is set
+                    and add SEMANTIC_MATCH. Indexed catalogs report HYBRID or SEMANTIC; the pilot
+                    catalog stays RULES. SOURCE_FINDER_EMBEDDING_PROVIDER=openai fail-closes without
+                    the key.
+                  </span>
                 </div>
               </div>
               <div className="saved-search-list">

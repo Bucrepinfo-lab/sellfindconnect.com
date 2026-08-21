@@ -6,6 +6,8 @@ import {
   createSourceFinderOutcomeFeedback,
   applySourceFinderOutcomes,
   applySourceFinderFullTextRanking,
+  attachSourceFinderEmbeddingRanks,
+  cosineSimilarity,
   buildSourceFinderHierarchyReport,
   buildSourceFinderIndexDocument,
   buildSourceFinderTsQuery,
@@ -275,6 +277,44 @@ describe('source finder outcome feedback', () => {
         ftsHitCount: 0,
       }),
     ).toBe('RULES');
+  });
+
+  it('boosts Source Finder results with embedding similarity and reports SEMANTIC mode', () => {
+    const record = searchSourceFinderRecords({ query: 'fresh produce', countryCode: 'KE' })[0];
+    expect(record).toBeDefined();
+    const indexed = {
+      ...buildSourceFinderIndexDocument(record!),
+      embedding: [1, 0],
+    };
+    const hits = attachSourceFinderEmbeddingRanks([], [indexed], [0.99, 0.1]);
+
+    expect(cosineSimilarity([1, 0], [0.99, 0.1])).toBeGreaterThan(0.9);
+    expect(hits[0]?.embeddingRank).toBeGreaterThan(0.9);
+    expect(toSourceFinderRecord(indexed)).not.toHaveProperty('embedding');
+
+    const ranked = rankSourceFinderWithFullText(
+      { query: 'fresh produce', countryCode: 'KE', sortBy: 'RELEVANCE' },
+      searchSourceFinderRecords({ query: '', countryCode: 'KE' }),
+      hits,
+    );
+    expect(ranked[0]?.reasonCodes).toContain('SEMANTIC_MATCH');
+    expect(ranked[0]?.reasons).toContain('Semantic embedding matched the search intent.');
+    expect(
+      resolveSourceFinderSearchMode({
+        indexedDocumentCount: 1,
+        query: 'fresh produce',
+        ftsHitCount: 0,
+        embeddingHitCount: 1,
+      }),
+    ).toBe('SEMANTIC');
+    expect(
+      resolveSourceFinderSearchMode({
+        indexedDocumentCount: 1,
+        query: 'fresh produce',
+        ftsHitCount: 2,
+        embeddingHitCount: 1,
+      }),
+    ).toBe('HYBRID');
   });
 
   it('rolls Source Finder catalog records into country, industry, and role hierarchy buckets', () => {

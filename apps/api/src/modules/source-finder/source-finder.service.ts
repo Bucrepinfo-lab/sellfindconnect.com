@@ -13,6 +13,7 @@ import {
   buildOpportunityAlert,
   buildSourceFinderHierarchyReport,
   buildSourceFinderIndexDocument,
+  attachSourceFinderEmbeddingRanks,
   createSavedSourceFinderSearch,
   createSourceFinderOutcomeFeedback,
   defaultNotificationPreferences,
@@ -48,10 +49,15 @@ import type {
 } from './dto/search-source-finder.dto';
 import { InMemorySourceFinderRepository } from './in-memory-source-finder.repository';
 import { SOURCE_FINDER_REPOSITORY, type SourceFinderRepository } from './source-finder.repository';
+import {
+  SOURCE_FINDER_EMBEDDER,
+  type SourceFinderEmbedder,
+} from './openai-embeddings';
 
 @Injectable()
 export class SourceFinderService {
   private readonly repository: SourceFinderRepository;
+  private readonly embedder?: SourceFinderEmbedder;
 
   constructor(
     @Optional()
@@ -60,8 +66,12 @@ export class SourceFinderService {
     @Optional() private readonly relationships?: RelationshipsService,
     @Optional() private readonly auth?: AuthService,
     @Optional() private readonly notifications?: NotificationsService,
+    @Optional()
+    @Inject(SOURCE_FINDER_EMBEDDER)
+    embedder?: SourceFinderEmbedder | null,
   ) {
     this.repository = repository ?? new InMemorySourceFinderRepository();
+    this.embedder = embedder ?? undefined;
   }
 
   async search(input: SearchSourceFinderDto, tenantId?: string) {
@@ -76,16 +86,20 @@ export class SourceFinderService {
             role: input.role,
           })
         : [];
-    const ranked = rankSourceFinderWithFullText(input, records, hits);
+    const queryEmbedding = await this.embedQuery(input.query);
+    const rankedHits = attachSourceFinderEmbeddingRanks(hits, indexedDocuments, queryEmbedding);
+    const ranked = rankSourceFinderWithFullText(input, records, rankedHits);
     const feedback = tenantId ? await this.repository.listOutcomeFeedback(tenantId) : [];
     const results = applySourceFinderOutcomes(ranked, feedback, {
       behavioralMatchingConsent: input.behavioralMatchingConsent === true,
     });
-    const ftsHitCount = hits.filter((hit) => hit.ftsRank > 0).length;
+    const ftsHitCount = rankedHits.filter((hit) => hit.ftsRank > 0).length;
+    const embeddingHitCount = rankedHits.filter((hit) => (hit.embeddingRank ?? 0) > 0).length;
     const searchMode = resolveSourceFinderSearchMode({
       indexedDocumentCount: indexedDocuments.length,
       query: input.query,
       ftsHitCount,
+      embeddingHitCount,
     });
 
     return {
@@ -115,7 +129,8 @@ export class SourceFinderService {
       this.assertSafe(record, 'Source Finder index document contains blocked content.');
       return buildSourceFinderIndexDocument(record, now);
     });
-    await this.repository.replaceIndexDocuments(documents, tenantId);
+    const embeddedDocuments = await this.embedIndexDocuments(documents);
+    await this.repository.replaceIndexDocuments(embeddedDocuments, tenantId);
     if (tenantId) {
       await this.auth?.recordTenantAudit({
         tenantId,
@@ -124,7 +139,9 @@ export class SourceFinderService {
         entityType: 'SOURCE_FINDER_INDEX',
         entityId: tenantId,
         metadata: {
-          indexed: documents.length,
+          indexed: embeddedDocuments.length,
+          embedded: embeddedDocuments.filter((document) => Boolean(document.embedding?.length)).length,
+          embeddingProvider: this.embedder?.provider ?? 'none',
           includePilot: input.includePilot !== false,
         },
       });
@@ -132,8 +149,9 @@ export class SourceFinderService {
 
     return {
       indexedAt: now,
-      indexed: documents.length,
-      documents: documents.map((document) => this.indexSummary(document)),
+      indexed: embeddedDocuments.length,
+      embedded: embeddedDocuments.filter((document) => Boolean(document.embedding?.length)).length,
+      documents: embeddedDocuments.map((document) => this.indexSummary(document)),
     };
   }
 
@@ -400,6 +418,41 @@ export class SourceFinderService {
     return indexed.map((document) => toSourceFinderRecord(document));
   }
 
+  private async embedQuery(query: string): Promise<number[] | undefined> {
+    if (!this.embedder || !query.trim()) {
+      return undefined;
+    }
+
+    try {
+      return await this.embedder.embed(query);
+    } catch {
+      if (this.embedder.required) {
+        throw new UnprocessableEntityException('Source Finder embeddings are unavailable.');
+      }
+      return undefined;
+    }
+  }
+
+  private async embedIndexDocuments(
+    documents: SourceFinderIndexDocument[],
+  ): Promise<SourceFinderIndexDocument[]> {
+    if (!this.embedder || documents.length === 0) {
+      return documents;
+    }
+
+    try {
+      const embeddings = await this.embedder.embedBatch(documents.map((document) => document.searchText));
+      return documents.map((document, index) =>
+        embeddings[index]?.length ? { ...document, embedding: embeddings[index] } : document,
+      );
+    } catch {
+      if (this.embedder.required) {
+        throw new UnprocessableEntityException('Source Finder embeddings are unavailable.');
+      }
+      return documents;
+    }
+  }
+
   private indexSummary(document: SourceFinderIndexDocument) {
     return {
       id: document.id,
@@ -409,6 +462,7 @@ export class SourceFinderService {
       countryCode: document.countryCode,
       location: document.location,
       indexedAt: document.indexedAt,
+      embedded: Boolean(document.embedding?.length),
     };
   }
 

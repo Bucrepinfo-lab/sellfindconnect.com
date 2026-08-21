@@ -207,6 +207,63 @@ describe('SourceFinderService', () => {
     });
   });
 
+  it('overlays OpenAI embeddings onto the Source Finder index without exposing vectors', async () => {
+    const audits: Array<{ action: string; metadata?: Record<string, unknown> }> = [];
+    const embedder = {
+      provider: 'openai',
+      required: false,
+      embed: async () => [1, 0],
+      embedBatch: async (texts: string[]) => texts.map(() => [1, 0]),
+    };
+    const service = new SourceFinderService(
+      undefined,
+      undefined,
+      {
+        recordTenantAudit: async (record: { action: string; metadata?: Record<string, unknown> }) => {
+          audits.push(record);
+        },
+      } as never,
+      undefined,
+      embedder,
+    );
+    const tenantId = '11111111-1111-4111-8111-111111111111';
+
+    const rebuilt = await service.rebuildIndex({ now: '2026-08-21T12:00:00.000Z' }, 'owner-1', tenantId);
+    const listed = await service.listIndex();
+    const search = await service.search({ query: 'fresh unicornfarm', countryCode: 'KE' }, tenantId);
+
+    expect(rebuilt.embedded).toBe(4);
+    expect(listed.documents.every((document) => document.embedded)).toBe(true);
+    expect(search.searchMode).toBe('SEMANTIC');
+    expect(search.results[0]?.reasonCodes).toContain('SEMANTIC_MATCH');
+    expect(audits[0]?.metadata).toMatchObject({
+      indexed: 4,
+      embedded: 4,
+      embeddingProvider: 'openai',
+    });
+    expect(JSON.stringify(listed)).not.toContain('tokenVector');
+    expect(JSON.stringify(listed)).not.toContain('"embedding"');
+    expect(JSON.stringify(audits)).not.toContain('sk-');
+  });
+
+  it('fail-closes required embedding overlays when OpenAI is unavailable', async () => {
+    const embedder = {
+      provider: 'openai',
+      required: true,
+      embed: async () => {
+        throw new Error('SOURCE_FINDER_EMBEDDING_UNAVAILABLE');
+      },
+      embedBatch: async () => {
+        throw new Error('SOURCE_FINDER_EMBEDDING_UNAVAILABLE');
+      },
+    };
+    const service = new SourceFinderService(undefined, undefined, undefined, undefined, embedder);
+
+    await expect(service.rebuildIndex({ now: '2026-08-21T12:00:00.000Z' })).rejects.toThrow(
+      'Source Finder embeddings are unavailable.',
+    );
+  });
+
   it('summarizes catalog records into a Source Finder hierarchy dashboard', async () => {
     const service = new SourceFinderService();
     const report = await service.hierarchy({ countryCode: 'KE' });

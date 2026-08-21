@@ -130,7 +130,10 @@ without validating it against the authenticated user's assignments.
   `POST /v1/source-finder/index/reindex` rebuilding the index.
   Indexed documents use token overlap in memory and Postgres `tsvector`
   ranking when `SOURCE_FINDER_REPOSITORY=prisma`. Search responses include
-  `searchMode` (`RULES` | `FTS` | `HYBRID`) and `KEYWORD_MATCH`.
+  `searchMode` (`RULES` | `FTS` | `HYBRID` | `SEMANTIC`) and `KEYWORD_MATCH`.
+  Optional OpenAI `text-embedding-3-small` overlays when `OPENAI_API_KEY` is
+  set; `SOURCE_FINDER_EMBEDDING_PROVIDER=openai` fail-closes without the key.
+  Semantic hits add `SEMANTIC_MATCH`. Index summaries omit vectors.
   `GET /v1/source-finder/hierarchy` rolls catalog records into country,
   industry, role, and relationship-link dashboards.
   Hide/report always suppress a tenant's results; accept/save ranking boosts

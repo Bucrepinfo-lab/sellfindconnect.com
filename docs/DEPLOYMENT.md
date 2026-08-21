@@ -334,6 +334,10 @@ GitHub source connection status on 2026-06-16:
     `POST /v1/auth/identity/session`. `AUTH_IDENTITY_PROVIDER=auth0`, `clerk`,
     `oidc`, or `live` fail-closes without those values; `development` keeps
     first-party password/MFA login only.
+  - Optional Source Finder embeddings: `OPENAI_API_KEY` overlays
+    `text-embedding-3-small` on catalog reindex and search.
+    `SOURCE_FINDER_EMBEDDING_PROVIDER=openai` fail-closes without the key;
+    `development` keeps FTS-only ranking.
   - Optional finance payment adapters: `PAYMENT_PROVIDER=manual` by default.
     `stripe`, `africastalking`, or `live` require `STRIPE_SECRET_KEY` and/or
     `AT_API_KEY` / `AT_USERNAME` / `AT_PAYMENTS_PRODUCT_NAME`. Raw card numbers

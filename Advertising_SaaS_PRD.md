@@ -586,9 +586,12 @@ Implementation progress on 2026-08-21:
   `GET /v1/source-finder/hierarchy` and shown on the Relationship Graph panel.
 - Added Postgres full-text ranking on the Source Finder catalog index. Indexed
   documents score with token overlap in memory and `tsvector` search in Prisma.
-  Search responses include `searchMode` (`RULES` | `FTS` | `HYBRID`) and
-  `KEYWORD_MATCH` without requiring live OpenAI embeddings. The `embedding`
-  column is reserved for an optional later overlay.
+  Search responses include `searchMode` (`RULES` | `FTS` | `HYBRID` | `SEMANTIC`)
+  and `KEYWORD_MATCH` without requiring live OpenAI embeddings.
+- Added optional OpenAI embedding overlay. `OPENAI_API_KEY` embeds Source Finder
+  index documents and queries with `text-embedding-3-small`. Named
+  `SOURCE_FINDER_EMBEDDING_PROVIDER=openai` or `live` fail-closes without the
+  key; `development` keeps FTS-only. Semantic hits add `SEMANTIC_MATCH`.
 - Remaining hardening: native mobile screens are out of scope. Hosted Prisma
   enablement remains next.
 
