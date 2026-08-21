@@ -147,7 +147,8 @@ without validating it against the authenticated user's assignments.
 - Billing: trial, subscription, invoice, payment, refund, and chargeback.
 - Finance: country tax profiles, tax snapshots, ledger, reconciliation, returns,
   remittances, alerts, approvals, and evidence. Tenant finance routes require
-  an MFA-verified tenant session.
+  an MFA-verified tenant session. Opt-in Prisma persistence is selected with
+  `FINANCE_REPOSITORY=prisma`.
 - Analytics: privacy-aware product and business events. Tenant analytics routes
   require an MFA-verified tenant session.
 

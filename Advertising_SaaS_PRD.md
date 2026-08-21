@@ -1034,7 +1034,8 @@ Implementation progress on 2026-06-17:
 - Continued implementation on 2026-06-23 with protected invoice and receipt command endpoints, country/year document numbering, payment-balance tracking, and a paid transaction path that creates an invoice, optional receipt, immutable tax snapshot, and ledger entries.
 - Continued implementation on 2026-06-24 with protected refund, chargeback, adjustment listing, and dunning commands, including refund credit-note numbering, proportional tax/revenue reversal ledger entries, disputed-balance reopening, and duplicate-safe overdue invoice notices.
 - Continued implementation on 2026-08-21 with the tax return workbench: review submission, reconciliation-gated approval, dual filing approval above 10,000 filing-currency units, filing/remittance evidence, period lock, CSV/JSON country tax exports, `COUNTRY_FINANCE_ADMIN` access, and product-audit events that omit notes and receipt references.
-- Remaining hardening: durable database persistence, payment-provider adapters/idempotency, and controlled post-lock correction entries.
+- Continued implementation on 2026-08-21 with an in-memory finance repository plus opt-in Prisma persistence through `FINANCE_REPOSITORY=prisma`. Country tax profiles, rules, snapshots, ledger entries, invoices, receipts, adjustments, tax returns, payments, and reconciliation runs survive process restarts when PostgreSQL is enabled.
+- Remaining hardening: live payment-provider adapters/idempotency, and controlled post-lock correction entries.
 
 ### 7.11 Moderation, Trust, and Safety
 

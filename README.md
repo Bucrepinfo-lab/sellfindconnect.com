@@ -63,5 +63,6 @@ storage by default for local demo work. After migrations and seed data are
 ready, set `AUTH_REPOSITORY=prisma`, `PROFILE_REPOSITORY=prisma`,
 `ADVERT_REPOSITORY=prisma`, `RELATIONSHIPS_REPOSITORY=prisma`,
 `CONVERSATIONS_REPOSITORY=prisma`, `SOURCE_FINDER_REPOSITORY=prisma`,
-`NOTIFICATIONS_REPOSITORY=prisma`, and `ANALYTICS_REPOSITORY=prisma` with
-`DATABASE_URL` to use PostgreSQL-backed persistence.
+`NOTIFICATIONS_REPOSITORY=prisma`, `FINANCE_REPOSITORY=prisma`, and
+`ANALYTICS_REPOSITORY=prisma` with `DATABASE_URL` to use PostgreSQL-backed
+persistence.

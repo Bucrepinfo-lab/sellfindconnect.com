@@ -24,20 +24,11 @@ import {
   type FinanceAdjustmentStatus,
   type FinanceAdjustmentType,
   type FinanceDocumentType,
-  type FinancePaymentStatus,
-  type FilingFrequency,
   type FinanceAlertType,
-  type InvoiceLine,
-  type InvoicePaymentStatus,
-  type InvoiceStatus,
-  type PaymentMethod,
   type ProductAuditAction,
-  type ReconciliationSummary,
-  type TaxProfileStatus,
   type TaxReportExportFormat,
   type TaxReturnEvidenceKind,
   type TaxReturnStatus,
-  type TenantAccessRole,
 } from '@telpen/domain';
 import { randomUUID } from 'node:crypto';
 
@@ -70,313 +61,46 @@ import {
   createConfiguredPaymentAdapter,
   type PaymentAdapter,
 } from './payment.adapter';
-
-type CountryTaxProfileRecord = {
-  id: string;
-  countryCode: string;
-  taxAuthorityName: string;
-  taxRegistrationStatus: string;
-  filingPortalUrl?: string;
-  localFinanceOwner: string;
-  filingFrequency: FilingFrequency;
-  recordRetentionYears: number;
-  taxInclusivePricing: boolean;
-  status: TaxProfileStatus;
-  approvedAt?: string;
-  approvedBy?: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
-type TaxRuleRecord = {
-  id: string;
-  countryCode: string;
-  taxType: string;
-  taxRate: number;
-  productTaxCode: string;
-  registrationThreshold?: number;
-  effectiveFrom: string;
-  effectiveTo?: string;
-  notes?: string;
-  createdAt: string;
-};
-
-type TaxCalculationSnapshotRecord = {
-  id: string;
-  tenantId: string;
-  countryCode: string;
-  taxRuleVersionId: string;
-  taxType: string;
-  provider: string;
-  providerReference?: string;
-  grossAmount: number;
-  taxableAmount: number;
-  taxAmount: number;
-  netRevenueAmount: number;
-  presentmentCurrency: string;
-  filingCurrency: string;
-  exchangeRate: number;
-  customerEvidence: Record<string, unknown>;
-  calculationReason: string;
-  transactionAt: string;
-  createdAt: string;
-};
-
-type TaxLedgerEntryRecord = {
-  id: string;
-  taxCalculationSnapshotId: string;
-  entryType:
-    | 'TAX_LIABILITY'
-    | 'PLATFORM_REVENUE'
-    | 'REFUND_TAX_REVERSAL'
-    | 'REFUND_REVENUE_REVERSAL'
-    | 'CHARGEBACK_TAX_REVERSAL'
-    | 'CHARGEBACK_REVENUE_REVERSAL';
-  amount: number;
-  currencyCode: string;
-  occurredAt: string;
-  createdAt: string;
-};
-
-type TaxReturnEvidenceRecord = {
-  id: string;
-  kind: TaxReturnEvidenceKind;
-  reference: string;
-  note?: string;
-  attachedBy: string;
-  attachedAt: string;
-};
-
-type TaxReturnRecord = {
-  id: string;
-  countryCode: string;
-  taxType: string;
-  periodStart: string;
-  periodEnd: string;
-  filingDeadline: string;
-  paymentDeadline: string;
-  filingCurrency: string;
-  computedTaxDue: number;
-  status: TaxReturnStatus;
-  evidence: TaxReturnEvidenceRecord[];
-  reviewApprovedBy?: string;
-  reviewApprovedAt?: string;
-  filingApprovedBy?: string;
-  filingApprovedAt?: string;
-  filedAt?: string;
-  remittedAt?: string;
-  lockedAt?: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
-type FinanceWorkbenchContext = {
-  tenantId?: string;
-  actorUserId?: string;
-  actorRole?: AccessRole;
-  sessionRole?: TenantAccessRole;
-};
-
-type FinanceInvoiceLineItemRecord = {
-  description: string;
-  quantity: number;
-  unitAmount: number;
-  taxableAmount: number;
-  taxAmount: number;
-  grossAmount: number;
-  currencyCode: string;
-};
-
-type FinanceInvoiceRecord = {
-  id: string;
-  tenantId: string;
-  invoiceNumber: string;
-  countryCode: string;
-  customerName: string;
-  customerEmail?: string;
-  billingReference?: string;
-  taxCalculationSnapshotId: string;
-  lineItems: FinanceInvoiceLineItemRecord[];
-  subtotalAmount: number;
-  taxAmount: number;
-  totalAmount: number;
-  amountPaid: number;
-  amountDue: number;
-  refundedAmount: number;
-  chargebackAmount: number;
-  netCollectedAmount: number;
-  paymentStatus: InvoicePaymentStatus;
-  presentmentCurrency: string;
-  filingCurrency: string;
-  status: 'ISSUED' | 'PAID' | 'VOID' | 'OVERDUE' | 'REFUNDED' | 'DISPUTED';
-  issuedAt: string;
-  dueAt?: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
-type FinanceReceiptRecord = {
-  id: string;
-  tenantId: string;
-  receiptNumber: string;
-  invoiceId: string;
-  invoiceNumber: string;
-  countryCode: string;
-  taxCalculationSnapshotId: string;
-  amountPaid: number;
-  currencyCode: string;
-  paymentProvider: string;
-  paymentReference: string;
-  paidAt: string;
-  issuedAt: string;
-  createdAt: string;
-};
-
-type FinanceAdjustmentRecord = {
-  id: string;
-  tenantId: string;
-  adjustmentType: FinanceAdjustmentType;
-  creditNoteNumber?: string;
-  invoiceId: string;
-  invoiceNumber: string;
-  countryCode: string;
-  taxCalculationSnapshotId: string;
-  amount: number;
-  taxAmount: number;
-  netRevenueAmount: number;
-  currencyCode: string;
-  filingCurrency: string;
-  reason: string;
-  paymentProvider?: string;
-  providerReference?: string;
-  evidenceUrl?: string;
-  status: FinanceAdjustmentStatus;
-  requestedBy?: string;
-  createdAt: string;
-  updatedAt: string;
-  settledAt?: string;
-};
-
-type DunningNoticeRecord = {
-  id: string;
-  tenantId: string;
-  invoiceId: string;
-  invoiceNumber: string;
-  countryCode: string;
-  stage: DunningNoticeStage;
-  daysOverdue: number;
-  amountDue: number;
-  currencyCode: string;
-  message: string;
-  severity: 'INFO' | 'WARNING' | 'CRITICAL';
-  status: 'OPEN' | 'SENT' | 'SUPPRESSED' | 'RESOLVED';
-  dueAt: string;
-  createdAt: string;
-  dedupeKey: string;
-};
-
-type FinanceAlertRecord = {
-  id: string;
-  dedupeKey: string;
-  tenantId?: string;
-  countryCode: string;
-  taxReturnId?: string;
-  invoiceId?: string;
-  alertType: FinanceAlertType;
-  message: string;
-  severity: 'INFO' | 'WARNING' | 'CRITICAL';
-  dueAt: string;
-  status: 'OPEN' | 'ACKNOWLEDGED' | 'RESOLVED' | 'OVERDUE';
-  createdAt: string;
-};
-
-type InvoiceRecord = {
-  id: string;
-  tenantId: string;
-  invoiceNumber: string;
-  countryCode: string;
-  currencyCode: string;
-  status: InvoiceStatus;
-  lines: InvoiceLine[];
-  subtotal: number;
-  taxAmount: number;
-  total: number;
-  amountPaid: number;
-  amountRefunded: number;
-  taxCalculationSnapshotId?: string;
-  issuedAt: string;
-  dueAt?: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
-type PaymentRecord = {
-  id: string;
-  tenantId: string;
-  invoiceId: string;
-  provider: string;
-  providerPaymentId: string;
-  method: PaymentMethod;
-  status: FinancePaymentStatus;
-  amount: number;
-  currencyCode: string;
-  idempotencyKey: string;
-  failureReason?: string;
-  capturedAt?: string;
-  createdAt: string;
-};
-
-type ReceiptRecord = {
-  id: string;
-  tenantId: string;
-  invoiceId: string;
-  paymentId: string;
-  receiptNumber: string;
-  amount: number;
-  currencyCode: string;
-  issuedAt: string;
-};
-
-type ReconciliationRunRecord = {
-  id: string;
-  tenantId: string;
-  provider: string;
-  statementReference: string;
-  countryCode?: string;
-  currencyCode?: string;
-  summary: ReconciliationSummary;
-  createdAt: string;
-};
+import type {
+  CountryTaxProfileRecord,
+  DunningNoticeRecord,
+  FinanceAdjustmentRecord,
+  FinanceAlertRecord,
+  FinanceInvoiceRecord,
+  FinanceReceiptRecord,
+  FinanceWorkbenchContext,
+  InvoiceRecord,
+  PaymentRecord,
+  ReceiptRecord,
+  ReconciliationRunRecord,
+  TaxCalculationSnapshotRecord,
+  TaxLedgerEntryRecord,
+  TaxReturnEvidenceRecord,
+  TaxReturnRecord,
+  TaxRuleRecord,
+} from './finance.records';
+import { InMemoryFinanceRepository } from './in-memory-finance.repository';
+import type { FinanceRepository } from './finance.repository';
 
 @Injectable()
 export class FinanceService {
-  private readonly countryProfiles = new Map<string, CountryTaxProfileRecord>();
-  private readonly taxRules = new Map<string, TaxRuleRecord>();
-  private readonly snapshots = new Map<string, TaxCalculationSnapshotRecord>();
-  private readonly ledgerEntries = new Map<string, TaxLedgerEntryRecord>();
-  private readonly taxReturns = new Map<string, TaxReturnRecord>();
-  private readonly invoices = new Map<string, FinanceInvoiceRecord>();
-  private readonly receipts = new Map<string, FinanceReceiptRecord>();
-  private readonly adjustments = new Map<string, FinanceAdjustmentRecord>();
-  private readonly dunningNotices = new Map<string, DunningNoticeRecord>();
-  private readonly financeAlerts = new Map<string, FinanceAlertRecord>();
-  private readonly documentSequences = new Map<string, number>();
-  private readonly paymentInvoices = new Map<string, InvoiceRecord>();
-  private readonly payments = new Map<string, PaymentRecord>();
-  private readonly paymentReceipts = new Map<string, ReceiptRecord>();
-  private readonly reconciliationRuns = new Map<string, ReconciliationRunRecord>();
-  private readonly paymentInvoiceSequences = new Map<string, number>();
   private readonly paymentAdapter: PaymentAdapter;
   private readonly auth?: AuthService;
+  private readonly repository: FinanceRepository;
 
-  constructor(paymentAdapter?: PaymentAdapter, auth?: AuthService) {
+  constructor(
+    paymentAdapter?: PaymentAdapter,
+    auth?: AuthService,
+    repository?: FinanceRepository,
+  ) {
     this.paymentAdapter =
       paymentAdapter ??
       createConfiguredPaymentAdapter({ get: (key) => process.env[key] });
     this.auth = auth;
+    this.repository = repository ?? new InMemoryFinanceRepository();
   }
 
-  configureCountryTaxProfile(input: ConfigureCountryTaxProfileDto): CountryTaxProfileRecord {
+  async configureCountryTaxProfile(input: ConfigureCountryTaxProfileDto): Promise<CountryTaxProfileRecord> {
     this.assertSafe(input, 'Country tax profile contains blocked content.');
 
     const country = getCountry(input.countryCode);
@@ -385,7 +109,7 @@ export class FinanceService {
     }
 
     const now = new Date().toISOString();
-    const existing = this.countryProfiles.get(input.countryCode);
+    const existing = await this.repository.getCountryProfile(input.countryCode);
     const approvedBy = input.approvedBy ?? existing?.approvedBy;
     const profile: CountryTaxProfileRecord = {
       id: existing?.id ?? randomUUID(),
@@ -404,20 +128,20 @@ export class FinanceService {
       updatedAt: now,
     };
 
-    this.countryProfiles.set(profile.countryCode, profile);
+    await this.repository.saveCountryProfile(profile);
     return profile;
   }
 
-  listCountryTaxProfiles(): CountryTaxProfileRecord[] {
-    return Array.from(this.countryProfiles.values()).sort((a, b) =>
+  async listCountryTaxProfiles(): Promise<CountryTaxProfileRecord[]> {
+    return (await this.repository.listCountryProfiles()).sort((a, b) =>
       a.countryCode.localeCompare(b.countryCode),
     );
   }
 
-  createTaxRule(input: CreateTaxRuleDto): TaxRuleRecord {
+  async createTaxRule(input: CreateTaxRuleDto): Promise<TaxRuleRecord> {
     this.assertSafe(input, 'Tax rule contains blocked content.');
 
-    const profile = this.countryProfiles.get(input.countryCode);
+    const profile = await this.repository.getCountryProfile(input.countryCode);
     if (!profile) {
       throw new UnprocessableEntityException('Create the country tax profile before adding rules.');
     }
@@ -431,22 +155,22 @@ export class FinanceService {
       createdAt: now,
     };
 
-    this.taxRules.set(rule.id, rule);
+    await this.repository.saveTaxRule(rule);
     return rule;
   }
 
-  listTaxRules(countryCode?: string): TaxRuleRecord[] {
-    return Array.from(this.taxRules.values())
+  async listTaxRules(countryCode?: string): Promise<TaxRuleRecord[]> {
+    return (await this.repository.listTaxRules())
       .filter((rule) => !countryCode || rule.countryCode === countryCode)
       .sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
   }
 
-  calculateTax(tenantId: string, input: CalculateTaxDto) {
+  async calculateTax(tenantId: string, input: CalculateTaxDto) {
     this.assertSafe(input, 'Tax calculation contains blocked content.');
 
     const transactionAt = input.transactionAt ?? new Date().toISOString();
-    const profile = this.requireApprovedProfile(input.countryCode);
-    const rule = this.findActiveRule(input, transactionAt);
+    const profile = await this.requireApprovedProfile(input.countryCode);
+    const rule = await this.findActiveRule(input, transactionAt);
     const amounts = calculateTaxSnapshotAmounts({
       amount: input.grossAmount,
       taxRate: rule.taxRate,
@@ -475,28 +199,28 @@ export class FinanceService {
     };
     const ledgerEntries = this.createLedgerEntries(snapshot, now);
 
-    this.snapshots.set(snapshot.id, snapshot);
+    await this.repository.saveSnapshot(snapshot);
     for (const entry of ledgerEntries) {
-      this.ledgerEntries.set(entry.id, entry);
+      await this.repository.saveLedgerEntry(entry);
     }
 
     return { snapshot, ledgerEntries };
   }
 
-  listTaxCalculations(tenantId: string): TaxCalculationSnapshotRecord[] {
-    return Array.from(this.snapshots.values())
+  async listTaxCalculations(tenantId: string): Promise<TaxCalculationSnapshotRecord[]> {
+    return (await this.repository.listSnapshots())
       .filter((snapshot) => snapshot.tenantId === tenantId)
       .sort((a, b) => b.transactionAt.localeCompare(a.transactionAt));
   }
 
-  generateTaxReturn(input: GenerateTaxReturnDto, context?: FinanceWorkbenchContext) {
+  async generateTaxReturn(input: GenerateTaxReturnDto, context?: FinanceWorkbenchContext) {
     this.requireWorkbenchOperator(context);
-    const profile = this.requireApprovedProfile(input.countryCode);
+    const profile = await this.requireApprovedProfile(input.countryCode);
     if (profile.status !== 'APPROVED') {
       throw new UnprocessableEntityException('Country tax profile is not approved.');
     }
 
-    const snapshots = Array.from(this.snapshots.values()).filter((snapshot) => {
+    const snapshots = (await this.repository.listSnapshots()).filter((snapshot) => {
       if (snapshot.countryCode !== input.countryCode) return false;
       if (snapshot.taxType !== input.taxType.toUpperCase()) return false;
       return snapshot.transactionAt >= input.periodStart && snapshot.transactionAt <= input.periodEnd;
@@ -519,10 +243,10 @@ export class FinanceService {
       updatedAt: now,
     };
 
-    this.taxReturns.set(taxReturn.id, taxReturn);
+    await this.repository.saveTaxReturn(taxReturn);
     const alertsCreated = [
-      this.createReturnAlert(taxReturn, 'RETURN_READY_FOR_REVIEW', input.filingDeadline, now),
-      this.createReturnAlert(taxReturn, 'APPROVAL_REQUIRED', input.paymentDeadline, now),
+      await this.createReturnAlert(taxReturn, 'RETURN_READY_FOR_REVIEW', input.filingDeadline, now),
+      await this.createReturnAlert(taxReturn, 'APPROVAL_REQUIRED', input.paymentDeadline, now),
     ];
     this.auditProduct({
       tenantId: context?.tenantId,
@@ -540,22 +264,22 @@ export class FinanceService {
     return { taxReturn, sourceSnapshotCount: snapshots.length, alertsCreated };
   }
 
-  listTaxReturns(context?: FinanceWorkbenchContext): TaxReturnRecord[] {
+  async listTaxReturns(context?: FinanceWorkbenchContext): Promise<TaxReturnRecord[]> {
     this.requireWorkbenchOperator(context);
-    return Array.from(this.taxReturns.values()).sort((a, b) =>
+    return (await this.repository.listTaxReturns()).sort((a, b) =>
       b.periodEnd.localeCompare(a.periodEnd),
     );
   }
 
-  getTaxReturn(id: string, context?: FinanceWorkbenchContext): TaxReturnRecord {
+  async getTaxReturn(id: string, context?: FinanceWorkbenchContext): Promise<TaxReturnRecord> {
     this.requireWorkbenchOperator(context);
-    return this.requireTaxReturn(id);
+    return await this.requireTaxReturn(id);
   }
 
-  submitTaxReturn(id: string, input: SubmitTaxReturnDto = {}, context?: FinanceWorkbenchContext) {
+  async submitTaxReturn(id: string, input: SubmitTaxReturnDto = {}, context?: FinanceWorkbenchContext) {
     const actor = this.requireWorkbenchOperator({ ...context, ...input });
-    const taxReturn = this.requireUnlockedTaxReturn(id);
-    this.transitionTaxReturn(taxReturn, 'IN_REVIEW', this.actorName(input, actor));
+    const taxReturn = await this.requireUnlockedTaxReturn(id);
+    await this.transitionTaxReturn(taxReturn, 'IN_REVIEW', this.actorName(input, actor));
     this.auditProduct({
       tenantId: context?.tenantId,
       actorUserId: input.actorUserId ?? context?.actorUserId,
@@ -570,15 +294,15 @@ export class FinanceService {
     return taxReturn;
   }
 
-  approveTaxReturn(id: string, input: ApproveTaxReturnDto = {}, context?: FinanceWorkbenchContext) {
+  async approveTaxReturn(id: string, input: ApproveTaxReturnDto = {}, context?: FinanceWorkbenchContext) {
     const actor = this.requireWorkbenchOperator({ ...context, ...input });
-    const taxReturn = this.requireUnlockedTaxReturn(id);
-    this.assertReconciliationClear(taxReturn.countryCode);
+    const taxReturn = await this.requireUnlockedTaxReturn(id);
+    await this.assertReconciliationClear(taxReturn.countryCode);
     const approvedBy = this.actorName(input, actor);
-    this.transitionTaxReturn(taxReturn, 'APPROVED', approvedBy);
+    await this.transitionTaxReturn(taxReturn, 'APPROVED', approvedBy);
     taxReturn.reviewApprovedBy = approvedBy;
     taxReturn.reviewApprovedAt = taxReturn.updatedAt;
-    this.taxReturns.set(taxReturn.id, taxReturn);
+    await this.repository.saveTaxReturn(taxReturn);
     this.auditProduct({
       tenantId: context?.tenantId,
       actorUserId: input.actorUserId ?? context?.actorUserId,
@@ -593,15 +317,15 @@ export class FinanceService {
     return taxReturn;
   }
 
-  attachTaxReturnEvidence(
+  async attachTaxReturnEvidence(
     id: string,
     input: AttachTaxReturnEvidenceDto,
     context?: FinanceWorkbenchContext,
   ) {
     const actor = this.requireWorkbenchOperator({ ...context, ...input });
     this.assertSafe(input, 'Tax return evidence contains blocked content.');
-    const taxReturn = this.requireUnlockedTaxReturn(id);
-    const evidence = this.addTaxReturnEvidence(taxReturn, input, this.actorName(input, actor));
+    const taxReturn = await this.requireUnlockedTaxReturn(id);
+    const evidence = await this.addTaxReturnEvidence(taxReturn, input, this.actorName(input, actor));
     this.auditProduct({
       tenantId: context?.tenantId,
       actorUserId: input.actorUserId ?? context?.actorUserId,
@@ -617,10 +341,10 @@ export class FinanceService {
     return { taxReturn, evidence };
   }
 
-  fileTaxReturn(id: string, input: FileTaxReturnDto, context?: FinanceWorkbenchContext) {
+  async fileTaxReturn(id: string, input: FileTaxReturnDto, context?: FinanceWorkbenchContext) {
     const actor = this.requireWorkbenchOperator({ ...context, ...input });
     this.assertSafe(input, 'Tax return filing contains blocked content.');
-    const taxReturn = this.requireUnlockedTaxReturn(id);
+    const taxReturn = await this.requireUnlockedTaxReturn(id);
     const filingApprovedBy = this.actorName(input, actor);
     this.runWorkbench(() =>
       assertFilingApproverSeparation({
@@ -630,15 +354,15 @@ export class FinanceService {
         thresholdAmount: input.dualApprovalThresholdAmount,
       }),
     );
-    this.addTaxReturnEvidence(taxReturn, input, filingApprovedBy);
+    await this.addTaxReturnEvidence(taxReturn, input, filingApprovedBy);
     if (!taxReturn.evidence.some((item) => item.kind === 'FILING_CONFIRMATION')) {
       throw new UnprocessableEntityException('Filing confirmation evidence is required before filing.');
     }
-    this.transitionTaxReturn(taxReturn, 'FILED', filingApprovedBy);
+    await this.transitionTaxReturn(taxReturn, 'FILED', filingApprovedBy);
     taxReturn.filingApprovedBy = filingApprovedBy;
     taxReturn.filingApprovedAt = taxReturn.updatedAt;
     taxReturn.filedAt = taxReturn.updatedAt;
-    this.taxReturns.set(taxReturn.id, taxReturn);
+    await this.repository.saveTaxReturn(taxReturn);
     this.auditProduct({
       tenantId: context?.tenantId,
       actorUserId: input.actorUserId ?? context?.actorUserId,
@@ -653,11 +377,11 @@ export class FinanceService {
     return taxReturn;
   }
 
-  remitTaxReturn(id: string, input: RemitTaxReturnDto, context?: FinanceWorkbenchContext) {
+  async remitTaxReturn(id: string, input: RemitTaxReturnDto, context?: FinanceWorkbenchContext) {
     const actor = this.requireWorkbenchOperator({ ...context, ...input });
     this.assertSafe(input, 'Tax return remittance contains blocked content.');
-    const taxReturn = this.requireUnlockedTaxReturn(id);
-    this.addTaxReturnEvidence(
+    const taxReturn = await this.requireUnlockedTaxReturn(id);
+    await this.addTaxReturnEvidence(
       taxReturn,
       {
         kind: input.kind ?? 'REMITTANCE_RECEIPT',
@@ -669,10 +393,10 @@ export class FinanceService {
     if (!taxReturn.evidence.some((item) => item.kind === 'REMITTANCE_RECEIPT')) {
       throw new UnprocessableEntityException('Remittance receipt evidence is required before remittance.');
     }
-    this.transitionTaxReturn(taxReturn, 'REMITTED', this.actorName(input, actor));
+    await this.transitionTaxReturn(taxReturn, 'REMITTED', this.actorName(input, actor));
     taxReturn.remittedAt = taxReturn.updatedAt;
-    this.taxReturns.set(taxReturn.id, taxReturn);
-    this.createFinanceAlert({
+    await this.repository.saveTaxReturn(taxReturn);
+    await this.createFinanceAlert({
       countryCode: taxReturn.countryCode,
       taxReturnId: taxReturn.id,
       alertType: 'FILING_COMPLETED',
@@ -696,9 +420,9 @@ export class FinanceService {
     return taxReturn;
   }
 
-  lockTaxReturn(id: string, input: LockTaxReturnDto = {}, context?: FinanceWorkbenchContext) {
+  async lockTaxReturn(id: string, input: LockTaxReturnDto = {}, context?: FinanceWorkbenchContext) {
     const actor = this.requireWorkbenchOperator({ ...context, ...input });
-    const taxReturn = this.requireUnlockedTaxReturn(id);
+    const taxReturn = await this.requireUnlockedTaxReturn(id);
     const completion = evaluateTaxPeriodCompletion({
       status: taxReturn.status,
       evidenceKinds: taxReturn.evidence.map((item) => item.kind),
@@ -711,9 +435,9 @@ export class FinanceService {
         `Tax period cannot be locked until filing evidence, remittance evidence, approvers, and timestamps are present. Missing: ${completion.missing.join(', ')}.`,
       );
     }
-    this.transitionTaxReturn(taxReturn, 'LOCKED', this.actorName(input, actor));
+    await this.transitionTaxReturn(taxReturn, 'LOCKED', this.actorName(input, actor));
     taxReturn.lockedAt = taxReturn.updatedAt;
-    this.taxReturns.set(taxReturn.id, taxReturn);
+    await this.repository.saveTaxReturn(taxReturn);
     this.auditProduct({
       tenantId: context?.tenantId,
       actorUserId: input.actorUserId ?? context?.actorUserId,
@@ -728,9 +452,9 @@ export class FinanceService {
     return taxReturn;
   }
 
-  exportTaxReturn(id: string, query: ExportTaxReturnQueryDto = {}, context?: FinanceWorkbenchContext) {
+  async exportTaxReturn(id: string, query: ExportTaxReturnQueryDto = {}, context?: FinanceWorkbenchContext) {
     const actor = this.requireExportOperator({ ...context, actorRole: query.actorRole });
-    const taxReturn = this.requireTaxReturn(id);
+    const taxReturn = await this.requireTaxReturn(id);
     const format: TaxReportExportFormat = query.format ?? 'CSV';
     const exported = buildTaxReturnExport(
       {
@@ -772,16 +496,16 @@ export class FinanceService {
     return exported;
   }
 
-  createInvoice(tenantId: string, input: CreateInvoiceDto) {
+  async createInvoice(tenantId: string, input: CreateInvoiceDto) {
     this.assertSafe(input, 'Invoice request contains blocked content.');
 
-    const taxCalculation = this.calculateTax(tenantId, input);
+    const taxCalculation = await this.calculateTax(tenantId, input);
     const now = new Date().toISOString();
-    const invoice = this.createInvoiceRecord(tenantId, input, taxCalculation.snapshot, now);
-    this.invoices.set(invoice.id, invoice);
+    const invoice = await this.createInvoiceRecord(tenantId, input, taxCalculation.snapshot, now);
+    await this.repository.saveInvoice(invoice);
 
     const receipt = input.issueReceipt
-      ? this.createReceiptForInvoice(
+      ? await this.createReceiptForInvoice(
           invoice,
           {
             amountPaid: input.amountPaid ?? invoice.totalAmount,
@@ -797,37 +521,37 @@ export class FinanceService {
     return { invoice, receipt, taxCalculation };
   }
 
-  listInvoices(tenantId: string): FinanceInvoiceRecord[] {
-    return Array.from(this.invoices.values())
+  async listInvoices(tenantId: string): Promise<FinanceInvoiceRecord[]> {
+    return (await this.repository.listInvoices())
       .filter((invoice) => invoice.tenantId === tenantId)
       .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt));
   }
 
-  issueReceipt(tenantId: string, input: IssueReceiptDto) {
+  async issueReceipt(tenantId: string, input: IssueReceiptDto) {
     this.assertSafe(input, 'Receipt request contains blocked content.');
 
-    const invoice = this.invoices.get(input.invoiceId);
+    const invoice = await this.repository.getInvoice(input.invoiceId);
     if (!invoice || invoice.tenantId !== tenantId) {
       throw new NotFoundException('Invoice not found.');
     }
 
     const now = new Date().toISOString();
-    const receipt = this.createReceiptForInvoice(invoice, input, now);
+    const receipt = await this.createReceiptForInvoice(invoice, input, now);
     return { invoice, receipt };
   }
 
-  listReceipts(tenantId: string): FinanceReceiptRecord[] {
-    return Array.from(this.receipts.values())
+  async listReceipts(tenantId: string): Promise<FinanceReceiptRecord[]> {
+    return (await this.repository.listReceipts())
       .filter((receipt) => receipt.tenantId === tenantId)
       .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt));
   }
 
-  requestRefund(tenantId: string, input: RequestRefundDto) {
+  async requestRefund(tenantId: string, input: RequestRefundDto) {
     this.assertSafe(input, 'Refund request contains blocked content.');
 
-    const invoice = this.requireTenantInvoice(tenantId, input.invoiceId);
+    const invoice = await this.requireTenantInvoice(tenantId, input.invoiceId);
     const now = new Date().toISOString();
-    const adjustment = this.createAdjustmentRecord(
+    const adjustment = await this.createAdjustmentRecord(
       invoice,
       {
         adjustmentType: 'REFUND',
@@ -844,13 +568,13 @@ export class FinanceService {
     );
     const ledgerEntries = this.createAdjustmentLedgerEntries(adjustment, now);
 
-    this.adjustments.set(adjustment.id, adjustment);
+    await this.repository.saveAdjustment(adjustment);
     for (const entry of ledgerEntries) {
-      this.ledgerEntries.set(entry.id, entry);
+      await this.repository.saveLedgerEntry(entry);
     }
-    this.applyAdjustmentToInvoice(invoice, adjustment, now);
+    await this.applyAdjustmentToInvoice(invoice, adjustment, now);
 
-    const financeAlert = this.createFinanceAlert({
+    const financeAlert = await this.createFinanceAlert({
       tenantId,
       countryCode: invoice.countryCode,
       invoiceId: invoice.id,
@@ -865,12 +589,12 @@ export class FinanceService {
     return { adjustment, invoice, ledgerEntries, financeAlert };
   }
 
-  openChargeback(tenantId: string, input: OpenChargebackDto) {
+  async openChargeback(tenantId: string, input: OpenChargebackDto) {
     this.assertSafe(input, 'Chargeback request contains blocked content.');
 
-    const invoice = this.requireTenantInvoice(tenantId, input.invoiceId);
+    const invoice = await this.requireTenantInvoice(tenantId, input.invoiceId);
     const now = input.openedAt ?? new Date().toISOString();
-    const adjustment = this.createAdjustmentRecord(
+    const adjustment = await this.createAdjustmentRecord(
       invoice,
       {
         adjustmentType: 'CHARGEBACK',
@@ -886,13 +610,13 @@ export class FinanceService {
     );
     const ledgerEntries = this.createAdjustmentLedgerEntries(adjustment, now);
 
-    this.adjustments.set(adjustment.id, adjustment);
+    await this.repository.saveAdjustment(adjustment);
     for (const entry of ledgerEntries) {
-      this.ledgerEntries.set(entry.id, entry);
+      await this.repository.saveLedgerEntry(entry);
     }
-    this.applyAdjustmentToInvoice(invoice, adjustment, now);
+    await this.applyAdjustmentToInvoice(invoice, adjustment, now);
 
-    const financeAlert = this.createFinanceAlert({
+    const financeAlert = await this.createFinanceAlert({
       tenantId,
       countryCode: invoice.countryCode,
       invoiceId: invoice.id,
@@ -907,17 +631,17 @@ export class FinanceService {
     return { adjustment, invoice, ledgerEntries, financeAlert };
   }
 
-  listAdjustments(tenantId: string): FinanceAdjustmentRecord[] {
-    return Array.from(this.adjustments.values())
+  async listAdjustments(tenantId: string): Promise<FinanceAdjustmentRecord[]> {
+    return (await this.repository.listAdjustments())
       .filter((adjustment) => adjustment.tenantId === tenantId)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
-  runDunning(tenantId: string, input: RunDunningDto = {}) {
+  async runDunning(tenantId: string, input: RunDunningDto = {}) {
     const now = input.now ?? new Date().toISOString();
     const noticesCreated: DunningNoticeRecord[] = [];
 
-    for (const invoice of this.invoices.values()) {
+    for (const invoice of await this.repository.listInvoices()) {
       if (invoice.tenantId !== tenantId) continue;
       if (input.invoiceId && invoice.id !== input.invoiceId) continue;
       if (!invoice.dueAt || invoice.amountDue <= 0) continue;
@@ -927,7 +651,7 @@ export class FinanceService {
       if (!decision) continue;
 
       const dedupeKey = `${invoice.id}:DUNNING:${decision.stage}`;
-      if (this.hasDunningNoticeDedupeKey(dedupeKey)) continue;
+      if (await this.hasDunningNoticeDedupeKey(dedupeKey)) continue;
 
       const notice: DunningNoticeRecord = {
         id: randomUUID(),
@@ -949,9 +673,9 @@ export class FinanceService {
 
       invoice.status = 'OVERDUE';
       invoice.updatedAt = now;
-      this.invoices.set(invoice.id, invoice);
-      this.dunningNotices.set(notice.id, notice);
-      this.createFinanceAlert({
+      await this.repository.saveInvoice(invoice);
+      await this.repository.saveDunningNotice(notice);
+      await this.createFinanceAlert({
         tenantId,
         countryCode: invoice.countryCode,
         invoiceId: invoice.id,
@@ -968,21 +692,21 @@ export class FinanceService {
     return {
       checkedAt: now,
       noticesCreated,
-      openNotices: this.listDunningNotices(tenantId),
+      openNotices: await this.listDunningNotices(tenantId),
     };
   }
 
-  listDunningNotices(tenantId: string): DunningNoticeRecord[] {
-    return Array.from(this.dunningNotices.values())
+  async listDunningNotices(tenantId: string): Promise<DunningNoticeRecord[]> {
+    return (await this.repository.listDunningNotices())
       .filter((notice) => notice.tenantId === tenantId)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
-  runFinanceAlerts(input: RunFinanceAlertsDto = {}) {
+  async runFinanceAlerts(input: RunFinanceAlertsDto = {}) {
     const now = input.now ?? new Date().toISOString();
     const alertsCreated: FinanceAlertRecord[] = [];
 
-    for (const taxReturn of this.taxReturns.values()) {
+    for (const taxReturn of await this.repository.listTaxReturns()) {
       if (['FILED', 'REMITTED', 'LOCKED'].includes(taxReturn.status)) continue;
 
       const decision = getRemittanceAlertDecision(taxReturn.paymentDeadline, now);
@@ -993,9 +717,9 @@ export class FinanceService {
         decision.alertType,
         decision.daysUntilDue,
       ].join(':');
-      if (this.hasAlertDedupeKey(dedupeKey)) continue;
+      if (await this.hasAlertDedupeKey(dedupeKey)) continue;
 
-      const alert = this.createFinanceAlert({
+      const alert = await this.createFinanceAlert({
         countryCode: taxReturn.countryCode,
         taxReturnId: taxReturn.id,
         alertType: decision.alertType,
@@ -1011,22 +735,22 @@ export class FinanceService {
     return {
       checkedAt: now,
       alertsCreated,
-      openAlerts: this.listFinanceAlerts(),
+      openAlerts: await this.listFinanceAlerts(),
     };
   }
 
-  listFinanceAlerts(): FinanceAlertRecord[] {
-    return Array.from(this.financeAlerts.values()).sort((a, b) =>
+  async listFinanceAlerts(): Promise<FinanceAlertRecord[]> {
+    return (await this.repository.listFinanceAlerts()).sort((a, b) =>
       b.createdAt.localeCompare(a.createdAt),
     );
   }
 
-  issueInvoice(tenantId: string, input: IssueInvoiceDto): InvoiceRecord {
+  async issueInvoice(tenantId: string, input: IssueInvoiceDto): Promise<InvoiceRecord> {
     this.assertSafe(input, 'Invoice contains blocked content.');
 
     // Validates the country has an APPROVED tax profile before any invoice is
     // issued; throws otherwise.
-    this.requireApprovedProfile(input.countryCode);
+    await this.requireApprovedProfile(input.countryCode);
     const issuedAt = input.issuedAt ?? new Date().toISOString();
 
     let taxAmount = input.taxAmount ?? 0;
@@ -1034,7 +758,7 @@ export class FinanceService {
     let taxCalculationSnapshotId: string | undefined;
 
     if (input.taxCalculationSnapshotId) {
-      const snapshot = this.snapshots.get(input.taxCalculationSnapshotId);
+      const snapshot = await this.repository.getSnapshot(input.taxCalculationSnapshotId);
       if (!snapshot || snapshot.tenantId !== tenantId) {
         throw new NotFoundException('Tax calculation snapshot not found for this tenant.');
       }
@@ -1044,7 +768,7 @@ export class FinanceService {
     }
 
     const summary = summarizeInvoiceLines(input.lines, taxAmount);
-    const sequence = this.nextInvoiceSequence(input.countryCode);
+    const sequence = await this.nextInvoiceSequence(input.countryCode);
     const now = new Date().toISOString();
     const invoice: InvoiceRecord = {
       id: randomUUID(),
@@ -1070,12 +794,12 @@ export class FinanceService {
       updatedAt: now,
     };
 
-    this.paymentInvoices.set(invoice.id, invoice);
+    await this.repository.savePaymentInvoice(invoice);
     return invoice;
   }
 
-  listPaymentInvoices(tenantId: string): InvoiceRecord[] {
-    return Array.from(this.paymentInvoices.values())
+  async listPaymentInvoices(tenantId: string): Promise<InvoiceRecord[]> {
+    return (await this.repository.listPaymentInvoices())
       .filter((invoice) => invoice.tenantId === tenantId)
       .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt));
   }
@@ -1083,22 +807,22 @@ export class FinanceService {
   async payInvoice(tenantId: string, input: PayInvoiceDto) {
     this.assertSafe(input, 'Payment contains blocked content.');
 
-    const invoice = this.requireTenantPaymentInvoice(tenantId, input.invoiceId);
+    const invoice = await this.requireTenantPaymentInvoice(tenantId, input.invoiceId);
 
     // Idempotency is checked first so a replay with the same key returns the
     // original result instead of tripping the "already paid" guard below.
-    const attempt = this.countInvoicePayments(invoice.id) + 1;
+    const attempt = (await this.countInvoicePayments(invoice.id)) + 1;
     const idempotencyKey =
       input.idempotencyKey ??
       buildPaymentIdempotencyKey({ tenantId, invoiceId: invoice.id, attempt });
-    const existing = Array.from(this.payments.values()).find(
+    const existing = (await this.repository.listPayments()).find(
       (payment) => payment.idempotencyKey === idempotencyKey,
     );
     if (existing) {
       return {
-        invoice: this.paymentInvoices.get(existing.invoiceId) ?? invoice,
+        invoice: await this.repository.getPaymentInvoice(existing.invoiceId) ?? invoice,
         payment: existing,
-        receipt: this.findReceiptForPayment(existing.id),
+        receipt: await this.findReceiptForPayment(existing.id),
         idempotentReplay: true,
       };
     }
@@ -1136,7 +860,7 @@ export class FinanceService {
       capturedAt: result.status === 'CAPTURED' ? now : undefined,
       createdAt: now,
     };
-    this.payments.set(payment.id, payment);
+    await this.repository.savePayment(payment);
 
     if (result.status !== 'CAPTURED') {
       throw new UnprocessableEntityException({
@@ -1152,19 +876,19 @@ export class FinanceService {
       status: amountPaid >= invoice.total ? 'PAID' : invoice.status,
       updatedAt: now,
     };
-    this.paymentInvoices.set(invoice.id, paidInvoice);
+    await this.repository.savePaymentInvoice(paidInvoice);
 
     const receipt: ReceiptRecord = {
       id: randomUUID(),
       tenantId,
       invoiceId: invoice.id,
       paymentId: payment.id,
-      receiptNumber: `${paidInvoice.invoiceNumber}-R${this.countInvoiceReceipts(invoice.id) + 1}`,
+      receiptNumber: `${paidInvoice.invoiceNumber}-R${(await this.countInvoiceReceipts(invoice.id)) + 1}`,
       amount: result.capturedAmount,
       currencyCode: invoice.currencyCode,
       issuedAt: now,
     };
-    this.paymentReceipts.set(receipt.id, receipt);
+    await this.repository.savePaymentReceipt(receipt);
 
     return { invoice: paidInvoice, payment, receipt, idempotentReplay: false };
   }
@@ -1172,8 +896,8 @@ export class FinanceService {
   async refundInvoice(tenantId: string, input: RefundInvoiceDto) {
     this.assertSafe(input, 'Refund contains blocked content.');
 
-    const invoice = this.requireTenantPaymentInvoice(tenantId, input.invoiceId);
-    const capturedPayments = Array.from(this.payments.values()).filter(
+    const invoice = await this.requireTenantPaymentInvoice(tenantId, input.invoiceId);
+    const capturedPayments = (await this.repository.listPayments()).filter(
       (payment) => payment.invoiceId === invoice.id && payment.status === 'CAPTURED',
     );
     const source = capturedPayments[capturedPayments.length - 1];
@@ -1204,11 +928,11 @@ export class FinanceService {
       status: result.status === 'FAILED' ? 'FAILED' : 'REFUNDED',
       amount: -roundMoney(result.refundedAmount || requested),
       currencyCode: invoice.currencyCode,
-      idempotencyKey: `${source.idempotencyKey}:refund:${this.countInvoiceRefunds(invoice.id) + 1}`,
+      idempotencyKey: `${source.idempotencyKey}:refund:${(await this.countInvoiceRefunds(invoice.id)) + 1}`,
       failureReason: result.failureReason,
       createdAt: now,
     };
-    this.payments.set(refundPayment.id, refundPayment);
+    await this.repository.savePayment(refundPayment);
 
     if (result.status === 'FAILED') {
       throw new UnprocessableEntityException({ message: 'Refund failed.', payment: refundPayment });
@@ -1221,28 +945,28 @@ export class FinanceService {
       status: amountRefunded >= invoice.amountPaid ? 'REFUNDED' : 'PARTIALLY_REFUNDED',
       updatedAt: now,
     };
-    this.paymentInvoices.set(invoice.id, refundedInvoice);
+    await this.repository.savePaymentInvoice(refundedInvoice);
 
     return { invoice: refundedInvoice, refund: refundPayment };
   }
 
-  listPayments(tenantId: string): PaymentRecord[] {
-    return Array.from(this.payments.values())
+  async listPayments(tenantId: string): Promise<PaymentRecord[]> {
+    return (await this.repository.listPayments())
       .filter((payment) => payment.tenantId === tenantId)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
-  listPaymentReceipts(tenantId: string): ReceiptRecord[] {
-    return Array.from(this.paymentReceipts.values())
+  async listPaymentReceipts(tenantId: string): Promise<ReceiptRecord[]> {
+    return (await this.repository.listPaymentReceipts())
       .filter((receipt) => receipt.tenantId === tenantId)
       .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt));
   }
 
-  reconcileProviderSettlement(tenantId: string, input: ReconcileSettlementDto) {
+  async reconcileProviderSettlement(tenantId: string, input: ReconcileSettlementDto) {
     this.assertSafe(input, 'Reconciliation input contains blocked content.');
 
     const currencyFilter = input.currencyCode?.toUpperCase();
-    const ledgerLines = Array.from(this.payments.values())
+    const ledgerLines = (await this.repository.listPayments())
       .filter((payment) => payment.tenantId === tenantId)
       .filter((payment) => payment.status === 'CAPTURED')
       .filter((payment) => !input.provider || payment.provider === input.provider)
@@ -1270,10 +994,10 @@ export class FinanceService {
       summary,
       createdAt: now,
     };
-    this.reconciliationRuns.set(run.id, run);
+    await this.repository.saveReconciliationRun(run);
 
     if (summary.hasVariance) {
-      this.createFinanceAlert({
+      await this.createFinanceAlert({
         tenantId,
         countryCode: input.countryCode ?? 'GLOBAL',
         alertType: 'RECONCILIATION_VARIANCE',
@@ -1285,55 +1009,53 @@ export class FinanceService {
       });
     }
 
-    return { run, openAlerts: this.listFinanceAlerts() };
+    return { run, openAlerts: await this.listFinanceAlerts() };
   }
 
-  listReconciliationRuns(tenantId: string): ReconciliationRunRecord[] {
-    return Array.from(this.reconciliationRuns.values())
+  async listReconciliationRuns(tenantId: string): Promise<ReconciliationRunRecord[]> {
+    return (await this.repository.listReconciliationRuns())
       .filter((run) => run.tenantId === tenantId)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
-  private requireTenantPaymentInvoice(tenantId: string, invoiceId: string): InvoiceRecord {
-    const invoice = this.paymentInvoices.get(invoiceId);
+  private async requireTenantPaymentInvoice(tenantId: string, invoiceId: string): Promise<InvoiceRecord> {
+    const invoice = await this.repository.getPaymentInvoice(invoiceId);
     if (!invoice || invoice.tenantId !== tenantId) {
       throw new NotFoundException('Invoice not found for this tenant.');
     }
     return invoice;
   }
 
-  private nextInvoiceSequence(countryCode: string): number {
-    const next = (this.paymentInvoiceSequences.get(countryCode) ?? 0) + 1;
-    this.paymentInvoiceSequences.set(countryCode, next);
-    return next;
+  private async nextInvoiceSequence(countryCode: string): Promise<number> {
+    return this.repository.nextPaymentInvoiceSequence(countryCode);
   }
 
-  private countInvoicePayments(invoiceId: string): number {
-    return Array.from(this.payments.values()).filter(
+  private async countInvoicePayments(invoiceId: string): Promise<number> {
+    return (await this.repository.listPayments()).filter(
       (payment) => payment.invoiceId === invoiceId && payment.amount > 0,
     ).length;
   }
 
-  private countInvoiceRefunds(invoiceId: string): number {
-    return Array.from(this.payments.values()).filter(
+  private async countInvoiceRefunds(invoiceId: string): Promise<number> {
+    return (await this.repository.listPayments()).filter(
       (payment) => payment.invoiceId === invoiceId && payment.amount < 0,
     ).length;
   }
 
-  private countInvoiceReceipts(invoiceId: string): number {
-    return Array.from(this.paymentReceipts.values()).filter(
+  private async countInvoiceReceipts(invoiceId: string): Promise<number> {
+    return (await this.repository.listPaymentReceipts()).filter(
       (receipt) => receipt.invoiceId === invoiceId,
     ).length;
   }
 
-  private findReceiptForPayment(paymentId: string): ReceiptRecord | undefined {
-    return Array.from(this.paymentReceipts.values()).find(
+  private async findReceiptForPayment(paymentId: string): Promise<ReceiptRecord | undefined> {
+    return (await this.repository.listPaymentReceipts()).find(
       (receipt) => receipt.paymentId === paymentId,
     );
   }
 
-  private requireApprovedProfile(countryCode: string): CountryTaxProfileRecord {
-    const profile = this.countryProfiles.get(countryCode);
+  private async requireApprovedProfile(countryCode: string): Promise<CountryTaxProfileRecord> {
+    const profile = await this.repository.getCountryProfile(countryCode);
     if (!profile) {
       throw new NotFoundException('Country tax profile not found.');
     }
@@ -1345,10 +1067,10 @@ export class FinanceService {
     return profile;
   }
 
-  private findActiveRule(input: CalculateTaxDto, transactionAt: string): TaxRuleRecord {
+  private async findActiveRule(input: CalculateTaxDto, transactionAt: string): Promise<TaxRuleRecord> {
     const taxType = input.taxType?.toUpperCase();
     const productTaxCode = input.productTaxCode?.toUpperCase();
-    const candidates = Array.from(this.taxRules.values())
+    const candidates = (await this.repository.listTaxRules())
       .filter((rule) => rule.countryCode === input.countryCode)
       .filter((rule) => !taxType || rule.taxType === taxType)
       .filter((rule) => !productTaxCode || rule.productTaxCode === productTaxCode)
@@ -1390,12 +1112,12 @@ export class FinanceService {
     ];
   }
 
-  private createInvoiceRecord(
+  private async createInvoiceRecord(
     tenantId: string,
     input: CreateInvoiceDto,
     snapshot: TaxCalculationSnapshotRecord,
     now: string,
-  ): FinanceInvoiceRecord {
+  ): Promise<FinanceInvoiceRecord> {
     const issuedAt = now;
     const balance = calculatePaymentBalance({
       totalAmount: snapshot.grossAmount,
@@ -1405,7 +1127,7 @@ export class FinanceService {
     return {
       id: randomUUID(),
       tenantId,
-      invoiceNumber: this.nextDocumentNumber(input.countryCode, 'INVOICE', issuedAt),
+      invoiceNumber: await this.nextDocumentNumber(input.countryCode, 'INVOICE', issuedAt),
       countryCode: input.countryCode,
       customerName: input.customerName,
       customerEmail: input.customerEmail,
@@ -1441,7 +1163,7 @@ export class FinanceService {
     };
   }
 
-  private createReceiptForInvoice(
+  private async createReceiptForInvoice(
     invoice: FinanceInvoiceRecord,
     input: {
       amountPaid?: number;
@@ -1450,7 +1172,7 @@ export class FinanceService {
       paidAt?: string;
     },
     now: string,
-  ): FinanceReceiptRecord {
+  ): Promise<FinanceReceiptRecord> {
     if (invoice.paymentStatus === 'PAID' || invoice.paymentStatus === 'OVERPAID') {
       throw new UnprocessableEntityException('Invoice already has a settled payment balance.');
     }
@@ -1459,7 +1181,7 @@ export class FinanceService {
       throw new UnprocessableEntityException('Payment reference is required to issue a receipt.');
     }
 
-    const duplicateReceipt = Array.from(this.receipts.values()).find(
+    const duplicateReceipt = (await this.repository.listReceipts()).find(
       (receipt) =>
         receipt.paymentProvider === input.paymentProvider &&
         receipt.paymentReference === input.paymentReference,
@@ -1477,7 +1199,7 @@ export class FinanceService {
     const receipt: FinanceReceiptRecord = {
       id: randomUUID(),
       tenantId: invoice.tenantId,
-      receiptNumber: this.nextDocumentNumber(invoice.countryCode, 'RECEIPT', now),
+      receiptNumber: await this.nextDocumentNumber(invoice.countryCode, 'RECEIPT', now),
       invoiceId: invoice.id,
       invoiceNumber: invoice.invoiceNumber,
       countryCode: invoice.countryCode,
@@ -1507,13 +1229,13 @@ export class FinanceService {
         : 'ISSUED';
     invoice.updatedAt = now;
 
-    this.invoices.set(invoice.id, invoice);
-    this.receipts.set(receipt.id, receipt);
+    await this.repository.saveInvoice(invoice);
+    await this.repository.saveReceipt(receipt);
     return receipt;
   }
 
-  private requireTenantInvoice(tenantId: string, invoiceId: string): FinanceInvoiceRecord {
-    const invoice = this.invoices.get(invoiceId);
+  private async requireTenantInvoice(tenantId: string, invoiceId: string): Promise<FinanceInvoiceRecord> {
+    const invoice = await this.repository.getInvoice(invoiceId);
     if (!invoice || invoice.tenantId !== tenantId) {
       throw new NotFoundException('Invoice not found.');
     }
@@ -1521,7 +1243,7 @@ export class FinanceService {
     return invoice;
   }
 
-  private createAdjustmentRecord(
+  private async createAdjustmentRecord(
     invoice: FinanceInvoiceRecord,
     input: {
       adjustmentType: FinanceAdjustmentType;
@@ -1535,7 +1257,7 @@ export class FinanceService {
       settledAt?: string;
     },
     now: string,
-  ): FinanceAdjustmentRecord {
+  ): Promise<FinanceAdjustmentRecord> {
     const availableAmount = this.availableAdjustmentAmount(invoice);
     if (input.amount <= 0) {
       throw new UnprocessableEntityException('Adjustment amount must be greater than zero.');
@@ -1545,7 +1267,7 @@ export class FinanceService {
       throw new UnprocessableEntityException('Adjustment amount exceeds the collected balance.');
     }
 
-    const snapshot = this.snapshots.get(invoice.taxCalculationSnapshotId);
+    const snapshot = await this.repository.getSnapshot(invoice.taxCalculationSnapshotId);
     if (!snapshot) {
       throw new NotFoundException('Tax calculation snapshot not found for invoice.');
     }
@@ -1563,7 +1285,7 @@ export class FinanceService {
       adjustmentType: input.adjustmentType,
       creditNoteNumber:
         input.adjustmentType === 'REFUND'
-          ? this.nextDocumentNumber(invoice.countryCode, 'CREDIT_NOTE', now)
+          ? await this.nextDocumentNumber(invoice.countryCode, 'CREDIT_NOTE', now)
           : undefined,
       invoiceId: invoice.id,
       invoiceNumber: invoice.invoiceNumber,
@@ -1624,11 +1346,11 @@ export class FinanceService {
     ];
   }
 
-  private applyAdjustmentToInvoice(
+  private async applyAdjustmentToInvoice(
     invoice: FinanceInvoiceRecord,
     adjustment: FinanceAdjustmentRecord,
     now: string,
-  ): void {
+  ): Promise<void> {
     if (adjustment.adjustmentType === 'REFUND') {
       invoice.refundedAmount = roundMoney(invoice.refundedAmount + adjustment.amount);
       invoice.status = invoice.refundedAmount >= invoice.amountPaid ? 'REFUNDED' : invoice.status;
@@ -1647,28 +1369,27 @@ export class FinanceService {
     invoice.amountDue = balance.amountDue;
     invoice.paymentStatus = balance.paymentStatus;
     invoice.updatedAt = now;
-    this.invoices.set(invoice.id, invoice);
+    await this.repository.saveInvoice(invoice);
   }
 
-  private nextDocumentNumber(
+  private async nextDocumentNumber(
     countryCode: string,
     documentType: FinanceDocumentType,
     issuedAt: string,
-  ): string {
+  ): Promise<string> {
     const year = new Date(issuedAt).getUTCFullYear();
     const key = `${countryCode.toUpperCase()}:${documentType}:${year}`;
-    const sequence = (this.documentSequences.get(key) ?? 0) + 1;
-    this.documentSequences.set(key, sequence);
+    const sequence = await this.repository.nextDocumentSequence(key);
     return createFinanceDocumentNumber({ countryCode, documentType, issuedAt, sequence });
   }
 
-  private createReturnAlert(
+  private async createReturnAlert(
     taxReturn: TaxReturnRecord,
     alertType: Extract<FinanceAlertType, 'RETURN_READY_FOR_REVIEW' | 'APPROVAL_REQUIRED'>,
     dueAt: string,
     now: string,
-  ): FinanceAlertRecord {
-    return this.createFinanceAlert({
+  ): Promise<FinanceAlertRecord> {
+    return await this.createFinanceAlert({
       countryCode: taxReturn.countryCode,
       taxReturnId: taxReturn.id,
       alertType,
@@ -1683,7 +1404,7 @@ export class FinanceService {
     });
   }
 
-  private createFinanceAlert(input: {
+  private async createFinanceAlert(input: {
     tenantId?: string;
     countryCode: string;
     taxReturnId?: string;
@@ -1694,8 +1415,8 @@ export class FinanceService {
     dueAt: string;
     createdAt: string;
     dedupeKey: string;
-  }): FinanceAlertRecord {
-    const existing = Array.from(this.financeAlerts.values()).find(
+  }): Promise<FinanceAlertRecord> {
+    const existing = (await this.repository.listFinanceAlerts()).find(
       (alert) => alert.dedupeKey === input.dedupeKey,
     );
     if (existing) return existing;
@@ -1715,16 +1436,16 @@ export class FinanceService {
       createdAt: input.createdAt,
     };
 
-    this.financeAlerts.set(alert.id, alert);
+    await this.repository.saveFinanceAlert(alert);
     return alert;
   }
 
-  private hasAlertDedupeKey(dedupeKey: string): boolean {
-    return Array.from(this.financeAlerts.values()).some((alert) => alert.dedupeKey === dedupeKey);
+  private async hasAlertDedupeKey(dedupeKey: string): Promise<boolean> {
+    return (await this.repository.listFinanceAlerts()).some((alert) => alert.dedupeKey === dedupeKey);
   }
 
-  private hasDunningNoticeDedupeKey(dedupeKey: string): boolean {
-    return Array.from(this.dunningNotices.values()).some((notice) => notice.dedupeKey === dedupeKey);
+  private async hasDunningNoticeDedupeKey(dedupeKey: string): Promise<boolean> {
+    return (await this.repository.listDunningNotices()).some((notice) => notice.dedupeKey === dedupeKey);
   }
 
   private remittanceMessage(taxReturn: TaxReturnRecord, daysUntilDue: number): string {
@@ -1780,8 +1501,8 @@ export class FinanceService {
     return role;
   }
 
-  private requireTaxReturn(id: string): TaxReturnRecord {
-    const taxReturn = this.taxReturns.get(id);
+  private async requireTaxReturn(id: string): Promise<TaxReturnRecord> {
+    const taxReturn = await this.repository.getTaxReturn(id);
     if (!taxReturn) {
       throw new NotFoundException('Tax return not found.');
     }
@@ -1789,24 +1510,24 @@ export class FinanceService {
     return taxReturn;
   }
 
-  private requireUnlockedTaxReturn(id: string): TaxReturnRecord {
-    const taxReturn = this.requireTaxReturn(id);
+  private async requireUnlockedTaxReturn(id: string): Promise<TaxReturnRecord> {
+    const taxReturn = await this.requireTaxReturn(id);
     this.runWorkbench(() => assertTaxReturnPeriodUnlocked(taxReturn.status));
     return taxReturn;
   }
 
-  private transitionTaxReturn(taxReturn: TaxReturnRecord, to: TaxReturnStatus, _actor: string): void {
+  private async transitionTaxReturn(taxReturn: TaxReturnRecord, to: TaxReturnStatus, _actor: string): Promise<void> {
     this.runWorkbench(() => assertTaxReturnTransition(taxReturn.status, to));
     taxReturn.status = to;
     taxReturn.updatedAt = new Date().toISOString();
-    this.taxReturns.set(taxReturn.id, taxReturn);
+    await this.repository.saveTaxReturn(taxReturn);
   }
 
-  private addTaxReturnEvidence(
+  private async addTaxReturnEvidence(
     taxReturn: TaxReturnRecord,
     input: { kind: TaxReturnEvidenceKind; reference: string; note?: string },
     attachedBy: string,
-  ): TaxReturnEvidenceRecord {
+  ): Promise<TaxReturnEvidenceRecord> {
     const evidence: TaxReturnEvidenceRecord = {
       id: randomUUID(),
       kind: input.kind,
@@ -1817,12 +1538,12 @@ export class FinanceService {
     };
     taxReturn.evidence = [...taxReturn.evidence.filter((item) => item.kind !== evidence.kind), evidence];
     taxReturn.updatedAt = evidence.attachedAt;
-    this.taxReturns.set(taxReturn.id, taxReturn);
+    await this.repository.saveTaxReturn(taxReturn);
     return evidence;
   }
 
-  private assertReconciliationClear(countryCode: string): void {
-    const runs = Array.from(this.reconciliationRuns.values())
+  private async assertReconciliationClear(countryCode: string): Promise<void> {
+    const runs = (await this.repository.listReconciliationRuns())
       .filter((run) => !run.countryCode || run.countryCode === countryCode)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
@@ -1836,7 +1557,7 @@ export class FinanceService {
       );
     }
 
-    const openVariance = Array.from(this.financeAlerts.values()).find(
+    const openVariance = (await this.repository.listFinanceAlerts()).find(
       (alert) =>
         alert.alertType === 'RECONCILIATION_VARIANCE' &&
         alert.status === 'OPEN' &&

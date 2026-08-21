@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import { FinanceService } from './finance.service';
+import { InMemoryFinanceRepository } from './in-memory-finance.repository';
 
 const tenantId = '11111111-1111-4111-8111-111111111111';
 
-function configuredService() {
+async function configuredService() {
   const service = new FinanceService();
 
-  service.configureCountryTaxProfile({
+  await service.configureCountryTaxProfile({
     countryCode: 'KE',
     taxAuthorityName: 'Pilot Tax Authority',
     taxRegistrationStatus: 'REGISTERED',
@@ -17,7 +18,7 @@ function configuredService() {
     taxInclusivePricing: true,
     approvedBy: 'global-finance-admin',
   });
-  service.createTaxRule({
+  await service.createTaxRule({
     countryCode: 'KE',
     taxType: 'VAT',
     taxRate: 0.16,
@@ -29,10 +30,10 @@ function configuredService() {
 }
 
 describe('FinanceService', () => {
-  it('requires an approved country tax profile before calculating tax', () => {
+  it('requires an approved country tax profile before calculating tax', async () => {
     const service = new FinanceService();
 
-    service.configureCountryTaxProfile({
+    await service.configureCountryTaxProfile({
       countryCode: 'KE',
       taxAuthorityName: 'Pilot Tax Authority',
       taxRegistrationStatus: 'DRAFT',
@@ -41,7 +42,7 @@ describe('FinanceService', () => {
       recordRetentionYears: 7,
       taxInclusivePricing: true,
     });
-    service.createTaxRule({
+    await service.createTaxRule({
       countryCode: 'KE',
       taxType: 'VAT',
       taxRate: 0.16,
@@ -49,7 +50,7 @@ describe('FinanceService', () => {
       effectiveFrom: '2026-01-01T00:00:00.000Z',
     });
 
-    expect(() =>
+    await expect(
       service.calculateTax(tenantId, {
         countryCode: 'KE',
         grossAmount: 10,
@@ -57,12 +58,12 @@ describe('FinanceService', () => {
         productTaxCode: 'SFC_SUBSCRIPTION',
         customerEvidence: { billingCountry: 'KE' },
       }),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 
-  it('creates immutable tax snapshots and ledger entries from approved rules', () => {
-    const service = configuredService();
-    const result = service.calculateTax(tenantId, {
+  it('creates immutable tax snapshots and ledger entries from approved rules', async () => {
+    const service = await configuredService();
+    const result = await service.calculateTax(tenantId, {
       countryCode: 'KE',
       grossAmount: 10,
       presentmentCurrency: 'KES',
@@ -77,13 +78,13 @@ describe('FinanceService', () => {
       'TAX_LIABILITY',
       'PLATFORM_REVENUE',
     ]);
-    expect(service.listTaxCalculations(tenantId)).toHaveLength(1);
+    expect(await service.listTaxCalculations(tenantId)).toHaveLength(1);
   });
 
-  it('generates a tax return and approval alerts from stored snapshots', () => {
-    const service = configuredService();
+  it('generates a tax return and approval alerts from stored snapshots', async () => {
+    const service = await configuredService();
 
-    service.calculateTax(tenantId, {
+    await service.calculateTax(tenantId, {
       countryCode: 'KE',
       grossAmount: 10,
       presentmentCurrency: 'KES',
@@ -92,7 +93,7 @@ describe('FinanceService', () => {
       transactionAt: '2026-06-17T10:00:00.000Z',
     });
 
-    const result = service.generateTaxReturn({
+    const result = await service.generateTaxReturn({
       countryCode: 'KE',
       taxType: 'VAT',
       periodStart: '2026-06-01T00:00:00.000Z',
@@ -110,10 +111,10 @@ describe('FinanceService', () => {
     ]);
   });
 
-  it('creates an invoice, receipt, tax snapshot, and ledger entries for a paid transaction', () => {
-    const service = configuredService();
+  it('creates an invoice, receipt, tax snapshot, and ledger entries for a paid transaction', async () => {
+    const service = await configuredService();
 
-    const result = service.createInvoice(tenantId, {
+    const result = await service.createInvoice(tenantId, {
       countryCode: 'KE',
       grossAmount: 10,
       presentmentCurrency: 'KES',
@@ -138,13 +139,13 @@ describe('FinanceService', () => {
     expect(result.receipt?.amountPaid).toBe(10);
     expect(result.taxCalculation.snapshot.taxAmount).toBe(1.3793);
     expect(result.taxCalculation.ledgerEntries).toHaveLength(2);
-    expect(service.listInvoices(tenantId)).toHaveLength(1);
-    expect(service.listReceipts(tenantId)).toHaveLength(1);
+    expect(await service.listInvoices(tenantId)).toHaveLength(1);
+    expect(await service.listReceipts(tenantId)).toHaveLength(1);
   });
 
-  it('issues receipts against an existing invoice until the balance is paid', () => {
-    const service = configuredService();
-    const invoiceResult = service.createInvoice(tenantId, {
+  it('issues receipts against an existing invoice until the balance is paid', async () => {
+    const service = await configuredService();
+    const invoiceResult = await service.createInvoice(tenantId, {
       countryCode: 'KE',
       grossAmount: 10,
       presentmentCurrency: 'KES',
@@ -154,7 +155,7 @@ describe('FinanceService', () => {
       lineItemDescription: 'Sell Find Connect monthly subscription',
     });
 
-    const partial = service.issueReceipt(tenantId, {
+    const partial = await service.issueReceipt(tenantId, {
       invoiceId: invoiceResult.invoice.id,
       amountPaid: 4,
       paymentProvider: 'MANUAL',
@@ -164,7 +165,7 @@ describe('FinanceService', () => {
     expect(partial.invoice.paymentStatus).toBe('PARTIALLY_PAID');
     expect(partial.invoice.amountDue).toBe(6);
 
-    const final = service.issueReceipt(tenantId, {
+    const final = await service.issueReceipt(tenantId, {
       invoiceId: invoiceResult.invoice.id,
       paymentProvider: 'MANUAL',
       paymentReference: 'manual-payment-2',
@@ -172,19 +173,19 @@ describe('FinanceService', () => {
 
     expect(final.invoice.paymentStatus).toBe('PAID');
     expect(final.receipt.amountPaid).toBe(6);
-    expect(service.listReceipts(tenantId)).toHaveLength(2);
-    expect(() =>
+    expect(await service.listReceipts(tenantId)).toHaveLength(2);
+    await expect(
       service.issueReceipt(tenantId, {
         invoiceId: invoiceResult.invoice.id,
         paymentProvider: 'MANUAL',
         paymentReference: 'manual-payment-2',
       }),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 
-  it('creates refund credit notes and reversal ledger entries against paid invoices', () => {
-    const service = configuredService();
-    const invoiceResult = service.createInvoice(tenantId, {
+  it('creates refund credit notes and reversal ledger entries against paid invoices', async () => {
+    const service = await configuredService();
+    const invoiceResult = await service.createInvoice(tenantId, {
       countryCode: 'KE',
       grossAmount: 10,
       presentmentCurrency: 'KES',
@@ -196,7 +197,7 @@ describe('FinanceService', () => {
       paymentReference: 'manual-payment-123',
     });
 
-    const result = service.requestRefund(tenantId, {
+    const result = await service.requestRefund(tenantId, {
       invoiceId: invoiceResult.invoice.id,
       amount: 5,
       reason: 'Customer cancelled during support grace period.',
@@ -215,12 +216,12 @@ describe('FinanceService', () => {
     expect(result.ledgerEntries.every((entry) => entry.amount < 0)).toBe(true);
     expect(result.invoice.refundedAmount).toBe(5);
     expect(result.invoice.netCollectedAmount).toBe(5);
-    expect(service.listAdjustments(tenantId)).toHaveLength(1);
+    expect(await service.listAdjustments(tenantId)).toHaveLength(1);
   });
 
-  it('opens chargebacks and creates dunning notices for reopened balances', () => {
-    const service = configuredService();
-    const invoiceResult = service.createInvoice(tenantId, {
+  it('opens chargebacks and creates dunning notices for reopened balances', async () => {
+    const service = await configuredService();
+    const invoiceResult = await service.createInvoice(tenantId, {
       countryCode: 'KE',
       grossAmount: 10,
       presentmentCurrency: 'KES',
@@ -233,7 +234,7 @@ describe('FinanceService', () => {
       paymentReference: 'manual-payment-123',
     });
 
-    const chargeback = service.openChargeback(tenantId, {
+    const chargeback = await service.openChargeback(tenantId, {
       invoiceId: invoiceResult.invoice.id,
       amount: 10,
       reason: 'Cardholder dispute received from payment provider.',
@@ -251,20 +252,20 @@ describe('FinanceService', () => {
       'CHARGEBACK_REVENUE_REVERSAL',
     ]);
 
-    const firstRun = service.runDunning(tenantId, { now: '2026-06-27T00:00:00.000Z' });
-    const secondRun = service.runDunning(tenantId, { now: '2026-06-27T12:00:00.000Z' });
+    const firstRun = await service.runDunning(tenantId, { now: '2026-06-27T00:00:00.000Z' });
+    const secondRun = await service.runDunning(tenantId, { now: '2026-06-27T12:00:00.000Z' });
 
     expect(firstRun.noticesCreated).toHaveLength(1);
     expect(firstRun.noticesCreated[0]?.stage).toBe('FIRST_NOTICE');
     expect(firstRun.noticesCreated[0]?.amountDue).toBe(10);
     expect(secondRun.noticesCreated).toHaveLength(0);
-    expect(service.listDunningNotices(tenantId)).toHaveLength(1);
+    expect(await service.listDunningNotices(tenantId)).toHaveLength(1);
   });
 
-  it('creates remittance alerts on milestone days without duplicating them', () => {
-    const service = configuredService();
+  it('creates remittance alerts on milestone days without duplicating them', async () => {
+    const service = await configuredService();
 
-    service.calculateTax(tenantId, {
+    await service.calculateTax(tenantId, {
       countryCode: 'KE',
       grossAmount: 10,
       presentmentCurrency: 'KES',
@@ -272,7 +273,7 @@ describe('FinanceService', () => {
       customerEvidence: { billingCountry: 'KE' },
       transactionAt: '2026-06-17T10:00:00.000Z',
     });
-    service.generateTaxReturn({
+    await service.generateTaxReturn({
       countryCode: 'KE',
       taxType: 'VAT',
       periodStart: '2026-06-01T00:00:00.000Z',
@@ -282,18 +283,18 @@ describe('FinanceService', () => {
       filingCurrency: 'KES',
     });
 
-    const firstRun = service.runFinanceAlerts({ now: '2026-07-24T00:00:00.000Z' });
-    const secondRun = service.runFinanceAlerts({ now: '2026-07-24T12:00:00.000Z' });
+    const firstRun = await service.runFinanceAlerts({ now: '2026-07-24T00:00:00.000Z' });
+    const secondRun = await service.runFinanceAlerts({ now: '2026-07-24T12:00:00.000Z' });
 
     expect(firstRun.alertsCreated).toHaveLength(1);
     expect(firstRun.alertsCreated[0]?.alertType).toBe('UPCOMING_REMITTANCE');
     expect(secondRun.alertsCreated).toHaveLength(0);
   });
 
-  it('blocks prohibited finance configuration text', () => {
+  it('blocks prohibited finance configuration text', async () => {
     const service = new FinanceService();
 
-    expect(() =>
+    await expect(
       service.configureCountryTaxProfile({
         countryCode: 'KE',
         taxAuthorityName: 'Weapons settlement desk',
@@ -303,13 +304,13 @@ describe('FinanceService', () => {
         recordRetentionYears: 7,
         approvedBy: 'global-finance-admin',
       }),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 
   it('issues an invoice, captures payment, and produces a receipt', async () => {
-    const service = configuredService();
+    const service = await configuredService();
 
-    const invoice = service.issueInvoice(tenantId, {
+    const invoice = await service.issueInvoice(tenantId, {
       countryCode: 'KE',
       currencyCode: 'KES',
       lines: [{ description: 'Monthly subscription', quantity: 1, unitAmount: 10 }],
@@ -327,12 +328,12 @@ describe('FinanceService', () => {
     expect(paid.payment.status).toBe('CAPTURED');
     expect(paid.invoice.status).toBe('PAID');
     expect(paid.receipt?.amount).toBe(11.3793);
-    expect(service.listPaymentReceipts(tenantId)).toHaveLength(1);
+    expect(await service.listPaymentReceipts(tenantId)).toHaveLength(1);
   });
 
   it('is idempotent when paying with the same idempotency key', async () => {
-    const service = configuredService();
-    const invoice = service.issueInvoice(tenantId, {
+    const service = await configuredService();
+    const invoice = await service.issueInvoice(tenantId, {
       countryCode: 'KE',
       currencyCode: 'KES',
       lines: [{ description: 'Monthly subscription', quantity: 1, unitAmount: 10 }],
@@ -352,12 +353,12 @@ describe('FinanceService', () => {
     expect(first.idempotentReplay).toBe(false);
     expect(replay.idempotentReplay).toBe(true);
     expect(replay.payment.id).toBe(first.payment.id);
-    expect(service.listPayments(tenantId)).toHaveLength(1);
+    expect(await service.listPayments(tenantId)).toHaveLength(1);
   });
 
   it('refunds a captured invoice and updates its status', async () => {
-    const service = configuredService();
-    const invoice = service.issueInvoice(tenantId, {
+    const service = await configuredService();
+    const invoice = await service.issueInvoice(tenantId, {
       countryCode: 'KE',
       currencyCode: 'KES',
       lines: [{ description: 'Monthly subscription', quantity: 1, unitAmount: 10 }],
@@ -371,15 +372,15 @@ describe('FinanceService', () => {
   });
 
   it('reconciles a provider settlement and raises a variance alert', async () => {
-    const service = configuredService();
-    const invoice = service.issueInvoice(tenantId, {
+    const service = await configuredService();
+    const invoice = await service.issueInvoice(tenantId, {
       countryCode: 'KE',
       currencyCode: 'KES',
       lines: [{ description: 'Monthly subscription', quantity: 1, unitAmount: 10 }],
     });
     const paid = await service.payInvoice(tenantId, { invoiceId: invoice.id, method: 'CARD' });
 
-    const reconciliation = service.reconcileProviderSettlement(tenantId, {
+    const reconciliation = await service.reconcileProviderSettlement(tenantId, {
       statementReference: 'PROVIDER-2026-06',
       currencyCode: 'KES',
       settlementLines: [
@@ -400,7 +401,7 @@ describe('FinanceService', () => {
         audits.push(record);
       },
     } as never);
-    service.configureCountryTaxProfile({
+    await service.configureCountryTaxProfile({
       countryCode: 'KE',
       taxAuthorityName: 'Pilot Tax Authority',
       taxRegistrationStatus: 'REGISTERED',
@@ -410,7 +411,7 @@ describe('FinanceService', () => {
       taxInclusivePricing: true,
       approvedBy: 'global-finance-admin',
     });
-    service.createTaxRule({
+    await service.createTaxRule({
       countryCode: 'KE',
       taxType: 'VAT',
       taxRate: 0.16,
@@ -418,7 +419,7 @@ describe('FinanceService', () => {
       effectiveFrom: '2026-01-01T00:00:00.000Z',
     });
 
-    service.calculateTax(tenantId, {
+    await service.calculateTax(tenantId, {
       countryCode: 'KE',
       grossAmount: 10,
       presentmentCurrency: 'KES',
@@ -426,13 +427,13 @@ describe('FinanceService', () => {
       customerEvidence: { billingCountry: 'KE' },
       transactionAt: '2026-06-17T10:00:00.000Z',
     });
-    const invoice = service.issueInvoice(tenantId, {
+    const invoice = await service.issueInvoice(tenantId, {
       countryCode: 'KE',
       currencyCode: 'KES',
       lines: [{ description: 'Monthly subscription', quantity: 1, unitAmount: 10 }],
     });
     const paid = await service.payInvoice(tenantId, { invoiceId: invoice.id, method: 'CARD' });
-    service.reconcileProviderSettlement(tenantId, {
+    await service.reconcileProviderSettlement(tenantId, {
       statementReference: 'PROVIDER-KE-2026-06',
       countryCode: 'KE',
       currencyCode: 'KES',
@@ -445,7 +446,7 @@ describe('FinanceService', () => {
       ],
     });
 
-    const generated = service.generateTaxReturn(
+    const generated = await service.generateTaxReturn(
       {
         countryCode: 'KE',
         taxType: 'VAT',
@@ -459,24 +460,28 @@ describe('FinanceService', () => {
     );
     const id = generated.taxReturn.id;
 
-    expect(service.submitTaxReturn(id, { actorUserId: 'country-finance-admin' }).status).toBe(
+    expect((await service.submitTaxReturn(id, { actorUserId: 'country-finance-admin' })).status).toBe(
       'IN_REVIEW',
     );
     expect(
-      service.approveTaxReturn(id, {
-        actorRole: 'COUNTRY_FINANCE_ADMIN',
-        actorUserId: 'country-finance-admin',
-      }).status,
+      (
+        await service.approveTaxReturn(id, {
+          actorRole: 'COUNTRY_FINANCE_ADMIN',
+          actorUserId: 'country-finance-admin',
+        })
+      ).status,
     ).toBe('APPROVED');
     expect(
-      service.fileTaxReturn(id, {
-        kind: 'FILING_CONFIRMATION',
-        reference: 'KRA-VAT-2026-06',
-        actorRole: 'GLOBAL_FINANCE_ADMIN',
-        actorUserId: 'global-finance-admin',
-      }).status,
+      (
+        await service.fileTaxReturn(id, {
+          kind: 'FILING_CONFIRMATION',
+          reference: 'KRA-VAT-2026-06',
+          actorRole: 'GLOBAL_FINANCE_ADMIN',
+          actorUserId: 'global-finance-admin',
+        })
+      ).status,
     ).toBe('FILED');
-    const remitted = service.remitTaxReturn(id, {
+    const remitted = await service.remitTaxReturn(id, {
       reference: 'PAY-8891',
       actorRole: 'GLOBAL_FINANCE_ADMIN',
       actorUserId: 'global-finance-admin',
@@ -487,23 +492,23 @@ describe('FinanceService', () => {
       'REMITTANCE_RECEIPT',
     ]);
 
-    const locked = service.lockTaxReturn(id, {
+    const locked = await service.lockTaxReturn(id, {
       actorRole: 'GLOBAL_FINANCE_ADMIN',
       actorUserId: 'global-finance-admin',
     });
     expect(locked.status).toBe('LOCKED');
     expect(locked.lockedAt).toBeTruthy();
 
-    const exported = service.exportTaxReturn(id, { format: 'CSV' }, { tenantId });
+    const exported = await service.exportTaxReturn(id, { format: 'CSV' }, { tenantId });
     expect(exported.fileName).toContain('tax-return-ke-vat-2026-06-01');
     expect(exported.content).toContain('KRA-VAT-2026-06|PAY-8891');
     expect(exported.content).not.toContain('Board approved');
-    expect(() =>
+    await expect(
       service.attachTaxReturnEvidence(id, {
         kind: 'AUTHORITY_REFERENCE',
         reference: 'KRA-REF-99',
       }),
-    ).toThrow(/Locked tax periods cannot be changed/);
+    ).rejects.toThrow(/Locked tax periods cannot be changed/);
     expect(audits.map((record) => record.action)).toEqual([
       'TAX_RETURN_GENERATED',
       'TAX_RETURN_SUBMITTED',
@@ -517,8 +522,8 @@ describe('FinanceService', () => {
   });
 
   it('blocks tax-return approval until reconciliation is clear', async () => {
-    const service = configuredService();
-    service.calculateTax(tenantId, {
+    const service = await configuredService();
+    await service.calculateTax(tenantId, {
       countryCode: 'KE',
       grossAmount: 10,
       presentmentCurrency: 'KES',
@@ -526,7 +531,7 @@ describe('FinanceService', () => {
       customerEvidence: { billingCountry: 'KE' },
       transactionAt: '2026-06-17T10:00:00.000Z',
     });
-    const generated = service.generateTaxReturn({
+    const generated = await service.generateTaxReturn({
       countryCode: 'KE',
       taxType: 'VAT',
       periodStart: '2026-06-01T00:00:00.000Z',
@@ -535,19 +540,19 @@ describe('FinanceService', () => {
       paymentDeadline: '2026-07-31T00:00:00.000Z',
       filingCurrency: 'KES',
     });
-    service.submitTaxReturn(generated.taxReturn.id);
+    await service.submitTaxReturn(generated.taxReturn.id);
 
-    expect(() => service.approveTaxReturn(generated.taxReturn.id)).toThrow(
+    await expect(service.approveTaxReturn(generated.taxReturn.id)).rejects.toThrow(
       /Reconciliation is required before tax return approval/,
     );
 
-    const invoice = service.issueInvoice(tenantId, {
+    const invoice = await service.issueInvoice(tenantId, {
       countryCode: 'KE',
       currencyCode: 'KES',
       lines: [{ description: 'Monthly subscription', quantity: 1, unitAmount: 10 }],
     });
     const paid = await service.payInvoice(tenantId, { invoiceId: invoice.id, method: 'CARD' });
-    service.reconcileProviderSettlement(tenantId, {
+    await service.reconcileProviderSettlement(tenantId, {
       statementReference: 'PROVIDER-KE-VARIANCE',
       countryCode: 'KE',
       currencyCode: 'KES',
@@ -560,14 +565,14 @@ describe('FinanceService', () => {
       ],
     });
 
-    expect(() => service.approveTaxReturn(generated.taxReturn.id)).toThrow(
+    await expect(service.approveTaxReturn(generated.taxReturn.id)).rejects.toThrow(
       /Reconciliation variance must be cleared/,
     );
   });
 
   it('requires a different filing approver above the dual-control threshold', async () => {
-    const service = configuredService();
-    service.calculateTax(tenantId, {
+    const service = await configuredService();
+    await service.calculateTax(tenantId, {
       countryCode: 'KE',
       grossAmount: 100000,
       presentmentCurrency: 'KES',
@@ -575,13 +580,13 @@ describe('FinanceService', () => {
       customerEvidence: { billingCountry: 'KE' },
       transactionAt: '2026-06-17T10:00:00.000Z',
     });
-    const invoice = service.issueInvoice(tenantId, {
+    const invoice = await service.issueInvoice(tenantId, {
       countryCode: 'KE',
       currencyCode: 'KES',
       lines: [{ description: 'Monthly subscription', quantity: 1, unitAmount: 10 }],
     });
     const paid = await service.payInvoice(tenantId, { invoiceId: invoice.id, method: 'CARD' });
-    service.reconcileProviderSettlement(tenantId, {
+    await service.reconcileProviderSettlement(tenantId, {
       statementReference: 'PROVIDER-KE-THRESHOLD',
       countryCode: 'KE',
       currencyCode: 'KES',
@@ -593,7 +598,7 @@ describe('FinanceService', () => {
         },
       ],
     });
-    const generated = service.generateTaxReturn({
+    const generated = await service.generateTaxReturn({
       countryCode: 'KE',
       taxType: 'VAT',
       periodStart: '2026-06-01T00:00:00.000Z',
@@ -603,21 +608,21 @@ describe('FinanceService', () => {
       filingCurrency: 'KES',
     });
     expect(generated.taxReturn.computedTaxDue).toBeGreaterThanOrEqual(10_000);
-    service.submitTaxReturn(generated.taxReturn.id, { actorUserId: 'same-approver' });
-    service.approveTaxReturn(generated.taxReturn.id, { actorUserId: 'same-approver' });
+    await service.submitTaxReturn(generated.taxReturn.id, { actorUserId: 'same-approver' });
+    await service.approveTaxReturn(generated.taxReturn.id, { actorUserId: 'same-approver' });
 
-    expect(() =>
+    await expect(
       service.fileTaxReturn(generated.taxReturn.id, {
         kind: 'FILING_CONFIRMATION',
         reference: 'KRA-VAT-LARGE',
         actorUserId: 'same-approver',
       }),
-    ).toThrow(/different approver than review/);
+    ).rejects.toThrow(/different approver than review/);
   });
 
-  it('blocks billing managers from country tax reports and workbench actions', () => {
-    const service = configuredService();
-    const generated = service.generateTaxReturn({
+  it('blocks billing managers from country tax reports and workbench actions', async () => {
+    const service = await configuredService();
+    const generated = await service.generateTaxReturn({
       countryCode: 'KE',
       taxType: 'VAT',
       periodStart: '2026-06-01T00:00:00.000Z',
@@ -627,11 +632,62 @@ describe('FinanceService', () => {
       filingCurrency: 'KES',
     });
 
-    expect(() =>
+    await expect(
       service.exportTaxReturn(generated.taxReturn.id, { format: 'JSON' }, { sessionRole: 'BILLING_MANAGER' }),
-    ).toThrow(/Country tax reports require a finance admin role/);
-    expect(() =>
+    ).rejects.toThrow(/Country tax reports require a finance admin role/);
+    await expect(
       service.submitTaxReturn(generated.taxReturn.id, {}, { sessionRole: 'BILLING_MANAGER' }),
-    ).toThrow(/Country tax return workbench requires a finance admin role/);
+    ).rejects.toThrow(/Country tax return workbench requires a finance admin role/);
+  });
+
+  it('persists tax profiles, snapshots, and invoices through the repository boundary', async () => {
+    const repository = new InMemoryFinanceRepository();
+    const writer = new FinanceService(undefined, undefined, repository);
+    const reader = new FinanceService(undefined, undefined, repository);
+
+    await writer.configureCountryTaxProfile({
+      countryCode: 'KE',
+      taxAuthorityName: 'Pilot Tax Authority',
+      taxRegistrationStatus: 'REGISTERED',
+      localFinanceOwner: 'Country Finance Admin',
+      filingFrequency: 'MONTHLY',
+      recordRetentionYears: 7,
+      taxInclusivePricing: true,
+      approvedBy: 'global-finance-admin',
+    });
+    await writer.createTaxRule({
+      countryCode: 'KE',
+      taxType: 'VAT',
+      taxRate: 0.16,
+      productTaxCode: 'SFC_SUBSCRIPTION',
+      effectiveFrom: '2026-01-01T00:00:00.000Z',
+    });
+    const calculated = await writer.calculateTax(tenantId, {
+      countryCode: 'KE',
+      grossAmount: 10,
+      presentmentCurrency: 'KES',
+      productTaxCode: 'SFC_SUBSCRIPTION',
+      customerEvidence: { billingCountry: 'KE' },
+      transactionAt: '2026-06-17T10:00:00.000Z',
+    });
+    const invoice = await writer.createInvoice(tenantId, {
+      countryCode: 'KE',
+      grossAmount: 10,
+      presentmentCurrency: 'KES',
+      productTaxCode: 'SFC_SUBSCRIPTION',
+      customerEvidence: { billingCountry: 'KE' },
+      customerName: 'Acme Supplies Ltd',
+      lineItemDescription: 'Sell Find Connect monthly subscription',
+    });
+
+    expect(await reader.listCountryTaxProfiles()).toEqual([
+      expect.objectContaining({ countryCode: 'KE', status: 'APPROVED' }),
+    ]);
+    expect(await reader.listTaxCalculations(tenantId)).toEqual([
+      expect.objectContaining({ id: calculated.snapshot.id, taxAmount: 1.3793 }),
+    ]);
+    expect(await reader.listInvoices(tenantId)).toEqual([
+      expect.objectContaining({ id: invoice.invoice.id, tenantId }),
+    ]);
   });
 });

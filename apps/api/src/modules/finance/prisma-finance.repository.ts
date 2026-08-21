@@ -1,126 +1,276 @@
-﻿import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+﻿import { PrismaPg } from '@prisma/adapter-pg';
+import { Prisma, PrismaClient } from '@prisma/client';
 
-export interface FinancePersistencePort {
-  findIdempotent(tenantId: string, scope: string, key: string): Promise<string | null>;
-  saveIdempotent(tenantId: string, scope: string, key: string, resultId: string): Promise<void>;
-  nextSequence(countryId: string, kind: string, year: number): Promise<number>;
-  isPeriodLocked(tenantId: string, countryId: string, period: string): Promise<boolean>;
-  lockPeriod(tenantId: string, countryId: string, period: string, lockedBy: string): Promise<void>;
-  getReturnApproval(tenantId: string, countryId: string, period: string): Promise<{ status: string; requestedBy: string; decidedBy?: string | null } | null>;
-  saveReturnApproval(tenantId: string, countryId: string, period: string, status: string, requestedBy: string, decidedBy?: string): Promise<void>;
-  saveCreditNote(tenantId: string, amount: number, currency: string, reason: string, idempotencyKey: string): Promise<{ id: string }>;
-  findCreditNoteByKey(tenantId: string, idempotencyKey: string): Promise<{ id: string } | null>;
-  saveRefund(tenantId: string, amount: number, currency: string, reason: string, idempotencyKey: string): Promise<{ id: string }>;
-  findRefundByKey(tenantId: string, idempotencyKey: string): Promise<{ id: string } | null>;
-  saveChargeback(tenantId: string, amount: number, currency: string, status: string, evidence: unknown, idempotencyKey: string): Promise<{ id: string }>;
-  findChargebackByKey(tenantId: string, idempotencyKey: string): Promise<{ id: string } | null>;
-  saveReconciliationRun(params: { tenantId: string; countryCode: string; periodStart: Date; periodEnd: Date; provider: string; calculatedTax: number; collectedTax: number; varianceAmount: number; status: string; matchedCount: number; variances: unknown }): Promise<{ id: string }>;
-  saveFinanceAlert(params: { countryTaxProfileId: string; assignedToUserId?: string; alertType: string; message: string; severity: string; dueAt: Date; dedupeKey: string }): Promise<{ id: string } | null>;
+import type {
+  CountryTaxProfileRecord,
+  DunningNoticeRecord,
+  FinanceAdjustmentRecord,
+  FinanceAlertRecord,
+  FinanceInvoiceRecord,
+  FinanceReceiptRecord,
+  InvoiceRecord,
+  PaymentRecord,
+  ReceiptRecord,
+  ReconciliationRunRecord,
+  TaxCalculationSnapshotRecord,
+  TaxLedgerEntryRecord,
+  TaxReturnRecord,
+  TaxRuleRecord,
+} from './finance.records';
+import type { FinanceRepository } from './finance.repository';
+
+export function createFinancePrismaClient(connectionString: string) {
+  const adapter = new PrismaPg({ connectionString });
+  return new PrismaClient({ adapter });
 }
 
-@Injectable()
-export class PrismaFinanceRepository implements FinancePersistencePort {
-  constructor(private readonly prisma: PrismaService) {}
+type Collection =
+  | 'countryProfile'
+  | 'taxRule'
+  | 'snapshot'
+  | 'ledgerEntry'
+  | 'taxReturn'
+  | 'invoice'
+  | 'receipt'
+  | 'adjustment'
+  | 'dunningNotice'
+  | 'financeAlert'
+  | 'sequence'
+  | 'paymentInvoice'
+  | 'payment'
+  | 'paymentReceipt'
+  | 'paymentInvoiceSequence'
+  | 'reconciliationRun';
 
-  async findIdempotent(tenantId: string, scope: string, key: string) {
-    const row = await this.prisma.financeIdempotency.findUnique({
-      where: { tenantId_scope_key: { tenantId, scope, key } },
-      select: { resultId: true },
-    });
-    return row?.resultId ?? null;
+export class PrismaFinanceRepository implements FinanceRepository {
+  constructor(private readonly prisma: PrismaClient) {}
+
+  getCountryProfile(countryCode: string) {
+    return this.get<CountryTaxProfileRecord>('countryProfile', countryCode);
   }
 
-  async saveIdempotent(tenantId: string, scope: string, key: string, resultId: string) {
-    await this.prisma.financeIdempotency.create({ data: { tenantId, scope, key, resultId } });
-  }
-
-  async nextSequence(countryId: string, kind: string, year: number) {
-    const row = await this.prisma.financeSequence.upsert({
-      where: { countryId_kind_year: { countryId, kind, year } },
-      create: { countryId, kind, year, value: 1 },
-      update: { value: { increment: 1 } },
-    });
-    return row.value;
-  }
-
-  async isPeriodLocked(tenantId: string, countryId: string, period: string) {
-    const lock = await this.prisma.financePeriodLock.findUnique({
-      where: { tenantId_countryId_period: { tenantId, countryId, period } },
-    });
-    return lock !== null;
-  }
-
-  async lockPeriod(tenantId: string, countryId: string, period: string, lockedBy: string) {
-    await this.prisma.financePeriodLock.create({
-      data: { tenantId, countryId, period, lockedAt: new Date(), lockedBy },
+  saveCountryProfile(profile: CountryTaxProfileRecord) {
+    return this.save('countryProfile', profile.countryCode, profile, {
+      countryCode: profile.countryCode,
     });
   }
 
-  async getReturnApproval(tenantId: string, countryId: string, period: string) {
-    return this.prisma.financeReturnApproval.findUnique({
-      where: { tenantId_countryId_period: { tenantId, countryId, period } },
-      select: { status: true, requestedBy: true, decidedBy: true },
+  listCountryProfiles() {
+    return this.list<CountryTaxProfileRecord>('countryProfile');
+  }
+
+  saveTaxRule(rule: TaxRuleRecord) {
+    return this.save('taxRule', rule.id, rule, { countryCode: rule.countryCode });
+  }
+
+  listTaxRules() {
+    return this.list<TaxRuleRecord>('taxRule');
+  }
+
+  getSnapshot(id: string) {
+    return this.get<TaxCalculationSnapshotRecord>('snapshot', id);
+  }
+
+  saveSnapshot(snapshot: TaxCalculationSnapshotRecord) {
+    return this.save('snapshot', snapshot.id, snapshot, {
+      tenantId: snapshot.tenantId,
+      countryCode: snapshot.countryCode,
     });
   }
 
-  async saveReturnApproval(tenantId: string, countryId: string, period: string, status: string, requestedBy: string, decidedBy?: string) {
-    await this.prisma.financeReturnApproval.upsert({
-      where: { tenantId_countryId_period: { tenantId, countryId, period } },
-      create: { tenantId, countryId, period, status, requestedBy, decidedBy, decidedAt: decidedBy ? new Date() : undefined },
-      update: { status, decidedBy, decidedAt: decidedBy ? new Date() : undefined },
+  listSnapshots() {
+    return this.list<TaxCalculationSnapshotRecord>('snapshot');
+  }
+
+  saveLedgerEntry(entry: TaxLedgerEntryRecord) {
+    return this.save('ledgerEntry', entry.id, entry);
+  }
+
+  listLedgerEntries() {
+    return this.list<TaxLedgerEntryRecord>('ledgerEntry');
+  }
+
+  getTaxReturn(id: string) {
+    return this.get<TaxReturnRecord>('taxReturn', id);
+  }
+
+  saveTaxReturn(record: TaxReturnRecord) {
+    return this.save('taxReturn', record.id, record, { countryCode: record.countryCode });
+  }
+
+  listTaxReturns() {
+    return this.list<TaxReturnRecord>('taxReturn');
+  }
+
+  getInvoice(id: string) {
+    return this.get<FinanceInvoiceRecord>('invoice', id);
+  }
+
+  saveInvoice(invoice: FinanceInvoiceRecord) {
+    return this.save('invoice', invoice.id, invoice, {
+      tenantId: invoice.tenantId,
+      countryCode: invoice.countryCode,
     });
   }
 
-  async saveCreditNote(tenantId: string, amount: number, currency: string, reason: string, idempotencyKey: string) {
-    return this.prisma.creditNote.create({ data: { tenantId, amount, currency, reason, idempotencyKey }, select: { id: true } });
+  listInvoices() {
+    return this.list<FinanceInvoiceRecord>('invoice');
   }
 
-  async findCreditNoteByKey(tenantId: string, idempotencyKey: string) {
-    return this.prisma.creditNote.findFirst({ where: { tenantId, idempotencyKey }, select: { id: true } });
+  saveReceipt(receipt: FinanceReceiptRecord) {
+    return this.save('receipt', receipt.id, receipt, {
+      tenantId: receipt.tenantId,
+      countryCode: receipt.countryCode,
+    });
   }
 
-  async saveRefund(tenantId: string, amount: number, currency: string, reason: string, idempotencyKey: string) {
-    return this.prisma.refund.create({ data: { tenantId, amount, currency, reason, idempotencyKey }, select: { id: true } });
+  listReceipts() {
+    return this.list<FinanceReceiptRecord>('receipt');
   }
 
-  async findRefundByKey(tenantId: string, idempotencyKey: string) {
-    return this.prisma.refund.findFirst({ where: { tenantId, idempotencyKey }, select: { id: true } });
+  saveAdjustment(adjustment: FinanceAdjustmentRecord) {
+    return this.save('adjustment', adjustment.id, adjustment, {
+      tenantId: adjustment.tenantId,
+      countryCode: adjustment.countryCode,
+    });
   }
 
-  async saveChargeback(tenantId: string, amount: number, currency: string, status: string, evidence: unknown, idempotencyKey: string) {
-    return this.prisma.chargeback.create({ data: { tenantId, amount, currency, status, evidence: evidence as any, idempotencyKey }, select: { id: true } });
+  listAdjustments() {
+    return this.list<FinanceAdjustmentRecord>('adjustment');
   }
 
-  async findChargebackByKey(tenantId: string, idempotencyKey: string) {
-    return this.prisma.chargeback.findFirst({ where: { tenantId, idempotencyKey }, select: { id: true } });
+  saveDunningNotice(notice: DunningNoticeRecord) {
+    return this.save('dunningNotice', notice.id, notice, {
+      tenantId: notice.tenantId,
+      countryCode: notice.countryCode,
+    });
   }
 
-  async saveReconciliationRun(params: { tenantId: string; countryCode: string; periodStart: Date; periodEnd: Date; provider: string; calculatedTax: number; collectedTax: number; varianceAmount: number; status: string; matchedCount: number; variances: unknown }) {
-    return this.prisma.reconciliationRun.create({
-      data: {
-        tenantId: params.tenantId,
-        countryCode: params.countryCode,
-        periodStart: params.periodStart,
-        periodEnd: params.periodEnd,
-        provider: params.provider,
-        calculatedTax: params.calculatedTax,
-        collectedTax: params.collectedTax,
-        varianceAmount: params.varianceAmount,
-        status: params.status,
-        matchedCount: params.matchedCount,
-        variances: params.variances as any,
+  listDunningNotices() {
+    return this.list<DunningNoticeRecord>('dunningNotice');
+  }
+
+  saveFinanceAlert(alert: FinanceAlertRecord) {
+    return this.save('financeAlert', alert.id, alert, {
+      tenantId: alert.tenantId,
+      countryCode: alert.countryCode,
+    });
+  }
+
+  listFinanceAlerts() {
+    return this.list<FinanceAlertRecord>('financeAlert');
+  }
+
+  nextDocumentSequence(key: string) {
+    return this.nextSequence(key);
+  }
+
+  getPaymentInvoice(id: string) {
+    return this.get<InvoiceRecord>('paymentInvoice', id);
+  }
+
+  savePaymentInvoice(invoice: InvoiceRecord) {
+    return this.save('paymentInvoice', invoice.id, invoice, {
+      tenantId: invoice.tenantId,
+      countryCode: invoice.countryCode,
+    });
+  }
+
+  listPaymentInvoices() {
+    return this.list<InvoiceRecord>('paymentInvoice');
+  }
+
+  savePayment(payment: PaymentRecord) {
+    return this.save('payment', payment.id, payment, { tenantId: payment.tenantId });
+  }
+
+  listPayments() {
+    return this.list<PaymentRecord>('payment');
+  }
+
+  savePaymentReceipt(receipt: ReceiptRecord) {
+    return this.save('paymentReceipt', receipt.id, receipt, { tenantId: receipt.tenantId });
+  }
+
+  listPaymentReceipts() {
+    return this.list<ReceiptRecord>('paymentReceipt');
+  }
+
+  nextPaymentInvoiceSequence(countryCode: string) {
+    return this.nextSequence(`paymentInvoice:${countryCode}`);
+  }
+
+  saveReconciliationRun(run: ReconciliationRunRecord) {
+    return this.save('reconciliationRun', run.id, run, {
+      tenantId: run.tenantId,
+      countryCode: run.countryCode,
+    });
+  }
+
+  listReconciliationRuns() {
+    return this.list<ReconciliationRunRecord>('reconciliationRun');
+  }
+
+  private async get<T>(collection: Collection, recordId: string): Promise<T | undefined> {
+    const record = await this.prisma.financeWorkbenchRecord.findUnique({
+      where: { collection_recordId: { collection, recordId } },
+    });
+    return record ? (structuredClone(record.payload) as T) : undefined;
+  }
+
+  private async list<T>(collection: Collection): Promise<T[]> {
+    const records = await this.prisma.financeWorkbenchRecord.findMany({
+      where: { collection },
+      orderBy: { createdAt: 'asc' },
+    });
+    return records.map((record) => structuredClone(record.payload) as T);
+  }
+
+  private async save(
+    collection: Collection,
+    recordId: string,
+    payload: object,
+    keys: { tenantId?: string; countryCode?: string } = {},
+  ): Promise<void> {
+    const data = {
+      collection,
+      recordId,
+      tenantId: keys.tenantId ?? null,
+      countryCode: keys.countryCode ?? null,
+      payload: payload as Prisma.InputJsonValue,
+    };
+    await this.prisma.financeWorkbenchRecord.upsert({
+      where: { collection_recordId: { collection, recordId } },
+      create: data,
+      update: {
+        tenantId: data.tenantId,
+        countryCode: data.countryCode,
+        payload: data.payload,
       },
-      select: { id: true },
     });
   }
 
-  async saveFinanceAlert(params: { countryTaxProfileId: string; assignedToUserId?: string; alertType: string; message: string; severity: string; dueAt: Date; dedupeKey: string }) {
-    const existing = await this.prisma.financeAlert.findFirst({ where: { dedupeKey: params.dedupeKey }, select: { id: true } });
-    if (existing) return null;
-    return this.prisma.financeAlert.create({
-      data: { countryTaxProfileId: params.countryTaxProfileId, assignedToUserId: params.assignedToUserId, alertType: params.alertType, message: params.message, severity: params.severity, dueAt: params.dueAt, dedupeKey: params.dedupeKey },
-      select: { id: true },
+  private async nextSequence(recordId: string): Promise<number> {
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.financeWorkbenchRecord.findUnique({
+        where: { collection_recordId: { collection: 'sequence', recordId } },
+      });
+      const current =
+        existing &&
+        typeof existing.payload === 'object' &&
+        existing.payload !== null &&
+        !Array.isArray(existing.payload) &&
+        typeof (existing.payload as { value?: unknown }).value === 'number'
+          ? (existing.payload as { value: number }).value
+          : 0;
+      const value = current + 1;
+      const payload = { value } as Prisma.InputJsonValue;
+      await tx.financeWorkbenchRecord.upsert({
+        where: { collection_recordId: { collection: 'sequence', recordId } },
+        create: { collection: 'sequence', recordId, payload },
+        update: { payload },
+      });
+      return value;
     });
   }
 }

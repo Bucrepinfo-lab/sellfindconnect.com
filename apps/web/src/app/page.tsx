@@ -1846,6 +1846,10 @@ export default function Home() {
                     : 'Finance admin only'
                 }
               />
+              <FinanceRow
+                label="Durable store"
+                value="FINANCE_REPOSITORY=prisma"
+              />
               {canManageTaxReturn ? (
                 <div className="policy-box ok compact">
                   <FileCheck2 size={16} />

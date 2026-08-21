@@ -1314,6 +1314,22 @@ model CountryPricing {
   mode        String   @db.VarChar(10)
   updatedAt   DateTime @updatedAt
 }
+
+model FinanceWorkbenchRecord {
+  id          String   @id @default(uuid())
+  collection  String   @db.VarChar(40)
+  recordId    String
+  tenantId    String?
+  countryCode String?  @db.VarChar(2)
+  payload     Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([collection, recordId])
+  @@index([collection, tenantId])
+  @@index([collection, countryCode])
+}
+
 // ─── Payments (M-Pesa / mobile money via Africa's Talking) ─────────────────────
 
 model PaymentTxn {
