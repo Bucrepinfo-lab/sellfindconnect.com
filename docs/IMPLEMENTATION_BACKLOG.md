@@ -304,8 +304,12 @@ Progress (2026-08-21):
   present and falls back to the in-memory catalog otherwise.
 - Added Source Finder hierarchy dashboards with country, industry, role, and
   relationship-link rollups via `GET /v1/source-finder/hierarchy`.
-- Native mobile saved-search screens, provider-backed push/SMS/WhatsApp
-  delivery, and Postgres full-text/pgvector remain next.
+- Added Postgres full-text ranking on the Source Finder catalog index. In-memory
+  token overlap and Prisma `tsvector` search add `KEYWORD_MATCH` and report
+  `searchMode` as `RULES`, `FTS`, or `HYBRID`. The `embedding` column is reserved
+  for an optional later overlay and is not required for tests.
+- Native mobile saved-search screens remain out of scope. Provider-backed
+  WhatsApp delivery and live object-storage/media scanners remain next.
 
 ## Epic 6: Matching and Lead Conversion
 

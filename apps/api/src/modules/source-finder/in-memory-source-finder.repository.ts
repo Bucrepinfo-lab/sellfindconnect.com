@@ -2,10 +2,12 @@ import { Injectable } from '@nestjs/common';
 import type {
   SavedSourceFinderSearch,
   SourceFinderIndexDocument,
+  SourceFinderIndexSearchHit,
+  SourceFinderIndexSearchInput,
   SourceFinderOpportunityAlert,
   SourceFinderOutcomeFeedback,
 } from '@telpen/domain';
-import { opportunityAlertKey } from '@telpen/domain';
+import { opportunityAlertKey, searchSourceFinderIndexDocuments } from '@telpen/domain';
 
 import type { SourceFinderRepository } from './source-finder.repository';
 
@@ -85,6 +87,10 @@ export class InMemorySourceFinderRepository implements SourceFinderRepository {
     return Array.from(this.index.values()).sort((left, right) =>
       right.indexedAt.localeCompare(left.indexedAt),
     );
+  }
+
+  searchIndexDocuments(input: SourceFinderIndexSearchInput = {}): SourceFinderIndexSearchHit[] {
+    return searchSourceFinderIndexDocuments(this.listIndexDocuments(), input);
   }
 
   private key(tenantId: string, id: string): string {

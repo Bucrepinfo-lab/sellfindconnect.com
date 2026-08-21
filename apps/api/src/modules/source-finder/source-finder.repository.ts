@@ -1,6 +1,8 @@
 import type {
   SavedSourceFinderSearch,
   SourceFinderIndexDocument,
+  SourceFinderIndexSearchHit,
+  SourceFinderIndexSearchInput,
   SourceFinderOpportunityAlert,
   SourceFinderOutcomeFeedback,
 } from '@telpen/domain';
@@ -34,4 +36,7 @@ export interface SourceFinderRepository {
   ): RepositoryResult<void>;
   findIndexDocument(sourceRecordId: string): RepositoryResult<SourceFinderIndexDocument | undefined>;
   listIndexDocuments(): RepositoryResult<SourceFinderIndexDocument[]>;
+  searchIndexDocuments(
+    input?: SourceFinderIndexSearchInput,
+  ): RepositoryResult<SourceFinderIndexSearchHit[]>;
 }

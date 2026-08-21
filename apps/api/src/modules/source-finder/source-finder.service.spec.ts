@@ -12,6 +12,7 @@ describe('SourceFinderService', () => {
     });
 
     expect(response.total).toBeGreaterThan(0);
+    expect(response.searchMode).toBe('RULES');
     expect(response.results[0]?.id).toBe('r1');
     expect(response.results[0]?.reasonCodes).toContain('OFFER_MATCH');
     expect(response.results[0]?.relatedLinks.length).toBeGreaterThan(0);
@@ -187,7 +188,9 @@ describe('SourceFinderService', () => {
       expect.arrayContaining(['r1', 'r2', 'r3', 'r4']),
     );
     expect(search.indexedDocuments).toBe(4);
+    expect(search.searchMode).toBe('HYBRID');
     expect(search.results[0]?.id).toBe('r1');
+    expect(search.results[0]?.reasonCodes).toContain('KEYWORD_MATCH');
     expect(audits.map((record) => record.action)).toEqual(['SOURCE_FINDER_INDEX_REBUILT']);
     expect(JSON.stringify(listed)).not.toContain('tokenVector');
 
@@ -195,9 +198,13 @@ describe('SourceFinderService', () => {
     expect(cleared.indexed).toBe(0);
     await expect(
       service.search({ query: 'fresh produce', countryCode: 'KE' }, tenantId),
-    ).resolves.toMatchObject({ indexedDocuments: 0, results: expect.arrayContaining([
-      expect.objectContaining({ id: 'r1' }),
-    ]) });
+    ).resolves.toMatchObject({
+      indexedDocuments: 0,
+      searchMode: 'RULES',
+      results: expect.arrayContaining([
+        expect.objectContaining({ id: 'r1' }),
+      ]),
+    });
   });
 
   it('summarizes catalog records into a Source Finder hierarchy dashboard', async () => {

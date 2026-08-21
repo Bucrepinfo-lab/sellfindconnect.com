@@ -117,6 +117,9 @@ without validating it against the authenticated user's assignments.
   Prisma persistence is selected with `SOURCE_FINDER_REPOSITORY=prisma`.
   Catalog search documents persist through the same flag, with
   `POST /v1/source-finder/index/reindex` rebuilding the index.
+  Indexed documents use token overlap in memory and Postgres `tsvector`
+  ranking when `SOURCE_FINDER_REPOSITORY=prisma`. Search responses include
+  `searchMode` (`RULES` | `FTS` | `HYBRID`) and `KEYWORD_MATCH`.
   `GET /v1/source-finder/hierarchy` rolls catalog records into country,
   industry, role, and relationship-link dashboards.
   Hide/report always suppress a tenant's results; accept/save ranking boosts

@@ -1,6 +1,7 @@
-import { buildDiscoveryIndexDocument, type DiscoveryVector } from './discovery';
+import { buildDiscoveryIndexDocument, tokenizeDiscoveryText, type DiscoveryVector } from './discovery';
 import { getCountry } from './geography';
 import { industryCategories, type SupplyChainRole } from './industries';
+import { normaliseFtsRank } from './search';
 
 export const sourceFinderSortOptions = [
   'RELEVANCE',
@@ -62,6 +63,7 @@ export const sourceFinderReasonCodes = [
   'FAST_RESPONSE',
   'RELATIONSHIP_LINKS',
   'OUTCOME_FEEDBACK',
+  'KEYWORD_MATCH',
 ] as const;
 
 export type SourceFinderReasonCode = (typeof sourceFinderReasonCodes)[number];
@@ -104,6 +106,143 @@ export function buildSourceFinderIndexDocument(
     tokenVector: document.tokenVector,
     indexedAt,
   };
+}
+
+export type SourceFinderIndexSearchInput = {
+  query?: string;
+  countryCode?: string;
+  industryCode?: string;
+  role?: SupplyChainRole | 'ALL';
+};
+
+export function buildSourceFinderTsQuery(query: string): string {
+  const tokens = tokenizeDiscoveryText(query)
+    .map((token) => token.replace(/[^a-z0-9]/g, ''))
+    .filter((token) => token.length >= 2)
+    .map((token) => `${token}:*`);
+  return tokens.join(' & ') || "''";
+}
+
+export function scoreSourceFinderFullText(
+  document: Pick<SourceFinderIndexDocument, 'searchText' | 'tokenVector'>,
+  query: string,
+): number {
+  const tokens = tokenizeDiscoveryText(query);
+  if (tokens.length === 0) {
+    return 0;
+  }
+
+  let hits = 0;
+  let weight = 0;
+  for (const token of tokens) {
+    const vectorWeight = document.tokenVector[token] ?? 0;
+    if (vectorWeight > 0 || document.searchText.includes(token)) {
+      hits += 1;
+      weight += vectorWeight > 0 ? vectorWeight : 0.1;
+    }
+  }
+
+  if (hits < tokens.length) {
+    return 0;
+  }
+
+  return Number((weight / tokens.length).toFixed(6));
+}
+
+export type SourceFinderSearchMode = 'RULES' | 'FTS' | 'HYBRID';
+
+export type SourceFinderIndexSearchHit = {
+  document: SourceFinderIndexDocument;
+  ftsRank: number;
+};
+
+export function searchSourceFinderIndexDocuments(
+  documents: SourceFinderIndexDocument[],
+  input: SourceFinderIndexSearchInput = {},
+): SourceFinderIndexSearchHit[] {
+  const filtered = documents
+    .filter((document) => !input.countryCode || document.countryCode === input.countryCode)
+    .filter(
+      (document) =>
+        !input.industryCode ||
+        input.industryCode === 'ALL' ||
+        document.industryCode === input.industryCode,
+    )
+    .filter((document) => !input.role || input.role === 'ALL' || document.role === input.role);
+
+  const query = input.query?.trim() ?? '';
+  if (!query || tokenizeDiscoveryText(query).length === 0) {
+    return filtered.map((document) => ({ document, ftsRank: 0 }));
+  }
+
+  return filtered
+    .map((document) => ({
+      document,
+      ftsRank: scoreSourceFinderFullText(document, query),
+    }))
+    .filter((hit) => hit.ftsRank > 0);
+}
+
+export function resolveSourceFinderSearchMode(input: {
+  indexedDocumentCount: number;
+  query: string;
+  ftsHitCount: number;
+}): SourceFinderSearchMode {
+  const hasQuery = tokenizeDiscoveryText(input.query).length > 0;
+  if (input.indexedDocumentCount === 0 || !hasQuery) {
+    return 'RULES';
+  }
+  if (input.ftsHitCount === 0) {
+    return 'RULES';
+  }
+  return 'HYBRID';
+}
+
+export function rankSourceFinderWithFullText(
+  input: SourceFinderSearchInput,
+  records: SourceFinderRecord[],
+  hits: SourceFinderIndexSearchHit[] = [],
+): SourceFinderSearchResult[] {
+  const matchingHits = hits.filter((hit) => hit.ftsRank > 0);
+  const catalog =
+    matchingHits.length > 0
+      ? records.filter((record) => matchingHits.some((hit) => hit.document.id === record.id))
+      : records;
+  const ranks = new Map(matchingHits.map((hit) => [hit.document.id, hit.ftsRank]));
+  return applySourceFinderFullTextRanking(
+    searchSourceFinderRecords(input, catalog),
+    ranks,
+    input.sortBy ?? 'RELEVANCE',
+  );
+}
+
+export function applySourceFinderFullTextRanking(
+  results: SourceFinderSearchResult[],
+  ranks: Map<string, number>,
+  sortBy: SourceFinderSortOption = 'RELEVANCE',
+): SourceFinderSearchResult[] {
+  const boosted = results.map((result) => {
+    const ftsRank = ranks.get(result.id) ?? 0;
+    if (ftsRank <= 0) {
+      return result;
+    }
+
+    const reasonCodes = result.reasonCodes.includes('KEYWORD_MATCH')
+      ? result.reasonCodes
+      : [...result.reasonCodes, 'KEYWORD_MATCH' as const];
+    const reasons = result.reasons.includes('Full-text index matched the search keywords.')
+      ? result.reasons
+      : [...result.reasons, 'Full-text index matched the search keywords.'];
+
+    return {
+      ...result,
+      score: Math.min(100, result.score + Math.round(normaliseFtsRank(ftsRank) * 20)),
+      reasonCodes,
+      reasons,
+    };
+  });
+
+  return sortResults(boosted, sortBy);
 }
 
 export function toSourceFinderRecord(document: SourceFinderIndexDocument): SourceFinderRecord {

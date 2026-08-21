@@ -71,6 +71,7 @@ import {
   buildOpportunityAlert,
   buildSourceFinderHierarchyReport,
   buildProductAuditRecord,
+  buildSourceFinderIndexDocument,
   buildTaxReturnExport,
   canViewTenantAuditLogs,
   createRelationshipClaim,
@@ -90,8 +91,10 @@ import {
   type SourceFinderOpportunityAlert,
   type SourceFinderOutcomeFeedback,
   selectOpportunityMatches,
+  rankSourceFinderWithFullText,
   pilotSourceFinderRecords,
   prohibitedCategorySummaries,
+  searchSourceFinderIndexDocuments,
   searchSourceFinderRecords,
   sourceFinderOutcomeActions,
   sourceFinderSortOptions,
@@ -561,7 +564,7 @@ export default function Home() {
     role,
   });
   const rankedResults: SourceFinderSearchResult[] = querySafetyDecision.allowed
-    ? searchSourceFinderRecords(
+    ? rankSourceFinderWithFullText(
         {
           query,
           role,
@@ -570,6 +573,15 @@ export default function Home() {
           sortBy,
         },
         graphRecords,
+        searchSourceFinderIndexDocuments(
+          graphRecords.map((record) => buildSourceFinderIndexDocument(record)),
+          {
+            query,
+            countryCode,
+            industryCode,
+            role,
+          },
+        ),
       )
     : [];
   const filteredResults = applySourceFinderOutcomes(rankedResults, sourceFinderOutcomes, {
@@ -1437,6 +1449,7 @@ export default function Home() {
               ) : (
                 <span>No synonym expansion</span>
               )}
+              <span>Postgres FTS + token rank</span>
               <span>{filteredResults.length} alert candidates</span>
             </div>
 
@@ -2453,8 +2466,8 @@ export default function Home() {
               <div className="policy-box ok compact">
                 <Search size={16} />
                 <div>
-                  <strong>Search index</strong>
-                  <span>Catalog documents persist through SOURCE_FINDER_REPOSITORY=prisma.</span>
+                  <strong>Full-text search</strong>
+                  <span>Postgres FTS + token rank. Indexed catalogs report HYBRID; the pilot catalog stays RULES.</span>
                 </div>
               </div>
               <div className="saved-search-list">

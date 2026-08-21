@@ -22,6 +22,8 @@ import {
   industryCategories,
   isOpportunityAlertDue,
   pilotSourceFinderRecords,
+  rankSourceFinderWithFullText,
+  resolveSourceFinderSearchMode,
   searchSourceFinderRecords,
   selectOpportunityMatches,
   toSourceFinderRecord,
@@ -64,22 +66,39 @@ export class SourceFinderService {
 
   async search(input: SearchSourceFinderDto, tenantId?: string) {
     const records = await this.safeRecords(input);
-    const ranked = searchSourceFinderRecords(input, records);
+    const indexedDocuments = await this.repository.listIndexDocuments();
+    const hits =
+      indexedDocuments.length > 0
+        ? await this.repository.searchIndexDocuments({
+            query: input.query,
+            countryCode: input.countryCode,
+            industryCode: input.industryCode,
+            role: input.role,
+          })
+        : [];
+    const ranked = rankSourceFinderWithFullText(input, records, hits);
     const feedback = tenantId ? await this.repository.listOutcomeFeedback(tenantId) : [];
     const results = applySourceFinderOutcomes(ranked, feedback, {
       behavioralMatchingConsent: input.behavioralMatchingConsent === true,
+    });
+    const ftsHitCount = hits.filter((hit) => hit.ftsRank > 0).length;
+    const searchMode = resolveSourceFinderSearchMode({
+      indexedDocumentCount: indexedDocuments.length,
+      query: input.query,
+      ftsHitCount,
     });
 
     return {
       query: input.query,
       sortBy: input.sortBy ?? 'RELEVANCE',
+      searchMode,
       behavioralMatchingConsent: input.behavioralMatchingConsent === true,
       filters: {
         countryCode: input.countryCode ?? null,
         industryCode: input.industryCode ?? null,
         role: input.role ?? null,
       },
-      indexedDocuments: (await this.repository.listIndexDocuments()).length,
+      indexedDocuments: indexedDocuments.length,
       total: results.length,
       results,
     };

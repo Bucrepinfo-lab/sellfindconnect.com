@@ -5,8 +5,14 @@ import {
   createSavedSourceFinderSearch,
   createSourceFinderOutcomeFeedback,
   applySourceFinderOutcomes,
+  applySourceFinderFullTextRanking,
   buildSourceFinderHierarchyReport,
   buildSourceFinderIndexDocument,
+  buildSourceFinderTsQuery,
+  rankSourceFinderWithFullText,
+  resolveSourceFinderSearchMode,
+  scoreSourceFinderFullText,
+  searchSourceFinderIndexDocuments,
   isOpportunityAlertDue,
   searchSourceFinderRecords,
   selectOpportunityMatches,
@@ -205,6 +211,70 @@ describe('source finder outcome feedback', () => {
       offers: record!.offers,
     });
     expect(toSourceFinderRecord(indexed)).not.toHaveProperty('searchText');
+  });
+
+  it('scores Source Finder full-text matches and boosts ranked results', () => {
+    const record = searchSourceFinderRecords({ query: 'fresh produce', countryCode: 'KE' })[0];
+    const indexed = buildSourceFinderIndexDocument(record!);
+    const ftsScore = scoreSourceFinderFullText(indexed, 'fresh produce');
+
+    expect(buildSourceFinderTsQuery('fresh produce')).toBe('fresh:* & produce:*');
+    expect(ftsScore).toBeGreaterThan(0);
+    expect(scoreSourceFinderFullText(indexed, 'ammunition')).toBe(0);
+
+    const boosted = applySourceFinderFullTextRanking(
+      searchSourceFinderRecords({ query: 'fresh produce', countryCode: 'KE' }),
+      new Map([[record!.id, ftsScore]]),
+    );
+    expect(boosted[0]?.reasonCodes).toContain('KEYWORD_MATCH');
+    expect(boosted.find((item) => item.id === record!.id)?.reasons).toContain(
+      'Full-text index matched the search keywords.',
+    );
+
+    const belowCap = searchSourceFinderRecords({ query: 'fresh produce', countryCode: 'KE' }).find(
+      (item) => item.score < 100,
+    );
+    expect(belowCap).toBeDefined();
+    const belowCapBoost = applySourceFinderFullTextRanking(
+      [belowCap!],
+      new Map([
+        [belowCap!.id, scoreSourceFinderFullText(buildSourceFinderIndexDocument(belowCap!), 'fresh produce')],
+      ]),
+    );
+    expect(belowCapBoost[0]?.score).toBeGreaterThan(belowCap!.score);
+
+    const indexedCatalog = searchSourceFinderRecords({ query: '', countryCode: 'KE' }).map((item) =>
+      buildSourceFinderIndexDocument(item),
+    );
+    const hits = searchSourceFinderIndexDocuments(indexedCatalog, {
+      query: 'fresh produce',
+      countryCode: 'KE',
+    });
+    expect(hits.every((hit) => hit.ftsRank > 0)).toBe(true);
+    expect(
+      searchSourceFinderIndexDocuments(indexedCatalog, { query: 'fresh ammunition', countryCode: 'KE' }),
+    ).toHaveLength(0);
+
+    const hybrid = rankSourceFinderWithFullText(
+      { query: 'fresh produce', countryCode: 'KE', sortBy: 'RELEVANCE' },
+      searchSourceFinderRecords({ query: '', countryCode: 'KE' }),
+      hits,
+    );
+    expect(hybrid[0]?.reasonCodes).toContain('KEYWORD_MATCH');
+    expect(
+      resolveSourceFinderSearchMode({
+        indexedDocumentCount: indexedCatalog.length,
+        query: 'fresh produce',
+        ftsHitCount: hits.length,
+      }),
+    ).toBe('HYBRID');
+    expect(
+      resolveSourceFinderSearchMode({
+        indexedDocumentCount: 0,
+        query: 'fresh produce',
+        ftsHitCount: 0,
+      }),
+    ).toBe('RULES');
   });
 
   it('rolls Source Finder catalog records into country, industry, and role hierarchy buckets', () => {

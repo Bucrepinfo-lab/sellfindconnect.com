@@ -8,7 +8,9 @@ import {
   type SourceFinderOutcomeFeedback as PrismaOutcomeFeedback,
 } from '@prisma/client';
 import {
+  buildSourceFinderTsQuery,
   opportunityAlertFrequencies,
+  searchSourceFinderIndexDocuments,
   sourceFinderOutcomeActions,
   sourceFinderReasonCodes,
   sourceFinderSortOptions,
@@ -16,6 +18,8 @@ import {
   type OpportunityAlertFrequency,
   type SavedSourceFinderSearch,
   type SourceFinderIndexDocument,
+  type SourceFinderIndexSearchHit,
+  type SourceFinderIndexSearchInput,
   type SourceFinderOpportunityAlert,
   type SourceFinderOutcomeAction,
   type SourceFinderOutcomeFeedback,
@@ -183,6 +187,46 @@ export class PrismaSourceFinderRepository implements SourceFinderRepository {
     return records.map((record) => this.fromIndex(record));
   }
 
+  async searchIndexDocuments(
+    input: SourceFinderIndexSearchInput = {},
+  ): Promise<SourceFinderIndexSearchHit[]> {
+    const query = input.query?.trim() ?? '';
+    if (!query) {
+      return searchSourceFinderIndexDocuments(await this.listIndexDocuments(), input);
+    }
+
+    try {
+      const conditions: string[] = [];
+      const params: unknown[] = [];
+      let placeholder = 1;
+      if (input.countryCode) {
+        conditions.push(`"countryCode" = $${placeholder++}`);
+        params.push(input.countryCode);
+      }
+      if (input.industryCode && input.industryCode !== 'ALL') {
+        conditions.push(`"industryCode" = $${placeholder++}`);
+        params.push(input.industryCode);
+      }
+      if (input.role && input.role !== 'ALL') {
+        conditions.push(`"role" = $${placeholder++}`);
+        params.push(input.role);
+      }
+      params.push(buildSourceFinderTsQuery(query));
+      const tsQueryPlaceholder = placeholder;
+      conditions.push(`"searchVector" @@ to_tsquery('english', $${tsQueryPlaceholder})`);
+      const sql = `SELECT "id", "sourceRecordId", "tenantId", "name", "role", "industryCode", "countryCode", "location", "offers", "needs", "relatedLinks", "verified", "publishedAt", "responseTimeMinutes", "analytics", "searchText", "tokenVector", "indexedAt", "createdAt", "updatedAt", ts_rank("searchVector", to_tsquery('english', $${tsQueryPlaceholder})) AS "ftsRank" FROM "SourceFinderIndex" WHERE ${conditions.join(' AND ')} ORDER BY "ftsRank" DESC, "indexedAt" DESC`;
+      const rows = (await this.prisma.$queryRawUnsafe(sql, ...params)) as Array<
+        PrismaSourceFinderIndex & { ftsRank: number | string }
+      >;
+      return rows.map((row) => ({
+        document: this.fromIndex(row),
+        ftsRank: Number(row.ftsRank) || 0,
+      }));
+    } catch {
+      return searchSourceFinderIndexDocuments(await this.listIndexDocuments(), input);
+    }
+  }
+
   private toSearchData(search: SavedSourceFinderSearch) {
     return {
       id: search.id,
@@ -318,7 +362,7 @@ export class PrismaSourceFinderRepository implements SourceFinderRepository {
       needs: this.stringArray(record.needs),
       relatedLinks: this.relatedLinks(record.relatedLinks),
       verified: record.verified,
-      publishedAt: record.publishedAt.toISOString(),
+      publishedAt: this.toIso(record.publishedAt),
       responseTimeMinutes: record.responseTimeMinutes,
       analytics: this.analytics(record.analytics),
       searchText: record.searchText,
@@ -326,8 +370,12 @@ export class PrismaSourceFinderRepository implements SourceFinderRepository {
         record.tokenVector && typeof record.tokenVector === 'object' && !Array.isArray(record.tokenVector)
           ? (record.tokenVector as SourceFinderIndexDocument['tokenVector'])
           : {},
-      indexedAt: record.indexedAt.toISOString(),
+      indexedAt: this.toIso(record.indexedAt),
     };
+  }
+
+  private toIso(value: Date | string): string {
+    return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
   }
 
   private stringArray(value: Prisma.JsonValue): string[] {
