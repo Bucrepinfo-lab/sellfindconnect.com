@@ -7,25 +7,32 @@ import {
 } from '@nestjs/common';
 import {
   ConversationReceiptError,
+  assertConversationAttachmentsSendable,
   buildLeadConversionIntelligence,
   buildSavedReplySuggestions,
   calculateConversationSlaDecision,
   countUnreadMessagesForRole,
+  evaluateMediaAssetInput,
+  evaluateMediaUploadPreparationInput,
   evaluateSafetyFields,
   evaluateSafetyText,
   isConversationTypingActive,
   isSameConversationSide,
   markMessageDelivered,
   markMessageRead,
+  mediaPolicy,
   pilotSourceFinderRecords,
   recordConversationTyping,
   searchSourceFinderRecords,
   shouldCountAsTenantResponse,
   shouldCreateInboundResponseSla,
+  toConversationAttachment,
   type ConversationMessage,
+  type ConversationMessageAttachment,
   type ConversationNotification,
   type ConversationParticipantRole,
   type ConversationRecord,
+  type MediaAsset,
   type SourceFinderSearchResult,
 } from '@telpen/domain';
 import { randomUUID } from 'node:crypto';
@@ -33,23 +40,36 @@ import { randomUUID } from 'node:crypto';
 import type {
   AssignConversationDto,
   CreateConversationDto,
+  CreateConversationMediaDto,
+  PrepareConversationMediaUploadDto,
   RunConversationSlaDto,
   SendConversationMessageDto,
   UpdateConversationStatusDto,
 } from './dto/conversations.dto';
 import { CONVERSATIONS_REPOSITORY, type ConversationsRepository } from './conversations.repository';
 import { InMemoryConversationsRepository } from './in-memory-conversations.repository';
+import {
+  MEDIA_ADAPTERS,
+  createDefaultMediaAdapters,
+  enqueueMediaProcessingJobs,
+  type MediaAdapters,
+} from '../media/media.adapters';
 
 @Injectable()
 export class ConversationsService {
   private readonly repository: ConversationsRepository;
+  private readonly mediaAdapters: MediaAdapters;
 
   constructor(
     @Optional()
     @Inject(CONVERSATIONS_REPOSITORY)
     repository?: ConversationsRepository,
+    @Optional()
+    @Inject(MEDIA_ADAPTERS)
+    mediaAdapters?: MediaAdapters,
   ) {
     this.repository = repository ?? new InMemoryConversationsRepository();
+    this.mediaAdapters = mediaAdapters ?? createDefaultMediaAdapters();
   }
 
   async createConversation(tenantId: string, input: CreateConversationDto) {
@@ -138,6 +158,11 @@ export class ConversationsService {
     }
 
     const now = new Date().toISOString();
+    const attachments = await this.requireSendableAttachments(
+      tenantId,
+      conversationId,
+      input.mediaAssetIds,
+    );
     const message: ConversationMessage = {
       id: randomUUID(),
       conversationId,
@@ -145,6 +170,7 @@ export class ConversationsService {
       senderRole: input.senderRole,
       body: input.body,
       deliveryStatus: 'SENT',
+      attachments: attachments.length > 0 ? attachments : undefined,
       createdAt: now,
     };
 
@@ -217,6 +243,123 @@ export class ConversationsService {
       updated,
       await this.repository.listMessages(tenantId, conversationId),
     );
+  }
+
+  async prepareMediaUpload(
+    tenantId: string,
+    conversationId: string,
+    input: PrepareConversationMediaUploadDto,
+  ) {
+    await this.requireConversation(tenantId, conversationId);
+    const existingMedia = await this.repository.listMediaAssets(tenantId, conversationId);
+    if (existingMedia.length >= mediaPolicy.maxItemsPerOwner) {
+      throw new UnprocessableEntityException(
+        `A conversation can hold a maximum of ${mediaPolicy.maxItemsPerOwner} media items.`,
+      );
+    }
+
+    const uploadInput = {
+      tenantId,
+      ownerType: 'CONVERSATION' as const,
+      ownerId: conversationId,
+      fileName: input.fileName.trim(),
+      mimeType: input.mimeType.trim().toLowerCase(),
+      fileSizeBytes: input.fileSizeBytes,
+    };
+    const mediaDecision = evaluateMediaUploadPreparationInput(uploadInput);
+    if (!mediaDecision.allowed) {
+      throw new UnprocessableEntityException({
+        message: 'Conversation media upload violates media policy.',
+        mediaPolicy: mediaDecision,
+      });
+    }
+
+    this.assertSafe(uploadInput, 'Conversation media upload metadata contains blocked content.');
+    const upload = await this.mediaAdapters.storage.prepareUpload(uploadInput);
+    return {
+      upload,
+      mediaSlots: {
+        used: existingMedia.length,
+        max: mediaPolicy.maxItemsPerOwner,
+        remaining: mediaPolicy.maxItemsPerOwner - existingMedia.length,
+      },
+    };
+  }
+
+  async addMedia(tenantId: string, conversationId: string, input: CreateConversationMediaDto) {
+    await this.requireConversation(tenantId, conversationId);
+    const existingMedia = await this.repository.listMediaAssets(tenantId, conversationId);
+    if (existingMedia.length >= mediaPolicy.maxItemsPerOwner) {
+      throw new UnprocessableEntityException(
+        `A conversation can hold a maximum of ${mediaPolicy.maxItemsPerOwner} media items.`,
+      );
+    }
+
+    const mediaInput = {
+      sourceUrl: input.sourceUrl.trim(),
+      thumbnailUrl: input.thumbnailUrl?.trim(),
+      fileName: input.fileName.trim(),
+      mimeType: input.mimeType.trim().toLowerCase(),
+      fileSizeBytes: input.fileSizeBytes,
+      caption: input.caption?.trim(),
+      displayOrder: existingMedia.length,
+      visibility: 'TENANT_ONLY' as const,
+    };
+    const mediaDecision = evaluateMediaAssetInput(mediaInput);
+    if (!mediaDecision.allowed) {
+      throw new UnprocessableEntityException({
+        message: 'Conversation media metadata violates media policy.',
+        mediaPolicy: mediaDecision,
+      });
+    }
+
+    this.assertSafe(mediaInput, 'Conversation media metadata contains blocked content.');
+    const moderation = await this.mediaAdapters.moderation.review(mediaInput);
+    if (!moderation.allowed) {
+      throw new UnprocessableEntityException({
+        message: 'Conversation media failed malware scan or moderation review.',
+        moderation,
+      });
+    }
+
+    const now = new Date().toISOString();
+    const baseMedia: MediaAsset = {
+      ...mediaInput,
+      id: randomUUID(),
+      tenantId,
+      ownerType: 'CONVERSATION',
+      ownerId: conversationId,
+      kind: mediaDecision.kind,
+      status: 'READY_FOR_PREVIEW',
+      moderationStatus: moderation.moderationStatus,
+      moderationReason: moderation.moderationReason,
+      storageProvider: input.storageProvider,
+      objectKey: input.objectKey,
+      uploadedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const transform = await this.mediaAdapters.transforms.plan(baseMedia);
+    const media: MediaAsset = {
+      ...baseMedia,
+      cdnUrl: transform.cdnUrl ?? baseMedia.cdnUrl,
+      thumbnailUrl: transform.thumbnailUrl ?? baseMedia.thumbnailUrl,
+      transformStatus: transform.transformStatus,
+      variants: transform.variants ?? baseMedia.variants,
+    };
+    await this.repository.createMediaAsset(media);
+    const processingJobs = await enqueueMediaProcessingJobs(this.mediaAdapters, media);
+
+    return {
+      media,
+      processingJobs,
+      sendable: media.moderationStatus === 'PASSED',
+    };
+  }
+
+  async listMedia(tenantId: string, conversationId: string) {
+    await this.requireConversation(tenantId, conversationId);
+    return this.repository.listMediaAssets(tenantId, conversationId);
   }
 
   async markThreadDelivered(tenantId: string, conversationId: string) {
@@ -502,6 +645,27 @@ export class ConversationsService {
     }
 
     return message;
+  }
+
+  private async requireSendableAttachments(
+    tenantId: string,
+    conversationId: string,
+    mediaAssetIds: string[] | undefined,
+  ) {
+    if (!mediaAssetIds?.length) {
+      return [];
+    }
+
+    const attachments: ConversationMessageAttachment[] = [];
+    for (const mediaId of mediaAssetIds) {
+      const asset = await this.repository.findMediaAsset(tenantId, conversationId, mediaId);
+      if (!asset) {
+        throw new NotFoundException('Conversation attachment not found.');
+      }
+      attachments.push(toConversationAttachment(asset));
+    }
+
+    return this.runReceipt(() => assertConversationAttachmentsSendable(attachments));
   }
 
   private requireTerms(acceptedTerms: boolean): void {

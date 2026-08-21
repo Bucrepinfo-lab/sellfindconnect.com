@@ -45,6 +45,7 @@ import {
   isConversationTypingActive,
   markMessageDelivered,
   markMessageRead,
+  toConversationAttachment,
   defaultNotificationPreferences,
   evaluateAccess,
   evaluatePasswordPolicy,
@@ -80,6 +81,7 @@ import {
   type LeadStatus,
   type MatchFeedbackAction,
   type ConversationMessage,
+  type ConversationMessageAttachment,
   type ConversationStatus,
   type MessageDeliveryStatus,
   type AccessPermission,
@@ -429,6 +431,7 @@ export default function Home() {
   const [chatTypingAt, setChatTypingAt] = useState<string | undefined>();
   const [outboundDeliveryStatus, setOutboundDeliveryStatus] =
     useState<MessageDeliveryStatus>('SENT');
+  const [chatAttachment, setChatAttachment] = useState<ConversationMessageAttachment | null>(null);
   const [inboundReceipt, setInboundReceipt] = useState<ConversationMessage>({
     id: 'demo-inbound',
     conversationId: 'demo-conversation',
@@ -1813,6 +1816,14 @@ export default function Home() {
                 label="Typing"
                 value={chatTypingActive ? 'Sales desk is typing' : 'Idle'}
               />
+              <FinanceRow
+                label="Attachment"
+                value={
+                  chatAttachment
+                    ? `${chatAttachment.fileName} · ${codeLabel(chatAttachment.moderationStatus)}`
+                    : 'None'
+                }
+              />
               <label className="lead-select-row">
                 <span>Status</span>
                 <select
@@ -1906,6 +1917,26 @@ export default function Home() {
                   <Eye size={16} />
                   Mark read
                 </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={!selectedMatch}
+                  onClick={() =>
+                    setChatAttachment(
+                      toConversationAttachment({
+                        id: 'demo-quote-sheet',
+                        kind: 'IMAGE',
+                        fileName: 'quote-sheet.jpg',
+                        mimeType: 'image/jpeg',
+                        moderationStatus: 'PASSED',
+                        sourceUrl: 'https://cdn.example.test/chat/quote-sheet.jpg',
+                      }),
+                    )
+                  }
+                >
+                  <FileCheck2 size={16} />
+                  Attach scan-ready image
+                </button>
               </div>
               <div className={canSendChat ? 'policy-box ok compact' : 'policy-box block compact'}>
                 {canSendChat ? <ShieldCheck size={18} /> : <CircleAlert size={18} />}
@@ -1913,7 +1944,7 @@ export default function Home() {
                   <strong>{canSendChat ? 'Messaging unlocked' : 'Messaging locked'}</strong>
                   <span>
                     {canSendChat
-                      ? `${conversationSla?.message ?? 'SLA active'}`
+                      ? `${conversationSla?.message ?? 'SLA active'}${chatAttachment ? ` · ${chatAttachment.fileName} ready` : ''}`
                       : chatSafetyDecision.allowed
                         ? 'Accepted terms and an open safe match are required.'
                         : `Message blocked - ${chatSafetyDecision.policyCode}`}

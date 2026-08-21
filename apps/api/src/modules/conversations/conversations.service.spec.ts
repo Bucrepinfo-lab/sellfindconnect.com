@@ -187,4 +187,70 @@ describe('ConversationsService', () => {
     expect(read.messages[0]?.deliveryStatus).toBe('READ');
     expect((await service.getConversation(tenantId, conversation.id)).unreadCount).toBe(0);
   });
+
+  it('attaches scanned conversation media and sends it only after moderation passes', async () => {
+    const service = new ConversationsService();
+    const conversation = await service.createConversation(tenantId, opener);
+    const prepared = await service.prepareMediaUpload(tenantId, conversation.id, {
+      fileName: 'quote-sheet.jpg',
+      mimeType: 'image/jpeg',
+      fileSizeBytes: 800_000,
+    });
+    const attached = await service.addMedia(tenantId, conversation.id, {
+      sourceUrl: 'https://cdn.example.test/chat/quote-sheet.jpg',
+      fileName: 'quote-sheet.jpg',
+      mimeType: 'image/jpeg',
+      fileSizeBytes: 800_000,
+    });
+
+    expect(prepared.upload.requiredHeaders['x-media-owner-type']).toBe('CONVERSATION');
+    expect(attached.media.ownerType).toBe('CONVERSATION');
+    expect(attached.sendable).toBe(true);
+    expect(attached.processingJobs.length).toBeGreaterThan(0);
+
+    const sent = await service.sendMessage(tenantId, conversation.id, {
+      senderRole: 'TENANT_AGENT',
+      body: 'Please see the attached quote sheet.',
+      acceptedTerms: true,
+      mediaAssetIds: [attached.media.id],
+    });
+
+    expect(sent.message.attachments).toEqual([
+      expect.objectContaining({
+        mediaAssetId: attached.media.id,
+        fileName: 'quote-sheet.jpg',
+        moderationStatus: 'PASSED',
+      }),
+    ]);
+  });
+
+  it('rejects blocked conversation media before it can be attached', async () => {
+    const service = new ConversationsService(undefined, {
+      storage: {
+        prepareUpload: () => {
+          throw new Error('storage adapter should not be used');
+        },
+      },
+      moderation: {
+        review: () => ({
+          allowed: false,
+          moderationStatus: 'BLOCKED',
+          moderationReason: 'MALWARE',
+        }),
+      },
+      transforms: {
+        plan: () => ({ transformStatus: 'NOT_REQUIRED' }),
+      },
+    });
+    const conversation = await service.createConversation(tenantId, opener);
+
+    await expect(
+      service.addMedia(tenantId, conversation.id, {
+        sourceUrl: 'https://cdn.example.test/chat/payload.jpg',
+        fileName: 'payload.jpg',
+        mimeType: 'image/jpeg',
+        fileSizeBytes: 800_000,
+      }),
+    ).rejects.toThrow(/malware scan or moderation/);
+  });
 });

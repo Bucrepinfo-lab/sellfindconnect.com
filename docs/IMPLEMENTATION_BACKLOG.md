@@ -342,8 +342,10 @@ Progress:
 - Added HTTP delivery receipts, read receipts, typing indicators, unread
   counts, and opt-in Prisma conversation persistence through
   `CONVERSATIONS_REPOSITORY=prisma`.
-- Live websocket delivery, online presence, attachments, actual provider
-  adapters, and audit logs remain next.
+- Added conversation attachments that reuse media policy, malware-scan jobs,
+  and moderation adapters. Blocked or still-pending files cannot be sent.
+- Live websocket delivery, online presence, actual provider adapters, and
+  audit logs remain next.
 
 ## Epic 7: Analytics
 

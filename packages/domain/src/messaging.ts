@@ -1,4 +1,5 @@
 import type { InquiryType, LeadConversionIntelligence, LeadPriority } from './lead-conversion';
+import type { MediaAssetKind, MediaModerationStatus } from './media';
 
 export const conversationStatuses = [
   'OPEN',
@@ -91,7 +92,19 @@ export type ConversationMessage = {
   deliveredAt?: string;
   readAt?: string;
   readByRole?: ConversationParticipantRole;
+  attachments?: ConversationMessageAttachment[];
   createdAt: string;
+};
+
+export const conversationAttachmentLimit = 4;
+
+export type ConversationMessageAttachment = {
+  mediaAssetId: string;
+  kind: MediaAssetKind;
+  fileName: string;
+  mimeType: string;
+  moderationStatus: MediaModerationStatus;
+  sourceUrl?: string;
 };
 
 export type ConversationNotification = {
@@ -358,4 +371,47 @@ export function describeMessageDeliveryStatus(status: MessageDeliveryStatus): st
     case 'FAILED':
       return 'Failed';
   }
+}
+
+export function toConversationAttachment(input: {
+  id: string;
+  kind: MediaAssetKind;
+  fileName: string;
+  mimeType: string;
+  moderationStatus: MediaModerationStatus;
+  sourceUrl?: string;
+  cdnUrl?: string;
+}): ConversationMessageAttachment {
+  return {
+    mediaAssetId: input.id,
+    kind: input.kind,
+    fileName: input.fileName,
+    mimeType: input.mimeType,
+    moderationStatus: input.moderationStatus,
+    sourceUrl: input.cdnUrl ?? input.sourceUrl,
+  };
+}
+
+export function assertConversationAttachmentsSendable(
+  attachments: ConversationMessageAttachment[],
+): ConversationMessageAttachment[] {
+  if (attachments.length > conversationAttachmentLimit) {
+    throw new ConversationReceiptError(
+      `A message can include at most ${conversationAttachmentLimit} attachments.`,
+    );
+  }
+
+  for (const attachment of attachments) {
+    if (attachment.moderationStatus === 'BLOCKED') {
+      throw new ConversationReceiptError('Blocked attachments cannot be sent in chat.');
+    }
+
+    if (attachment.moderationStatus !== 'PASSED') {
+      throw new ConversationReceiptError(
+        'Attachments must finish malware scan and moderation before they can be sent.',
+      );
+    }
+  }
+
+  return attachments;
 }

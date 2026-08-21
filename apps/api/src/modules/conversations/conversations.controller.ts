@@ -9,6 +9,8 @@ import {
   ConversationReceiptDto,
   ConversationTypingDto,
   CreateConversationDto,
+  CreateConversationMediaDto,
+  PrepareConversationMediaUploadDto,
   RunConversationSlaDto,
   SendConversationMessageDto,
   UpdateConversationStatusDto,
@@ -56,6 +58,29 @@ export class ConversationsController {
   @Get(':conversationId/messages')
   listMessages(@TenantId() tenantId: string, @Param('conversationId') conversationId: string) {
     return this.conversations.listMessages(tenantId, conversationId);
+  }
+
+  @Get(':conversationId/media')
+  listMedia(@TenantId() tenantId: string, @Param('conversationId') conversationId: string) {
+    return this.conversations.listMedia(tenantId, conversationId);
+  }
+
+  @Post(':conversationId/media/prepare')
+  prepareMediaUpload(
+    @TenantId() tenantId: string,
+    @Param('conversationId') conversationId: string,
+    @Body() body: PrepareConversationMediaUploadDto,
+  ) {
+    return this.conversations.prepareMediaUpload(tenantId, conversationId, body);
+  }
+
+  @Post(':conversationId/media')
+  addMedia(
+    @TenantId() tenantId: string,
+    @Param('conversationId') conversationId: string,
+    @Body() body: CreateConversationMediaDto,
+  ) {
+    return this.conversations.addMedia(tenantId, conversationId, body);
   }
 
   @Post(':conversationId/messages')

@@ -987,6 +987,7 @@ model ConversationMessage {
   deliveredAt    DateTime?
   readAt         DateTime?
   readByRole     ConversationParticipantRole?
+  attachments    Json?
   createdAt      DateTime                     @default(now())
   tenant         Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   conversation   Conversation                 @relation(fields: [conversationId], references: [id], onDelete: Cascade)

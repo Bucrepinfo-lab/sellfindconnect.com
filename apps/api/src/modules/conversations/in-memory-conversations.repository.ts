@@ -4,6 +4,7 @@ import type {
   ConversationNotification,
   ConversationNotificationType,
   ConversationRecord,
+  MediaAsset,
 } from '@telpen/domain';
 
 import type { ConversationsRepository } from './conversations.repository';
@@ -14,6 +15,7 @@ export class InMemoryConversationsRepository implements ConversationsRepository 
   private readonly messages = new Map<string, ConversationMessage[]>();
   private readonly notifications = new Map<string, ConversationNotification>();
   private readonly slaAlertKeys = new Set<string>();
+  private readonly mediaAssets = new Map<string, MediaAsset>();
 
   createConversation(conversation: ConversationRecord): void {
     this.conversations.set(this.key(conversation.tenantId, conversation.id), conversation);
@@ -93,6 +95,36 @@ export class InMemoryConversationsRepository implements ConversationsRepository 
     dueAt: string,
   ): void {
     this.slaAlertKeys.add(this.slaKey(tenantId, conversationId, type, dueAt));
+  }
+
+  createMediaAsset(asset: MediaAsset): void {
+    this.mediaAssets.set(this.key(asset.tenantId, asset.id), asset);
+  }
+
+  findMediaAsset(
+    tenantId: string,
+    conversationId: string,
+    mediaId: string,
+  ): MediaAsset | undefined {
+    const asset = this.mediaAssets.get(this.key(tenantId, mediaId));
+    if (!asset || asset.ownerType !== 'CONVERSATION' || asset.ownerId !== conversationId) {
+      return undefined;
+    }
+
+    return asset;
+  }
+
+  listMediaAssets(tenantId: string, conversationId: string): MediaAsset[] {
+    return Array.from(this.mediaAssets.values())
+      .filter(
+        (asset) =>
+          asset.tenantId === tenantId &&
+          asset.ownerType === 'CONVERSATION' &&
+          asset.ownerId === conversationId &&
+          asset.status !== 'BLOCKED' &&
+          asset.status !== 'ARCHIVED',
+      )
+      .sort((left, right) => left.displayOrder - right.displayOrder || left.createdAt.localeCompare(right.createdAt));
   }
 
   private key(tenantId: string, id: string): string {

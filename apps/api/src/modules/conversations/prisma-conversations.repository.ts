@@ -1,5 +1,6 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import {
+  Prisma,
   PrismaClient,
   type Conversation as PrismaConversation,
   type ConversationMessage as PrismaConversationMessage,
@@ -7,20 +8,35 @@ import {
   type ConversationNotificationType as PrismaConversationNotificationType,
   type ConversationParticipantRole as PrismaParticipantRole,
   type ConversationStatus as PrismaConversationStatus,
+  type MediaAsset as PrismaMediaAsset,
 } from '@prisma/client';
 import {
   conversationNotificationTypes,
   conversationParticipantRoles,
   conversationStatuses,
   inquiryTypes,
+  mediaAssetKinds,
+  mediaAssetStatuses,
+  mediaModerationStatuses,
+  mediaOwnerTypes,
+  mediaTransformStatuses,
+  mediaVisibilityStates,
   messageDeliveryStatuses,
   type ConversationMessage,
+  type ConversationMessageAttachment,
   type ConversationNotification,
   type ConversationNotificationType,
   type ConversationParticipantRole,
   type ConversationRecord,
   type ConversationStatus,
   type InquiryType,
+  type MediaAsset,
+  type MediaAssetKind,
+  type MediaAssetStatus,
+  type MediaModerationStatus,
+  type MediaOwnerType,
+  type MediaTransformStatus,
+  type MediaVisibility,
   type MessageDeliveryStatus,
 } from '@telpen/domain';
 
@@ -156,6 +172,70 @@ export class PrismaConversationsRepository implements ConversationsRepository {
     return;
   }
 
+  async createMediaAsset(asset: MediaAsset): Promise<void> {
+    await this.prisma.mediaAsset.create({
+      data: {
+        id: asset.id,
+        tenantId: asset.tenantId,
+        ownerType: asset.ownerType,
+        ownerId: asset.ownerId,
+        kind: asset.kind,
+        status: asset.status,
+        sourceUrl: asset.sourceUrl,
+        thumbnailUrl: asset.thumbnailUrl,
+        mimeType: asset.mimeType,
+        fileName: asset.fileName,
+        fileSizeBytes: asset.fileSizeBytes,
+        width: asset.width,
+        height: asset.height,
+        durationSeconds: asset.durationSeconds,
+        caption: asset.caption,
+        altText: asset.altText,
+        displayOrder: asset.displayOrder,
+        visibility: asset.visibility,
+        moderationStatus: asset.moderationStatus,
+        moderationReason: asset.moderationReason,
+        storageProvider: asset.storageProvider,
+        objectKey: asset.objectKey,
+        cdnUrl: asset.cdnUrl,
+        transformStatus: asset.transformStatus,
+        variants: asset.variants === undefined ? undefined : (asset.variants as Prisma.InputJsonValue),
+        uploadedAt: new Date(asset.uploadedAt),
+        createdAt: new Date(asset.createdAt),
+        updatedAt: new Date(asset.updatedAt),
+      },
+    });
+  }
+
+  async findMediaAsset(
+    tenantId: string,
+    conversationId: string,
+    mediaId: string,
+  ): Promise<MediaAsset | undefined> {
+    const record = await this.prisma.mediaAsset.findFirst({
+      where: {
+        id: mediaId,
+        tenantId,
+        ownerType: 'CONVERSATION',
+        ownerId: conversationId,
+      },
+    });
+    return record ? this.fromMediaAsset(record) : undefined;
+  }
+
+  async listMediaAssets(tenantId: string, conversationId: string): Promise<MediaAsset[]> {
+    const records = await this.prisma.mediaAsset.findMany({
+      where: {
+        tenantId,
+        ownerType: 'CONVERSATION',
+        ownerId: conversationId,
+        status: { notIn: ['BLOCKED', 'ARCHIVED'] },
+      },
+      orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
+    });
+    return records.map((record) => this.fromMediaAsset(record));
+  }
+
   private toConversationData(conversation: ConversationRecord) {
     return {
       id: conversation.id,
@@ -195,6 +275,7 @@ export class PrismaConversationsRepository implements ConversationsRepository {
       deliveredAt: message.deliveredAt ? new Date(message.deliveredAt) : null,
       readAt: message.readAt ? new Date(message.readAt) : null,
       readByRole: (message.readByRole as PrismaParticipantRole | undefined) ?? null,
+      attachments: (message.attachments ?? []) as Prisma.InputJsonValue,
       createdAt: new Date(message.createdAt),
     };
   }
@@ -248,6 +329,7 @@ export class PrismaConversationsRepository implements ConversationsRepository {
       deliveredAt: record.deliveredAt?.toISOString(),
       readAt: record.readAt?.toISOString(),
       readByRole: record.readByRole ? this.participantRole(record.readByRole) : undefined,
+      attachments: this.fromAttachments(record.attachments),
       createdAt: record.createdAt.toISOString(),
     };
   }
@@ -271,5 +353,82 @@ export class PrismaConversationsRepository implements ConversationsRepository {
     return conversationParticipantRoles.includes(value as ConversationParticipantRole)
       ? (value as ConversationParticipantRole)
       : 'REQUESTER';
+  }
+
+  private fromAttachments(value: Prisma.JsonValue | null): ConversationMessageAttachment[] | undefined {
+    if (!Array.isArray(value) || value.length === 0) {
+      return undefined;
+    }
+
+    return value.flatMap((item) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item) || !('mediaAssetId' in item)) {
+        return [];
+      }
+
+      const record = item as Record<string, unknown>;
+      const kind = mediaAssetKinds.includes(record.kind as MediaAssetKind)
+        ? (record.kind as MediaAssetKind)
+        : 'IMAGE';
+      const moderationStatus = mediaModerationStatuses.includes(
+        record.moderationStatus as MediaModerationStatus,
+      )
+        ? (record.moderationStatus as MediaModerationStatus)
+        : 'PENDING';
+
+      return [
+        {
+          mediaAssetId: String(record.mediaAssetId),
+          kind,
+          fileName: String(record.fileName ?? 'attachment'),
+          mimeType: String(record.mimeType ?? 'application/octet-stream'),
+          moderationStatus,
+          sourceUrl: typeof record.sourceUrl === 'string' ? record.sourceUrl : undefined,
+        },
+      ];
+    });
+  }
+
+  private fromMediaAsset(asset: PrismaMediaAsset): MediaAsset {
+    return {
+      id: asset.id,
+      tenantId: asset.tenantId,
+      ownerType: mediaOwnerTypes.includes(asset.ownerType as MediaOwnerType)
+        ? (asset.ownerType as MediaOwnerType)
+        : 'CONVERSATION',
+      ownerId: asset.ownerId,
+      kind: mediaAssetKinds.includes(asset.kind as MediaAssetKind)
+        ? (asset.kind as MediaAssetKind)
+        : 'IMAGE',
+      status: mediaAssetStatuses.includes(asset.status as MediaAssetStatus)
+        ? (asset.status as MediaAssetStatus)
+        : 'READY_FOR_PREVIEW',
+      sourceUrl: asset.sourceUrl,
+      thumbnailUrl: asset.thumbnailUrl ?? undefined,
+      mimeType: asset.mimeType,
+      fileName: asset.fileName,
+      fileSizeBytes: asset.fileSizeBytes,
+      width: asset.width ?? undefined,
+      height: asset.height ?? undefined,
+      durationSeconds: asset.durationSeconds ?? undefined,
+      caption: asset.caption ?? undefined,
+      altText: asset.altText ?? undefined,
+      displayOrder: asset.displayOrder,
+      visibility: mediaVisibilityStates.includes(asset.visibility as MediaVisibility)
+        ? (asset.visibility as MediaVisibility)
+        : 'TENANT_ONLY',
+      moderationStatus: mediaModerationStatuses.includes(asset.moderationStatus as MediaModerationStatus)
+        ? (asset.moderationStatus as MediaModerationStatus)
+        : 'PENDING',
+      moderationReason: asset.moderationReason ?? undefined,
+      storageProvider: asset.storageProvider ?? undefined,
+      objectKey: asset.objectKey ?? undefined,
+      cdnUrl: asset.cdnUrl ?? undefined,
+      transformStatus: mediaTransformStatuses.includes(asset.transformStatus as MediaTransformStatus)
+        ? (asset.transformStatus as MediaTransformStatus)
+        : undefined,
+      uploadedAt: asset.uploadedAt.toISOString(),
+      createdAt: asset.createdAt.toISOString(),
+      updatedAt: asset.updatedAt.toISOString(),
+    };
   }
 }

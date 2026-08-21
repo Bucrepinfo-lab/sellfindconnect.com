@@ -2,7 +2,7 @@ export const mediaAssetKinds = ['IMAGE', 'VIDEO'] as const;
 
 export type MediaAssetKind = (typeof mediaAssetKinds)[number];
 
-export const mediaOwnerTypes = ['PROFILE_DRAFT', 'PUBLISHED_PROFILE', 'ADVERT'] as const;
+export const mediaOwnerTypes = ['PROFILE_DRAFT', 'PUBLISHED_PROFILE', 'ADVERT', 'CONVERSATION'] as const;
 
 export type MediaOwnerType = (typeof mediaOwnerTypes)[number];
 

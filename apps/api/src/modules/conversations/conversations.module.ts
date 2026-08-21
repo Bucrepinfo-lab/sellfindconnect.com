@@ -2,13 +2,14 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { AuthModule } from '../auth/auth.module';
+import { MediaModule } from '../media/media.module';
 import { ConversationsController } from './conversations.controller';
 import { CONVERSATIONS_REPOSITORY } from './conversations.repository';
 import { ConversationsService } from './conversations.service';
 import { InMemoryConversationsRepository } from './in-memory-conversations.repository';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, MediaModule],
   controllers: [ConversationsController],
   providers: [
     InMemoryConversationsRepository,

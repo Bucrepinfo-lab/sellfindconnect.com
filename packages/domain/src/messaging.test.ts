@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  assertConversationAttachmentsSendable,
   buildSavedReplySuggestions,
   calculateConversationSlaDecision,
   countUnreadMessagesForRole,
@@ -11,6 +12,7 @@ import {
   recordConversationTyping,
   shouldCountAsTenantResponse,
   shouldCreateInboundResponseSla,
+  toConversationAttachment,
 } from './messaging';
 
 describe('conversation messaging helpers', () => {
@@ -168,5 +170,26 @@ describe('conversation receipts and typing', () => {
       ),
     ).toBe(0);
     expect(describeMessageDeliveryStatus(inbound.deliveryStatus)).toBe('Delivered');
+  });
+
+  it('only allows scanned and moderated attachments on a chat message', () => {
+    const passed = toConversationAttachment({
+      id: 'media-1',
+      kind: 'IMAGE',
+      fileName: 'quote.jpg',
+      mimeType: 'image/jpeg',
+      moderationStatus: 'PASSED',
+      sourceUrl: 'https://cdn.example.test/quote.jpg',
+    });
+
+    expect(assertConversationAttachmentsSendable([passed])).toEqual([passed]);
+    expect(() =>
+      assertConversationAttachmentsSendable([
+        { ...passed, moderationStatus: 'PENDING' },
+      ]),
+    ).toThrow(/malware scan/);
+    expect(() =>
+      assertConversationAttachmentsSendable([{ ...passed, moderationStatus: 'BLOCKED' }]),
+    ).toThrow(/Blocked attachments/);
   });
 });

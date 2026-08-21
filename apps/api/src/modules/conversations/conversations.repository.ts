@@ -3,6 +3,7 @@ import type {
   ConversationNotification,
   ConversationNotificationType,
   ConversationRecord,
+  MediaAsset,
 } from '@telpen/domain';
 
 export const CONVERSATIONS_REPOSITORY = Symbol('CONVERSATIONS_REPOSITORY');
@@ -37,4 +38,11 @@ export interface ConversationsRepository {
     type: ConversationNotificationType,
     dueAt: string,
   ): RepositoryResult<void>;
+  createMediaAsset(asset: MediaAsset): RepositoryResult<void>;
+  findMediaAsset(
+    tenantId: string,
+    conversationId: string,
+    mediaId: string,
+  ): RepositoryResult<MediaAsset | undefined>;
+  listMediaAssets(tenantId: string, conversationId: string): RepositoryResult<MediaAsset[]>;
 }
