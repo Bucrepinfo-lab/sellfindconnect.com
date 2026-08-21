@@ -116,6 +116,14 @@ describe('media adapters', () => {
           })[key],
       }),
     ).rejects.toThrow('DATABASE_URL is required when MEDIA_JOB_QUEUE_DRIVER=prisma.');
+    await expect(
+      createConfiguredMediaAdaptersAsync({
+        get: (key: string) =>
+          ({
+            PERSISTENCE_DRIVER: 'prisma',
+          })[key],
+      }),
+    ).rejects.toThrow('DATABASE_URL is required when PERSISTENCE_DRIVER=prisma.');
   });
 
   it('normalizes HTTP provider processor responses', async () => {

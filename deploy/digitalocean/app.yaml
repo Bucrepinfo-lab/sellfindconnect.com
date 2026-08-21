@@ -86,6 +86,8 @@ services:
       - key: DATABASE_URL
         value: ${sfc-postgres.DATABASE_URL}
         scope: RUN_TIME
+      - key: PERSISTENCE_DRIVER
+        value: prisma
       - key: AUTH_REPOSITORY
         value: prisma
       - key: PROFILE_REPOSITORY

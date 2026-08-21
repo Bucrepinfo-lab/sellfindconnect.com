@@ -1684,7 +1684,8 @@ export default function Home() {
                     enrollment is available after the first MFA-verified session. Confirmation
                     issues 10 hashed recovery codes once. Auth0/Clerk OIDC overlays when issuer
                     and audience are set; AUTH_IDENTITY_PROVIDER=auth0 or clerk fail-closes
-                    without those values.
+                    without those values. PERSISTENCE_DRIVER=prisma overlays hosted PostgreSQL
+                    when DATABASE_URL is set; AUTH_REPOSITORY=memory still wins.
                   </span>
                 </div>
               </div>
@@ -2314,7 +2315,8 @@ export default function Home() {
                     before marking READY. Kenya reporting playbooks attach on escalate. Moderators
                     work a review queue with SLAs and can restore only mistaken classifications.
                     Tenants see ready, under-review, blocked, or replace-file status without
-                    internal reasons.
+                    internal reasons. PERSISTENCE_DRIVER=prisma persists the job queue and review
+                    cases when DATABASE_URL is set.
                   </span>
                 </div>
               </div>
@@ -2512,7 +2514,8 @@ export default function Home() {
                     Postgres FTS + token rank. OpenAI embeddings overlay when OPENAI_API_KEY is set
                     and add SEMANTIC_MATCH. Indexed catalogs report HYBRID or SEMANTIC; the pilot
                     catalog stays RULES. SOURCE_FINDER_EMBEDDING_PROVIDER=openai fail-closes without
-                    the key.
+                    the key. PERSISTENCE_DRIVER=prisma uses the hosted catalog when DATABASE_URL is
+                    set.
                   </span>
                 </div>
               </div>

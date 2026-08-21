@@ -60,9 +60,8 @@ OpenAPI: `http://localhost:4000/docs`
 
 Auth, profile, advert, relationship, and analytics repositories use in-memory
 storage by default for local demo work. After migrations and seed data are
-ready, set `AUTH_REPOSITORY=prisma`, `PROFILE_REPOSITORY=prisma`,
-`ADVERT_REPOSITORY=prisma`, `RELATIONSHIPS_REPOSITORY=prisma`,
-`CONVERSATIONS_REPOSITORY=prisma`, `SOURCE_FINDER_REPOSITORY=prisma`,
-`NOTIFICATIONS_REPOSITORY=prisma`, `FINANCE_REPOSITORY=prisma`, and
-`ANALYTICS_REPOSITORY=prisma` with `DATABASE_URL` to use PostgreSQL-backed
-persistence.
+ready, set `PERSISTENCE_DRIVER=prisma` with `DATABASE_URL` to overlay
+PostgreSQL-backed persistence for repositories and media queues. Named
+`PERSISTENCE_DRIVER=live` fail-closes without `DATABASE_URL`. Per-repository
+keys such as `AUTH_REPOSITORY=memory` still win over the overlay. `GET /v1/health`
+reports `persistence.driver`, `mode`, and `databaseConfigured` without the URL.

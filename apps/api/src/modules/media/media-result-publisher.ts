@@ -5,6 +5,7 @@ import type {
   MediaTransformStatus,
 } from '@telpen/domain';
 
+import { requireDatabaseUrl, resolvePersistenceMode } from '../../persistence';
 import type {
   MediaAdapterConfigReader,
   MediaProcessingJob,
@@ -60,29 +61,18 @@ export class NoopMediaAssetResultPublisherAdapter implements MediaAssetResultPub
 export async function createConfiguredMediaAssetResultPublisherAsync(
   config?: MediaAdapterConfigReader,
 ): Promise<MediaAssetResultPublisherAdapter> {
-  const explicitDriver = normalizeConfigString(
-    config?.get('MEDIA_ASSET_RESULT_PUBLISHER_DRIVER') ??
-      config?.get('MEDIA_ASSET_PUBLICATION_DRIVER'),
-  );
-  const queueDriver = normalizeConfigString(
-    config?.get('MEDIA_JOB_QUEUE_DRIVER') ?? config?.get('MEDIA_PROCESSING_QUEUE_DRIVER'),
-  );
-  const databaseUrl = normalizeOptionalConfigString(config?.get('DATABASE_URL'));
-  const prismaDrivers = ['prisma', 'postgres', 'database'];
-  const shouldUsePrisma =
-    (explicitDriver !== undefined && prismaDrivers.includes(explicitDriver)) ||
-    (!explicitDriver &&
-      queueDriver !== undefined &&
-      prismaDrivers.includes(queueDriver) &&
-      Boolean(databaseUrl));
-
-  if (!shouldUsePrisma) {
+  if (
+    resolvePersistenceMode(config, [
+      'MEDIA_ASSET_RESULT_PUBLISHER_DRIVER',
+      'MEDIA_ASSET_PUBLICATION_DRIVER',
+      'MEDIA_JOB_QUEUE_DRIVER',
+      'MEDIA_PROCESSING_QUEUE_DRIVER',
+    ]) === 'memory'
+  ) {
     return new NoopMediaAssetResultPublisherAdapter();
   }
 
-  if (!databaseUrl) {
-    throw new Error('DATABASE_URL is required when MEDIA_ASSET_RESULT_PUBLISHER_DRIVER=prisma.');
-  }
+  const databaseUrl = requireDatabaseUrl(config, 'MEDIA_ASSET_RESULT_PUBLISHER_DRIVER');
 
   const { PrismaMediaAssetResultPublisherAdapter, createMediaAssetPublisherPrismaClient } =
     await import('./prisma-media-asset-result-publisher.adapter.js');
@@ -345,13 +335,4 @@ function truncateReason(value: string): string {
 
 function truncateReviewReason(value: string): string {
   return value.trim().slice(0, 240) || 'MEDIA_REVIEW_REQUIRED';
-}
-
-function normalizeConfigString(value: string | undefined): string | undefined {
-  return normalizeOptionalConfigString(value)?.toLowerCase();
-}
-
-function normalizeOptionalConfigString(value: string | undefined): string | undefined {
-  const normalized = value?.trim();
-  return normalized ? normalized : undefined;
 }

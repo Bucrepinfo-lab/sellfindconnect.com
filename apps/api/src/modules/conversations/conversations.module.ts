@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import { requireDatabaseUrl, resolvePersistenceMode } from '../../persistence';
 import { AuthModule } from '../auth/auth.module';
 import { MediaModule } from '../media/media.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -20,24 +21,18 @@ import { InMemoryConversationsRepository } from './in-memory-conversations.repos
       provide: CONVERSATIONS_REPOSITORY,
       inject: [ConfigService, InMemoryConversationsRepository],
       useFactory: async (config: ConfigService, inMemory: InMemoryConversationsRepository) => {
-        const repositoryMode = (
-          config.get<string>('CONVERSATIONS_REPOSITORY') ??
-          config.get<string>('ADVERT_REPOSITORY') ??
-          config.get<string>('ADVERTS_REPOSITORY') ??
-          config.get<string>('AUTH_REPOSITORY') ??
-          'memory'
-        ).toLowerCase();
-        const usePrisma = ['prisma', 'postgres', 'database'].includes(repositoryMode);
-
-        if (!usePrisma) {
+        if (
+          resolvePersistenceMode(config, [
+            'CONVERSATIONS_REPOSITORY',
+            'ADVERT_REPOSITORY',
+            'ADVERTS_REPOSITORY',
+            'AUTH_REPOSITORY',
+          ]) === 'memory'
+        ) {
           return inMemory;
         }
 
-        const databaseUrl = config.get<string>('DATABASE_URL');
-        if (!databaseUrl) {
-          throw new Error('DATABASE_URL is required when CONVERSATIONS_REPOSITORY=prisma.');
-        }
-
+        const databaseUrl = requireDatabaseUrl(config, 'CONVERSATIONS_REPOSITORY');
         const { PrismaConversationsRepository, createConversationsPrismaClient } = await import(
           './prisma-conversations.repository.js'
         );

@@ -14,4 +14,32 @@ describe('HealthController', () => {
       service: 'sellfindconnect-api',
     });
   });
+
+  it('reports persistence without throwing or leaking a database URL', () => {
+    const previousDriver = process.env.PERSISTENCE_DRIVER;
+    const previousUrl = process.env.DATABASE_URL;
+    process.env.PERSISTENCE_DRIVER = 'prisma';
+    delete process.env.DATABASE_URL;
+
+    try {
+      const payload = new HealthController().check();
+      expect(payload.persistence).toEqual({
+        driver: 'prisma',
+        mode: 'misconfigured',
+        databaseConfigured: false,
+      });
+      expect(JSON.stringify(payload)).not.toContain('postgresql://');
+    } finally {
+      if (previousDriver === undefined) {
+        delete process.env.PERSISTENCE_DRIVER;
+      } else {
+        process.env.PERSISTENCE_DRIVER = previousDriver;
+      }
+      if (previousUrl === undefined) {
+        delete process.env.DATABASE_URL;
+      } else {
+        process.env.DATABASE_URL = previousUrl;
+      }
+    }
+  });
 });

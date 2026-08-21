@@ -243,16 +243,20 @@ provider captures stay `REQUIRES_CAPTURE` until `POST /v1/finance/payments/settl
   session tokens.
 - Prisma migrations are checked in and deployed with
   `npm run db:migrate:deploy`; baseline domain data is loaded with
-  `npm run db:seed` before enabling hosted Prisma-backed repositories such as
-  `AUTH_REPOSITORY=prisma` and `PROFILE_REPOSITORY=prisma`.
+  `npm run db:seed` before enabling hosted Prisma with
+  `PERSISTENCE_DRIVER=prisma` and `DATABASE_URL`. Per-repository keys such as
+  `AUTH_REPOSITORY=memory` still override the overlay. Unset driver keeps the
+  in-memory default even if `DATABASE_URL` exists. `GET /v1/health` reports
+  `persistence.driver`, `mode`, and `databaseConfigured` without the URL.
 - Media processing queue persistence is enabled with
-  `MEDIA_JOB_QUEUE_DRIVER=prisma` after applying the database migrations and
-  setting `DATABASE_URL`; development and tests use the in-memory queue by
-  default. The protected operations runner can be scheduled by cron or run from
-  a dedicated worker service once provider adapters are configured. Media asset
-  result publication uses `MEDIA_ASSET_RESULT_PUBLISHER_DRIVER=prisma` or is
-  selected automatically when the Prisma media queue is enabled with
-  `DATABASE_URL`. Unsafe media review cases are persisted in `MediaReviewCase`
+  `PERSISTENCE_DRIVER=prisma` or `MEDIA_JOB_QUEUE_DRIVER=prisma` after applying
+  the database migrations and setting `DATABASE_URL`; development and tests use
+  the in-memory queue by default. The protected operations runner can be scheduled
+  by cron or run from a dedicated worker service once provider adapters are
+  configured. Media asset result publication uses
+  `MEDIA_ASSET_RESULT_PUBLISHER_DRIVER=prisma`, follows `PERSISTENCE_DRIVER=prisma`,
+  or is selected when the Prisma media queue is enabled. Unsafe media review cases
+  are persisted in `MediaReviewCase`
   and indexed by tenant, status, severity, job type, media, and source job.
   List and GET responses add computed SLA fields (CRITICAL 24h, HIGH 72h,
   MEDIUM 168h from `openedAt`). HIGH/CRITICAL restore or dismiss requires

@@ -1,6 +1,7 @@
 ﻿import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import { requireDatabaseUrl, resolvePersistenceMode } from '../../persistence';
 import { AuthModule } from '../auth/auth.module';
 import { AuthService } from '../auth/auth.service';
 import { FinanceController } from './finance.controller';
@@ -16,21 +17,13 @@ import { InMemoryFinanceRepository } from './in-memory-finance.repository';
       provide: FINANCE_REPOSITORY,
       inject: [ConfigService, InMemoryFinanceRepository],
       useFactory: async (config: ConfigService, inMemory: InMemoryFinanceRepository) => {
-        const repositoryMode = (
-          config.get<string>('FINANCE_REPOSITORY') ??
-          config.get<string>('AUTH_REPOSITORY') ??
-          'memory'
-        ).toLowerCase();
-        const usePrisma = ['prisma', 'postgres', 'database'].includes(repositoryMode);
-
-        if (!usePrisma) {
+        if (
+          resolvePersistenceMode(config, ['FINANCE_REPOSITORY', 'AUTH_REPOSITORY']) === 'memory'
+        ) {
           return inMemory;
         }
 
-        const databaseUrl = config.get<string>('DATABASE_URL');
-        if (!databaseUrl) {
-          throw new Error('DATABASE_URL is required when FINANCE_REPOSITORY=prisma.');
-        }
+        const databaseUrl = requireDatabaseUrl(config, 'FINANCE_REPOSITORY');
 
         const { PrismaFinanceRepository, createFinancePrismaClient } = await import(
           './prisma-finance.repository.js'

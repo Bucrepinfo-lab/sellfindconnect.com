@@ -8,6 +8,7 @@ import type {
 } from '@telpen/domain';
 import { createHash, createHmac, randomUUID } from 'node:crypto';
 
+import { requireDatabaseUrl, resolvePersistenceMode } from '../../persistence';
 import { overlayApprovedMediaJobProcessors } from './media-scanners';
 import { overlayCdnPublicationVerification } from './media-cdn-verification';
 
@@ -643,18 +644,14 @@ export async function createConfiguredMediaAdaptersAsync(
   config?: MediaAdapterConfigReader,
 ): Promise<MediaAdapters> {
   const adapters = createConfiguredMediaAdapters(config);
-  const queueDriver = normalizeConfigString(
-    config?.get('MEDIA_JOB_QUEUE_DRIVER') ?? config?.get('MEDIA_PROCESSING_QUEUE_DRIVER'),
-  );
-
-  if (!['prisma', 'postgres', 'database'].includes(queueDriver)) {
+  if (
+    resolvePersistenceMode(config, ['MEDIA_JOB_QUEUE_DRIVER', 'MEDIA_PROCESSING_QUEUE_DRIVER']) ===
+    'memory'
+  ) {
     return adapters;
   }
 
-  const databaseUrl = normalizeOptionalConfigString(config?.get('DATABASE_URL'));
-  if (!databaseUrl) {
-    throw new Error('DATABASE_URL is required when MEDIA_JOB_QUEUE_DRIVER=prisma.');
-  }
+  const databaseUrl = requireDatabaseUrl(config, 'MEDIA_JOB_QUEUE_DRIVER');
 
   const { PrismaMediaProcessingQueueAdapter, createMediaProcessingPrismaClient } = await import(
     './prisma-media-processing-queue.adapter.js'

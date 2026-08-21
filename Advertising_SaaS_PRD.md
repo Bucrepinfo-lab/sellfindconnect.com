@@ -300,6 +300,8 @@ Implementation progress on 2026-06-18:
 - Added Resend overlay for email verification, password reset, tenant invites, and email MFA. Development tokens stay in non-production responses when no live sender is configured; `AUTH_EMAIL_PROVIDER=resend` fail-closes without credentials.
 - Added RFC 6238 authenticator TOTP enrollment. MFA-verified owners can start and confirm enrollment, later logins use `AUTHENTICATOR` delivery, and reused time-steps are rejected. Confirmation issues 10 hashed single-use recovery codes; regenerate invalidates the prior set.
 - Added hosted identity overlay for Auth0, Clerk, or generic OIDC. `POST /v1/auth/identity/session` verifies an RS256 ID token via JWKS and issues a first-party session for an existing tenant account. `AUTH_IDENTITY_PROVIDER=auth0|clerk|oidc|live` fail-closes without issuer and audience. Unverified emails and unknown accounts are rejected. New tenants still accept terms through owner signup.
+- Added `PERSISTENCE_DRIVER=prisma` overlay so production can select Prisma for all repositories and media queues with one env var when `DATABASE_URL` is set. Named `live` fail-closes without the URL. Per-repository `memory` overrides still win. Unset driver keeps the in-memory default even if `DATABASE_URL` exists. `GET /v1/health` reports driver, mode, and `databaseConfigured` without the URL.
+- Remaining hardening: broader non-auth product audit coverage. Native mobile clients remain out of scope.
 
 Acceptance criteria:
 
@@ -421,8 +423,11 @@ Implementation progress on 2026-06-19:
   HIGH 72h, MEDIUM 168h), GET by id, job-type and overdue filters,
   mistaken-classification gates for HIGH/CRITICAL restore or dismiss, and
   reopen of dismissed cases only. Escalated cases stay closed.
-- Remaining hardening: hosted Prisma enablement. Native mobile clients
-  remain out of scope.
+- Added `PERSISTENCE_DRIVER=prisma` overlay for media review cases, job queues,
+  and result publication. Named `live` fail-closes without `DATABASE_URL`.
+  Per-driver `memory` overrides still win.
+- Remaining hardening: broader non-auth product audit coverage. Native mobile
+  clients remain out of scope.
 
 ### 7.3 Media Display Area
 
@@ -592,8 +597,11 @@ Implementation progress on 2026-08-21:
   index documents and queries with `text-embedding-3-small`. Named
   `SOURCE_FINDER_EMBEDDING_PROVIDER=openai` or `live` fail-closes without the
   key; `development` keeps FTS-only. Semantic hits add `SEMANTIC_MATCH`.
-- Remaining hardening: native mobile screens are out of scope. Hosted Prisma
-  enablement remains next.
+- Added `PERSISTENCE_DRIVER=prisma` overlay so Source Finder catalog, embeddings,
+  and hierarchy persistence can follow the hosted PostgreSQL driver without
+  setting every `*_REPOSITORY` key. Per-repository `memory` overrides still win.
+- Remaining hardening: native mobile screens are out of scope. Broader non-auth
+  product audit coverage remains next.
 
 Implementation progress on 2026-06-20:
 
@@ -610,8 +618,8 @@ Implementation progress on 2026-06-20:
   downloads.
 - Added web/PWA saved-search UX with named searches, alert cadence, blocked
   search handling, restored-search controls, and previewable alert candidates.
-- Remaining hardening: hosted Prisma enablement. Native mobile saved-search screens
-  are out of scope.
+- Remaining hardening: broader non-auth product audit coverage. Native mobile
+  saved-search screens are out of scope.
 
 ### 7.6 Precision Matching and Link Intelligence
 
@@ -1082,8 +1090,9 @@ Implementation progress on 2026-06-17:
 - Continued implementation on 2026-08-21 with an in-memory finance repository plus opt-in Prisma persistence through `FINANCE_REPOSITORY=prisma`. Country tax profiles, rules, snapshots, ledger entries, invoices, receipts, adjustments, tax returns, payments, and reconciliation runs survive process restarts when PostgreSQL is enabled.
 - Continued implementation on 2026-08-21 with controlled post-lock tax-return corrections. Locked periods stay locked; finance admins can post signed correction entries with `PERIOD_CORRECTION` evidence, ledger impact, dual-control above 10,000 units, and product-audit events that omit notes and authority references.
 - Continued implementation on 2026-08-21 with live payment-provider adapters. Invoice capture stays on the manual development adapter by default. `PAYMENT_PROVIDER=stripe`, `africastalking`, or `live` selects Stripe PaymentIntents and/or Africa's Talking M-Pesa checkout, rejects raw card numbers, records `REQUIRES_CAPTURE` until `POST /v1/finance/payments/settle`, and fail-closes when credentials are missing.
+- Continued implementation on 2026-08-21 with `PERSISTENCE_DRIVER=prisma` overlay for finance and payment repositories. Named `live` fail-closes without `DATABASE_URL`; `FINANCE_REPOSITORY=memory` still wins.
 - Remaining hardening: app-store billing rails are out of scope while native
-  mobile is not in delivery. Hosted Prisma enablement remains next.
+  mobile is not in delivery. Broader non-auth product audit coverage remains next.
 
 ### 7.11 Moderation, Trust, and Safety
 

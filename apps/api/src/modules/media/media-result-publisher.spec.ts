@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  NoopMediaAssetResultPublisherAdapter,
   buildMediaAssetPublicationPatch,
   buildMediaReviewCaseDraft,
+  createConfiguredMediaAssetResultPublisherAsync,
   type MediaAssetResultPublicationInput,
 } from './media-result-publisher';
 import type { MediaProcessingJob } from './media.adapters';
@@ -80,6 +82,30 @@ describe('media result publisher', () => {
       moderationReason: null,
     });
     expect(buildMediaReviewCaseDraft(input, patch)).toBeUndefined();
+  });
+
+  it('keeps in-memory publication unless Prisma is selected with DATABASE_URL', async () => {
+    await expect(
+      createConfiguredMediaAssetResultPublisherAsync({
+        get: () => undefined,
+      }),
+    ).resolves.toBeInstanceOf(NoopMediaAssetResultPublisherAdapter);
+    await expect(
+      createConfiguredMediaAssetResultPublisherAsync({
+        get: (key: string) =>
+          ({
+            MEDIA_ASSET_RESULT_PUBLISHER_DRIVER: 'prisma',
+          })[key],
+      }),
+    ).rejects.toThrow('DATABASE_URL is required when MEDIA_ASSET_RESULT_PUBLISHER_DRIVER=prisma.');
+    await expect(
+      createConfiguredMediaAssetResultPublisherAsync({
+        get: (key: string) =>
+          ({
+            PERSISTENCE_DRIVER: 'prisma',
+          })[key],
+      }),
+    ).rejects.toThrow('DATABASE_URL is required when PERSISTENCE_DRIVER=prisma.');
   });
 });
 

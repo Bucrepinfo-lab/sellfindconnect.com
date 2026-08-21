@@ -157,8 +157,12 @@ Progress:
   onboarding attributes, and terms acceptance evidence.
 - Added the initial Prisma migration and seed workflow required before enabling
   production Prisma persistence against a hosted PostgreSQL database.
-- Production Prisma enablement against hosted PostgreSQL and broader non-auth
-  product audit coverage remain next.
+- Added `PERSISTENCE_DRIVER=prisma` overlay so hosted PostgreSQL can be selected
+  for repositories and media queues with one env var. Named `live` fail-closes
+  without `DATABASE_URL`. Per-repository `memory` overrides still win. Tests
+  stay on the in-memory default. `GET /v1/health` reports driver and
+  `databaseConfigured` without the URL.
+- Broader non-auth product audit coverage remains next.
 
 ## Epic 3: Advertiser Profile Vertical Slice
 

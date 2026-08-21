@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import { requireDatabaseUrl, resolvePersistenceMode } from '../../persistence';
 import { AccessModule } from '../access/access.module';
 import { AuthModule } from '../auth/auth.module';
 import { MediaModule } from '../media/media.module';
@@ -19,22 +20,11 @@ import { ProfilesService } from './profiles.service';
       provide: PROFILES_REPOSITORY,
       inject: [ConfigService, InMemoryProfilesRepository],
       useFactory: async (config: ConfigService, inMemory: InMemoryProfilesRepository) => {
-        const repositoryMode = (
-          config.get<string>('PROFILE_REPOSITORY') ??
-          config.get<string>('AUTH_REPOSITORY') ??
-          'memory'
-        ).toLowerCase();
-        const usePrisma = ['prisma', 'postgres', 'database'].includes(repositoryMode);
-
-        if (!usePrisma) {
+        if (resolvePersistenceMode(config, ['PROFILE_REPOSITORY', 'AUTH_REPOSITORY']) === 'memory') {
           return inMemory;
         }
 
-        const databaseUrl = config.get<string>('DATABASE_URL');
-        if (!databaseUrl) {
-          throw new Error('DATABASE_URL is required when PROFILE_REPOSITORY=prisma.');
-        }
-
+        const databaseUrl = requireDatabaseUrl(config, 'PROFILE_REPOSITORY');
         const { PrismaProfilesRepository, createProfilesPrismaClient } = await import(
           './prisma-profiles.repository.js'
         );

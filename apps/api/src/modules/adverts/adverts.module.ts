@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import { requireDatabaseUrl, resolvePersistenceMode } from '../../persistence';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { AuthModule } from '../auth/auth.module';
 import { MediaModule } from '../media/media.module';
@@ -18,23 +19,17 @@ import { InMemoryAdvertsRepository } from './in-memory-adverts.repository';
       provide: ADVERTS_REPOSITORY,
       inject: [ConfigService, InMemoryAdvertsRepository],
       useFactory: async (config: ConfigService, inMemory: InMemoryAdvertsRepository) => {
-        const repositoryMode = (
-          config.get<string>('ADVERTS_REPOSITORY') ??
-          config.get<string>('PROFILE_REPOSITORY') ??
-          config.get<string>('AUTH_REPOSITORY') ??
-          'memory'
-        ).toLowerCase();
-        const usePrisma = ['prisma', 'postgres', 'database'].includes(repositoryMode);
-
-        if (!usePrisma) {
+        if (
+          resolvePersistenceMode(config, [
+            'ADVERTS_REPOSITORY',
+            'PROFILE_REPOSITORY',
+            'AUTH_REPOSITORY',
+          ]) === 'memory'
+        ) {
           return inMemory;
         }
 
-        const databaseUrl = config.get<string>('DATABASE_URL');
-        if (!databaseUrl) {
-          throw new Error('DATABASE_URL is required when ADVERTS_REPOSITORY=prisma.');
-        }
-
+        const databaseUrl = requireDatabaseUrl(config, 'ADVERTS_REPOSITORY');
         const { PrismaAdvertsRepository, createAdvertsPrismaClient } =
           await import('./prisma-adverts.repository.js');
         return new PrismaAdvertsRepository(createAdvertsPrismaClient(databaseUrl));

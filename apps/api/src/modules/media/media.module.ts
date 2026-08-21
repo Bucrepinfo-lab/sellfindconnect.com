@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import { requireDatabaseUrl, resolvePersistenceMode } from '../../persistence';
 import { AccessModule } from '../access/access.module';
 import { AuthModule } from '../auth/auth.module';
 import { InMemoryMediaReviewCaseRepository } from './in-memory-media-review-case.repository';
@@ -28,22 +29,17 @@ import { MediaWorkerService } from './media-worker.service';
       provide: MEDIA_REVIEW_CASE_REPOSITORY,
       inject: [ConfigService, InMemoryMediaReviewCaseRepository],
       useFactory: async (config: ConfigService, inMemory: InMemoryMediaReviewCaseRepository) => {
-        const repositoryMode = (
-          config.get<string>('MEDIA_REVIEW_CASE_REPOSITORY') ??
-          config.get<string>('MEDIA_ASSET_RESULT_PUBLISHER_DRIVER') ??
-          config.get<string>('MEDIA_JOB_QUEUE_DRIVER') ??
-          'memory'
-        ).toLowerCase();
-        const usePrisma = ['prisma', 'postgres', 'database'].includes(repositoryMode);
-
-        if (!usePrisma) {
+        if (
+          resolvePersistenceMode(config, [
+            'MEDIA_REVIEW_CASE_REPOSITORY',
+            'MEDIA_ASSET_RESULT_PUBLISHER_DRIVER',
+            'MEDIA_JOB_QUEUE_DRIVER',
+          ]) === 'memory'
+        ) {
           return inMemory;
         }
 
-        const databaseUrl = config.get<string>('DATABASE_URL');
-        if (!databaseUrl) {
-          throw new Error('DATABASE_URL is required when MEDIA_REVIEW_CASE_REPOSITORY=prisma.');
-        }
+        const databaseUrl = requireDatabaseUrl(config, 'MEDIA_REVIEW_CASE_REPOSITORY');
 
         const { PrismaMediaReviewCaseRepository, createMediaReviewCasePrismaClient } =
           await import('./prisma-media-review-case.repository.js');
