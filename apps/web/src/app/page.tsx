@@ -2309,8 +2309,10 @@ export default function Home() {
                   <span>
                     SPACES_* credentials overlay DigitalOcean Spaces uploads. ClamAV and Sightengine
                     scanners overlay when their keys are set. Transform jobs verify public CDN URLs
-                    before marking READY. Kenya reporting playbooks attach on escalate. Tenants see
-                    ready, under-review, blocked, or replace-file status without internal reasons.
+                    before marking READY. Kenya reporting playbooks attach on escalate. Moderators
+                    work a review queue with SLAs and can restore only mistaken classifications.
+                    Tenants see ready, under-review, blocked, or replace-file status without
+                    internal reasons.
                   </span>
                 </div>
               </div>

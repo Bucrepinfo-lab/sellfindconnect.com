@@ -56,6 +56,7 @@ export type ListMediaReviewCasesInput = {
   status?: MediaReviewCaseStatus;
   tenantId?: string;
   severity?: string;
+  jobType?: string;
   assignedTo?: string;
   unassignedOnly?: boolean;
   limit?: number;
@@ -87,6 +88,7 @@ export interface MediaReviewCaseRepository {
   resolveCase(
     input: ResolveMediaReviewCaseInput,
   ): RepositoryResult<MediaReviewCaseRecord | undefined>;
+  reopenCase(id: string, reopenedAt?: string): RepositoryResult<MediaReviewCaseRecord | undefined>;
 }
 
 export function statusForResolution(resolution: MediaReviewResolution): MediaReviewCaseStatus {

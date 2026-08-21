@@ -249,6 +249,10 @@ provider captures stay `REQUIRES_CAPTURE` until `POST /v1/finance/payments/settl
   selected automatically when the Prisma media queue is enabled with
   `DATABASE_URL`. Unsafe media review cases are persisted in `MediaReviewCase`
   and indexed by tenant, status, severity, job type, media, and source job.
+  List and GET responses add computed SLA fields (CRITICAL 24h, HIGH 72h,
+  MEDIUM 168h from `openedAt`). HIGH/CRITICAL restore or dismiss requires
+  mistaken-classification confirmation plus a reviewer note. Dismissed cases
+  can be reopened; escalated and resolved cases stay closed.
 - Analytics event persistence is enabled with `ANALYTICS_REPOSITORY=prisma`
   after migrations are applied and `DATABASE_URL` is set. The service writes
   consent-aware events to `AnalyticsEvent` and summarizes tenant-scoped views,

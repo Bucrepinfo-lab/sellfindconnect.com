@@ -38,6 +38,7 @@ export class InMemoryMediaReviewCaseRepository implements MediaReviewCaseReposit
       .filter((record) => (input.status ? record.status === input.status : true))
       .filter((record) => (input.tenantId ? record.tenantId === input.tenantId : true))
       .filter((record) => (input.severity ? record.severity === input.severity : true))
+      .filter((record) => (input.jobType ? record.jobType === input.jobType : true))
       .filter((record) =>
         input.assignedTo && !input.unassignedOnly ? record.assignedTo === input.assignedTo : true,
       )
@@ -83,5 +84,24 @@ export class InMemoryMediaReviewCaseRepository implements MediaReviewCaseReposit
     };
     this.cases.set(resolved.id, resolved);
     return resolved;
+  }
+
+  reopenCase(id: string, reopenedAt?: string): MediaReviewCaseRecord | undefined {
+    const existing = this.cases.get(id);
+    if (!existing || existing.status !== 'DISMISSED') {
+      return undefined;
+    }
+
+    const updatedAt = reopenedAt ?? new Date().toISOString();
+    const reopened: MediaReviewCaseRecord = {
+      ...existing,
+      status: 'OPEN',
+      resolvedAt: undefined,
+      resolvedBy: undefined,
+      resolution: undefined,
+      updatedAt,
+    };
+    this.cases.set(reopened.id, reopened);
+    return reopened;
   }
 }

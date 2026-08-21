@@ -71,6 +71,7 @@ export class PrismaMediaReviewCaseRepository implements MediaReviewCaseRepositor
         ...(input.status ? { status: input.status } : {}),
         ...(input.tenantId ? { tenantId: input.tenantId } : {}),
         ...(input.severity ? { severity: input.severity } : {}),
+        ...(input.jobType ? { jobType: input.jobType } : {}),
         ...(input.assignedTo && !input.unassignedOnly ? { assignedTo: input.assignedTo } : {}),
         ...(input.unassignedOnly ? { assignedTo: null } : {}),
       },
@@ -128,6 +129,29 @@ export class PrismaMediaReviewCaseRepository implements MediaReviewCaseRepositor
     }
 
     return this.findCase(input.id);
+  }
+
+  async reopenCase(id: string, reopenedAt?: string): Promise<MediaReviewCaseRecord | undefined> {
+    const updatedAt = reopenedAt ? new Date(reopenedAt) : new Date();
+    const updated = await this.prisma.mediaReviewCase.updateMany({
+      where: {
+        id,
+        status: 'DISMISSED',
+      },
+      data: {
+        status: 'OPEN',
+        resolvedAt: null,
+        resolvedBy: null,
+        resolution: null,
+        updatedAt,
+      },
+    });
+
+    if (updated.count === 0) {
+      return undefined;
+    }
+
+    return this.findCase(id);
   }
 
   private mapCase(record: PrismaMediaReviewCase): MediaReviewCaseRecord {

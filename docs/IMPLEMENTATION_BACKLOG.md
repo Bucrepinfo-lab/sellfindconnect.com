@@ -231,7 +231,11 @@ Progress:
   a reporting snapshot, and fail closed for countries without one.
 - Added user-facing media review status on tenant profile, advert, and
   conversation media. Internal reasons are omitted. Public discovery only
-  includes ready files. Richer review-case management remains next.
+  includes ready files.
+- Added richer media review-case management: computed SLAs (CRITICAL 24h,
+  HIGH 72h, MEDIUM 168h), GET by id, job-type and overdue filters,
+  mistaken-classification gates for HIGH/CRITICAL restore or dismiss, and
+  reopen of dismissed cases only.
 
 ## Epic 4: Listing and Media Vertical Slice
 
@@ -279,8 +283,10 @@ Progress:
   jobs.
 - Added Kenya legal/reporting playbooks on media review escalate and severe
   confirmed-block decisions.
-- Added user-facing media review status on tenant media responses. Richer
-  review-case management remains next.
+- Added user-facing media review status on tenant media responses.
+- Added richer media review-case management: computed SLAs, GET by id,
+  job-type and overdue filters, mistaken-classification restore/dismiss gates,
+  and reopen of dismissed cases only.
 
 ## Epic 5: Source Finder and Relationship Graph
 

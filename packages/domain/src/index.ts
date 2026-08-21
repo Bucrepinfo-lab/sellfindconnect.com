@@ -12,6 +12,7 @@ export * from './conversation-realtime';
 export * from './media';
 export * from './media-escalation';
 export * from './media-review-status';
+export * from './media-review-policy';
 export * from './notifications';
 export * from './notification-dispatch';
 export * from './onboarding';

@@ -31,12 +31,26 @@ export class MediaReviewController {
     return this.reviews.listCases(query, session);
   }
 
+  @Get('reviews/:id')
+  getCase(@PlatformAuthSession() session: PlatformAccessSession, @Param('id') id: string) {
+    return this.reviews.getCase(id, session);
+  }
+
   @Get('escalation-playbooks')
   previewEscalationPlaybook(
     @PlatformAuthSession() session: PlatformAccessSession,
     @Query() query: PreviewMediaEscalationPlaybookDto,
   ) {
     return this.reviews.previewEscalationPlaybook(query, session);
+  }
+
+  @Post('reviews/:id/assign')
+  assignCase(
+    @PlatformAuthSession() session: PlatformAccessSession,
+    @Param('id') id: string,
+    @Body() body: AssignMediaReviewCaseDto,
+  ) {
+    return this.reviews.assignCase(id, body, session);
   }
 
   @Post('reviews/:id/resolve')
@@ -48,12 +62,8 @@ export class MediaReviewController {
     return this.reviews.resolveCase(id, body, session);
   }
 
-  @Post('reviews/:id/assign')
-  assignCase(
-    @PlatformAuthSession() session: PlatformAccessSession,
-    @Param('id') id: string,
-    @Body() body: AssignMediaReviewCaseDto,
-  ) {
-    return this.reviews.assignCase(id, body, session);
+  @Post('reviews/:id/reopen')
+  reopenCase(@PlatformAuthSession() session: PlatformAccessSession, @Param('id') id: string) {
+    return this.reviews.reopenCase(id, session);
   }
 }

@@ -199,6 +199,142 @@ describe('MediaReviewService', () => {
     await expect(repository.findCase('case-ug')).toMatchObject({ status: 'OPEN' });
   });
 
+  it('presents SLA fields and returns a case by id', async () => {
+    const repository = new InMemoryMediaReviewCaseRepository();
+    const openedAt = new Date().toISOString();
+    repository.createCase(reviewCase({ id: 'case-sla', openedAt }));
+    const service = new MediaReviewService(repository, authService());
+
+    const presented = await service.getCase('case-sla', platformSession());
+
+    expect(presented).toMatchObject({
+      id: 'case-sla',
+      slaHours: 24,
+      dueAt: new Date(Date.parse(openedAt) + 24 * 3_600_000).toISOString(),
+      overdue: false,
+    });
+    repository.createCase(reviewCase({ id: 'case-ug', tenantId: 'tenant-ug', openedAt }));
+    await expect(service.getCase('case-ug', platformSession())).rejects.toThrow('scope denied');
+  });
+
+  it('filters the queue by job type and overdue SLA', async () => {
+    const repository = new InMemoryMediaReviewCaseRepository();
+    repository.createCase(
+      reviewCase({
+        id: 'case-overdue',
+        jobType: 'VIDEO_TRANSCODE',
+        openedAt: '2026-06-01T09:00:00.000Z',
+      }),
+    );
+    repository.createCase(
+      reviewCase({
+        id: 'case-fresh',
+        jobType: 'MALWARE_SCAN',
+        openedAt: new Date().toISOString(),
+      }),
+    );
+    const service = new MediaReviewService(repository, authService());
+
+    await expect(
+      service.listCases({ jobType: 'VIDEO_TRANSCODE' }, platformSession()),
+    ).resolves.toEqual([
+      expect.objectContaining({ id: 'case-overdue', jobType: 'VIDEO_TRANSCODE' }),
+    ]);
+    await expect(service.listCases({ overdueOnly: true }, platformSession())).resolves.toEqual([
+      expect.objectContaining({ id: 'case-overdue', overdue: true }),
+    ]);
+  });
+
+  it('requires a mistaken-classification flag and note to restore HIGH or CRITICAL cases', async () => {
+    const auditLogs: unknown[] = [];
+    const repository = new InMemoryMediaReviewCaseRepository();
+    repository.createCase(reviewCase({ id: 'case-restore' }));
+    const service = new MediaReviewService(repository, authService(auditLogs));
+
+    await expect(
+      service.resolveCase(
+        'case-restore',
+        { resolution: 'RESTORED', notes: 'False positive after hash collision review.' },
+        platformSession(),
+      ),
+    ).rejects.toThrow(UnprocessableEntityException);
+
+    const restored = await service.resolveCase(
+      'case-restore',
+      {
+        resolution: 'RESTORED',
+        notes: 'False positive after hash collision review.',
+        mistakenClassification: true,
+      },
+      platformSession(),
+    );
+    expect(restored).toMatchObject({
+      status: 'RESOLVED',
+      resolution: 'RESTORED',
+    });
+    expect(auditLogs).toEqual([
+      expect.objectContaining({
+        action: 'MEDIA_REVIEW_CASE_RESOLVED',
+        metadata: expect.objectContaining({
+          resolution: 'RESTORED',
+          mistakenClassification: true,
+        }),
+      }),
+    ]);
+    expect(JSON.stringify(auditLogs)).not.toContain('False positive');
+  });
+
+  it('reopens dismissed cases and refuses escalated ones', async () => {
+    const auditLogs: unknown[] = [];
+    const repository = new InMemoryMediaReviewCaseRepository();
+    repository.createCase(
+      reviewCase({
+        id: 'case-reopen',
+        severity: 'HIGH',
+        reason: 'POLICY_REVIEW',
+        evidence: { verdict: 'needs_review' },
+      }),
+    );
+    const service = new MediaReviewService(repository, authService(auditLogs));
+    await service.resolveCase(
+      'case-reopen',
+      {
+        resolution: 'DISMISSED',
+        notes: 'False positive after hash collision review.',
+        mistakenClassification: true,
+      },
+      platformSession(),
+    );
+
+    const reopened = await service.reopenCase('case-reopen', platformSession());
+    expect(reopened).toMatchObject({
+      status: 'OPEN',
+      resolution: undefined,
+    });
+    expect(reopened.resolvedAt).toBeUndefined();
+    expect(auditLogs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'MEDIA_REVIEW_CASE_REOPENED',
+          entityId: 'case-reopen',
+          metadata: expect.objectContaining({
+            previousStatus: 'DISMISSED',
+          }),
+        }),
+      ]),
+    );
+
+    repository.createCase(reviewCase({ id: 'case-escalated' }));
+    await service.resolveCase(
+      'case-escalated',
+      { resolution: 'ESCALATED', notes: 'Escalated to the approved Kenya reporting path.' },
+      platformSession(),
+    );
+    await expect(service.reopenCase('case-escalated', platformSession())).rejects.toThrow(
+      UnprocessableEntityException,
+    );
+  });
+
   it('previews the Kenya playbook for in-scope moderators', async () => {
     const service = new MediaReviewService(new InMemoryMediaReviewCaseRepository(), authService());
 

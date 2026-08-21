@@ -27,6 +27,18 @@ export class ListMediaReviewCasesDto {
   @MaxLength(40)
   declare severity?: string;
 
+  @ApiPropertyOptional({ example: 'CONTENT_MODERATION' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  declare jobType?: string;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  @IsBoolean()
+  declare overdueOnly?: boolean;
+
   @ApiPropertyOptional({ example: 'country-mod-1' })
   @IsOptional()
   @IsString()
@@ -55,7 +67,7 @@ export class AssignMediaReviewCaseDto {
   @MaxLength(120)
   declare assignedTo?: string;
 
-  @ApiPropertyOptional({ example: 'Prioritize this because the provider reported malware.' })
+  @ApiPropertyOptional({ example: 'Assign to the Kenya queue.' })
   @IsOptional()
   @IsString()
   @MaxLength(1000)
@@ -72,6 +84,12 @@ export class ResolveMediaReviewCaseDto {
   @IsString()
   @MaxLength(1000)
   declare notes?: string;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  @IsBoolean()
+  declare mistakenClassification?: boolean;
 }
 
 export class PreviewMediaEscalationPlaybookDto {

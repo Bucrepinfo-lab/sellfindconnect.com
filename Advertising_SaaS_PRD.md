@@ -416,7 +416,11 @@ Implementation progress on 2026-06-19:
 - Added user-facing media review status on tenant profile, advert, and
   conversation media. Internal reasons are omitted. Public discovery only
   includes files that are ready to display.
-- Remaining hardening: richer review case management. Native mobile clients
+- Added richer media review-case management: computed SLAs (CRITICAL 24h,
+  HIGH 72h, MEDIUM 168h), GET by id, job-type and overdue filters,
+  mistaken-classification gates for HIGH/CRITICAL restore or dismiss, and
+  reopen of dismissed cases only. Escalated cases stay closed.
+- Remaining hardening: production identity. Native mobile clients
   remain out of scope.
 
 ### 7.3 Media Display Area
@@ -496,6 +500,9 @@ Implementation progress:
   media processing output.
 - Added protected platform media review-case listing and resolution actions for
   scoped moderators, with unsafe review-note blocking and audit evidence.
+- Added richer media review-case management: computed SLAs, GET by id,
+  job-type and overdue filters, mistaken-classification restore/dismiss gates,
+  and reopen of dismissed cases only.
 - Added durable advert draft and published-advert repositories with in-memory
   and Prisma implementations, database migration support, draft preview,
   publish-to-live versioning, persisted renewal alerts, and pause/archive/renew

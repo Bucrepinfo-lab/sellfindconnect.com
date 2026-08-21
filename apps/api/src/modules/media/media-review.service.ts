@@ -6,11 +6,15 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import {
+  evaluateMediaReviewResolution,
   evaluateSafetyFields,
   getCountry,
   mediaEscalationRequiresPlaybook,
+  canReopenMediaReviewCase,
+  presentMediaReviewSla,
   resolveMediaEscalationPlaybook,
   toMediaEscalationAuditMetadata,
+  type MediaReviewSla,
 } from '@telpen/domain';
 
 import { AuthService } from '../auth/auth.service';
@@ -40,25 +44,29 @@ export class MediaReviewService {
   async listCases(
     input: ListMediaReviewCasesDto,
     session: PlatformAccessSession,
-  ): Promise<MediaReviewCaseRecord[]> {
+  ): Promise<Array<MediaReviewCaseRecord & MediaReviewSla>> {
     const tenantCountryMap = await this.tenantCountryMap();
     const cases = await this.repository.listCases({
       status: input.status ?? 'OPEN',
       tenantId: input.tenantId,
       severity: input.severity,
+      jobType: input.jobType,
       assignedTo: input.unassignedOnly ? undefined : input.assignedTo,
       unassignedOnly: input.unassignedOnly,
       limit: input.limit,
     });
 
-    return cases.filter(
-      (reviewCase) =>
-        this.auth?.canPlatformAccess(
-          session,
-          'MODERATE_CONTENT',
-          this.caseAccessResource(reviewCase, tenantCountryMap),
-        ) ?? true,
-    );
+    return cases
+      .filter(
+        (reviewCase) =>
+          this.auth?.canPlatformAccess(
+            session,
+            'MODERATE_CONTENT',
+            this.caseAccessResource(reviewCase, tenantCountryMap),
+          ) ?? true,
+      )
+      .map((reviewCase) => this.presentCase(reviewCase))
+      .filter((reviewCase) => (input.overdueOnly ? reviewCase.overdue : true));
   }
 
   async resolveCase(
@@ -83,6 +91,16 @@ export class MediaReviewService {
           safety,
         });
       }
+    }
+
+    const resolutionGate = evaluateMediaReviewResolution({
+      resolution: input.resolution,
+      severity: existing.severity,
+      mistakenClassification: input.mistakenClassification,
+      notes: input.notes,
+    });
+    if (!resolutionGate.ok) {
+      throw new UnprocessableEntityException(resolutionGate.reason);
     }
 
     const tenantCountryMap = await this.tenantCountryMap();
@@ -119,12 +137,70 @@ export class MediaReviewService {
         resolution: resolved.resolution ?? input.resolution,
         role: decision?.role ?? 'GLOBAL_MODERATOR_LEAD',
         notesProvided: Boolean(input.notes),
+        mistakenClassification: Boolean(input.mistakenClassification),
         ...(resolved.escalation ? toMediaEscalationAuditMetadata(resolved.escalation) : {}),
       },
     });
 
     return {
-      ...resolved,
+      ...this.presentCase(resolved),
+      reviewerRole: decision?.role,
+    };
+  }
+
+  async getCase(id: string, session: PlatformAccessSession) {
+    const existing = await this.repository.findCase(id);
+    if (!existing) {
+      throw new NotFoundException('Media review case not found.');
+    }
+
+    const tenantCountryMap = await this.tenantCountryMap();
+    await this.auth?.requirePlatformAccess(
+      session,
+      'MODERATE_CONTENT',
+      this.caseAccessResource(existing, tenantCountryMap),
+    );
+    return this.presentCase(existing);
+  }
+
+  async reopenCase(id: string, session: PlatformAccessSession) {
+    const existing = await this.repository.findCase(id);
+    if (!existing) {
+      throw new NotFoundException('Media review case not found.');
+    }
+
+    if (!canReopenMediaReviewCase(existing.status)) {
+      throw new UnprocessableEntityException('Only dismissed media review cases can be reopened.');
+    }
+
+    const tenantCountryMap = await this.tenantCountryMap();
+    const decision = await this.auth?.requirePlatformAccess(
+      session,
+      'MODERATE_CONTENT',
+      this.caseAccessResource(existing, tenantCountryMap),
+    );
+    const reopened = await this.repository.reopenCase(id);
+    if (!reopened) {
+      throw new UnprocessableEntityException('Only dismissed media review cases can be reopened.');
+    }
+
+    await this.auth?.recordTenantAudit({
+      tenantId: reopened.tenantId,
+      actorUserId: session.userId,
+      action: 'MEDIA_REVIEW_CASE_REOPENED',
+      entityType: 'MEDIA_REVIEW_CASE',
+      entityId: reopened.id,
+      metadata: {
+        mediaId: reopened.mediaId,
+        jobType: reopened.jobType,
+        severity: reopened.severity,
+        previousStatus: existing.status,
+        role: decision?.role ?? 'GLOBAL_MODERATOR_LEAD',
+      },
+    });
+
+    return {
+      ...this.presentCase(reopened),
       reviewerRole: decision?.role,
     };
   }
@@ -184,7 +260,7 @@ export class MediaReviewService {
     });
 
     return {
-      ...assigned,
+      ...this.presentCase(assigned),
       reviewerRole: decision?.role,
     };
   }
@@ -232,6 +308,16 @@ export class MediaReviewService {
     }
 
     return decision.snapshot;
+  }
+
+  private presentCase(reviewCase: MediaReviewCaseRecord) {
+    return {
+      ...reviewCase,
+      ...presentMediaReviewSla({
+        openedAt: reviewCase.openedAt,
+        severity: reviewCase.severity,
+      }),
+    };
   }
 
   private async tenantCountryMap(): Promise<Map<string, string>> {

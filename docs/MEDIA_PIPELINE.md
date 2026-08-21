@@ -36,8 +36,12 @@ Last updated: 2026-08-21
 - Tenant media list/attach responses include a user-facing review status
   (`UNDER_REVIEW`, `READY`, `BLOCKED`, `PROCESSING_FAILED`) and omit internal
   moderation reasons. Public discovery only includes ready files.
-- Remaining production hardening is richer review-case management. Native
-  mobile remains out of scope.
+- Moderators manage review cases with computed SLAs (CRITICAL 24h, HIGH 72h,
+  MEDIUM 168h), GET by id, job-type and overdue filters, and reopen of
+  dismissed cases only. HIGH/CRITICAL restore or dismiss requires an explicit
+  mistaken-classification confirmation plus a reviewer note.
+- Remaining production hardening is hosted identity. Native mobile remains
+  out of scope.
 
 ## Storage Modes
 
@@ -220,12 +224,22 @@ The case preserves job ID, job type, attempts, object key, source URL, provider
 result metadata, last error, and the exact media patch applied by publication.
 
 Kenya reporting playbooks apply when a moderator escalates a case or confirms a
-HIGH/CRITICAL block:
+HIGH/CRITICAL block. Review-case management:
 
 ```text
+GET /v1/platform/media/reviews
+GET /v1/platform/media/reviews/:id
 GET /v1/platform/media/escalation-playbooks?countryCode=KE&severity=CRITICAL&jobType=MALWARE_SCAN
+POST /v1/platform/media/reviews/:id/assign
 POST /v1/platform/media/reviews/:id/resolve
+POST /v1/platform/media/reviews/:id/reopen
 ```
+
+List query filters include `status`, `severity`, `jobType`, `assignedTo`,
+`unassignedOnly`, and `overdueOnly`. Responses include `slaHours`, `dueAt`, and
+`overdue`. HIGH/CRITICAL `RESTORED` or `DISMISSED` bodies must set
+`mistakenClassification: true` and include a reviewer note. Reopen is allowed
+for `DISMISSED` only.
 
 Playbook `KE-MEDIA-2026-08` routes scanner-blocked uploads to KE-CIRT incident
 reporting and the hosting abuse desk, youth-protection cases to NCMEC
