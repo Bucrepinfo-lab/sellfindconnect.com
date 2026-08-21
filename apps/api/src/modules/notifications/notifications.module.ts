@@ -3,9 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import { NotificationAdapterRegistry } from '@telpen/domain';
 
 import { AuthModule } from '../auth/auth.module';
+import { InMemoryNotificationsRepository } from './in-memory-notifications.repository';
 import { createDefaultNotificationAdapters } from './notification-adapters';
 import { NotificationDispatchService } from './notification-dispatch.service';
 import { NotificationsController } from './notifications.controller';
+import { NOTIFICATIONS_REPOSITORY } from './notifications.repository';
 import { NotificationsService } from './notifications.service';
 
 @Module({
@@ -27,6 +29,33 @@ import { NotificationsService } from './notifications.service';
         }),
     },
     NotificationDispatchService,
+    InMemoryNotificationsRepository,
+    {
+      provide: NOTIFICATIONS_REPOSITORY,
+      inject: [ConfigService, InMemoryNotificationsRepository],
+      useFactory: async (config: ConfigService, inMemory: InMemoryNotificationsRepository) => {
+        const repositoryMode = (
+          config.get<string>('NOTIFICATIONS_REPOSITORY') ??
+          config.get<string>('AUTH_REPOSITORY') ??
+          'memory'
+        ).toLowerCase();
+        const usePrisma = ['prisma', 'postgres', 'database'].includes(repositoryMode);
+
+        if (!usePrisma) {
+          return inMemory;
+        }
+
+        const databaseUrl = config.get<string>('DATABASE_URL');
+        if (!databaseUrl) {
+          throw new Error('DATABASE_URL is required when NOTIFICATIONS_REPOSITORY=prisma.');
+        }
+
+        const { PrismaNotificationsRepository, createNotificationsPrismaClient } = await import(
+          './prisma-notifications.repository.js'
+        );
+        return new PrismaNotificationsRepository(createNotificationsPrismaClient(databaseUrl));
+      },
+    },
     NotificationsService,
   ],
   exports: [NotificationsService, NotificationDispatchService, NotificationAdapterRegistry],

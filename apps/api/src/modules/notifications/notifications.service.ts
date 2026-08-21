@@ -9,7 +9,6 @@ import {
   resolveNotificationDispatchAddress,
   shouldRetryNotificationChannel,
   type NotificationChannel,
-  type NotificationDeliveryPlan,
   type NotificationDestination,
   type NotificationPreference,
 } from '@telpen/domain';
@@ -19,47 +18,27 @@ import type {
   CreateNotificationPlanDto,
   UpdateNotificationPreferencesDto,
 } from './dto/notifications.dto';
+import { InMemoryNotificationsRepository } from './in-memory-notifications.repository';
 import { createDefaultNotificationAdapters } from './notification-adapters';
 import { NotificationDispatchService } from './notification-dispatch.service';
 import { AuthService } from '../auth/auth.service';
+import type {
+  NotificationChannelStatus,
+  NotificationOutboxRecord,
+} from './notifications.records';
+import { NOTIFICATIONS_REPOSITORY, type NotificationsRepository } from './notifications.repository';
 
-export type NotificationChannelStatus = {
-  channel: NotificationChannel;
-  status: 'QUEUED' | 'SUPPRESSED' | 'SENT' | 'FAILED';
-  reason?: string;
-  provider?: string;
-  providerReference?: string;
-};
-
-export type NotificationDeliveryAttemptRecord = {
-  id: string;
-  channel: NotificationChannel;
-  status: 'SENT' | 'FAILED' | 'SUPPRESSED';
-  provider?: string;
-  providerReference?: string;
-  failureReason?: string;
-  attemptedAt: string;
-};
-
-export type NotificationOutboxRecord = {
-  id: string;
-  tenantId: string;
-  entityType?: string;
-  entityId?: string;
-  destination?: NotificationDestination;
-  plan: NotificationDeliveryPlan;
-  channelStatuses: NotificationChannelStatus[];
-  deliveryAttempts: NotificationDeliveryAttemptRecord[];
-  createdAt: string;
-  updatedAt: string;
-};
+export type {
+  NotificationChannelStatus,
+  NotificationDeliveryAttemptRecord,
+  NotificationOutboxRecord,
+} from './notifications.records';
 
 @Injectable()
 export class NotificationsService {
-  private readonly preferences = new Map<string, NotificationPreference[]>();
-  private readonly outbox = new Map<string, NotificationOutboxRecord>();
   private readonly dispatch: NotificationDispatchService;
   private readonly auth?: AuthService;
+  private readonly repository: NotificationsRepository;
 
   constructor(
     @Optional()
@@ -69,25 +48,30 @@ export class NotificationsService {
     dispatch?: NotificationDispatchService,
     @Optional()
     auth?: AuthService,
+    @Optional()
+    @Inject(NOTIFICATIONS_REPOSITORY)
+    repository?: NotificationsRepository,
   ) {
     const adapters = registry ?? createDefaultNotificationAdapters();
     this.dispatch = dispatch ?? new NotificationDispatchService(adapters);
     this.auth = auth;
+    this.repository = repository ?? new InMemoryNotificationsRepository();
   }
 
-  getPreferences(tenantId: string): NotificationPreference[] {
-    return this.preferences.get(tenantId) ?? defaultNotificationPreferences;
+  async getPreferences(tenantId: string): Promise<NotificationPreference[]> {
+    const stored = await this.repository.getPreferences(tenantId);
+    return stored.length > 0 ? stored : defaultNotificationPreferences;
   }
 
   availableAdapters(): NotificationChannel[] {
     return this.dispatch.availableChannels();
   }
 
-  updatePreferences(tenantId: string, input: UpdateNotificationPreferencesDto) {
+  async updatePreferences(tenantId: string, input: UpdateNotificationPreferencesDto) {
     this.assertSafe(input, 'Notification preferences contain blocked content.');
 
     const normalized = input.preferences.map((preference) => ({ ...preference }));
-    this.preferences.set(tenantId, normalized);
+    await this.repository.replacePreferences(tenantId, normalized);
 
     return {
       tenantId,
@@ -106,7 +90,7 @@ export class NotificationsService {
     }
 
     const now = new Date().toISOString();
-    const preferences = this.getPreferences(tenantId);
+    const preferences = await this.getPreferences(tenantId);
     const destination = this.destinationFrom(input);
     const plan = buildNotificationDeliveryPlan({
       eventType: input.eventType,
@@ -147,7 +131,7 @@ export class NotificationsService {
       updatedAt: now,
     };
 
-    this.outbox.set(this.key(tenantId, record.id), record);
+    await this.repository.saveOutbox(record);
     const dispatched = await this.dispatchRecord(record);
     await this.auditProduct({
       tenantId,
@@ -175,14 +159,12 @@ export class NotificationsService {
     return dispatched;
   }
 
-  listOutbox(tenantId: string): NotificationOutboxRecord[] {
-    return Array.from(this.outbox.values())
-      .filter((record) => record.tenantId === tenantId)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  async listOutbox(tenantId: string): Promise<NotificationOutboxRecord[]> {
+    return this.repository.listOutbox(tenantId);
   }
 
   async dispatchOutbox(tenantId: string, outboxId: string) {
-    const record = this.outbox.get(this.key(tenantId, outboxId));
+    const record = await this.repository.findOutbox(tenantId, outboxId);
     if (!record) {
       throw new UnprocessableEntityException('Notification outbox record was not found.');
     }
@@ -191,14 +173,10 @@ export class NotificationsService {
   }
 
   async runAllDispatch(input: { tenantId?: string; limit?: number } = {}) {
-    const limit = input.limit ?? 100;
-    const candidates = Array.from(this.outbox.values())
-      .filter((record) => !input.tenantId || record.tenantId === input.tenantId)
-      .filter((record) =>
-        record.channelStatuses.some((item) => shouldRetryNotificationChannel(item.status)),
-      )
-      .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
-      .slice(0, limit);
+    const candidates = await this.repository.listRetryableOutbox({
+      tenantId: input.tenantId,
+      limit: input.limit ?? 100,
+    });
 
     const dispatched = [];
     for (const record of candidates) {
@@ -272,7 +250,7 @@ export class NotificationsService {
     }
 
     record.updatedAt = now;
-    this.outbox.set(this.key(record.tenantId, record.id), record);
+    await this.repository.updateOutbox(record);
     return record;
   }
 
@@ -290,10 +268,6 @@ export class NotificationsService {
     if (!safety.allowed) {
       throw new UnprocessableEntityException({ message, safety });
     }
-  }
-
-  private key(tenantId: string, id: string): string {
-    return `${tenantId}:${id}`;
   }
 
   private async auditProduct(input: {

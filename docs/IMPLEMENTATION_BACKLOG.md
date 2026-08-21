@@ -358,6 +358,10 @@ Progress:
 - Added tenant product audit coverage for conversation and notification writes,
   metadata redaction for chat copy and secrets, and `GET /v1/audit` for owner
   or admin lookup.
+- Added in-memory and opt-in Prisma notification persistence through
+  `NOTIFICATIONS_REPOSITORY=prisma`, covering tenant preferences, outbox
+  destination/channel status, and delivery attempts. Dispatch retries read
+  that durable outbox. Live WhatsApp provider credentials remain next.
 
 ## Epic 7: Analytics
 

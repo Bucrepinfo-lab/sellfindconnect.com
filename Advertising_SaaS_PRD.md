@@ -790,6 +790,16 @@ Implementation progress on 2026-08-21:
 - The Product Audit workspace panel previews redacted events and the owner/
   admin gate.
 
+Implementation progress on 2026-08-21:
+
+- Added an in-memory notification repository plus opt-in Prisma persistence
+  through `NOTIFICATIONS_REPOSITORY=prisma`. Tenant preferences, outbox
+  destination, channel statuses, and delivery attempts survive process
+  restarts when PostgreSQL is enabled.
+- The operations dispatch sweep retries queued or failed channels from that
+  durable outbox. The Notification Delivery panel now shows Prisma persistence
+  readiness. Live WhatsApp provider credentials remain next.
+
 ### 7.9 Analytics and Monitoring
 
 Advertiser analytics:

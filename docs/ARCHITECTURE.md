@@ -136,7 +136,9 @@ without validating it against the authenticated user's assignments.
   records, adapter dispatch (memory by default; Resend email, Africa's Talking
   SMS, and FCM push when credentials are set), delivery attempts, suppression
   reasons, and scheduler jobs. Tenant notification routes require an
-  MFA-verified tenant session. `POST /v1/operations/notifications/dispatch/run`
+  MFA-verified tenant session. Opt-in Prisma persistence is selected with
+  `NOTIFICATIONS_REPOSITORY=prisma` and stores preferences, destination,
+  channel statuses, and delivery attempts. `POST /v1/operations/notifications/dispatch/run`
   retries queued or failed outbox channels.
 - Audit: tenant-scoped product audit logs for conversation and notification
   writes, with secret/contact/message-body redaction. Owner/admin lookup is

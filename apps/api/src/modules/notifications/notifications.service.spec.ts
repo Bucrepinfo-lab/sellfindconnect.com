@@ -2,15 +2,16 @@ import { describe, expect, it } from 'vitest';
 
 import type { AuthService } from '../auth/auth.service';
 import { createDefaultNotificationAdapters } from './notification-adapters';
+import { InMemoryNotificationsRepository } from './in-memory-notifications.repository';
 import { NotificationsService } from './notifications.service';
 
 const tenantId = '11111111-1111-4111-8111-111111111111';
 
 describe('NotificationsService', () => {
-  it('returns default tenant notification preferences', () => {
+  it('returns default tenant notification preferences', async () => {
     const service = new NotificationsService();
 
-    expect(service.getPreferences(tenantId).map((item) => item.channel)).toEqual([
+    expect((await service.getPreferences(tenantId)).map((item) => item.channel)).toEqual([
       'IN_APP',
       'EMAIL',
       'SMS',
@@ -19,10 +20,10 @@ describe('NotificationsService', () => {
     ]);
   });
 
-  it('updates notification preferences for a tenant', () => {
+  it('updates notification preferences for a tenant', async () => {
     const service = new NotificationsService();
 
-    const result = service.updatePreferences(tenantId, {
+    const result = await service.updatePreferences(tenantId, {
       preferences: [
         { channel: 'IN_APP', enabled: true, consentState: 'NOT_REQUIRED' },
         { channel: 'EMAIL', enabled: false, consentState: 'DENIED' },
@@ -31,7 +32,7 @@ describe('NotificationsService', () => {
 
     expect(result.preferences).toHaveLength(2);
     expect(result.adapters).toEqual(['IN_APP', 'EMAIL', 'SMS', 'PUSH', 'WHATSAPP']);
-    expect(service.getPreferences(tenantId)[1]?.enabled).toBe(false);
+    expect((await service.getPreferences(tenantId))[1]?.enabled).toBe(false);
   });
 
   it('plans and queues consent-aware delivery attempts', async () => {
@@ -49,7 +50,7 @@ describe('NotificationsService', () => {
     expect(record.channelStatuses.some((item) => item.status === 'SUPPRESSED')).toBe(true);
     expect(record.channelStatuses.find((item) => item.channel === 'IN_APP')?.status).toBe('SENT');
     expect(record.channelStatuses.find((item) => item.channel === 'EMAIL')?.status).toBe('FAILED');
-    expect(service.listOutbox(tenantId)).toHaveLength(1);
+    expect(await service.listOutbox(tenantId)).toHaveLength(1);
   });
 
   it('dispatches selected channels through adapters when destinations exist', async () => {
@@ -107,6 +108,52 @@ describe('NotificationsService', () => {
       'NOTIFICATION_DISPATCHED',
     ]);
     expect(JSON.stringify(auditLogs)).not.toContain(copy);
+  });
+
+  it('persists preferences and outbox records through the repository boundary', async () => {
+    const repository = new InMemoryNotificationsRepository();
+    const writer = new NotificationsService(undefined, undefined, undefined, repository);
+    const reader = new NotificationsService(undefined, undefined, undefined, repository);
+
+    await writer.updatePreferences(tenantId, {
+      preferences: [{ channel: 'IN_APP', enabled: true, consentState: 'NOT_REQUIRED' }],
+    });
+    const record = await writer.planAndQueue(tenantId, {
+      eventType: 'SOURCE_FINDER_OPPORTUNITY',
+      severity: 'MEDIUM',
+      title: 'Opportunity',
+      message: 'A saved search found a high-fit supplier.',
+      entityType: 'source-finder-alert',
+      entityId: 'alert-1',
+    });
+
+    expect(await reader.getPreferences(tenantId)).toEqual([
+      { channel: 'IN_APP', enabled: true, consentState: 'NOT_REQUIRED' },
+    ]);
+    expect(await reader.listOutbox(tenantId)).toEqual([
+      expect.objectContaining({ id: record.id, tenantId }),
+    ]);
+  });
+
+  it('retries failed channels from shared repository dispatch state', async () => {
+    const repository = new InMemoryNotificationsRepository();
+    const writer = new NotificationsService(undefined, undefined, undefined, repository);
+    const reader = new NotificationsService(undefined, undefined, undefined, repository);
+    const record = await writer.planAndQueue(tenantId, {
+      eventType: 'CONVERSATION_SLA_BREACHED',
+      severity: 'CRITICAL',
+      title: 'SLA breached',
+      message: 'A high-priority conversation has missed its response SLA.',
+    });
+
+    expect(record.channelStatuses.find((item) => item.channel === 'EMAIL')?.status).toBe('FAILED');
+
+    const retry = await reader.runAllDispatch({ tenantId });
+    expect(retry.dispatched).toBe(1);
+    expect(retry.records[0]?.id).toBe(record.id);
+    expect(retry.records[0]?.channelStatuses.find((item) => item.channel === 'EMAIL')?.status).toBe(
+      'FAILED',
+    );
   });
 });
 

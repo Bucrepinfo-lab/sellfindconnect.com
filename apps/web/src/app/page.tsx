@@ -2339,6 +2339,15 @@ export default function Home() {
                   <span>{notificationPlan.title}</span>
                 </div>
               </div>
+              <div className="policy-box ok compact">
+                <ShieldCheck size={18} />
+                <div>
+                  <strong>Durable outbox</strong>
+                  <span>
+                    Preferences and dispatch state persist through NOTIFICATIONS_REPOSITORY=prisma.
+                  </span>
+                </div>
+              </div>
             </section>
 
             <section className="side-panel">
