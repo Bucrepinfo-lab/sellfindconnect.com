@@ -918,6 +918,8 @@ model Conversation {
   firstResponseAt      DateTime?
   lastInboundMessageAt DateTime
   lastMessageAt        DateTime
+  typingRole           ConversationParticipantRole?
+  typingAt             DateTime?
   resolvedAt           DateTime?
   blockedAt            DateTime?
   createdAt            DateTime                   @default(now())
@@ -934,17 +936,22 @@ model Conversation {
 }
 
 model ConversationMessage {
-  id             String                      @id @default(uuid())
+  id             String                       @id @default(uuid())
   tenantId       String
   conversationId String
   senderRole     ConversationParticipantRole
   body           String
-  createdAt      DateTime                    @default(now())
-  tenant         Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  conversation   Conversation                @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  deliveryStatus String                       @default("SENT") @db.VarChar(20)
+  deliveredAt    DateTime?
+  readAt         DateTime?
+  readByRole     ConversationParticipantRole?
+  createdAt      DateTime                     @default(now())
+  tenant         Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversation   Conversation                 @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, conversationId, createdAt])
   @@index([senderRole, createdAt])
+  @@index([deliveryStatus, createdAt])
 }
 
 model ConversationNotification {

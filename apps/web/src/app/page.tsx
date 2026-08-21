@@ -5,6 +5,7 @@ import {
   BadgeCheck,
   Ban,
   Bell,
+  CheckCheck,
   Building2,
   ChartNoAxesCombined,
   ChevronRight,
@@ -39,6 +40,11 @@ import {
   calculateTaxSnapshotAmounts,
   calculateTrialSubscription,
   conversationStatuses,
+  countUnreadMessagesForRole,
+  describeMessageDeliveryStatus,
+  isConversationTypingActive,
+  markMessageDelivered,
+  markMessageRead,
   defaultNotificationPreferences,
   evaluateAccess,
   evaluatePasswordPolicy,
@@ -65,7 +71,9 @@ import {
   matchFeedbackActions,
   type LeadStatus,
   type MatchFeedbackAction,
+  type ConversationMessage,
   type ConversationStatus,
+  type MessageDeliveryStatus,
   type AccessPermission,
   type AccessResourceScope,
   type AccessRole,
@@ -410,6 +418,18 @@ export default function Home() {
   const [chatMessage, setChatMessage] = useState(
     'Please share price terms, availability, delivery coverage and minimum order.',
   );
+  const [chatTypingAt, setChatTypingAt] = useState<string | undefined>();
+  const [outboundDeliveryStatus, setOutboundDeliveryStatus] =
+    useState<MessageDeliveryStatus>('SENT');
+  const [inboundReceipt, setInboundReceipt] = useState<ConversationMessage>({
+    id: 'demo-inbound',
+    conversationId: 'demo-conversation',
+    tenantId: 'demo-tenant',
+    senderRole: 'REQUESTER',
+    body: 'Please confirm weekly supply availability for tomatoes and kale.',
+    deliveryStatus: 'SENT',
+    createdAt: conversationDemoOpenedAt,
+  });
   const [profileDescription, setProfileDescription] = useState(
     'We supply fresh vegetables to hotels, restaurants and retailers in Nairobi.',
   );
@@ -608,6 +628,8 @@ export default function Home() {
     conversationStatus !== 'BLOCKED' &&
     conversationStatus !== 'RESOLVED',
   );
+  const chatTypingActive = isConversationTypingActive(chatTypingAt);
+  const inboundUnreadCount = countUnreadMessagesForRole([inboundReceipt], 'TENANT_AGENT');
   const notificationPreferences = defaultNotificationPreferences.map((preference) => {
     if (preference.channel === 'PUSH') {
       return {
@@ -1699,7 +1721,9 @@ export default function Home() {
               <div className="panel-heading tight">
                 <h2>Conversation Workspace</h2>
                 <span>
-                  {conversationSla?.state ? codeLabel(conversationSla.state) : 'No thread'}
+                  {conversationSla?.state
+                    ? `${codeLabel(conversationSla.state)}${inboundUnreadCount > 0 ? ` · ${inboundUnreadCount} unread` : ''}`
+                    : 'No thread'}
                 </span>
               </div>
               <FinanceRow
@@ -1719,6 +1743,18 @@ export default function Home() {
               <FinanceRow
                 label="Due signal"
                 value={conversationSla ? `${conversationSla.minutesUntilDue}m` : '-'}
+              />
+              <FinanceRow
+                label="Inbound receipt"
+                value={`${describeMessageDeliveryStatus(inboundReceipt.deliveryStatus)} · ${inboundUnreadCount} unread`}
+              />
+              <FinanceRow
+                label="Outbound receipt"
+                value={describeMessageDeliveryStatus(outboundDeliveryStatus)}
+              />
+              <FinanceRow
+                label="Typing"
+                value={chatTypingActive ? 'Sales desk is typing' : 'Idle'}
               />
               <label className="lead-select-row">
                 <span>Status</span>
@@ -1750,7 +1786,10 @@ export default function Home() {
                 <span>Safe reply</span>
                 <textarea
                   value={chatMessage}
-                  onChange={(event) => setChatMessage(event.target.value)}
+                  onChange={(event) => {
+                    setChatMessage(event.target.value);
+                    setChatTypingAt(new Date().toISOString());
+                  }}
                   rows={5}
                   aria-invalid={!chatSafetyDecision.allowed}
                 />
@@ -1772,7 +1811,11 @@ export default function Home() {
                   className="primary-button"
                   type="button"
                   disabled={!canSendChat}
-                  onClick={() => setConversationStatus('WAITING_ON_REQUESTER')}
+                  onClick={() => {
+                    setConversationStatus('WAITING_ON_REQUESTER');
+                    setOutboundDeliveryStatus('SENT');
+                    setChatTypingAt(undefined);
+                  }}
                 >
                   <MessageSquareText size={16} />
                   Send Message
@@ -1785,6 +1828,26 @@ export default function Home() {
                 >
                   <UserCheck size={16} />
                   Assign
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={!selectedMatch || inboundReceipt.deliveryStatus !== 'SENT'}
+                  onClick={() => setInboundReceipt((current) => markMessageDelivered(current))}
+                >
+                  <CheckCheck size={16} />
+                  Mark delivered
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={!selectedMatch || inboundReceipt.deliveryStatus === 'READ'}
+                  onClick={() =>
+                    setInboundReceipt((current) => markMessageRead(current, 'TENANT_AGENT'))
+                  }
+                >
+                  <Eye size={16} />
+                  Mark read
                 </button>
               </div>
               <div className={canSendChat ? 'policy-box ok compact' : 'policy-box block compact'}>

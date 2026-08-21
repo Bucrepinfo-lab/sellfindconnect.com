@@ -626,7 +626,8 @@ Implementation progress on 2026-06-17:
 - Added the first messaging and SLA workspace: shared conversation rules, saved replies, terms-gated tenant conversation API, safe message submission, assignment, SLA notification checks, Prisma conversation/message/notification models, and a web Conversation Workspace panel.
 - Added consent-aware notification orchestration for in-app, email, SMS, push, and WhatsApp channels, with tenant preferences, an API outbox, and a web Notification Delivery readiness panel.
 - Added a protected internal conversation SLA sweep endpoint for scheduled response-time alerts: `POST /v1/operations/conversations/sla/run`.
-- Remaining hardening: live websocket delivery, read receipts, typing/presence, attachments with malware/media moderation, provider adapters, audit logs, and durable repository wiring.
+- Added HTTP delivery receipts, read receipts, typing indicators, unread counts, and opt-in Prisma conversation persistence through `CONVERSATIONS_REPOSITORY=prisma`.
+- Remaining hardening: live websocket delivery, online presence, attachments with malware/media moderation, provider adapters, and audit logs.
 
 ### 7.7 Relationship Links
 
@@ -700,6 +701,28 @@ Implementation progress on 2026-06-17:
 - Added a web Conversation Workspace preview for owner assignment, SLA state, status transitions, safe reply drafting, and saved replies.
 - Added Prisma models for durable `Conversation`, `ConversationMessage`, and `ConversationNotification` records.
 - Added a tenant notification preferences API, consent-aware delivery planning API, notification outbox, and protected internal SLA sweep endpoint.
+
+Implementation progress on 2026-08-21:
+
+- Added shared message delivery states (`SENT`, `DELIVERED`, `READ`, `FAILED`),
+  read-receipt rules that reject self-read and failed-message transitions, and a
+  15-second typing-indicator window.
+- Added tenant-session conversation receipt and typing routes:
+  `POST /v1/conversations/:id/messages/:messageId/delivered`,
+  `POST /v1/conversations/:id/messages/:messageId/read`,
+  `POST /v1/conversations/:id/receipts/delivered`,
+  `POST /v1/conversations/:id/receipts/read`, and
+  `POST /v1/conversations/:id/typing`.
+- Conversation list/detail now includes tenant unread counts and whether a
+  typing indicator is still active.
+- Added an in-memory conversation repository plus opt-in Prisma persistence
+  through `CONVERSATIONS_REPOSITORY=prisma`, including `deliveryStatus`,
+  `deliveredAt`, `readAt`, `readByRole`, `typingRole`, and `typingAt`.
+- Updated the web Conversation Workspace to preview inbound/outbound receipts,
+  unread count, typing, mark-delivered, and mark-read.
+- Remaining: live websocket delivery, online presence, attachments with
+  malware/media moderation, provider-backed notification adapters, and audit
+  logs.
 
 ### 7.9 Analytics and Monitoring
 

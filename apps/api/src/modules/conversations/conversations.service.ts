@@ -1,16 +1,30 @@
-import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import {
+  Inject,
+  Injectable,
+  NotFoundException,
+  Optional,
+  UnprocessableEntityException,
+} from '@nestjs/common';
+import {
+  ConversationReceiptError,
   buildLeadConversionIntelligence,
   buildSavedReplySuggestions,
   calculateConversationSlaDecision,
+  countUnreadMessagesForRole,
   evaluateSafetyFields,
   evaluateSafetyText,
+  isConversationTypingActive,
+  isSameConversationSide,
+  markMessageDelivered,
+  markMessageRead,
   pilotSourceFinderRecords,
+  recordConversationTyping,
   searchSourceFinderRecords,
   shouldCountAsTenantResponse,
   shouldCreateInboundResponseSla,
   type ConversationMessage,
   type ConversationNotification,
+  type ConversationParticipantRole,
   type ConversationRecord,
   type SourceFinderSearchResult,
 } from '@telpen/domain';
@@ -23,15 +37,22 @@ import type {
   SendConversationMessageDto,
   UpdateConversationStatusDto,
 } from './dto/conversations.dto';
+import { CONVERSATIONS_REPOSITORY, type ConversationsRepository } from './conversations.repository';
+import { InMemoryConversationsRepository } from './in-memory-conversations.repository';
 
 @Injectable()
 export class ConversationsService {
-  private readonly conversations = new Map<string, ConversationRecord>();
-  private readonly messages = new Map<string, ConversationMessage[]>();
-  private readonly notifications = new Map<string, ConversationNotification>();
-  private readonly slaAlertKeys = new Set<string>();
+  private readonly repository: ConversationsRepository;
 
-  createConversation(tenantId: string, input: CreateConversationDto) {
+  constructor(
+    @Optional()
+    @Inject(CONVERSATIONS_REPOSITORY)
+    repository?: ConversationsRepository,
+  ) {
+    this.repository = repository ?? new InMemoryConversationsRepository();
+  }
+
+  async createConversation(tenantId: string, input: CreateConversationDto) {
     this.requireTerms(input.acceptedTerms);
     this.assertSafe(input, 'Conversation contains blocked content.');
 
@@ -61,50 +82,57 @@ export class ConversationsService {
       createdAt: now,
       updatedAt: now,
     };
+    const opener: ConversationMessage = {
+      id: randomUUID(),
+      conversationId: conversation.id,
+      tenantId,
+      senderRole: 'REQUESTER',
+      body: input.message,
+      deliveryStatus: 'SENT',
+      createdAt: now,
+    };
 
-    this.conversations.set(this.key(tenantId, conversation.id), conversation);
-    this.messages.set(this.messageKey(tenantId, conversation.id), [
-      {
-        id: randomUUID(),
-        conversationId: conversation.id,
-        tenantId,
-        senderRole: 'REQUESTER',
-        body: input.message,
-        createdAt: now,
-      },
-    ]);
-    this.createNotification(tenantId, conversation, 'NEW_CONVERSATION', now);
+    await this.repository.createConversation(conversation);
+    await this.repository.createMessage(opener);
+    await this.createNotification(tenantId, conversation, 'NEW_CONVERSATION', now);
 
     if (input.assigneeUserId) {
-      this.createNotification(tenantId, conversation, 'ASSIGNMENT', now);
+      await this.createNotification(tenantId, conversation, 'ASSIGNMENT', now);
     }
 
-    return this.presentConversation(conversation);
+    return this.presentConversation(conversation, [opener]);
   }
 
-  listConversations(tenantId: string) {
-    return Array.from(this.conversations.values())
-      .filter((conversation) => conversation.tenantId === tenantId)
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      .map((conversation) => this.presentConversation(conversation));
-  }
-
-  getConversation(tenantId: string, conversationId: string) {
-    return this.presentConversation(this.requireConversation(tenantId, conversationId));
-  }
-
-  listMessages(tenantId: string, conversationId: string): ConversationMessage[] {
-    this.requireConversation(tenantId, conversationId);
-    return [...(this.messages.get(this.messageKey(tenantId, conversationId)) ?? [])].sort((a, b) =>
-      a.createdAt.localeCompare(b.createdAt),
+  async listConversations(tenantId: string) {
+    const conversations = await this.repository.listConversations(tenantId);
+    return Promise.all(
+      conversations.map(async (conversation) =>
+        this.presentConversation(
+          conversation,
+          await this.repository.listMessages(tenantId, conversation.id),
+        ),
+      ),
     );
   }
 
-  sendMessage(tenantId: string, conversationId: string, input: SendConversationMessageDto) {
+  async getConversation(tenantId: string, conversationId: string) {
+    const conversation = await this.requireConversation(tenantId, conversationId);
+    return this.presentConversation(
+      conversation,
+      await this.repository.listMessages(tenantId, conversationId),
+    );
+  }
+
+  async listMessages(tenantId: string, conversationId: string): Promise<ConversationMessage[]> {
+    await this.requireConversation(tenantId, conversationId);
+    return this.repository.listMessages(tenantId, conversationId);
+  }
+
+  async sendMessage(tenantId: string, conversationId: string, input: SendConversationMessageDto) {
     this.requireTerms(input.acceptedTerms);
     this.assertSafe(input, 'Message contains blocked content.');
 
-    const conversation = this.requireConversation(tenantId, conversationId);
+    const conversation = await this.requireConversation(tenantId, conversationId);
     if (conversation.status === 'BLOCKED' || conversation.status === 'RESOLVED') {
       throw new UnprocessableEntityException('Conversation is closed for new messages.');
     }
@@ -116,16 +144,15 @@ export class ConversationsService {
       tenantId,
       senderRole: input.senderRole,
       body: input.body,
+      deliveryStatus: 'SENT',
       createdAt: now,
     };
-
-    const messages = this.messages.get(this.messageKey(tenantId, conversationId)) ?? [];
-    messages.push(message);
-    this.messages.set(this.messageKey(tenantId, conversationId), messages);
 
     let updated: ConversationRecord = {
       ...conversation,
       lastMessageAt: now,
+      typingAt: undefined,
+      typingRole: undefined,
       updatedAt: now,
     };
 
@@ -145,19 +172,106 @@ export class ConversationsService {
       };
     }
 
-    this.conversations.set(this.key(tenantId, conversationId), updated);
-    this.createNotification(tenantId, updated, 'NEW_MESSAGE', now);
+    await this.repository.createMessage(message);
+    await this.repository.updateConversation(updated);
+    await this.createNotification(tenantId, updated, 'NEW_MESSAGE', now);
 
     return {
-      conversation: this.presentConversation(updated),
+      conversation: this.presentConversation(updated, [
+        ...(await this.repository.listMessages(tenantId, conversationId)),
+      ]),
       message,
     };
   }
 
-  assignConversation(tenantId: string, conversationId: string, input: AssignConversationDto) {
+  async markDelivered(tenantId: string, conversationId: string, messageId: string) {
+    await this.requireConversation(tenantId, conversationId);
+    const message = await this.requireMessage(tenantId, conversationId, messageId);
+    const updated = this.runReceipt(() => markMessageDelivered(message));
+    await this.repository.updateMessage(updated);
+    return updated;
+  }
+
+  async markRead(
+    tenantId: string,
+    conversationId: string,
+    messageId: string,
+    readerRole: ConversationParticipantRole,
+  ) {
+    await this.requireConversation(tenantId, conversationId);
+    const message = await this.requireMessage(tenantId, conversationId, messageId);
+    const updated = this.runReceipt(() => markMessageRead(message, readerRole));
+    await this.repository.updateMessage(updated);
+    return updated;
+  }
+
+  async recordTyping(
+    tenantId: string,
+    conversationId: string,
+    typingRole: ConversationParticipantRole,
+  ) {
+    const conversation = await this.requireConversation(tenantId, conversationId);
+    const updated = this.runReceipt(() => recordConversationTyping(conversation, typingRole));
+    await this.repository.updateConversation(updated);
+    return this.presentConversation(
+      updated,
+      await this.repository.listMessages(tenantId, conversationId),
+    );
+  }
+
+  async markThreadDelivered(tenantId: string, conversationId: string) {
+    await this.requireConversation(tenantId, conversationId);
+    const messages = await this.repository.listMessages(tenantId, conversationId);
+    let updatedCount = 0;
+
+    for (const message of messages) {
+      if (message.deliveryStatus !== 'SENT') {
+        continue;
+      }
+
+      const updated = this.runReceipt(() => markMessageDelivered(message));
+      await this.repository.updateMessage(updated);
+      updatedCount += 1;
+    }
+
+    return {
+      updatedCount,
+      messages: await this.repository.listMessages(tenantId, conversationId),
+    };
+  }
+
+  async markThreadRead(
+    tenantId: string,
+    conversationId: string,
+    readerRole: ConversationParticipantRole,
+  ) {
+    await this.requireConversation(tenantId, conversationId);
+    const messages = await this.repository.listMessages(tenantId, conversationId);
+    let updatedCount = 0;
+
+    for (const message of messages) {
+      if (
+        message.senderRole === 'SYSTEM' ||
+        isSameConversationSide(message.senderRole, readerRole)
+      ) {
+        continue;
+      }
+
+      const updated = this.runReceipt(() => markMessageRead(message, readerRole));
+      await this.repository.updateMessage(updated);
+      updatedCount += 1;
+    }
+
+    return {
+      updatedCount,
+      messages: await this.repository.listMessages(tenantId, conversationId),
+    };
+  }
+
+  async assignConversation(tenantId: string, conversationId: string, input: AssignConversationDto) {
     this.assertSafe(input, 'Assignment contains blocked content.');
 
-    const conversation = this.requireConversation(tenantId, conversationId);
+    const conversation = await this.requireConversation(tenantId, conversationId);
     const now = new Date().toISOString();
     const updated: ConversationRecord = {
       ...conversation,
@@ -167,13 +281,16 @@ export class ConversationsService {
       updatedAt: now,
     };
 
-    this.conversations.set(this.key(tenantId, conversationId), updated);
-    this.createNotification(tenantId, updated, 'ASSIGNMENT', now);
-    return this.presentConversation(updated);
+    await this.repository.updateConversation(updated);
+    await this.createNotification(tenantId, updated, 'ASSIGNMENT', now);
+    return this.presentConversation(
+      updated,
+      await this.repository.listMessages(tenantId, conversationId),
+    );
   }
 
-  updateStatus(tenantId: string, conversationId: string, input: UpdateConversationStatusDto) {
-    const conversation = this.requireConversation(tenantId, conversationId);
+  async updateStatus(tenantId: string, conversationId: string, input: UpdateConversationStatusDto) {
+    const conversation = await this.requireConversation(tenantId, conversationId);
     const now = new Date().toISOString();
     const updated: ConversationRecord = {
       ...conversation,
@@ -183,23 +300,23 @@ export class ConversationsService {
       updatedAt: now,
     };
 
-    this.conversations.set(this.key(tenantId, conversationId), updated);
-    return this.presentConversation(updated);
+    await this.repository.updateConversation(updated);
+    return this.presentConversation(
+      updated,
+      await this.repository.listMessages(tenantId, conversationId),
+    );
   }
 
-  listNotifications(tenantId: string): ConversationNotification[] {
-    return Array.from(this.notifications.values())
-      .filter((notification) => notification.tenantId === tenantId)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  async listNotifications(tenantId: string): Promise<ConversationNotification[]> {
+    return this.repository.listNotifications(tenantId);
   }
 
-  runSlaChecks(tenantId: string, input: RunConversationSlaDto = {}) {
+  async runSlaChecks(tenantId: string, input: RunConversationSlaDto = {}) {
     const checkedAt = input.now ?? new Date().toISOString();
     const notificationsCreated: ConversationNotification[] = [];
+    const conversations = await this.repository.listConversations(tenantId);
 
-    for (const conversation of Array.from(this.conversations.values())) {
-      if (conversation.tenantId !== tenantId) continue;
-
+    for (const conversation of conversations) {
       const decision = calculateConversationSlaDecision(
         {
           openedAt: conversation.openedAt,
@@ -214,37 +331,62 @@ export class ConversationsService {
 
       if (!decision.alertType) continue;
 
-      const alertKey = `${tenantId}:${conversation.id}:${decision.alertType}:${decision.dueAt}`;
-      if (this.slaAlertKeys.has(alertKey)) continue;
+      if (
+        await this.repository.hasSlaAlert(
+          tenantId,
+          conversation.id,
+          decision.alertType,
+          decision.dueAt,
+        )
+      ) {
+        continue;
+      }
 
-      this.slaAlertKeys.add(alertKey);
+      await this.repository.rememberSlaAlert(
+        tenantId,
+        conversation.id,
+        decision.alertType,
+        decision.dueAt,
+      );
       notificationsCreated.push(
-        this.createNotification(tenantId, conversation, decision.alertType, checkedAt, decision.message),
+        await this.createNotification(
+          tenantId,
+          conversation,
+          decision.alertType,
+          decision.dueAt,
+          decision.message,
+        ),
       );
     }
 
     return {
       checkedAt,
       notificationsCreated,
-      conversations: this.listConversations(tenantId),
+      conversations: await this.listConversations(tenantId),
     };
   }
 
-  runAllSlaChecks(input: RunConversationSlaDto = {}) {
+  async runAllSlaChecks(input: RunConversationSlaDto = {}) {
     const checkedAt = input.now ?? new Date().toISOString();
-    const tenantIds = [...new Set(Array.from(this.conversations.values()).map((item) => item.tenantId))];
+    const conversations = await this.repository.listAllConversations();
+    const tenantIds = [...new Set(conversations.map((item) => item.tenantId))];
 
     return {
       checkedAt,
       tenantsChecked: tenantIds.length,
-      results: tenantIds.map((tenantId) => ({
-        tenantId,
-        ...this.runSlaChecks(tenantId, { ...input, now: checkedAt }),
-      })),
+      results: await Promise.all(
+        tenantIds.map(async (tenantId) => ({
+          tenantId,
+          ...(await this.runSlaChecks(tenantId, { ...input, now: checkedAt })),
+        })),
+      ),
     };
   }
 
-  private presentConversation(conversation: ConversationRecord) {
+  private presentConversation(
+    conversation: ConversationRecord,
+    messages: ConversationMessage[] = [],
+  ) {
     const sla = calculateConversationSlaDecision({
       openedAt: conversation.openedAt,
       lastInboundMessageAt: conversation.lastInboundMessageAt,
@@ -257,21 +399,24 @@ export class ConversationsService {
       sourceName: conversation.sourceName,
       inquiryType: conversation.inquiryType,
     });
+    const unreadCount = countUnreadMessagesForRole(messages, 'TENANT_AGENT');
 
     return {
       ...conversation,
       sla,
       savedReplies,
+      unreadCount,
+      typingActive: isConversationTypingActive(conversation.typingAt),
     };
   }
 
-  private createNotification(
+  private async createNotification(
     tenantId: string,
     conversation: ConversationRecord,
     type: ConversationNotification['type'],
     now: string,
     overrideMessage?: string,
-  ): ConversationNotification {
+  ): Promise<ConversationNotification> {
     const titleByType: Record<ConversationNotification['type'], string> = {
       NEW_CONVERSATION: `New conversation: ${conversation.sourceName}`,
       NEW_MESSAGE: `New message: ${conversation.sourceName}`,
@@ -299,7 +444,7 @@ export class ConversationsService {
       createdAt: now,
     };
 
-    this.notifications.set(this.key(tenantId, notification.id), notification);
+    await this.repository.createNotification(notification);
     return notification;
   }
 
@@ -334,8 +479,11 @@ export class ConversationsService {
     return source;
   }
 
-  private requireConversation(tenantId: string, conversationId: string): ConversationRecord {
-    const conversation = this.conversations.get(this.key(tenantId, conversationId));
+  private async requireConversation(
+    tenantId: string,
+    conversationId: string,
+  ): Promise<ConversationRecord> {
+    const conversation = await this.repository.findConversation(tenantId, conversationId);
     if (!conversation) {
       throw new NotFoundException('Conversation not found.');
     }
@@ -343,9 +491,24 @@ export class ConversationsService {
     return conversation;
   }
 
+  private async requireMessage(
+    tenantId: string,
+    conversationId: string,
+    messageId: string,
+  ): Promise<ConversationMessage> {
+    const message = await this.repository.findMessage(tenantId, conversationId, messageId);
+    if (!message) {
+      throw new NotFoundException('Conversation message not found.');
+    }
+
+    return message;
+  }
+
   private requireTerms(acceptedTerms: boolean): void {
     if (!acceptedTerms) {
-      throw new UnprocessableEntityException('Current terms acceptance is required before messaging.');
+      throw new UnprocessableEntityException(
+        'Current terms acceptance is required before messaging.',
+      );
     }
   }
 
@@ -360,11 +523,14 @@ export class ConversationsService {
     }
   }
 
-  private key(tenantId: string, id: string): string {
-    return `${tenantId}:${id}`;
-  }
-
-  private messageKey(tenantId: string, conversationId: string): string {
-    return `${tenantId}:conversation:${conversationId}`;
+  private runReceipt<T>(callback: () => T): T {
+    try {
+      return callback();
+    } catch (error) {
+      if (error instanceof ConversationReceiptError) {
+        throw new UnprocessableEntityException(error.message);
+      }
+      throw error;
+    }
   }
 }

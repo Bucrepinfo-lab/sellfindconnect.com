@@ -30,6 +30,19 @@ export const conversationNotificationTypes = [
 
 export type ConversationNotificationType = (typeof conversationNotificationTypes)[number];
 
+export const messageDeliveryStatuses = ['SENT', 'DELIVERED', 'READ', 'FAILED'] as const;
+
+export type MessageDeliveryStatus = (typeof messageDeliveryStatuses)[number];
+
+export const conversationTypingWindowMs = 15_000;
+
+export class ConversationReceiptError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConversationReceiptError';
+  }
+}
+
 export type ConversationSlaState = 'ON_TRACK' | 'DUE_SOON' | 'BREACHED' | 'PAUSED';
 
 export type ConversationSlaDecision = {
@@ -60,6 +73,8 @@ export type ConversationRecord = {
   firstResponseAt?: string;
   lastInboundMessageAt: string;
   lastMessageAt: string;
+  typingRole?: ConversationParticipantRole;
+  typingAt?: string;
   resolvedAt?: string;
   blockedAt?: string;
   createdAt: string;
@@ -72,6 +87,10 @@ export type ConversationMessage = {
   tenantId: string;
   senderRole: ConversationParticipantRole;
   body: string;
+  deliveryStatus: MessageDeliveryStatus;
+  deliveredAt?: string;
+  readAt?: string;
+  readByRole?: ConversationParticipantRole;
   createdAt: string;
 };
 
@@ -227,4 +246,116 @@ export function shouldCountAsTenantResponse(senderRole: ConversationParticipantR
 
 export function shouldCreateInboundResponseSla(senderRole: ConversationParticipantRole): boolean {
   return senderRole === 'REQUESTER';
+}
+
+export function isSameConversationSide(
+  left: ConversationParticipantRole,
+  right: ConversationParticipantRole,
+): boolean {
+  const tenantSide = left === 'ADVERTISER' || left === 'TENANT_AGENT';
+  const otherTenantSide = right === 'ADVERTISER' || right === 'TENANT_AGENT';
+  return left === right || (tenantSide && otherTenantSide);
+}
+
+export function markMessageDelivered(
+  message: ConversationMessage,
+  nowIso = new Date().toISOString(),
+): ConversationMessage {
+  if (message.deliveryStatus === 'FAILED') {
+    throw new ConversationReceiptError('A failed message cannot be marked delivered.');
+  }
+
+  if (message.deliveryStatus === 'DELIVERED' || message.deliveryStatus === 'READ') {
+    return message;
+  }
+
+  return {
+    ...message,
+    deliveryStatus: 'DELIVERED',
+    deliveredAt: message.deliveredAt ?? nowIso,
+  };
+}
+
+export function markMessageRead(
+  message: ConversationMessage,
+  readerRole: ConversationParticipantRole,
+  nowIso = new Date().toISOString(),
+): ConversationMessage {
+  if (message.deliveryStatus === 'FAILED') {
+    throw new ConversationReceiptError('A failed message cannot be marked read.');
+  }
+
+  if (readerRole === 'SYSTEM' || message.senderRole === 'SYSTEM') {
+    throw new ConversationReceiptError('System messages do not accept read receipts.');
+  }
+
+  if (isSameConversationSide(message.senderRole, readerRole)) {
+    throw new ConversationReceiptError('A sender cannot mark their own message as read.');
+  }
+
+  if (message.deliveryStatus === 'READ') {
+    return message;
+  }
+
+  return {
+    ...message,
+    deliveryStatus: 'READ',
+    deliveredAt: message.deliveredAt ?? nowIso,
+    readAt: nowIso,
+    readByRole: readerRole,
+  };
+}
+
+export function recordConversationTyping(
+  conversation: ConversationRecord,
+  typingRole: ConversationParticipantRole,
+  nowIso = new Date().toISOString(),
+): ConversationRecord {
+  if (typingRole === 'SYSTEM') {
+    throw new ConversationReceiptError('System actors cannot set typing indicators.');
+  }
+
+  return {
+    ...conversation,
+    typingRole,
+    typingAt: nowIso,
+    updatedAt: nowIso,
+  };
+}
+
+export function isConversationTypingActive(
+  typingAt: string | undefined,
+  nowIso = new Date().toISOString(),
+  windowMs = conversationTypingWindowMs,
+): boolean {
+  if (!typingAt) {
+    return false;
+  }
+
+  return Date.parse(nowIso) - Date.parse(typingAt) <= windowMs;
+}
+
+export function countUnreadMessagesForRole(
+  messages: ConversationMessage[],
+  readerRole: ConversationParticipantRole,
+): number {
+  return messages.filter(
+    (message) =>
+      message.senderRole !== 'SYSTEM' &&
+      message.deliveryStatus !== 'READ' &&
+      !isSameConversationSide(message.senderRole, readerRole),
+  ).length;
+}
+
+export function describeMessageDeliveryStatus(status: MessageDeliveryStatus): string {
+  switch (status) {
+    case 'SENT':
+      return 'Sent';
+    case 'DELIVERED':
+      return 'Delivered';
+    case 'READ':
+      return 'Read';
+    case 'FAILED':
+      return 'Failed';
+  }
 }

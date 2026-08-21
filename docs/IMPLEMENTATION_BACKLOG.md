@@ -336,8 +336,11 @@ Progress:
 - Added a protected internal scheduler endpoint for all-tenant conversation SLA
   sweeps: `POST /v1/operations/conversations/sla/run`.
 - Added notification preference, outbox, and delivery-attempt database models.
-- Live websocket delivery, read receipts, typing/presence, attachments, actual
-  provider adapters, audit logs, and repository persistence remain next.
+- Added HTTP delivery receipts, read receipts, typing indicators, unread
+  counts, and opt-in Prisma conversation persistence through
+  `CONVERSATIONS_REPOSITORY=prisma`.
+- Live websocket delivery, online presence, attachments, actual provider
+  adapters, and audit logs remain next.
 
 ## Epic 7: Analytics
 

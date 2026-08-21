@@ -121,8 +121,10 @@ without validating it against the authenticated user's assignments.
   routes require an MFA-verified tenant session.
 - Matching: rules first, then semantic and graph ranking.
 - Conversations: inquiries, chat, RFQs, quotes, assignment, saved replies,
-  response SLAs, message safety checks, and notification alerts. Lead and
-  conversation routes require an MFA-verified tenant session.
+  response SLAs, message safety checks, delivery/read receipts, typing
+  indicators, unread counts, and notification alerts. Lead and conversation
+  routes require an MFA-verified tenant session. Opt-in Prisma persistence is
+  selected with `CONVERSATIONS_REPOSITORY=prisma`.
 - Notifications: tenant preferences, consent-aware channel planning, outbox
   records, provider delivery attempts, suppression reasons, and scheduler jobs.
   Tenant notification routes require an MFA-verified tenant session.

@@ -110,3 +110,15 @@ export class RunConversationSlaDto {
   @IsISO8601()
   declare now?: string;
 }
+
+export class ConversationReceiptDto {
+  @ApiProperty({ enum: conversationParticipantRoles, example: 'TENANT_AGENT' })
+  @IsIn(conversationParticipantRoles)
+  declare readerRole: ConversationParticipantRole;
+}
+
+export class ConversationTypingDto {
+  @ApiProperty({ enum: conversationParticipantRoles, example: 'TENANT_AGENT' })
+  @IsIn(conversationParticipantRoles)
+  declare typingRole: ConversationParticipantRole;
+}

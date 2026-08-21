@@ -61,6 +61,7 @@ OpenAPI: `http://localhost:4000/docs`
 Auth, profile, advert, relationship, and analytics repositories use in-memory
 storage by default for local demo work. After migrations and seed data are
 ready, set `AUTH_REPOSITORY=prisma`, `PROFILE_REPOSITORY=prisma`,
-`ADVERT_REPOSITORY=prisma`, `RELATIONSHIPS_REPOSITORY=prisma`, and
+`ADVERT_REPOSITORY=prisma`, `RELATIONSHIPS_REPOSITORY=prisma`,
+`CONVERSATIONS_REPOSITORY=prisma`, and
 `ANALYTICS_REPOSITORY=prisma` with `DATABASE_URL` to use PostgreSQL-backed
 persistence.
