@@ -1017,7 +1017,8 @@ Implementation progress on 2026-06-17:
 - Added the web Finance Readiness panel with computed subscription tax, net revenue, and next remittance alert status.
 - Continued implementation on 2026-06-23 with protected invoice and receipt command endpoints, country/year document numbering, payment-balance tracking, and a paid transaction path that creates an invoice, optional receipt, immutable tax snapshot, and ledger entries.
 - Continued implementation on 2026-06-24 with protected refund, chargeback, adjustment listing, and dunning commands, including refund credit-note numbering, proportional tax/revenue reversal ledger entries, disputed-balance reopening, and duplicate-safe overdue invoice notices.
-- Remaining hardening: durable database persistence, role-scoped finance permissions, payment-provider adapters/idempotency, reconciliation, evidence attachments, period locks, and exportable reports.
+- Continued implementation on 2026-08-21 with the tax return workbench: review submission, reconciliation-gated approval, dual filing approval above 10,000 filing-currency units, filing/remittance evidence, period lock, CSV/JSON country tax exports, `COUNTRY_FINANCE_ADMIN` access, and product-audit events that omit notes and receipt references.
+- Remaining hardening: durable database persistence, payment-provider adapters/idempotency, and controlled post-lock correction entries.
 
 ### 7.11 Moderation, Trust, and Safety
 

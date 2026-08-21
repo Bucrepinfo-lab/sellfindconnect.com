@@ -9,6 +9,14 @@ export const productAuditActions = [
   'CONVERSATION_MEDIA_ATTACHED',
   'NOTIFICATION_PLANNED',
   'NOTIFICATION_DISPATCHED',
+  'TAX_RETURN_GENERATED',
+  'TAX_RETURN_SUBMITTED',
+  'TAX_RETURN_APPROVED',
+  'TAX_RETURN_EVIDENCE_ATTACHED',
+  'TAX_RETURN_FILED',
+  'TAX_RETURN_REMITTED',
+  'TAX_RETURN_LOCKED',
+  'TAX_REPORT_EXPORTED',
 ] as const;
 
 export type ProductAuditAction = (typeof productAuditActions)[number];
@@ -36,6 +44,7 @@ const deniedExactKeys = new Set([
   'phone',
   'body',
   'message',
+  'note',
   'authorization',
   'apikey',
   'pushtoken',
@@ -66,6 +75,22 @@ export function describeProductAuditAction(action: string): string {
       return 'Notification planned';
     case 'NOTIFICATION_DISPATCHED':
       return 'Notification dispatched';
+    case 'TAX_RETURN_GENERATED':
+      return 'Tax return generated';
+    case 'TAX_RETURN_SUBMITTED':
+      return 'Tax return submitted';
+    case 'TAX_RETURN_APPROVED':
+      return 'Tax return approved';
+    case 'TAX_RETURN_EVIDENCE_ATTACHED':
+      return 'Tax return evidence attached';
+    case 'TAX_RETURN_FILED':
+      return 'Tax return filed';
+    case 'TAX_RETURN_REMITTED':
+      return 'Tax return remitted';
+    case 'TAX_RETURN_LOCKED':
+      return 'Tax period locked';
+    case 'TAX_REPORT_EXPORTED':
+      return 'Tax report exported';
     default:
       return action.replaceAll('_', ' ').toLowerCase();
   }

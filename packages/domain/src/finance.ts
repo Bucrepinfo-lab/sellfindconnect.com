@@ -1,3 +1,5 @@
+import { roleHasPermission, type AccessRole } from './access-control';
+
 export const filingFrequencies = ['MONTHLY', 'QUARTERLY', 'ANNUAL'] as const;
 
 export type FilingFrequency = (typeof filingFrequencies)[number];
@@ -532,5 +534,250 @@ export function reconcileSettlement(
     ),
     hasVariance: varianceCount + missingInLedgerCount + missingInSettlementCount > 0,
     lines,
+  };
+}
+
+export const taxReturnStatuses = [
+  'DRAFT',
+  'IN_REVIEW',
+  'APPROVED',
+  'FILED',
+  'REMITTED',
+  'LOCKED',
+] as const;
+
+export type TaxReturnStatus = (typeof taxReturnStatuses)[number];
+
+export const taxReturnEvidenceKinds = [
+  'FILING_CONFIRMATION',
+  'REMITTANCE_RECEIPT',
+  'AUTHORITY_REFERENCE',
+  'ACCOUNTANT_NOTES',
+  'BOARD_APPROVAL',
+] as const;
+
+export type TaxReturnEvidenceKind = (typeof taxReturnEvidenceKinds)[number];
+
+export const taxReportExportFormats = ['CSV', 'JSON'] as const;
+
+export type TaxReportExportFormat = (typeof taxReportExportFormats)[number];
+
+export const defaultDualApprovalThresholdAmount = 10_000;
+
+const taxReturnTransitions: Record<TaxReturnStatus, readonly TaxReturnStatus[]> = {
+  DRAFT: ['IN_REVIEW'],
+  IN_REVIEW: ['APPROVED'],
+  APPROVED: ['FILED'],
+  FILED: ['REMITTED'],
+  REMITTED: ['LOCKED'],
+  LOCKED: [],
+};
+
+export function assertTaxReturnTransition(from: TaxReturnStatus, to: TaxReturnStatus): void {
+  if (!taxReturnTransitions[from].includes(to)) {
+    throw new Error(`Tax return cannot move from ${from} to ${to}.`);
+  }
+}
+
+export function isTaxReturnPeriodLocked(status: TaxReturnStatus): boolean {
+  return status === 'LOCKED';
+}
+
+export function assertTaxReturnPeriodUnlocked(status: TaxReturnStatus): void {
+  if (isTaxReturnPeriodLocked(status)) {
+    throw new Error(
+      'Locked tax periods cannot be changed except through a controlled correction workflow.',
+    );
+  }
+}
+
+export function requiresSeparateFilingApprover(
+  computedTaxDue: number,
+  thresholdAmount = defaultDualApprovalThresholdAmount,
+): boolean {
+  return computedTaxDue >= thresholdAmount;
+}
+
+export function assertFilingApproverSeparation(input: {
+  computedTaxDue: number;
+  reviewApprovedBy: string;
+  filingApprovedBy: string;
+  thresholdAmount?: number;
+}): void {
+  if (!requiresSeparateFilingApprover(input.computedTaxDue, input.thresholdAmount)) {
+    return;
+  }
+
+  if (input.reviewApprovedBy.trim().toLowerCase() === input.filingApprovedBy.trim().toLowerCase()) {
+    throw new Error(
+      'Filing approval above the dual-control threshold requires a different approver than review.',
+    );
+  }
+}
+
+export type TaxPeriodCompletionInput = {
+  status: TaxReturnStatus;
+  evidenceKinds: readonly TaxReturnEvidenceKind[];
+  reviewApprovedBy?: string;
+  filingApprovedBy?: string;
+  remittedAt?: string;
+};
+
+export type TaxPeriodCompletion = {
+  complete: boolean;
+  missing: string[];
+};
+
+export function evaluateTaxPeriodCompletion(input: TaxPeriodCompletionInput): TaxPeriodCompletion {
+  const missing: string[] = [];
+
+  if (input.status !== 'REMITTED' && input.status !== 'LOCKED') {
+    missing.push('status');
+  }
+  if (!input.evidenceKinds.includes('FILING_CONFIRMATION')) {
+    missing.push('FILING_CONFIRMATION');
+  }
+  if (!input.evidenceKinds.includes('REMITTANCE_RECEIPT')) {
+    missing.push('REMITTANCE_RECEIPT');
+  }
+  if (!input.reviewApprovedBy?.trim()) {
+    missing.push('reviewApprovedBy');
+  }
+  if (!input.filingApprovedBy?.trim()) {
+    missing.push('filingApprovedBy');
+  }
+  if (!input.remittedAt?.trim()) {
+    missing.push('remittedAt');
+  }
+
+  return { complete: missing.length === 0, missing };
+}
+
+export function canOperateTaxReturnWorkbench(role: AccessRole): boolean {
+  return roleHasPermission(role, 'MANAGE_FINANCE');
+}
+
+export function canExportCountryTaxReport(role: AccessRole): boolean {
+  return roleHasPermission(role, 'MANAGE_FINANCE');
+}
+
+export type TaxReturnEvidenceExport = {
+  kind: TaxReturnEvidenceKind;
+  reference: string;
+  attachedAt: string;
+  attachedBy: string;
+};
+
+export type TaxReturnExportSource = {
+  id: string;
+  countryCode: string;
+  taxType: string;
+  periodStart: string;
+  periodEnd: string;
+  filingDeadline: string;
+  paymentDeadline: string;
+  filingCurrency: string;
+  computedTaxDue: number;
+  status: TaxReturnStatus;
+  reviewApprovedBy?: string;
+  filingApprovedBy?: string;
+  filedAt?: string;
+  remittedAt?: string;
+  lockedAt?: string;
+  evidence: TaxReturnEvidenceExport[];
+};
+
+export type TaxReturnExportResult = {
+  format: TaxReportExportFormat;
+  fileName: string;
+  contentType: string;
+  encoding: 'utf8';
+  content: string;
+};
+
+function csvCell(value: string): string {
+  return `"${value.replaceAll('"', '""')}"`;
+}
+
+export function buildTaxReturnExport(
+  source: TaxReturnExportSource,
+  format: TaxReportExportFormat = 'CSV',
+): TaxReturnExportResult {
+  const fileName = `tax-return-${source.countryCode.toLowerCase()}-${source.taxType.toLowerCase()}-${source.periodStart.slice(0, 10)}-${source.periodEnd.slice(0, 10)}.${format.toLowerCase()}`;
+
+  if (format === 'JSON') {
+    return {
+      format,
+      fileName,
+      contentType: 'application/json',
+      encoding: 'utf8',
+      content: JSON.stringify(
+        {
+          countryCode: source.countryCode,
+          taxType: source.taxType,
+          periodStart: source.periodStart,
+          periodEnd: source.periodEnd,
+          filingDeadline: source.filingDeadline,
+          paymentDeadline: source.paymentDeadline,
+          filingCurrency: source.filingCurrency,
+          computedTaxDue: source.computedTaxDue,
+          status: source.status,
+          reviewApprovedBy: source.reviewApprovedBy ?? null,
+          filingApprovedBy: source.filingApprovedBy ?? null,
+          filedAt: source.filedAt ?? null,
+          remittedAt: source.remittedAt ?? null,
+          lockedAt: source.lockedAt ?? null,
+          evidence: source.evidence.map((item) => ({
+            kind: item.kind,
+            reference: item.reference,
+            attachedAt: item.attachedAt,
+            attachedBy: item.attachedBy,
+          })),
+        },
+        null,
+        2,
+      ),
+    };
+  }
+
+  const header = [
+    'countryCode',
+    'taxType',
+    'periodStart',
+    'periodEnd',
+    'filingCurrency',
+    'computedTaxDue',
+    'status',
+    'reviewApprovedBy',
+    'filingApprovedBy',
+    'filedAt',
+    'remittedAt',
+    'lockedAt',
+    'evidenceKinds',
+    'evidenceReferences',
+  ];
+  const row = [
+    source.countryCode,
+    source.taxType,
+    source.periodStart,
+    source.periodEnd,
+    source.filingCurrency,
+    String(source.computedTaxDue),
+    source.status,
+    source.reviewApprovedBy ?? '',
+    source.filingApprovedBy ?? '',
+    source.filedAt ?? '',
+    source.remittedAt ?? '',
+    source.lockedAt ?? '',
+    source.evidence.map((item) => item.kind).join('|'),
+    source.evidence.map((item) => item.reference).join('|'),
+  ];
+
+  return {
+    format,
+    fileName,
+    contentType: 'text/csv',
+    encoding: 'utf8',
+    content: `${header.join(',')}\n${row.map(csvCell).join(',')}\n`,
   };
 }

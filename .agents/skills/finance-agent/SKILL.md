@@ -19,6 +19,10 @@ The API `finance` module already provides, per tenant/country:
   `RECONCILIATION_VARIANCE` alerts.
 - Draft **tax returns** and **T-30/T-14/T-7/T-3/T-1/due/overdue** remittance
   alerts.
+- **Tax return workbench**: review submit, reconciliation-gated approval, dual
+  filing approval above 10,000 units, evidence, remittance, period lock, and
+  CSV/JSON country tax exports. `COUNTRY_FINANCE_ADMIN` can operate it;
+  `BILLING_MANAGER` cannot.
 Pure logic lives in `packages/domain/src/finance.ts`; wiring in
 `apps/api/src/modules/finance`.
 

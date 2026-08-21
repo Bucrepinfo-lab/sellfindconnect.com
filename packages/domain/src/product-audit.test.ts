@@ -55,4 +55,27 @@ describe('product audit helpers', () => {
     expect(JSON.stringify(record)).not.toContain('hide this');
     expect(describeProductAuditAction(record.action)).toBe('Chat message sent');
   });
+
+  it('describes tax workbench audit actions without storing note bodies', () => {
+    const record = buildProductAuditRecord({
+      action: 'TAX_RETURN_EVIDENCE_ATTACHED',
+      entityType: 'TAX_RETURN',
+      entityId: 'return-1',
+      tenantId,
+      metadata: {
+        evidenceKind: 'ACCOUNTANT_NOTES',
+        noteLength: 48,
+        note: 'Board approved remittance for KE VAT June.',
+        email: 'finance@example.com',
+      },
+    });
+
+    expect(record.metadata).toEqual({
+      evidenceKind: 'ACCOUNTANT_NOTES',
+      noteLength: 48,
+    });
+    expect(JSON.stringify(record)).not.toContain('Board approved');
+    expect(describeProductAuditAction('TAX_RETURN_LOCKED')).toBe('Tax period locked');
+    expect(describeProductAuditAction('TAX_REPORT_EXPORTED')).toBe('Tax report exported');
+  });
 });

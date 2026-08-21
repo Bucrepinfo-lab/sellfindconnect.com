@@ -71,6 +71,35 @@ describe('access control policy', () => {
     expect(getRolePermissions('GLOBAL_FINANCE_ADMIN')).not.toContain('MODERATE_CONTENT');
   });
 
+  it('lets country finance admins manage finance after MFA', () => {
+    const allowed = evaluateAccess({
+      subject: {
+        userId: 'finance-1',
+        role: 'COUNTRY_FINANCE_ADMIN',
+        mfaVerified: true,
+        scope: { level: 'COUNTRY', countryCodes: ['KE'] },
+      },
+      permission: 'MANAGE_FINANCE',
+      resource: { countryCode: 'KE' },
+    });
+    const denied = evaluateAccess({
+      subject: {
+        userId: 'finance-1',
+        role: 'COUNTRY_FINANCE_ADMIN',
+        mfaVerified: true,
+        scope: { level: 'COUNTRY', countryCodes: ['KE'] },
+      },
+      permission: 'MANAGE_FINANCE',
+      resource: { countryCode: 'UG' },
+    });
+
+    expect(requiresMfa('COUNTRY_FINANCE_ADMIN')).toBe(true);
+    expect(getRolePermissions('COUNTRY_FINANCE_ADMIN')).toContain('MANAGE_FINANCE');
+    expect(allowed.allowed).toBe(true);
+    expect(denied.allowed).toBe(false);
+    expect(denied.reason).toBe('SCOPE_MISMATCH');
+  });
+
   it('allows country moderators to moderate only their country after MFA', () => {
     const allowed = evaluateAccess({
       subject: {

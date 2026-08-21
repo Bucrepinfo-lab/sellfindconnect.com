@@ -1,17 +1,25 @@
-import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import {
+  assertFilingApproverSeparation,
+  assertTaxReturnPeriodUnlocked,
+  assertTaxReturnTransition,
   buildInvoiceNumber,
+  buildTaxReturnExport,
   calculateFinanceAdjustmentBreakdown,
   calculatePaymentBalance,
   calculateTaxSnapshotAmounts,
+  canExportCountryTaxReport,
+  canOperateTaxReturnWorkbench,
   createFinanceDocumentNumber,
   evaluateSafetyFields,
+  evaluateTaxPeriodCompletion,
   getDunningNoticeDecision,
   getCountry,
   getRemittanceAlertDecision,
   reconcileSettlement,
   roundMoney,
   summarizeInvoiceLines,
+  type AccessRole,
   type DunningNoticeStage,
   type FinanceAdjustmentStatus,
   type FinanceAdjustmentType,
@@ -23,26 +31,39 @@ import {
   type InvoicePaymentStatus,
   type InvoiceStatus,
   type PaymentMethod,
+  type ProductAuditAction,
   type ReconciliationSummary,
   type TaxProfileStatus,
+  type TaxReportExportFormat,
+  type TaxReturnEvidenceKind,
+  type TaxReturnStatus,
+  type TenantAccessRole,
 } from '@telpen/domain';
 import { randomUUID } from 'node:crypto';
 
+import { AuthService } from '../auth/auth.service';
 import type {
+  ApproveTaxReturnDto,
+  AttachTaxReturnEvidenceDto,
   CalculateTaxDto,
   ConfigureCountryTaxProfileDto,
   CreateInvoiceDto,
   CreateTaxRuleDto,
+  ExportTaxReturnQueryDto,
+  FileTaxReturnDto,
   GenerateTaxReturnDto,
   IssueInvoiceDto,
   IssueReceiptDto,
+  LockTaxReturnDto,
   OpenChargebackDto,
   PayInvoiceDto,
   ReconcileSettlementDto,
   RefundInvoiceDto,
+  RemitTaxReturnDto,
   RequestRefundDto,
   RunDunningDto,
   RunFinanceAlertsDto,
+  SubmitTaxReturnDto,
 } from './dto/finance.dto';
 import {
   buildPaymentIdempotencyKey,
@@ -117,6 +138,15 @@ type TaxLedgerEntryRecord = {
   createdAt: string;
 };
 
+type TaxReturnEvidenceRecord = {
+  id: string;
+  kind: TaxReturnEvidenceKind;
+  reference: string;
+  note?: string;
+  attachedBy: string;
+  attachedAt: string;
+};
+
 type TaxReturnRecord = {
   id: string;
   countryCode: string;
@@ -127,9 +157,24 @@ type TaxReturnRecord = {
   paymentDeadline: string;
   filingCurrency: string;
   computedTaxDue: number;
-  status: 'DRAFT' | 'IN_REVIEW' | 'APPROVED' | 'FILED' | 'REMITTED' | 'LOCKED';
+  status: TaxReturnStatus;
+  evidence: TaxReturnEvidenceRecord[];
+  reviewApprovedBy?: string;
+  reviewApprovedAt?: string;
+  filingApprovedBy?: string;
+  filingApprovedAt?: string;
+  filedAt?: string;
+  remittedAt?: string;
+  lockedAt?: string;
   createdAt: string;
   updatedAt: string;
+};
+
+type FinanceWorkbenchContext = {
+  tenantId?: string;
+  actorUserId?: string;
+  actorRole?: AccessRole;
+  sessionRole?: TenantAccessRole;
 };
 
 type FinanceInvoiceLineItemRecord = {
@@ -322,11 +367,13 @@ export class FinanceService {
   private readonly reconciliationRuns = new Map<string, ReconciliationRunRecord>();
   private readonly paymentInvoiceSequences = new Map<string, number>();
   private readonly paymentAdapter: PaymentAdapter;
+  private readonly auth?: AuthService;
 
-  constructor(paymentAdapter?: PaymentAdapter) {
+  constructor(paymentAdapter?: PaymentAdapter, auth?: AuthService) {
     this.paymentAdapter =
       paymentAdapter ??
       createConfiguredPaymentAdapter({ get: (key) => process.env[key] });
+    this.auth = auth;
   }
 
   configureCountryTaxProfile(input: ConfigureCountryTaxProfileDto): CountryTaxProfileRecord {
@@ -442,7 +489,8 @@ export class FinanceService {
       .sort((a, b) => b.transactionAt.localeCompare(a.transactionAt));
   }
 
-  generateTaxReturn(input: GenerateTaxReturnDto) {
+  generateTaxReturn(input: GenerateTaxReturnDto, context?: FinanceWorkbenchContext) {
+    this.requireWorkbenchOperator(context);
     const profile = this.requireApprovedProfile(input.countryCode);
     if (profile.status !== 'APPROVED') {
       throw new UnprocessableEntityException('Country tax profile is not approved.');
@@ -466,6 +514,7 @@ export class FinanceService {
       filingCurrency: input.filingCurrency.toUpperCase(),
       computedTaxDue: Math.round((computedTaxDue + Number.EPSILON) * 10000) / 10000,
       status: 'DRAFT',
+      evidence: [],
       createdAt: now,
       updatedAt: now,
     };
@@ -475,14 +524,252 @@ export class FinanceService {
       this.createReturnAlert(taxReturn, 'RETURN_READY_FOR_REVIEW', input.filingDeadline, now),
       this.createReturnAlert(taxReturn, 'APPROVAL_REQUIRED', input.paymentDeadline, now),
     ];
+    this.auditProduct({
+      tenantId: context?.tenantId,
+      actorUserId: context?.actorUserId,
+      action: 'TAX_RETURN_GENERATED',
+      entityId: taxReturn.id,
+      metadata: {
+        countryCode: taxReturn.countryCode,
+        taxType: taxReturn.taxType,
+        computedTaxDue: taxReturn.computedTaxDue,
+        status: taxReturn.status,
+      },
+    });
 
     return { taxReturn, sourceSnapshotCount: snapshots.length, alertsCreated };
   }
 
-  listTaxReturns(): TaxReturnRecord[] {
+  listTaxReturns(context?: FinanceWorkbenchContext): TaxReturnRecord[] {
+    this.requireWorkbenchOperator(context);
     return Array.from(this.taxReturns.values()).sort((a, b) =>
       b.periodEnd.localeCompare(a.periodEnd),
     );
+  }
+
+  getTaxReturn(id: string, context?: FinanceWorkbenchContext): TaxReturnRecord {
+    this.requireWorkbenchOperator(context);
+    return this.requireTaxReturn(id);
+  }
+
+  submitTaxReturn(id: string, input: SubmitTaxReturnDto = {}, context?: FinanceWorkbenchContext) {
+    const actor = this.requireWorkbenchOperator({ ...context, ...input });
+    const taxReturn = this.requireUnlockedTaxReturn(id);
+    this.transitionTaxReturn(taxReturn, 'IN_REVIEW', this.actorName(input, actor));
+    this.auditProduct({
+      tenantId: context?.tenantId,
+      actorUserId: input.actorUserId ?? context?.actorUserId,
+      action: 'TAX_RETURN_SUBMITTED',
+      entityId: taxReturn.id,
+      metadata: {
+        countryCode: taxReturn.countryCode,
+        status: taxReturn.status,
+        actorRole: actor,
+      },
+    });
+    return taxReturn;
+  }
+
+  approveTaxReturn(id: string, input: ApproveTaxReturnDto = {}, context?: FinanceWorkbenchContext) {
+    const actor = this.requireWorkbenchOperator({ ...context, ...input });
+    const taxReturn = this.requireUnlockedTaxReturn(id);
+    this.assertReconciliationClear(taxReturn.countryCode);
+    const approvedBy = this.actorName(input, actor);
+    this.transitionTaxReturn(taxReturn, 'APPROVED', approvedBy);
+    taxReturn.reviewApprovedBy = approvedBy;
+    taxReturn.reviewApprovedAt = taxReturn.updatedAt;
+    this.taxReturns.set(taxReturn.id, taxReturn);
+    this.auditProduct({
+      tenantId: context?.tenantId,
+      actorUserId: input.actorUserId ?? context?.actorUserId,
+      action: 'TAX_RETURN_APPROVED',
+      entityId: taxReturn.id,
+      metadata: {
+        countryCode: taxReturn.countryCode,
+        status: taxReturn.status,
+        actorRole: actor,
+      },
+    });
+    return taxReturn;
+  }
+
+  attachTaxReturnEvidence(
+    id: string,
+    input: AttachTaxReturnEvidenceDto,
+    context?: FinanceWorkbenchContext,
+  ) {
+    const actor = this.requireWorkbenchOperator({ ...context, ...input });
+    this.assertSafe(input, 'Tax return evidence contains blocked content.');
+    const taxReturn = this.requireUnlockedTaxReturn(id);
+    const evidence = this.addTaxReturnEvidence(taxReturn, input, this.actorName(input, actor));
+    this.auditProduct({
+      tenantId: context?.tenantId,
+      actorUserId: input.actorUserId ?? context?.actorUserId,
+      action: 'TAX_RETURN_EVIDENCE_ATTACHED',
+      entityId: taxReturn.id,
+      metadata: {
+        countryCode: taxReturn.countryCode,
+        evidenceKind: evidence.kind,
+        noteLength: input.note?.length ?? 0,
+        actorRole: actor,
+      },
+    });
+    return { taxReturn, evidence };
+  }
+
+  fileTaxReturn(id: string, input: FileTaxReturnDto, context?: FinanceWorkbenchContext) {
+    const actor = this.requireWorkbenchOperator({ ...context, ...input });
+    this.assertSafe(input, 'Tax return filing contains blocked content.');
+    const taxReturn = this.requireUnlockedTaxReturn(id);
+    const filingApprovedBy = this.actorName(input, actor);
+    this.runWorkbench(() =>
+      assertFilingApproverSeparation({
+        computedTaxDue: taxReturn.computedTaxDue,
+        reviewApprovedBy: taxReturn.reviewApprovedBy ?? '',
+        filingApprovedBy,
+        thresholdAmount: input.dualApprovalThresholdAmount,
+      }),
+    );
+    this.addTaxReturnEvidence(taxReturn, input, filingApprovedBy);
+    if (!taxReturn.evidence.some((item) => item.kind === 'FILING_CONFIRMATION')) {
+      throw new UnprocessableEntityException('Filing confirmation evidence is required before filing.');
+    }
+    this.transitionTaxReturn(taxReturn, 'FILED', filingApprovedBy);
+    taxReturn.filingApprovedBy = filingApprovedBy;
+    taxReturn.filingApprovedAt = taxReturn.updatedAt;
+    taxReturn.filedAt = taxReturn.updatedAt;
+    this.taxReturns.set(taxReturn.id, taxReturn);
+    this.auditProduct({
+      tenantId: context?.tenantId,
+      actorUserId: input.actorUserId ?? context?.actorUserId,
+      action: 'TAX_RETURN_FILED',
+      entityId: taxReturn.id,
+      metadata: {
+        countryCode: taxReturn.countryCode,
+        status: taxReturn.status,
+        actorRole: actor,
+      },
+    });
+    return taxReturn;
+  }
+
+  remitTaxReturn(id: string, input: RemitTaxReturnDto, context?: FinanceWorkbenchContext) {
+    const actor = this.requireWorkbenchOperator({ ...context, ...input });
+    this.assertSafe(input, 'Tax return remittance contains blocked content.');
+    const taxReturn = this.requireUnlockedTaxReturn(id);
+    this.addTaxReturnEvidence(
+      taxReturn,
+      {
+        kind: input.kind ?? 'REMITTANCE_RECEIPT',
+        reference: input.reference,
+        note: input.note,
+      },
+      this.actorName(input, actor),
+    );
+    if (!taxReturn.evidence.some((item) => item.kind === 'REMITTANCE_RECEIPT')) {
+      throw new UnprocessableEntityException('Remittance receipt evidence is required before remittance.');
+    }
+    this.transitionTaxReturn(taxReturn, 'REMITTED', this.actorName(input, actor));
+    taxReturn.remittedAt = taxReturn.updatedAt;
+    this.taxReturns.set(taxReturn.id, taxReturn);
+    this.createFinanceAlert({
+      countryCode: taxReturn.countryCode,
+      taxReturnId: taxReturn.id,
+      alertType: 'FILING_COMPLETED',
+      message: `${taxReturn.countryCode} ${taxReturn.taxType} return for ${taxReturn.periodStart.slice(0, 7)} marked filed and remitted. Receipt/reference: ${input.reference}.`,
+      severity: 'INFO',
+      dueAt: taxReturn.updatedAt,
+      createdAt: taxReturn.updatedAt,
+      dedupeKey: `${taxReturn.id}:FILING_COMPLETED`,
+    });
+    this.auditProduct({
+      tenantId: context?.tenantId,
+      actorUserId: input.actorUserId ?? context?.actorUserId,
+      action: 'TAX_RETURN_REMITTED',
+      entityId: taxReturn.id,
+      metadata: {
+        countryCode: taxReturn.countryCode,
+        status: taxReturn.status,
+        actorRole: actor,
+      },
+    });
+    return taxReturn;
+  }
+
+  lockTaxReturn(id: string, input: LockTaxReturnDto = {}, context?: FinanceWorkbenchContext) {
+    const actor = this.requireWorkbenchOperator({ ...context, ...input });
+    const taxReturn = this.requireUnlockedTaxReturn(id);
+    const completion = evaluateTaxPeriodCompletion({
+      status: taxReturn.status,
+      evidenceKinds: taxReturn.evidence.map((item) => item.kind),
+      reviewApprovedBy: taxReturn.reviewApprovedBy,
+      filingApprovedBy: taxReturn.filingApprovedBy,
+      remittedAt: taxReturn.remittedAt,
+    });
+    if (!completion.complete) {
+      throw new UnprocessableEntityException(
+        `Tax period cannot be locked until filing evidence, remittance evidence, approvers, and timestamps are present. Missing: ${completion.missing.join(', ')}.`,
+      );
+    }
+    this.transitionTaxReturn(taxReturn, 'LOCKED', this.actorName(input, actor));
+    taxReturn.lockedAt = taxReturn.updatedAt;
+    this.taxReturns.set(taxReturn.id, taxReturn);
+    this.auditProduct({
+      tenantId: context?.tenantId,
+      actorUserId: input.actorUserId ?? context?.actorUserId,
+      action: 'TAX_RETURN_LOCKED',
+      entityId: taxReturn.id,
+      metadata: {
+        countryCode: taxReturn.countryCode,
+        status: taxReturn.status,
+        actorRole: actor,
+      },
+    });
+    return taxReturn;
+  }
+
+  exportTaxReturn(id: string, query: ExportTaxReturnQueryDto = {}, context?: FinanceWorkbenchContext) {
+    const actor = this.requireExportOperator({ ...context, actorRole: query.actorRole });
+    const taxReturn = this.requireTaxReturn(id);
+    const format: TaxReportExportFormat = query.format ?? 'CSV';
+    const exported = buildTaxReturnExport(
+      {
+        id: taxReturn.id,
+        countryCode: taxReturn.countryCode,
+        taxType: taxReturn.taxType,
+        periodStart: taxReturn.periodStart,
+        periodEnd: taxReturn.periodEnd,
+        filingDeadline: taxReturn.filingDeadline,
+        paymentDeadline: taxReturn.paymentDeadline,
+        filingCurrency: taxReturn.filingCurrency,
+        computedTaxDue: taxReturn.computedTaxDue,
+        status: taxReturn.status,
+        reviewApprovedBy: taxReturn.reviewApprovedBy,
+        filingApprovedBy: taxReturn.filingApprovedBy,
+        filedAt: taxReturn.filedAt,
+        remittedAt: taxReturn.remittedAt,
+        lockedAt: taxReturn.lockedAt,
+        evidence: taxReturn.evidence.map((item) => ({
+          kind: item.kind,
+          reference: item.reference,
+          attachedAt: item.attachedAt,
+          attachedBy: item.attachedBy,
+        })),
+      },
+      format,
+    );
+    this.auditProduct({
+      tenantId: context?.tenantId,
+      actorUserId: context?.actorUserId,
+      action: 'TAX_REPORT_EXPORTED',
+      entityId: taxReturn.id,
+      metadata: {
+        countryCode: taxReturn.countryCode,
+        format: exported.format,
+        actorRole: actor,
+      },
+    });
+    return exported;
   }
 
   createInvoice(tenantId: string, input: CreateInvoiceDto) {
@@ -1465,6 +1752,136 @@ export class FinanceService {
     }
 
     return `Grace-period dunning notice for ${invoice.invoiceNumber}. ${invoice.amountDue} ${invoice.presentmentCurrency} is ${decision.daysOverdue} day overdue.`;
+  }
+
+  private resolveWorkbenchRole(context?: FinanceWorkbenchContext): AccessRole {
+    if (context?.sessionRole === 'BILLING_MANAGER') {
+      return 'BILLING_MANAGER';
+    }
+
+    return context?.actorRole ?? 'GLOBAL_FINANCE_ADMIN';
+  }
+
+  private requireWorkbenchOperator(context?: FinanceWorkbenchContext): AccessRole {
+    const role = this.resolveWorkbenchRole(context);
+    if (!canOperateTaxReturnWorkbench(role)) {
+      throw new ForbiddenException('Country tax return workbench requires a finance admin role.');
+    }
+
+    return role;
+  }
+
+  private requireExportOperator(context?: FinanceWorkbenchContext): AccessRole {
+    const role = this.resolveWorkbenchRole(context);
+    if (!canExportCountryTaxReport(role)) {
+      throw new ForbiddenException('Country tax reports require a finance admin role.');
+    }
+
+    return role;
+  }
+
+  private requireTaxReturn(id: string): TaxReturnRecord {
+    const taxReturn = this.taxReturns.get(id);
+    if (!taxReturn) {
+      throw new NotFoundException('Tax return not found.');
+    }
+
+    return taxReturn;
+  }
+
+  private requireUnlockedTaxReturn(id: string): TaxReturnRecord {
+    const taxReturn = this.requireTaxReturn(id);
+    this.runWorkbench(() => assertTaxReturnPeriodUnlocked(taxReturn.status));
+    return taxReturn;
+  }
+
+  private transitionTaxReturn(taxReturn: TaxReturnRecord, to: TaxReturnStatus, _actor: string): void {
+    this.runWorkbench(() => assertTaxReturnTransition(taxReturn.status, to));
+    taxReturn.status = to;
+    taxReturn.updatedAt = new Date().toISOString();
+    this.taxReturns.set(taxReturn.id, taxReturn);
+  }
+
+  private addTaxReturnEvidence(
+    taxReturn: TaxReturnRecord,
+    input: { kind: TaxReturnEvidenceKind; reference: string; note?: string },
+    attachedBy: string,
+  ): TaxReturnEvidenceRecord {
+    const evidence: TaxReturnEvidenceRecord = {
+      id: randomUUID(),
+      kind: input.kind,
+      reference: input.reference.trim(),
+      note: input.note?.trim() || undefined,
+      attachedBy,
+      attachedAt: new Date().toISOString(),
+    };
+    taxReturn.evidence = [...taxReturn.evidence.filter((item) => item.kind !== evidence.kind), evidence];
+    taxReturn.updatedAt = evidence.attachedAt;
+    this.taxReturns.set(taxReturn.id, taxReturn);
+    return evidence;
+  }
+
+  private assertReconciliationClear(countryCode: string): void {
+    const runs = Array.from(this.reconciliationRuns.values())
+      .filter((run) => !run.countryCode || run.countryCode === countryCode)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+    if (runs.length === 0) {
+      throw new UnprocessableEntityException('Reconciliation is required before tax return approval.');
+    }
+
+    if (runs[0]?.summary.hasVariance) {
+      throw new UnprocessableEntityException(
+        'Reconciliation variance must be cleared before tax return approval.',
+      );
+    }
+
+    const openVariance = Array.from(this.financeAlerts.values()).find(
+      (alert) =>
+        alert.alertType === 'RECONCILIATION_VARIANCE' &&
+        alert.status === 'OPEN' &&
+        (alert.countryCode === countryCode || alert.countryCode === 'GLOBAL'),
+    );
+    if (openVariance) {
+      throw new UnprocessableEntityException(
+        'Reconciliation variance must be cleared before tax return approval.',
+      );
+    }
+  }
+
+  private actorName(
+    input: { actorUserId?: string },
+    role: AccessRole,
+  ): string {
+    return input.actorUserId?.trim() || role;
+  }
+
+  private auditProduct(input: {
+    tenantId?: string;
+    actorUserId?: string;
+    action: ProductAuditAction;
+    entityId: string;
+    metadata?: Record<string, string | number | boolean | null>;
+  }): void {
+    void this.auth?.recordTenantAudit({
+      tenantId: input.tenantId,
+      actorUserId: input.actorUserId,
+      action: input.action,
+      entityType: 'TAX_RETURN',
+      entityId: input.entityId,
+      metadata: input.metadata,
+    });
+  }
+
+  private runWorkbench<T>(callback: () => T): T {
+    try {
+      return callback();
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new UnprocessableEntityException(error.message);
+      }
+      throw error;
+    }
   }
 
   private assertSafe(input: object, message: string): void {

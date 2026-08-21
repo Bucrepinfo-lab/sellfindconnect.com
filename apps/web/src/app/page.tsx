@@ -41,6 +41,8 @@ import {
   calculateConversationSlaDecision,
   calculateTaxSnapshotAmounts,
   calculateTrialSubscription,
+  canExportCountryTaxReport,
+  canOperateTaxReturnWorkbench,
   conversationStatuses,
   conversationRealtimeNamespace,
   countUnreadMessagesForRole,
@@ -58,6 +60,7 @@ import {
   evaluateAccess,
   evaluatePasswordPolicy,
   evaluateSafetyText,
+  evaluateTaxPeriodCompletion,
   expandDiscoveryQuery,
   getRemittanceAlertDecision,
   getCountry,
@@ -66,6 +69,7 @@ import {
   attachApprovedRelationshipClaims,
   buildOpportunityAlert,
   buildProductAuditRecord,
+  buildTaxReturnExport,
   canViewTenantAuditLogs,
   createRelationshipClaim,
   createSavedSourceFinderSearch,
@@ -111,6 +115,7 @@ const lifecycleDemoNow = new Date(Date.UTC(2026, 6, 10, 0, 0, 0)).toISOString();
 const conversationDemoOpenedAt = '2026-06-17T08:00:00.000Z';
 const conversationDemoNow = '2026-06-17T11:15:00.000Z';
 const opportunityAlertDemoNow = '2026-08-22T08:00:00.000Z';
+const taxReturnDemoNow = '2026-07-31T09:05:00.000Z';
 const analyticsApiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/v1';
 
 type SavedSearchAlertPreview = {
@@ -476,6 +481,55 @@ export default function Home() {
     '2026-07-31T00:00:00.000Z',
     '2026-07-24T00:00:00.000Z',
   );
+  const taxReturnExport = buildTaxReturnExport(
+    {
+      id: 'tax-return-ke-vat-2026-06',
+      countryCode: country.code,
+      taxType: 'VAT',
+      periodStart: '2026-06-01T00:00:00.000Z',
+      periodEnd: '2026-06-30T23:59:59.999Z',
+      filingDeadline: '2026-07-20T00:00:00.000Z',
+      paymentDeadline: '2026-07-31T00:00:00.000Z',
+      filingCurrency: country.currencyCode,
+      computedTaxDue: pilotTaxSnapshot.taxAmount,
+      status: 'LOCKED',
+      reviewApprovedBy: 'country-finance-admin',
+      filingApprovedBy: 'global-finance-admin',
+      filedAt: '2026-07-18T09:00:00.000Z',
+      remittedAt: '2026-07-31T09:00:00.000Z',
+      lockedAt: taxReturnDemoNow,
+      evidence: [
+        {
+          kind: 'FILING_CONFIRMATION',
+          reference: 'KRA-VAT-2026-06',
+          attachedAt: '2026-07-18T09:00:00.000Z',
+          attachedBy: 'country-finance-admin',
+        },
+        {
+          kind: 'REMITTANCE_RECEIPT',
+          reference: 'PAY-8891',
+          attachedAt: '2026-07-31T09:00:00.000Z',
+          attachedBy: 'global-finance-admin',
+        },
+        {
+          kind: 'AUTHORITY_REFERENCE',
+          reference: 'KRA-REF-7781',
+          attachedAt: taxReturnDemoNow,
+          attachedBy: 'global-finance-admin',
+        },
+      ],
+    },
+    'CSV',
+  );
+  const taxPeriodCompletion = evaluateTaxPeriodCompletion({
+    status: 'LOCKED',
+    evidenceKinds: ['FILING_CONFIRMATION', 'REMITTANCE_RECEIPT', 'AUTHORITY_REFERENCE'],
+    reviewApprovedBy: 'country-finance-admin',
+    filingApprovedBy: 'global-finance-admin',
+    remittedAt: '2026-07-31T09:00:00.000Z',
+  });
+  const canManageTaxReturn = canOperateTaxReturnWorkbench(accessRole);
+  const canExportTaxReturn = canExportCountryTaxReport(accessRole);
   const selectedIndustry = industryCategories.find((industry) => industry.code === industryCode);
   const safetyDecision = evaluateSafetyText(profileDescription);
   const querySafetyDecision = evaluateSafetyText(query);
@@ -1686,6 +1740,49 @@ export default function Home() {
                     : 'Calendar clear'
                 }
               />
+              <FinanceRow
+                label="Tax return"
+                value={taxPeriodCompletion.complete ? 'June VAT locked' : 'Workbench incomplete'}
+              />
+              <FinanceRow
+                label="Filing evidence"
+                value="Confirmation, remittance, authority ref"
+              />
+              <FinanceRow
+                label="Dual approval"
+                value="Country then global finance"
+              />
+              <FinanceRow
+                label="Tax export"
+                value={
+                  canExportTaxReturn
+                    ? taxReturnExport.fileName
+                    : 'Finance admin only'
+                }
+              />
+              {canManageTaxReturn ? (
+                <div className="policy-box ok compact">
+                  <FileCheck2 size={16} />
+                  <div>
+                    <strong>Period lock on</strong>
+                    <span>
+                      Filing and remittance evidence plus both approvers are required before a
+                      period can close.
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="policy-box block compact">
+                  <CircleAlert size={18} />
+                  <div>
+                    <strong>Workbench locked</strong>
+                    <span>
+                      Billing managers can see tenant invoices, not country tax returns or
+                      exports.
+                    </span>
+                  </div>
+                </div>
+              )}
             </section>
 
             <section className="side-panel" id="relationship-graph">

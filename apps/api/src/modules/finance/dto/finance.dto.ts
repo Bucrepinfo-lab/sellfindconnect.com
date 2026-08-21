@@ -1,9 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  accessRoles,
   filingFrequencies,
   paymentMethods,
+  taxReportExportFormats,
+  taxReturnEvidenceKinds,
+  type AccessRole,
   type FilingFrequency,
   type PaymentMethod,
+  type TaxReportExportFormat,
+  type TaxReturnEvidenceKind,
 } from '@telpen/domain';
 import { Type } from 'class-transformer';
 import {
@@ -570,4 +576,78 @@ export class ReconcileSettlementDto {
   @IsNumber()
   @Min(0)
   declare toleranceAmount?: number;
+}
+
+export class FinanceActorDto {
+  @ApiPropertyOptional({ enum: accessRoles, example: 'COUNTRY_FINANCE_ADMIN' })
+  @IsOptional()
+  @IsIn(accessRoles)
+  declare actorRole?: AccessRole;
+
+  @ApiPropertyOptional({ example: 'country-finance-admin' })
+  @IsOptional()
+  @IsString()
+  @Length(2, 160)
+  declare actorUserId?: string;
+}
+
+export class SubmitTaxReturnDto extends FinanceActorDto {}
+
+export class ApproveTaxReturnDto extends FinanceActorDto {}
+
+export class AttachTaxReturnEvidenceDto extends FinanceActorDto {
+  @ApiProperty({ enum: taxReturnEvidenceKinds, example: 'FILING_CONFIRMATION' })
+  @IsIn(taxReturnEvidenceKinds)
+  declare kind: TaxReturnEvidenceKind;
+
+  @ApiProperty({ example: 'KRA-VAT-2026-06' })
+  @IsString()
+  @Length(2, 160)
+  declare reference: string;
+
+  @ApiPropertyOptional({ example: 'Filed through the Kenya revenue portal.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  declare note?: string;
+}
+
+export class FileTaxReturnDto extends AttachTaxReturnEvidenceDto {
+  @ApiPropertyOptional({ example: 10000 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  declare dualApprovalThresholdAmount?: number;
+}
+
+export class RemitTaxReturnDto extends FinanceActorDto {
+  @ApiPropertyOptional({ enum: taxReturnEvidenceKinds, example: 'REMITTANCE_RECEIPT' })
+  @IsOptional()
+  @IsIn(taxReturnEvidenceKinds)
+  declare kind?: TaxReturnEvidenceKind;
+
+  @ApiProperty({ example: 'PAY-8891' })
+  @IsString()
+  @Length(2, 160)
+  declare reference: string;
+
+  @ApiPropertyOptional({ example: 'Bank transfer confirmed by the tax authority.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  declare note?: string;
+}
+
+export class LockTaxReturnDto extends FinanceActorDto {}
+
+export class ExportTaxReturnQueryDto {
+  @ApiPropertyOptional({ enum: taxReportExportFormats, example: 'CSV' })
+  @IsOptional()
+  @IsIn(taxReportExportFormats)
+  declare format?: TaxReportExportFormat;
+
+  @ApiPropertyOptional({ enum: accessRoles, example: 'COUNTRY_FINANCE_ADMIN' })
+  @IsOptional()
+  @IsIn(accessRoles)
+  declare actorRole?: AccessRole;
 }

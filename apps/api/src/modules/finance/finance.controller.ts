@@ -1,23 +1,30 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 
-import { TenantId } from '../tenant/tenant-context.decorator';
-import { TenantSessionGuard } from '../tenant/tenant-session.guard';
+import { TenantAuthSession, TenantId } from '../tenant/tenant-context.decorator';
+import { TenantSessionGuard, type TenantSessionDecision } from '../tenant/tenant-session.guard';
 import {
+  ApproveTaxReturnDto,
+  AttachTaxReturnEvidenceDto,
   CalculateTaxDto,
   ConfigureCountryTaxProfileDto,
   CreateInvoiceDto,
   CreateTaxRuleDto,
+  ExportTaxReturnQueryDto,
+  FileTaxReturnDto,
   GenerateTaxReturnDto,
   IssueInvoiceDto,
   IssueReceiptDto,
+  LockTaxReturnDto,
   OpenChargebackDto,
   PayInvoiceDto,
   ReconcileSettlementDto,
   RefundInvoiceDto,
+  RemitTaxReturnDto,
   RequestRefundDto,
   RunDunningDto,
   RunFinanceAlertsDto,
+  SubmitTaxReturnDto,
 } from './dto/finance.dto';
 import { FinanceService } from './finance.service';
 
@@ -66,13 +73,130 @@ export class FinanceController {
   }
 
   @Post('tax-returns')
-  generateTaxReturn(@Body() body: GenerateTaxReturnDto) {
-    return this.finance.generateTaxReturn(body);
+  generateTaxReturn(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Body() body: GenerateTaxReturnDto,
+  ) {
+    return this.finance.generateTaxReturn(body, {
+      tenantId,
+      sessionRole: session.role,
+    });
   }
 
   @Get('tax-returns')
-  listTaxReturns() {
-    return this.finance.listTaxReturns();
+  listTaxReturns(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+  ) {
+    return this.finance.listTaxReturns({ tenantId, sessionRole: session.role });
+  }
+
+  @Get('tax-returns/:id/export')
+  exportTaxReturn(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Param('id') id: string,
+    @Query() query: ExportTaxReturnQueryDto,
+  ) {
+    return this.finance.exportTaxReturn(id, query, {
+      tenantId,
+      sessionRole: session.role,
+      actorUserId: session.userId,
+    });
+  }
+
+  @Get('tax-returns/:id')
+  getTaxReturn(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Param('id') id: string,
+  ) {
+    return this.finance.getTaxReturn(id, { tenantId, sessionRole: session.role });
+  }
+
+  @Post('tax-returns/:id/submit')
+  submitTaxReturn(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Param('id') id: string,
+    @Body() body: SubmitTaxReturnDto,
+  ) {
+    return this.finance.submitTaxReturn(id, body, {
+      tenantId,
+      sessionRole: session.role,
+      actorUserId: session.userId,
+    });
+  }
+
+  @Post('tax-returns/:id/approve')
+  approveTaxReturn(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Param('id') id: string,
+    @Body() body: ApproveTaxReturnDto,
+  ) {
+    return this.finance.approveTaxReturn(id, body, {
+      tenantId,
+      sessionRole: session.role,
+      actorUserId: session.userId,
+    });
+  }
+
+  @Post('tax-returns/:id/evidence')
+  attachTaxReturnEvidence(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Param('id') id: string,
+    @Body() body: AttachTaxReturnEvidenceDto,
+  ) {
+    return this.finance.attachTaxReturnEvidence(id, body, {
+      tenantId,
+      sessionRole: session.role,
+      actorUserId: session.userId,
+    });
+  }
+
+  @Post('tax-returns/:id/file')
+  fileTaxReturn(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Param('id') id: string,
+    @Body() body: FileTaxReturnDto,
+  ) {
+    return this.finance.fileTaxReturn(id, body, {
+      tenantId,
+      sessionRole: session.role,
+      actorUserId: session.userId,
+    });
+  }
+
+  @Post('tax-returns/:id/remit')
+  remitTaxReturn(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Param('id') id: string,
+    @Body() body: RemitTaxReturnDto,
+  ) {
+    return this.finance.remitTaxReturn(id, body, {
+      tenantId,
+      sessionRole: session.role,
+      actorUserId: session.userId,
+    });
+  }
+
+  @Post('tax-returns/:id/lock')
+  lockTaxReturn(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Param('id') id: string,
+    @Body() body: LockTaxReturnDto,
+  ) {
+    return this.finance.lockTaxReturn(id, body, {
+      tenantId,
+      sessionRole: session.role,
+      actorUserId: session.userId,
+    });
   }
 
   @Post('invoices')

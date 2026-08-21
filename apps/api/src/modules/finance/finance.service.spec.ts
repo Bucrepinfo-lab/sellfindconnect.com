@@ -392,4 +392,246 @@ describe('FinanceService', () => {
       reconciliation.openAlerts.some((alert) => alert.alertType === 'RECONCILIATION_VARIANCE'),
     ).toBe(true);
   });
+
+  it('files, remits, locks, and exports a tax return after reconciliation', async () => {
+    const audits: Array<{ action: string; metadata?: Record<string, unknown> }> = [];
+    const service = new FinanceService(undefined, {
+      recordTenantAudit: async (record: { action: string; metadata?: Record<string, unknown> }) => {
+        audits.push(record);
+      },
+    } as never);
+    service.configureCountryTaxProfile({
+      countryCode: 'KE',
+      taxAuthorityName: 'Pilot Tax Authority',
+      taxRegistrationStatus: 'REGISTERED',
+      localFinanceOwner: 'Country Finance Admin',
+      filingFrequency: 'MONTHLY',
+      recordRetentionYears: 7,
+      taxInclusivePricing: true,
+      approvedBy: 'global-finance-admin',
+    });
+    service.createTaxRule({
+      countryCode: 'KE',
+      taxType: 'VAT',
+      taxRate: 0.16,
+      productTaxCode: 'SFC_SUBSCRIPTION',
+      effectiveFrom: '2026-01-01T00:00:00.000Z',
+    });
+
+    service.calculateTax(tenantId, {
+      countryCode: 'KE',
+      grossAmount: 10,
+      presentmentCurrency: 'KES',
+      productTaxCode: 'SFC_SUBSCRIPTION',
+      customerEvidence: { billingCountry: 'KE' },
+      transactionAt: '2026-06-17T10:00:00.000Z',
+    });
+    const invoice = service.issueInvoice(tenantId, {
+      countryCode: 'KE',
+      currencyCode: 'KES',
+      lines: [{ description: 'Monthly subscription', quantity: 1, unitAmount: 10 }],
+    });
+    const paid = await service.payInvoice(tenantId, { invoiceId: invoice.id, method: 'CARD' });
+    service.reconcileProviderSettlement(tenantId, {
+      statementReference: 'PROVIDER-KE-2026-06',
+      countryCode: 'KE',
+      currencyCode: 'KES',
+      settlementLines: [
+        {
+          reference: paid.payment.providerPaymentId,
+          amount: paid.payment.amount,
+          currencyCode: 'KES',
+        },
+      ],
+    });
+
+    const generated = service.generateTaxReturn(
+      {
+        countryCode: 'KE',
+        taxType: 'VAT',
+        periodStart: '2026-06-01T00:00:00.000Z',
+        periodEnd: '2026-06-30T23:59:59.999Z',
+        filingDeadline: '2026-07-20T00:00:00.000Z',
+        paymentDeadline: '2026-07-31T00:00:00.000Z',
+        filingCurrency: 'KES',
+      },
+      { tenantId },
+    );
+    const id = generated.taxReturn.id;
+
+    expect(service.submitTaxReturn(id, { actorUserId: 'country-finance-admin' }).status).toBe(
+      'IN_REVIEW',
+    );
+    expect(
+      service.approveTaxReturn(id, {
+        actorRole: 'COUNTRY_FINANCE_ADMIN',
+        actorUserId: 'country-finance-admin',
+      }).status,
+    ).toBe('APPROVED');
+    expect(
+      service.fileTaxReturn(id, {
+        kind: 'FILING_CONFIRMATION',
+        reference: 'KRA-VAT-2026-06',
+        actorRole: 'GLOBAL_FINANCE_ADMIN',
+        actorUserId: 'global-finance-admin',
+      }).status,
+    ).toBe('FILED');
+    const remitted = service.remitTaxReturn(id, {
+      reference: 'PAY-8891',
+      actorRole: 'GLOBAL_FINANCE_ADMIN',
+      actorUserId: 'global-finance-admin',
+    });
+    expect(remitted.status).toBe('REMITTED');
+    expect(remitted.evidence.map((item) => item.kind)).toEqual([
+      'FILING_CONFIRMATION',
+      'REMITTANCE_RECEIPT',
+    ]);
+
+    const locked = service.lockTaxReturn(id, {
+      actorRole: 'GLOBAL_FINANCE_ADMIN',
+      actorUserId: 'global-finance-admin',
+    });
+    expect(locked.status).toBe('LOCKED');
+    expect(locked.lockedAt).toBeTruthy();
+
+    const exported = service.exportTaxReturn(id, { format: 'CSV' }, { tenantId });
+    expect(exported.fileName).toContain('tax-return-ke-vat-2026-06-01');
+    expect(exported.content).toContain('KRA-VAT-2026-06|PAY-8891');
+    expect(exported.content).not.toContain('Board approved');
+    expect(() =>
+      service.attachTaxReturnEvidence(id, {
+        kind: 'AUTHORITY_REFERENCE',
+        reference: 'KRA-REF-99',
+      }),
+    ).toThrow(/Locked tax periods cannot be changed/);
+    expect(audits.map((record) => record.action)).toEqual([
+      'TAX_RETURN_GENERATED',
+      'TAX_RETURN_SUBMITTED',
+      'TAX_RETURN_APPROVED',
+      'TAX_RETURN_FILED',
+      'TAX_RETURN_REMITTED',
+      'TAX_RETURN_LOCKED',
+      'TAX_REPORT_EXPORTED',
+    ]);
+    expect(JSON.stringify(audits)).not.toContain('PAY-8891');
+  });
+
+  it('blocks tax-return approval until reconciliation is clear', async () => {
+    const service = configuredService();
+    service.calculateTax(tenantId, {
+      countryCode: 'KE',
+      grossAmount: 10,
+      presentmentCurrency: 'KES',
+      productTaxCode: 'SFC_SUBSCRIPTION',
+      customerEvidence: { billingCountry: 'KE' },
+      transactionAt: '2026-06-17T10:00:00.000Z',
+    });
+    const generated = service.generateTaxReturn({
+      countryCode: 'KE',
+      taxType: 'VAT',
+      periodStart: '2026-06-01T00:00:00.000Z',
+      periodEnd: '2026-06-30T23:59:59.999Z',
+      filingDeadline: '2026-07-20T00:00:00.000Z',
+      paymentDeadline: '2026-07-31T00:00:00.000Z',
+      filingCurrency: 'KES',
+    });
+    service.submitTaxReturn(generated.taxReturn.id);
+
+    expect(() => service.approveTaxReturn(generated.taxReturn.id)).toThrow(
+      /Reconciliation is required before tax return approval/,
+    );
+
+    const invoice = service.issueInvoice(tenantId, {
+      countryCode: 'KE',
+      currencyCode: 'KES',
+      lines: [{ description: 'Monthly subscription', quantity: 1, unitAmount: 10 }],
+    });
+    const paid = await service.payInvoice(tenantId, { invoiceId: invoice.id, method: 'CARD' });
+    service.reconcileProviderSettlement(tenantId, {
+      statementReference: 'PROVIDER-KE-VARIANCE',
+      countryCode: 'KE',
+      currencyCode: 'KES',
+      settlementLines: [
+        {
+          reference: paid.payment.providerPaymentId,
+          amount: paid.payment.amount + 4,
+          currencyCode: 'KES',
+        },
+      ],
+    });
+
+    expect(() => service.approveTaxReturn(generated.taxReturn.id)).toThrow(
+      /Reconciliation variance must be cleared/,
+    );
+  });
+
+  it('requires a different filing approver above the dual-control threshold', async () => {
+    const service = configuredService();
+    service.calculateTax(tenantId, {
+      countryCode: 'KE',
+      grossAmount: 100000,
+      presentmentCurrency: 'KES',
+      productTaxCode: 'SFC_SUBSCRIPTION',
+      customerEvidence: { billingCountry: 'KE' },
+      transactionAt: '2026-06-17T10:00:00.000Z',
+    });
+    const invoice = service.issueInvoice(tenantId, {
+      countryCode: 'KE',
+      currencyCode: 'KES',
+      lines: [{ description: 'Monthly subscription', quantity: 1, unitAmount: 10 }],
+    });
+    const paid = await service.payInvoice(tenantId, { invoiceId: invoice.id, method: 'CARD' });
+    service.reconcileProviderSettlement(tenantId, {
+      statementReference: 'PROVIDER-KE-THRESHOLD',
+      countryCode: 'KE',
+      currencyCode: 'KES',
+      settlementLines: [
+        {
+          reference: paid.payment.providerPaymentId,
+          amount: paid.payment.amount,
+          currencyCode: 'KES',
+        },
+      ],
+    });
+    const generated = service.generateTaxReturn({
+      countryCode: 'KE',
+      taxType: 'VAT',
+      periodStart: '2026-06-01T00:00:00.000Z',
+      periodEnd: '2026-06-30T23:59:59.999Z',
+      filingDeadline: '2026-07-20T00:00:00.000Z',
+      paymentDeadline: '2026-07-31T00:00:00.000Z',
+      filingCurrency: 'KES',
+    });
+    expect(generated.taxReturn.computedTaxDue).toBeGreaterThanOrEqual(10_000);
+    service.submitTaxReturn(generated.taxReturn.id, { actorUserId: 'same-approver' });
+    service.approveTaxReturn(generated.taxReturn.id, { actorUserId: 'same-approver' });
+
+    expect(() =>
+      service.fileTaxReturn(generated.taxReturn.id, {
+        kind: 'FILING_CONFIRMATION',
+        reference: 'KRA-VAT-LARGE',
+        actorUserId: 'same-approver',
+      }),
+    ).toThrow(/different approver than review/);
+  });
+
+  it('blocks billing managers from country tax reports and workbench actions', () => {
+    const service = configuredService();
+    const generated = service.generateTaxReturn({
+      countryCode: 'KE',
+      taxType: 'VAT',
+      periodStart: '2026-06-01T00:00:00.000Z',
+      periodEnd: '2026-06-30T23:59:59.999Z',
+      filingDeadline: '2026-07-20T00:00:00.000Z',
+      paymentDeadline: '2026-07-31T00:00:00.000Z',
+      filingCurrency: 'KES',
+    });
+
+    expect(() =>
+      service.exportTaxReturn(generated.taxReturn.id, { format: 'JSON' }, { sessionRole: 'BILLING_MANAGER' }),
+    ).toThrow(/Country tax reports require a finance admin role/);
+    expect(() =>
+      service.submitTaxReturn(generated.taxReturn.id, {}, { sessionRole: 'BILLING_MANAGER' }),
+    ).toThrow(/Country tax return workbench requires a finance admin role/);
+  });
 });

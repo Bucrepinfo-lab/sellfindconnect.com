@@ -1,5 +1,6 @@
 ﻿import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { AuthService } from '../auth/auth.service';
 import { FinanceService } from './finance.service';
 import { FinanceController } from './finance.controller';
 
@@ -8,7 +9,8 @@ import { FinanceController } from './finance.controller';
   providers: [
     {
       provide: FinanceService,
-      useFactory: () => new FinanceService(),
+      inject: [AuthService],
+      useFactory: (auth: AuthService) => new FinanceService(undefined, auth),
     },
   ],
   controllers: [FinanceController],

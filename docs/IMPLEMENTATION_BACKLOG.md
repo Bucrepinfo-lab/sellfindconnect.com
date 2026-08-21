@@ -432,8 +432,12 @@ Progress:
   stored in finance metadata or configuration.
 - Added web Finance Readiness indicators for subscription amount, computed tax,
   net revenue, and next remittance alert.
-- Persistence, payment adapters, reconciliation, approval workflow, evidence
-  attachments, period locks, and report exports remain next.
+- Added the tax return workbench: review submission, reconciliation-gated
+  approval, dual filing approval above the 10,000-unit threshold, filing and
+  remittance evidence, period lock, CSV/JSON country tax exports, country
+  finance admin access, billing-manager export denial, and product-audit events.
+- Durable finance persistence, payment-provider adapters/idempotency, and
+  controlled post-lock correction entries remain next.
 
 ## Epic 9: Mobile, Localization, and Launch
 
