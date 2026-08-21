@@ -324,9 +324,7 @@ export class AdvertsService {
       published,
       publishedMediaAssets,
     });
-    if (published.status !== 'SCHEDULED') {
-      await this.syncDiscoveryIndex(published);
-    }
+    await this.syncDiscoveryIndex(published);
     await this.auth?.recordTenantAudit({
       tenantId,
       actorUserId,
@@ -578,7 +576,7 @@ export class AdvertsService {
       countryCode: input.countryCode?.toUpperCase(),
       industryCode: input.industryCode,
       role: input.role,
-      statuses: ['LIVE', 'RENEWAL_DUE'],
+      statuses: ['LIVE', 'RENEWAL_DUE', 'SCHEDULED'],
     });
     const candidates = entries.filter((entry) =>
       this.isDiscoveryEntryDiscoverable(entry, input, now),
@@ -818,7 +816,12 @@ export class AdvertsService {
     }
 
     const advert = await this.getMutableAdvert(tenantId, input.advertId);
-    if (advert.status !== 'LIVE' && advert.status !== 'RENEWAL_DUE') {
+    const occurredAt = input.occurredAt ?? new Date().toISOString();
+    const discoverable =
+      advert.status === 'LIVE' ||
+      advert.status === 'RENEWAL_DUE' ||
+      (advert.status === 'SCHEDULED' && Date.parse(advert.publishedAt) <= Date.parse(occurredAt));
+    if (!discoverable) {
       throw new UnprocessableEntityException(
         'Only discoverable live adverts can record discovery events.',
       );
@@ -1321,7 +1324,11 @@ export class AdvertsService {
     input: PublicAdvertSearchDto,
     now: string,
   ): boolean {
-    if (entry.status !== 'LIVE' && entry.status !== 'RENEWAL_DUE') {
+    if (entry.status === 'SCHEDULED') {
+      if (Date.parse(entry.publishedAt) > Date.parse(now)) {
+        return false;
+      }
+    } else if (entry.status !== 'LIVE' && entry.status !== 'RENEWAL_DUE') {
       return false;
     }
 
@@ -1337,11 +1344,7 @@ export class AdvertsService {
   }
 
   private async syncDiscoveryIndex(advert: AdvertPost): Promise<void> {
-    if (
-      advert.status === 'AUTO_DELETED' ||
-      advert.status === 'ARCHIVED' ||
-      advert.status === 'SCHEDULED'
-    ) {
+    if (advert.status === 'AUTO_DELETED' || advert.status === 'ARCHIVED') {
       await this.repository.deleteDiscoveryIndex(advert.tenantId, advert.id);
       return;
     }

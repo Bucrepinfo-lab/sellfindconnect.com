@@ -122,7 +122,7 @@ export class RelationshipsService {
       entityType: 'RELATIONSHIP_CLAIM',
       entityId: updated.id,
       metadata: {
-        reason: updated.removalReason,
+        reason: updated.removalReason ?? null,
         moderator: isModerator,
       },
     });
