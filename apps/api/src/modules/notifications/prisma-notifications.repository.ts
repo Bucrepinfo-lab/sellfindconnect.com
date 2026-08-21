@@ -268,14 +268,17 @@ export class PrismaNotificationsRepository implements NotificationsRepository {
             ) {
               return null;
             }
-            return {
-              channel,
-              status,
-              reason: typeof record.reason === 'string' ? record.reason : undefined,
-              provider: typeof record.provider === 'string' ? record.provider : undefined,
-              providerReference:
-                typeof record.providerReference === 'string' ? record.providerReference : undefined,
-            };
+            const parsed: NotificationChannelStatus = { channel, status };
+            if (typeof record.reason === 'string') {
+              parsed.reason = record.reason;
+            }
+            if (typeof record.provider === 'string') {
+              parsed.provider = record.provider;
+            }
+            if (typeof record.providerReference === 'string') {
+              parsed.providerReference = record.providerReference;
+            }
+            return parsed;
           })
           .filter((item): item is NotificationChannelStatus => Boolean(item))
       : [];
