@@ -8,6 +8,8 @@ import type {
 } from '@telpen/domain';
 import { createHash, createHmac, randomUUID } from 'node:crypto';
 
+import { overlayApprovedMediaJobProcessors } from './media-scanners';
+
 export type MediaModerationResult =
   | {
       allowed: true;
@@ -272,7 +274,9 @@ export class S3CompatibleMediaStorageAdapter implements MediaStorageAdapter {
     }
 
     const uploadUrl = new URL(endpoint.toString());
-    uploadUrl.hostname = `${this.options.bucket}.${uploadUrl.hostname}`;
+    if (!uploadUrl.hostname.startsWith(`${this.options.bucket}.`)) {
+      uploadUrl.hostname = `${this.options.bucket}.${uploadUrl.hostname}`;
+    }
     const canonicalUri = `${endpointPath}/${encodedKey}`;
     uploadUrl.pathname = canonicalUri;
     uploadUrl.search = '';
@@ -616,11 +620,9 @@ export type MediaAdapterConfigReader = {
 };
 
 export function createConfiguredMediaAdapters(config?: MediaAdapterConfigReader): MediaAdapters {
-  const storageDriver = normalizeConfigString(
-    config?.get('MEDIA_STORAGE_DRIVER') ?? config?.get('MEDIA_STORAGE_PROVIDER'),
-  );
+  const storageDriver = resolveMediaStorageDriver(config);
   const storage =
-    storageDriver === 's3' || storageDriver === 's3-compatible'
+    storageDriver === 's3'
       ? createS3CompatibleStorageAdapter(config)
       : new DevelopmentMediaStorageAdapter(
           normalizeOptionalConfigString(config?.get('MEDIA_DEVELOPMENT_BASE_URL')) ??
@@ -719,22 +721,85 @@ export function createConfiguredMediaJobProcessors(
     });
   }
 
-  return processors;
+  return overlayApprovedMediaJobProcessors(processors, config);
+}
+
+export function hasLiveObjectStorageConfig(config?: MediaAdapterConfigReader): boolean {
+  return Boolean(
+    firstConfig(config, ['MEDIA_S3_ACCESS_KEY_ID', 'SPACES_ACCESS_KEY']) &&
+      firstConfig(config, ['MEDIA_S3_SECRET_ACCESS_KEY', 'SPACES_SECRET_KEY']) &&
+      firstConfig(config, ['MEDIA_S3_ENDPOINT', 'SPACES_ENDPOINT']) &&
+      firstConfig(config, ['MEDIA_S3_BUCKET', 'SPACES_BUCKET']),
+  );
+}
+
+export function resolveMediaStorageDriver(config?: MediaAdapterConfigReader): 'development' | 's3' {
+  const explicit = normalizeOptionalConfigString(
+    config?.get('MEDIA_STORAGE_DRIVER') ?? config?.get('MEDIA_STORAGE_PROVIDER'),
+  )?.toLowerCase();
+  if (explicit === 'development' || explicit === 'local' || explicit === 'memory') {
+    return 'development';
+  }
+  if (
+    explicit === 's3' ||
+    explicit === 's3-compatible' ||
+    explicit === 'spaces' ||
+    explicit === 'digitalocean-spaces'
+  ) {
+    return 's3';
+  }
+  return hasLiveObjectStorageConfig(config) ? 's3' : 'development';
 }
 
 function createS3CompatibleStorageAdapter(config?: MediaAdapterConfigReader): S3CompatibleMediaStorageAdapter {
+  const endpoint = requiredStorageConfig(config, ['MEDIA_S3_ENDPOINT', 'SPACES_ENDPOINT']);
+  const usingSpaces = Boolean(firstConfig(config, ['SPACES_ACCESS_KEY', 'SPACES_SECRET_KEY', 'SPACES_ENDPOINT']));
   const options = {
-    endpoint: requiredConfig(config, 'MEDIA_S3_ENDPOINT'),
-    region: requiredConfig(config, 'MEDIA_S3_REGION'),
-    bucket: requiredConfig(config, 'MEDIA_S3_BUCKET'),
-    accessKeyId: requiredConfig(config, 'MEDIA_S3_ACCESS_KEY_ID'),
-    secretAccessKey: requiredConfig(config, 'MEDIA_S3_SECRET_ACCESS_KEY'),
-    publicBaseUrl: normalizeOptionalConfigString(config?.get('MEDIA_S3_PUBLIC_BASE_URL')),
-    providerName: normalizeOptionalConfigString(config?.get('MEDIA_S3_PROVIDER_NAME')),
+    endpoint,
+    region:
+      firstConfig(config, ['MEDIA_S3_REGION', 'SPACES_REGION']) ?? deriveObjectStorageRegion(endpoint),
+    bucket: requiredStorageConfig(config, ['MEDIA_S3_BUCKET', 'SPACES_BUCKET']),
+    accessKeyId: requiredStorageConfig(config, ['MEDIA_S3_ACCESS_KEY_ID', 'SPACES_ACCESS_KEY']),
+    secretAccessKey: requiredStorageConfig(config, ['MEDIA_S3_SECRET_ACCESS_KEY', 'SPACES_SECRET_KEY']),
+    publicBaseUrl: firstConfig(config, ['MEDIA_S3_PUBLIC_BASE_URL', 'SPACES_CDN_ENDPOINT']),
+    providerName:
+      firstConfig(config, ['MEDIA_S3_PROVIDER_NAME']) ??
+      (usingSpaces ? 'digitalocean-spaces' : undefined),
     forcePathStyle: normalizeConfigBoolean(config?.get('MEDIA_S3_FORCE_PATH_STYLE')),
     expiresSeconds: normalizeConfigInt(config?.get('MEDIA_UPLOAD_URL_TTL_SECONDS')),
   };
   return new S3CompatibleMediaStorageAdapter(options);
+}
+
+function requiredStorageConfig(config: MediaAdapterConfigReader | undefined, keys: string[]): string {
+  const value = firstConfig(config, keys);
+  if (!value) {
+    throw new Error(`${keys[0]} is required when MEDIA_STORAGE_DRIVER=s3.`);
+  }
+  return value;
+}
+
+function firstConfig(config: MediaAdapterConfigReader | undefined, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = normalizeOptionalConfigString(config?.get(key));
+    if (value) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function deriveObjectStorageRegion(endpoint: string): string {
+  try {
+    const host = new URL(endpoint).hostname;
+    const spaces = host.match(/(?:^|\.)([a-z0-9]+)\.digitaloceanspaces\.com$/i);
+    if (spaces?.[1] && spaces[1] !== 'cdn') {
+      return spaces[1];
+    }
+  } catch {
+    // Fall through to the generic S3 default.
+  }
+  return 'us-east-1';
 }
 
 function buildMediaObjectKey(
@@ -748,15 +813,6 @@ function buildMediaObjectKey(
       .replace(/[^a-z0-9._-]+/g, '-')
       .replace(/^-+|-+$/g, '') || 'upload';
   return `${input.ownerType.toLowerCase()}/${input.tenantId}/${input.ownerId}/${idFactory()}-${safeFileName}`;
-}
-
-function requiredConfig(config: MediaAdapterConfigReader | undefined, key: string): string {
-  const value = normalizeOptionalConfigString(config?.get(key));
-  if (!value) {
-    throw new Error(`${key} is required when MEDIA_STORAGE_DRIVER=s3.`);
-  }
-
-  return value;
 }
 
 function normalizeConfigString(value: string | undefined): string {

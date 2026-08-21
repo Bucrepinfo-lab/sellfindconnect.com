@@ -210,9 +210,10 @@ Progress:
 - Added durable unsafe-media review cases through Prisma `MediaReviewCase`
   records, including severity, reason, provider, source job, media reference,
   and evidence payload for blocked or final-failed media processing.
-- Real object-storage credentials, approved live provider endpoints, CDN
-  publication verification, moderator case assignment/resolution, country/legal
-  escalation actions, and richer review case management remain next.
+- Wired DigitalOcean Spaces credentials (`SPACES_*`) into the S3-compatible
+  upload signer and added approved ClamAV/Sightengine scanner overlays.
+  Named providers fail-close without credentials. CDN publication verification
+  and country/legal escalation playbooks remain next.
 
 ## Epic 4: Listing and Media Vertical Slice
 
@@ -308,8 +309,8 @@ Progress (2026-08-21):
   token overlap and Prisma `tsvector` search add `KEYWORD_MATCH` and report
   `searchMode` as `RULES`, `FTS`, or `HYBRID`. The `embedding` column is reserved
   for an optional later overlay and is not required for tests.
-- Native mobile saved-search screens remain out of scope. Live
-  object-storage/media scanners remain next.
+- Native mobile saved-search screens remain out of scope. CDN publication
+  verification remains next.
 
 ## Epic 6: Matching and Lead Conversion
 
@@ -377,8 +378,7 @@ Progress:
   `WHATSAPP_TOKEN` + `WHATSAPP_PHONE_NUMBER_ID` overlay WhatsApp Cloud, and
   `WHATSAPP_PROVIDER=africastalking` with `AT_WHATSAPP_FROM` overlays Africa's
   Talking. Explicit `WHATSAPP_PROVIDER` values fail-close without credentials.
-  Destinations that are not E.164 phone numbers are rejected. Live
-  object-storage/media scanners remain next.
+  Destinations that are not E.164 phone numbers are rejected.
 
 ## Epic 7: Analytics
 

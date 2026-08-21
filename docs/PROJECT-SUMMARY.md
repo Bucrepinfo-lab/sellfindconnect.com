@@ -53,6 +53,5 @@ When unblocked:
 
 ## Open items (post-deploy)
 - Production IdP (real identity provider)
-- Live object storage (wire Spaces to media pipeline)
 - React Native mobile app (Phase 5 - planned)
 - MVendoh agri-marketplace (separate project - planned)

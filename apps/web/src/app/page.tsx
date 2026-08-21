@@ -2287,6 +2287,16 @@ export default function Home() {
                   </span>
                 </div>
               </div>
+              <div className="policy-box ok compact">
+                <ShieldCheck size={16} />
+                <div>
+                  <strong>Live media storage</strong>
+                  <span>
+                    SPACES_* credentials overlay DigitalOcean Spaces uploads. ClamAV and Sightengine
+                    scanners overlay when their keys are set.
+                  </span>
+                </div>
+              </div>
             </section>
 
             <section className="side-panel">

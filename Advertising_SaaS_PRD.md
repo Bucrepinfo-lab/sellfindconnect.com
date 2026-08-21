@@ -399,10 +399,14 @@ Implementation progress on 2026-06-19:
   assigned/unassigned filters, assignment notes, assignment timestamps, scoped
   platform access enforcement, unsafe assignment-note blocking, and tenant audit
   evidence.
-- Remaining hardening: live object-storage credentials, approved provider
-  endpoints, CDN publication verification, legal/reporting escalation playbooks,
-  richer review case management, and user-facing review status in web/mobile
-  clients.
+- Added live object-storage overlay for DigitalOcean Spaces via `SPACES_*`
+  aliases, plus approved ClamAV malware and Sightengine visual-moderation
+  scanners. Named providers fail-close without credentials. Scanner results
+  omit API secrets.
+- Remaining hardening: CDN publication verification, legal/reporting
+  escalation playbooks, richer review case management, and user-facing review
+  status in web/mobile clients. Live Spaces credentials and ClamAV/Sightengine
+  scanners overlay when configured.
 
 ### 7.3 Media Display Area
 
@@ -566,8 +570,8 @@ Implementation progress on 2026-08-21:
   Search responses include `searchMode` (`RULES` | `FTS` | `HYBRID`) and
   `KEYWORD_MATCH` without requiring live OpenAI embeddings. The `embedding`
   column is reserved for an optional later overlay.
-- Remaining hardening: native mobile screens are out of scope. Live object-storage
-  credentials and approved media scanners remain next.
+- Remaining hardening: native mobile screens are out of scope. CDN publication
+  verification and production identity remain next.
 
 Implementation progress on 2026-06-20:
 
@@ -584,8 +588,8 @@ Implementation progress on 2026-06-20:
   downloads.
 - Added web/PWA saved-search UX with named searches, alert cadence, blocked
   search handling, restored-search controls, and previewable alert candidates.
-- Remaining hardening: live object-storage credentials and approved media
-  scanners. Native mobile saved-search screens are out of scope.
+- Remaining hardening: CDN publication verification and production identity.
+  Native mobile saved-search screens are out of scope.
 
 ### 7.6 Precision Matching and Link Intelligence
 
@@ -1057,8 +1061,7 @@ Implementation progress on 2026-06-17:
 - Continued implementation on 2026-08-21 with controlled post-lock tax-return corrections. Locked periods stay locked; finance admins can post signed correction entries with `PERIOD_CORRECTION` evidence, ledger impact, dual-control above 10,000 units, and product-audit events that omit notes and authority references.
 - Continued implementation on 2026-08-21 with live payment-provider adapters. Invoice capture stays on the manual development adapter by default. `PAYMENT_PROVIDER=stripe`, `africastalking`, or `live` selects Stripe PaymentIntents and/or Africa's Talking M-Pesa checkout, rejects raw card numbers, records `REQUIRES_CAPTURE` until `POST /v1/finance/payments/settle`, and fail-closes when credentials are missing.
 - Remaining hardening: app-store billing rails are out of scope while native
-  mobile is not in delivery. Live object-storage/media scanners and production
-  identity remain next.
+  mobile is not in delivery. Production identity remains next.
 
 ### 7.11 Moderation, Trust, and Safety
 

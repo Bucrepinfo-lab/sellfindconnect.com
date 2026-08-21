@@ -75,6 +75,38 @@ describe('media adapters', () => {
     expect(development.storage).not.toBeInstanceOf(S3CompatibleMediaStorageAdapter);
   });
 
+  it('wires DigitalOcean Spaces credentials without duplicating the bucket hostname', async () => {
+    const configured = createConfiguredMediaAdapters({
+      get: (key: string) =>
+        ({
+          SPACES_ACCESS_KEY: 'spaces-key',
+          SPACES_SECRET_KEY: 'spaces-secret',
+          SPACES_ENDPOINT: 'https://sellfindconnect-media.fra1.digitaloceanspaces.com',
+          SPACES_BUCKET: 'sellfindconnect-media',
+          SPACES_CDN_ENDPOINT: 'https://sellfindconnect-media.fra1.cdn.digitaloceanspaces.com',
+        })[key],
+    });
+    const upload = await configured.storage.prepareUpload({
+      tenantId: 'tenant-1',
+      ownerType: 'ADVERT',
+      ownerId: 'advert-1',
+      fileName: 'stall.jpg',
+      mimeType: 'image/jpeg',
+      fileSizeBytes: 800_000,
+    });
+    const uploadUrl = new URL(upload.uploadUrl);
+
+    expect(configured.storage).toBeInstanceOf(S3CompatibleMediaStorageAdapter);
+    expect(upload.provider).toBe('digitalocean-spaces');
+    expect(uploadUrl.hostname).toBe('sellfindconnect-media.fra1.digitaloceanspaces.com');
+    expect(upload.publicUrl).toContain('sellfindconnect-media.fra1.cdn.digitaloceanspaces.com');
+    expect(() =>
+      createConfiguredMediaAdapters({
+        get: (key: string) => ({ MEDIA_STORAGE_DRIVER: 'spaces' })[key],
+      }),
+    ).toThrow('MEDIA_S3_ENDPOINT is required when MEDIA_STORAGE_DRIVER=s3.');
+  });
+
   it('requires a database URL when durable Prisma queueing is enabled', async () => {
     await expect(
       createConfiguredMediaAdaptersAsync({

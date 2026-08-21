@@ -1,7 +1,7 @@
 # Media Pipeline
 
 Status: provider-ready foundation
-Last updated: 2026-06-20
+Last updated: 2026-08-21
 
 ## Current Capability
 
@@ -9,7 +9,8 @@ Last updated: 2026-06-20
 - Development mode returns deterministic local-style upload URLs without
   external credentials.
 - S3-compatible mode creates presigned PUT URLs with AWS Signature Version 4
-  using Node.js crypto, without adding an SDK dependency.
+  using Node.js crypto, without adding an SDK dependency. DigitalOcean
+  `SPACES_*` credentials overlay that signer automatically.
 - Media attach flows queue processing jobs through a worker-facing interface for
   malware scan, content moderation, image transform, and video transcode work.
 - Processing jobs use an in-memory development queue by default and can switch
@@ -25,9 +26,9 @@ Last updated: 2026-06-20
 - Unsafe or final-failed media processing can create durable
   `MediaReviewCase` records with severity, reason, provider, job evidence, and
   source media references for moderation follow-up.
-- Production still needs live provider credentials, vendor-specific endpoint
-  mapping, moderator case actions, legal/reporting escalation playbooks, and
-  CDN publication verification.
+- Production still needs CDN publication verification, legal/reporting
+  escalation playbooks, and user-facing review status. Live Spaces credentials
+  and approved ClamAV/Sightengine scanners overlay when configured.
 
 ## Storage Modes
 
@@ -38,7 +39,23 @@ MEDIA_STORAGE_DRIVER=development
 MEDIA_DEVELOPMENT_BASE_URL=https://media.local.sellfindconnect.test
 ```
 
-S3-compatible mode:
+S3-compatible / DigitalOcean Spaces:
+
+```text
+MEDIA_STORAGE_DRIVER=spaces
+SPACES_ENDPOINT=https://sellfindconnect-media.fra1.digitaloceanspaces.com
+SPACES_BUCKET=sellfindconnect-media
+SPACES_ACCESS_KEY=...
+SPACES_SECRET_KEY=...
+SPACES_CDN_ENDPOINT=https://sellfindconnect-media.fra1.cdn.digitaloceanspaces.com
+```
+
+`SPACES_*` aliases map onto the S3-compatible signer. If the Spaces origin
+hostname already includes the bucket, the adapter does not prepend it again.
+`MEDIA_STORAGE_DRIVER=s3` or `spaces` fail-closes without credentials. When the
+driver is unset, present Spaces/S3 keys overlay live storage automatically.
+
+The `MEDIA_S3_*` names remain supported:
 
 ```text
 MEDIA_STORAGE_DRIVER=s3
@@ -111,6 +128,22 @@ MEDIA_IMAGE_TRANSFORM_PROVIDER_NAME=...
 MEDIA_VIDEO_TRANSCODE_API_KEY=...
 MEDIA_VIDEO_TRANSCODE_PROVIDER_NAME=...
 ```
+
+Approved vendor overlays:
+
+```text
+MEDIA_MALWARE_SCAN_PROVIDER=clamav
+CLAMAV_SCAN_URL=https://clamav.example.com/scan
+MEDIA_CONTENT_MODERATION_PROVIDER=sightengine
+SIGHTENGINE_API_USER=...
+SIGHTENGINE_API_SECRET=...
+SIGHTENGINE_MODELS=nudity-2.0,wad,offensive,gore-2.0
+```
+
+`MEDIA_MALWARE_SCAN_PROVIDER=clamav` and `MEDIA_CONTENT_MODERATION_PROVIDER=sightengine`
+fail-close without credentials. Present `CLAMAV_SCAN_URL` or Sightengine keys
+overlay those processors without requiring the named provider flag. Scanner
+results store verdicts only; API secrets are not copied into job metadata.
 
 Provider responses should return JSON:
 
@@ -193,10 +226,9 @@ Workers should:
 4. Mark failed work as retryable to return it to `QUEUED` after backoff, or
    final to move it to `FAILED`.
 
-Job states are `QUEUED`, `RUNNING`, `SUCCEEDED`, and `FAILED`. The next
-hardening step is to connect approved live vendors, verify each provider's
-response schema, publish CDN assets, and add moderator case assignment,
-resolution, and country/legal escalation actions.
+Job states are `QUEUED`, `RUNNING`, `SUCCEEDED`, and `FAILED`. Remaining
+hardening is CDN publication verification, country/legal escalation playbooks,
+and user-facing review status.
 
 Internal batch runner:
 
