@@ -21,6 +21,8 @@ import {
   markMessageDelivered,
   markMessageRead,
   mediaPolicy,
+  presentTenantMediaAsset,
+  presentTenantMediaAssets,
   ConversationRealtimeError,
   pilotSourceFinderRecords,
   recordConversationTyping,
@@ -452,7 +454,7 @@ export class ConversationsService {
     const moderation = await this.mediaAdapters.moderation.review(mediaInput);
     if (!moderation.allowed) {
       throw new UnprocessableEntityException({
-        message: 'Conversation media failed malware scan or moderation review.',
+        message: 'Conversation media failed moderation review.',
         moderation,
       });
     }
@@ -496,7 +498,7 @@ export class ConversationsService {
     });
 
     return {
-      media,
+      media: presentTenantMediaAsset(media),
       processingJobs,
       sendable: media.moderationStatus === 'PASSED',
     };
@@ -504,7 +506,7 @@ export class ConversationsService {
 
   async listMedia(tenantId: string, conversationId: string) {
     await this.requireConversation(tenantId, conversationId);
-    return this.repository.listMediaAssets(tenantId, conversationId);
+    return presentTenantMediaAssets(await this.repository.listMediaAssets(tenantId, conversationId));
   }
 
   async markThreadDelivered(tenantId: string, conversationId: string) {

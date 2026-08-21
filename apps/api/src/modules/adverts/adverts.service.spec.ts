@@ -454,12 +454,16 @@ describe('AdvertsService', () => {
       ownerId: advert.id,
       status: 'LIVE',
       moderationStatus: 'PENDING',
-      moderationReason: 'SCAN_QUEUED',
       storageProvider: 's3-compatible',
       cdnUrl: 'https://cdn.example.test/display/fresh-stall.jpg',
       thumbnailUrl: 'https://cdn.example.test/thumb/fresh-stall.jpg',
       transformStatus: 'READY',
+      review: {
+        status: 'UNDER_REVIEW',
+        canPublish: false,
+      },
     });
+    expect(result.media).not.toHaveProperty('moderationReason');
     expect(result.mediaSlots).toEqual({ used: 1, max: mediaPolicy.maxItemsPerOwner, remaining: 9 });
     await expect(service.listAdvertMedia(tenantId, advert.id)).resolves.toHaveLength(1);
     expect(adverts[0]?.media).toHaveLength(1);

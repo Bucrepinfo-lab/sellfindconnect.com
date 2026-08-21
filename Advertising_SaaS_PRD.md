@@ -413,10 +413,11 @@ Implementation progress on 2026-06-19:
   HIGH/CRITICAL confirmed blocks require an approved country playbook, persist
   reporting channels and legal-hold deadlines, and fail closed for other
   countries. Audit metadata stores playbook codes only.
-- Remaining hardening: richer review case management and user-facing review
-  status in web clients. Live Spaces credentials, ClamAV/Sightengine scanners,
-  CDN verification, and Kenya reporting playbooks overlay when configured.
-  Native mobile clients remain out of scope.
+- Added user-facing media review status on tenant profile, advert, and
+  conversation media. Internal reasons are omitted. Public discovery only
+  includes files that are ready to display.
+- Remaining hardening: richer review case management. Native mobile clients
+  remain out of scope.
 
 ### 7.3 Media Display Area
 
@@ -580,8 +581,8 @@ Implementation progress on 2026-08-21:
   Search responses include `searchMode` (`RULES` | `FTS` | `HYBRID`) and
   `KEYWORD_MATCH` without requiring live OpenAI embeddings. The `embedding`
   column is reserved for an optional later overlay.
-- Remaining hardening: native mobile screens are out of scope. User-facing
-  media review status and production identity remain next.
+- Remaining hardening: native mobile screens are out of scope. Production
+  identity remains next.
 
 Implementation progress on 2026-06-20:
 
@@ -598,8 +599,8 @@ Implementation progress on 2026-06-20:
   downloads.
 - Added web/PWA saved-search UX with named searches, alert cadence, blocked
   search handling, restored-search controls, and previewable alert candidates.
-- Remaining hardening: user-facing media review status and production identity.
-  Native mobile saved-search screens are out of scope.
+- Remaining hardening: production identity. Native mobile saved-search screens
+  are out of scope.
 
 ### 7.6 Precision Matching and Link Intelligence
 

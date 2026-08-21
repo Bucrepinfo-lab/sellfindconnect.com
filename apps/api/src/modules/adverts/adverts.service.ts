@@ -16,6 +16,8 @@ import {
   inferDesiredDiscoveryRoles,
   industryCategories,
   mediaPolicy,
+  presentTenantMediaAsset,
+  presentTenantMediaAssets,
   scoreDiscoveryVector,
   type AnalyticsEvent,
   type AnalyticsEventType,
@@ -23,6 +25,7 @@ import {
   type AdvertPost,
   type DiscoveryRelationshipSignal,
   type MediaAsset,
+  type PresentedMediaAsset,
 } from '@telpen/domain';
 import { randomUUID } from 'node:crypto';
 
@@ -65,13 +68,13 @@ type AdvertDraftWithPreview = AdvertDraft & {
   preview: {
     country: ReturnType<typeof getCountry>;
     industry: (typeof industryCategories)[number] | undefined;
-    media: MediaAsset[];
+    media: PresentedMediaAsset[];
     mediaSlots: MediaSlots;
     lifecycle?: ReturnType<typeof calculateAdvertLifecycle>;
   };
 };
 type AdvertPostWithMedia = AdvertPost & {
-  media: MediaAsset[];
+  media: PresentedMediaAsset[];
   mediaSlots: MediaSlots;
   daysLive: number;
   daysRemaining: number;
@@ -238,7 +241,9 @@ export class AdvertsService {
 
   async previewDraft(tenantId: string, id: string): Promise<AdvertDraftWithPreview> {
     const draft = await this.getDraft(tenantId, id);
-    const media = await this.repository.listMediaAssets(tenantId, 'ADVERT', draft.id);
+    const media = presentTenantMediaAssets(
+      await this.repository.listMediaAssets(tenantId, 'ADVERT', draft.id),
+    );
     const country = getCountry(draft.countryCode);
     const industry = industryCategories.find((item) => item.code === draft.industryCode);
 
@@ -354,14 +359,14 @@ export class AdvertsService {
     return this.repository.listNotifications(tenantId);
   }
 
-  async listDraftMedia(tenantId: string, id: string): Promise<MediaAsset[]> {
+  async listDraftMedia(tenantId: string, id: string): Promise<PresentedMediaAsset[]> {
     const draft = await this.getDraft(tenantId, id);
-    return this.repository.listMediaAssets(tenantId, 'ADVERT', draft.id);
+    return presentTenantMediaAssets(await this.repository.listMediaAssets(tenantId, 'ADVERT', draft.id));
   }
 
-  async listAdvertMedia(tenantId: string, id: string): Promise<MediaAsset[]> {
+  async listAdvertMedia(tenantId: string, id: string): Promise<PresentedMediaAsset[]> {
     const advert = await this.getMutableAdvert(tenantId, id);
-    return this.repository.listMediaAssets(tenantId, 'ADVERT', advert.id);
+    return presentTenantMediaAssets(await this.repository.listMediaAssets(tenantId, 'ADVERT', advert.id));
   }
 
   async prepareDraftMediaUpload(
@@ -405,7 +410,7 @@ export class AdvertsService {
     id: string,
     input: CreateAdvertMediaDto,
     actorUserId?: string,
-  ): Promise<{ media: MediaAsset; mediaSlots: MediaSlots; processingJobs: MediaProcessingJob[] }> {
+  ): Promise<{ media: PresentedMediaAsset; mediaSlots: MediaSlots; processingJobs: MediaProcessingJob[] }> {
     const draft = await this.getDraft(tenantId, id);
     if (draft.status !== 'DRAFT') {
       throw new UnprocessableEntityException('Published advert drafts cannot accept new media.');
@@ -429,7 +434,7 @@ export class AdvertsService {
     id: string,
     input: CreateAdvertMediaDto,
     actorUserId?: string,
-  ): Promise<{ media: MediaAsset; mediaSlots: MediaSlots; processingJobs: MediaProcessingJob[] }> {
+  ): Promise<{ media: PresentedMediaAsset; mediaSlots: MediaSlots; processingJobs: MediaProcessingJob[] }> {
     const advert = await this.getMutableAdvert(tenantId, id);
     const result = await this.addMedia({
       tenantId,
@@ -1075,7 +1080,7 @@ export class AdvertsService {
     auditEntityId: string;
     action: string;
     status: MediaAsset['status'];
-  }): Promise<{ media: MediaAsset; mediaSlots: MediaSlots; processingJobs: MediaProcessingJob[] }> {
+  }): Promise<{ media: PresentedMediaAsset; mediaSlots: MediaSlots; processingJobs: MediaProcessingJob[] }> {
     await this.requireStoredTermsAcceptance(
       input.tenantId,
       input.actorUserId,
@@ -1182,7 +1187,7 @@ export class AdvertsService {
     });
 
     return {
-      media,
+      media: presentTenantMediaAsset(media),
       mediaSlots: this.mediaSlots([...existingMedia, media]),
       processingJobs,
     };
@@ -1216,7 +1221,9 @@ export class AdvertsService {
   }
 
   private async withMedia(advert: AdvertPost): Promise<AdvertPostWithMedia> {
-    const media = await this.repository.listMediaAssets(advert.tenantId, 'ADVERT', advert.id);
+    const media = presentTenantMediaAssets(
+      await this.repository.listMediaAssets(advert.tenantId, 'ADVERT', advert.id),
+    );
     const lifecycle = calculateAdvertLifecycle(advert.publishedAt);
     return {
       ...advert,
@@ -1239,6 +1246,7 @@ export class AdvertsService {
     }
 
     const withMedia = await this.withMedia(advert);
+    const publicMedia = withMedia.media.filter((asset) => asset.review.canPublish);
     const searchable = entry.searchText;
     const rankReasons: string[] = [];
     let rankScore = 0;
@@ -1300,8 +1308,8 @@ export class AdvertsService {
       rankReasons.push('RECENTLY_POSTED');
     }
 
-    if (withMedia.media.length > 0) {
-      rankScore += Math.min(20, withMedia.media.length * 4);
+    if (publicMedia.length > 0) {
+      rankScore += Math.min(20, publicMedia.length * 4);
       rankReasons.push('HAS_MEDIA');
     }
 
@@ -1311,6 +1319,8 @@ export class AdvertsService {
 
     return {
       ...withMedia,
+      media: publicMedia,
+      mediaSlots: this.mediaSlots(publicMedia),
       rankScore,
       rankReasons,
       boosted,

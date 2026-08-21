@@ -228,8 +228,10 @@ Progress:
   Unreachable objects fail closed; 5xx stays retryable.
 - Added Kenya legal/reporting escalation playbooks. `ESCALATED` resolutions and
   HIGH/CRITICAL confirmed blocks require an approved country playbook, persist
-  a reporting snapshot, and fail closed for countries without one. User-facing
-  review status remains next.
+  a reporting snapshot, and fail closed for countries without one.
+- Added user-facing media review status on tenant profile, advert, and
+  conversation media. Internal reasons are omitted. Public discovery only
+  includes ready files. Richer review-case management remains next.
 
 ## Epic 4: Listing and Media Vertical Slice
 
@@ -276,7 +278,9 @@ Progress:
 - Added CDN publication verification shared by advert and profile transform
   jobs.
 - Added Kenya legal/reporting playbooks on media review escalate and severe
-  confirmed-block decisions. User-facing review status remains next.
+  confirmed-block decisions.
+- Added user-facing media review status on tenant media responses. Richer
+  review-case management remains next.
 
 ## Epic 5: Source Finder and Relationship Graph
 
@@ -327,8 +331,8 @@ Progress (2026-08-21):
   token overlap and Prisma `tsvector` search add `KEYWORD_MATCH` and report
   `searchMode` as `RULES`, `FTS`, or `HYBRID`. The `embedding` column is reserved
   for an optional later overlay and is not required for tests.
-- Native mobile saved-search screens remain out of scope. User-facing media
-  review status remains next.
+- Native mobile saved-search screens remain out of scope. Production identity
+  remains next.
 
 ## Epic 6: Matching and Lead Conversion
 

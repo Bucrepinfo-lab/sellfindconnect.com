@@ -33,7 +33,11 @@ Last updated: 2026-08-21
 - Kenya media review escalate and HIGH/CRITICAL confirmed-block decisions
   attach an approved reporting playbook. Other countries fail closed until a
   playbook is approved.
-- Production still needs user-facing review status.
+- Tenant media list/attach responses include a user-facing review status
+  (`UNDER_REVIEW`, `READY`, `BLOCKED`, `PROCESSING_FAILED`) and omit internal
+  moderation reasons. Public discovery only includes ready files.
+- Remaining production hardening is richer review-case management. Native
+  mobile remains out of scope.
 
 ## Storage Modes
 
@@ -262,8 +266,8 @@ Workers should:
 4. Mark failed work as retryable to return it to `QUEUED` after backoff, or
    final to move it to `FAILED`.
 
-Job states are `QUEUED`, `RUNNING`, `SUCCEEDED`, and `FAILED`. Remaining
-hardening is user-facing review status.
+Job states are `QUEUED`, `RUNNING`, `SUCCEEDED`, and `FAILED`. Tenant clients
+read user-facing review status from media attach and list responses.
 
 Internal batch runner:
 

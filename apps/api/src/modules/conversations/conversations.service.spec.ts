@@ -245,6 +245,8 @@ describe('ConversationsService', () => {
     expect(prepared.upload.requiredHeaders['x-media-owner-type']).toBe('CONVERSATION');
     expect(attached.media.ownerType).toBe('CONVERSATION');
     expect(attached.sendable).toBe(true);
+    expect(attached.media.review).toMatchObject({ status: 'READY', canPublish: true });
+    expect(attached.media).not.toHaveProperty('moderationReason');
     expect(attached.processingJobs.length).toBeGreaterThan(0);
 
     const sent = await service.sendMessage(tenantId, conversation.id, {
@@ -290,7 +292,7 @@ describe('ConversationsService', () => {
         mimeType: 'image/jpeg',
         fileSizeBytes: 800_000,
       }),
-    ).rejects.toThrow(/malware scan or moderation/);
+    ).rejects.toThrow(/moderation review/);
   });
 
   it('records product audit evidence without storing chat text', async () => {

@@ -54,6 +54,7 @@ import {
   markMessageDelivered,
   markMessageRead,
   planNotificationDispatchAttempts,
+  presentUserFacingMediaReview,
   resolveConversationPresenceStatus,
   toConversationAttachment,
   defaultNotificationPreferences,
@@ -2159,7 +2160,9 @@ export default function Home() {
                 label="Attachment"
                 value={
                   chatAttachment
-                    ? `${chatAttachment.fileName} · ${codeLabel(chatAttachment.moderationStatus)}`
+                    ? `${chatAttachment.fileName} · ${presentUserFacingMediaReview({
+                        moderationStatus: chatAttachment.moderationStatus,
+                      }).message}`
                     : 'None'
                 }
               />
@@ -2306,7 +2309,8 @@ export default function Home() {
                   <span>
                     SPACES_* credentials overlay DigitalOcean Spaces uploads. ClamAV and Sightengine
                     scanners overlay when their keys are set. Transform jobs verify public CDN URLs
-                    before marking READY. Kenya reporting playbooks attach on escalate.
+                    before marking READY. Kenya reporting playbooks attach on escalate. Tenants see
+                    ready, under-review, blocked, or replace-file status without internal reasons.
                   </span>
                 </div>
               </div>

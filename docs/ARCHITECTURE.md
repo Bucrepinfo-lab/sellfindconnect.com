@@ -108,8 +108,9 @@ without validating it against the authenticated user's assignments.
   HTTPS Range GET before succeeding. Kenya legal/reporting playbooks attach
   KE-CIRT, NCMEC CyberTipline, and hosting-abuse channels on escalate and
   severe confirmed-block decisions. Other countries fail closed until a
-  playbook is approved. User-facing review status remains production
-  readiness work.
+  playbook is approved. Tenant media responses now include a user-facing
+  review status and omit internal reasons. Public discovery only includes
+  files that are ready to display.
 - Listings: draft, preview, publish, scheduled go-live, media, lifecycle, and visibility. Advert
   listing, lifecycle, and media routes require an MFA-verified tenant session.
   Advert media uses shared `MediaAsset` metadata, the ten-item display cap,

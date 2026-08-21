@@ -13,7 +13,10 @@ import {
   getCountry,
   industryCategories,
   mediaPolicy,
+  presentTenantMediaAsset,
+  presentTenantMediaAssets,
   type MediaAsset,
+  type PresentedMediaAsset,
   type ProfileDraft,
   type ProfileReviewReason,
   type PublishedProfile,
@@ -46,8 +49,9 @@ const highReviewRoles = new Set<string>(['FINANCIER', 'CERTIFIER', 'LOGISTICS_PR
 type ProfileReviewComparable = Pick<ProfileDraft, 'countryCode' | 'industryCode' | 'role'>;
 type MediaSlots = { used: number; max: number; remaining: number };
 type PublishedProfileWithMedia = PublishedProfile & {
-  media: MediaAsset[];
+  media: PresentedMediaAsset[];
   mediaSlots: MediaSlots;
+  daysLive: number;
 };
 
 @Injectable()
@@ -268,7 +272,9 @@ export class ProfilesService {
 
   async previewDraft(tenantId: string, id: string) {
     const draft = await this.getDraft(tenantId, id);
-    const media = await this.repository.listMediaAssets(tenantId, 'PROFILE_DRAFT', draft.id);
+    const media = presentTenantMediaAssets(
+      await this.repository.listMediaAssets(tenantId, 'PROFILE_DRAFT', draft.id),
+    );
     const country = getCountry(draft.countryCode);
     const industry = industryCategories.find((item) => item.code === draft.industryCode);
 
@@ -306,9 +312,11 @@ export class ProfilesService {
     };
   }
 
-  async listDraftMedia(tenantId: string, id: string): Promise<MediaAsset[]> {
+  async listDraftMedia(tenantId: string, id: string): Promise<PresentedMediaAsset[]> {
     const draft = await this.getDraft(tenantId, id);
-    return this.repository.listMediaAssets(tenantId, 'PROFILE_DRAFT', draft.id);
+    return presentTenantMediaAssets(
+      await this.repository.listMediaAssets(tenantId, 'PROFILE_DRAFT', draft.id),
+    );
   }
 
   async prepareDraftMediaUpload(
@@ -383,7 +391,7 @@ export class ProfilesService {
     id: string,
     input: CreateProfileMediaDto,
     actorUserId?: string,
-  ): Promise<{ media: MediaAsset; mediaSlots: MediaSlots; processingJobs: MediaProcessingJob[] }> {
+  ): Promise<{ media: PresentedMediaAsset; mediaSlots: MediaSlots; processingJobs: MediaProcessingJob[] }> {
     await this.requireStoredTermsAcceptance(
       tenantId,
       actorUserId,
@@ -488,7 +496,7 @@ export class ProfilesService {
     });
 
     return {
-      media,
+      media: presentTenantMediaAsset(media),
       mediaSlots: this.mediaSlots([...existingMedia, media]),
       processingJobs,
     };
@@ -614,7 +622,9 @@ export class ProfilesService {
       throw new NotFoundException('Published profile not found.');
     }
 
-    const media = await this.repository.listMediaAssets(tenantId, 'PUBLISHED_PROFILE', profile.id);
+    const media = presentTenantMediaAssets(
+      await this.repository.listMediaAssets(tenantId, 'PUBLISHED_PROFILE', profile.id),
+    );
     return {
       ...profile,
       daysLive: this.daysBetween(profile.publishedAt, new Date().toISOString()),

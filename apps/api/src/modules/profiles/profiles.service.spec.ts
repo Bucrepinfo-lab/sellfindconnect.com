@@ -242,20 +242,17 @@ describe('ProfilesService', () => {
 
     expect(result.media).toMatchObject({
       moderationStatus: 'PENDING',
-      moderationReason: 'SCAN_QUEUED',
       storageProvider: 's3-compatible',
       objectKey: 'profile-drafts/tenant/draft/fresh-produce.jpg',
       cdnUrl: 'https://cdn.example.test/display/fresh-produce.jpg',
       thumbnailUrl: 'https://cdn.example.test/thumb/fresh-produce.jpg',
       transformStatus: 'READY',
-      variants: [
-        {
-          label: 'thumbnail',
-          url: 'https://cdn.example.test/thumb/fresh-produce.jpg',
-          width: 480,
-        },
-      ],
+      review: {
+        status: 'UNDER_REVIEW',
+        canPublish: false,
+      },
     });
+    expect(result.media).not.toHaveProperty('moderationReason');
   });
 
   it('blocks profile media when the moderation adapter rejects it', async () => {
