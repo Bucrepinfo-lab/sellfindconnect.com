@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { searchSourceFinderRecords } from './source-finder';
+import {
+  buildOpportunityAlert,
+  createSavedSourceFinderSearch,
+  isOpportunityAlertDue,
+  searchSourceFinderRecords,
+  selectOpportunityMatches,
+} from './source-finder';
 
 describe('source finder ranking', () => {
   it('ranks supplier records by commercial search relevance', () => {
@@ -49,5 +55,57 @@ describe('source finder ranking', () => {
     expect(results).toHaveLength(1);
     expect(results[0]?.id).toBe('r4');
     expect(results[0]?.score).toBeGreaterThan(50);
+  });
+});
+
+describe('source finder saved searches and opportunity alerts', () => {
+  const search = createSavedSourceFinderSearch(
+    {
+      name: 'Fresh produce buyers',
+      query: 'fresh produce',
+      role: 'BUYER',
+      countryCode: 'KE',
+      alertFrequency: 'DAILY',
+    },
+    { tenantId: 'tenant-1', id: 'saved-1' },
+    '2026-08-21T08:00:00.000Z',
+  );
+
+  it('creates a named saved search and waits for the daily cadence after a run', () => {
+    expect(search.query).toBe('fresh produce');
+    expect(isOpportunityAlertDue(search, '2026-08-21T08:00:00.000Z')).toBe(true);
+    expect(
+      isOpportunityAlertDue(
+        { ...search, lastAlertedAt: '2026-08-21T08:00:00.000Z' },
+        '2026-08-21T12:00:00.000Z',
+      ),
+    ).toBe(false);
+    expect(
+      isOpportunityAlertDue(
+        { ...search, lastAlertedAt: '2026-08-21T08:00:00.000Z' },
+        '2026-08-22T08:00:00.000Z',
+      ),
+    ).toBe(true);
+  });
+
+  it('builds a de-duplicable opportunity alert from a high-scoring match', () => {
+    const results = searchSourceFinderRecords({
+      query: search.query,
+      role: search.role,
+      countryCode: search.countryCode,
+      sortBy: 'RELEVANCE',
+    });
+    const matches = selectOpportunityMatches(results, 3);
+    const alert = buildOpportunityAlert(
+      search,
+      matches[0]!,
+      'alert-1',
+      '2026-08-21T08:01:00.000Z',
+    );
+
+    expect(matches.length).toBeGreaterThan(0);
+    expect(alert.sourceRecordId).toBe(matches[0]?.id);
+    expect(alert.title).toContain('Opportunity');
+    expect(alert.score).toBeGreaterThanOrEqual(40);
   });
 });

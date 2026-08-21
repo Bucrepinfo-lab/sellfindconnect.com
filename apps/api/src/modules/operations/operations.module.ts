@@ -5,11 +5,19 @@ import { AnalyticsModule } from '../analytics/analytics.module';
 import { ConversationsModule } from '../conversations/conversations.module';
 import { FinanceModule } from '../finance/finance.module';
 import { MediaModule } from '../media/media.module';
+import { SourceFinderModule } from '../source-finder/source-finder.module';
 import { InternalJobGuard } from './internal-job.guard';
 import { OperationsController } from './operations.controller';
 
 @Module({
-  imports: [AdvertsModule, AnalyticsModule, ConversationsModule, FinanceModule, MediaModule],
+  imports: [
+    AdvertsModule,
+    AnalyticsModule,
+    ConversationsModule,
+    FinanceModule,
+    MediaModule,
+    SourceFinderModule,
+  ],
   controllers: [OperationsController],
   providers: [InternalJobGuard],
 })

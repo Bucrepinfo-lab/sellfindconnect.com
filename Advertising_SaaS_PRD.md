@@ -533,7 +533,20 @@ Implementation progress on 2026-06-17:
 - Added reason codes and human-readable match reasons so users understand why a producer, supplier, buyer, logistics provider, or related service appears.
 - Added a tenant-scoped Source Finder API endpoint with server-side zero-tolerance blocking for prohibited searches.
 - Updated the web Source Finder to use the shared ranking engine, expose sort modes, show match reasons, and display related commercial links.
-- Remaining hardening: persisted search index, saved searches, relationship claim approval, outcome feedback, hierarchy dashboards, and privacy/consent controls for behavioral matching.
+- Remaining hardening: persisted search index, outcome feedback, hierarchy dashboards, and privacy/consent controls for behavioral matching.
+
+Implementation progress on 2026-08-21:
+
+- Added Source Finder saved searches with INSTANT/DAILY/WEEKLY cadences,
+  zero-tolerance query blocking, de-duplicated opportunity alerts, consent-aware
+  IN_APP/email delivery plans, and opt-in Prisma persistence through
+  `SOURCE_FINDER_REPOSITORY=prisma`.
+- Added tenant routes `POST/GET /v1/source-finder/saved-searches`,
+  `GET /v1/source-finder/alerts`, `POST /v1/source-finder/alerts/run`, and the
+  protected scheduler `POST /v1/operations/source-finder/alerts/run`.
+- Updated the web Saved Searches panel to save cadence-backed searches and run
+  opportunity alerts. Native mobile saved-search screens and provider-backed
+  push/SMS/WhatsApp delivery remain next.
 
 Implementation progress on 2026-06-20:
 
@@ -551,8 +564,8 @@ Implementation progress on 2026-06-20:
 - Added web/PWA saved-search UX with named searches, alert cadence, blocked
   search handling, restored-search controls, and previewable alert candidates.
 - Remaining hardening: Postgres full-text/pgvector or external search provider,
-  analytics warehouse/aggregated rollups, relationship claim approval, external
-  notification delivery, native mobile saved-search screens, hierarchy
+  analytics warehouse/aggregated rollups, external provider-backed
+  push/SMS/WhatsApp delivery, native mobile saved-search screens, hierarchy
   dashboards, and privacy/consent controls for behavioral matching.
 
 ### 7.6 Precision Matching and Link Intelligence

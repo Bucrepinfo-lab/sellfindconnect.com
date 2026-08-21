@@ -111,7 +111,10 @@ without validating it against the authenticated user's assignments.
   the lifecycle sweep promotes it to `LIVE`.
   See `docs/MEDIA_PIPELINE.md` for storage mode and worker queue configuration.
 - Safety: blocked categories, policy decisions, moderation cases, and reports.
-- Discovery: Source Finder, search, filters, reason codes, and saved searches.
+- Discovery: Source Finder, search, filters, reason codes, saved searches,
+  and cadence-backed opportunity alerts. Tenant Source Finder routes require
+  an MFA-verified tenant session. Opt-in Prisma persistence is selected with
+  `SOURCE_FINDER_REPOSITORY=prisma`.
   Tenant-scoped discovery routes require an MFA-verified tenant session.
 - Relationships: structured claims (`SUPPLIES_TO`, `BUYS_FROM`, `PRODUCES`,
   `DISTRIBUTES`, `CONSUMES`, `INSTALLS`, `REPAIRS`, `FINANCES`, `CERTIFIES`,

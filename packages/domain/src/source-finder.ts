@@ -330,3 +330,151 @@ function tokenize(value: string): string[] {
 function normalize(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
+
+export const opportunityAlertFrequencies = ['INSTANT', 'DAILY', 'WEEKLY'] as const;
+
+export type OpportunityAlertFrequency = (typeof opportunityAlertFrequencies)[number];
+
+export const opportunityAlertCadenceMs: Record<OpportunityAlertFrequency, number> = {
+  INSTANT: 0,
+  DAILY: 24 * 60 * 60 * 1000,
+  WEEKLY: 7 * 24 * 60 * 60 * 1000,
+};
+
+export const opportunityAlertMinScore = 40;
+
+export class SourceFinderSearchError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SourceFinderSearchError';
+  }
+}
+
+export type SavedSourceFinderSearch = {
+  id: string;
+  tenantId: string;
+  name: string;
+  query: string;
+  role?: SupplyChainRole | 'ALL';
+  industryCode?: string;
+  countryCode?: string;
+  sortBy?: SourceFinderSortOption;
+  alertFrequency: OpportunityAlertFrequency;
+  isActive: boolean;
+  lastAlertedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SourceFinderOpportunityAlert = {
+  id: string;
+  tenantId: string;
+  savedSearchId: string;
+  sourceRecordId: string;
+  sourceName: string;
+  sourceRole: SupplyChainRole;
+  title: string;
+  message: string;
+  score: number;
+  reasonCodes: SourceFinderReasonCode[];
+  createdAt: string;
+};
+
+export type SavedSourceFinderSearchInput = {
+  name: string;
+  query: string;
+  role?: SupplyChainRole | 'ALL';
+  industryCode?: string;
+  countryCode?: string;
+  sortBy?: SourceFinderSortOption;
+  alertFrequency?: OpportunityAlertFrequency;
+};
+
+export function createSavedSourceFinderSearch(
+  input: SavedSourceFinderSearchInput,
+  context: { tenantId: string; id: string },
+  nowIso = new Date().toISOString(),
+): SavedSourceFinderSearch {
+  const name = input.name.trim();
+  const query = input.query.trim();
+
+  if (name.length < 2 || name.length > 120) {
+    throw new SourceFinderSearchError('Saved search name must be between 2 and 120 characters.');
+  }
+
+  if (query.length < 2 || query.length > 200) {
+    throw new SourceFinderSearchError('Saved search query must be between 2 and 200 characters.');
+  }
+
+  const alertFrequency = input.alertFrequency ?? 'DAILY';
+  if (!opportunityAlertFrequencies.includes(alertFrequency)) {
+    throw new SourceFinderSearchError('Unsupported opportunity alert cadence.');
+  }
+
+  return {
+    id: context.id,
+    tenantId: context.tenantId,
+    name,
+    query,
+    role: input.role,
+    industryCode: input.industryCode,
+    countryCode: input.countryCode,
+    sortBy: input.sortBy,
+    alertFrequency,
+    isActive: true,
+    createdAt: nowIso,
+    updatedAt: nowIso,
+  };
+}
+
+export function isOpportunityAlertDue(
+  search: Pick<SavedSourceFinderSearch, 'isActive' | 'alertFrequency' | 'lastAlertedAt'>,
+  nowIso = new Date().toISOString(),
+): boolean {
+  if (!search.isActive) {
+    return false;
+  }
+
+  if (!search.lastAlertedAt) {
+    return true;
+  }
+
+  return (
+    Date.parse(nowIso) - Date.parse(search.lastAlertedAt) >=
+    opportunityAlertCadenceMs[search.alertFrequency]
+  );
+}
+
+export function selectOpportunityMatches(
+  results: SourceFinderSearchResult[],
+  limit = 5,
+): SourceFinderSearchResult[] {
+  return results
+    .filter((result) => result.score >= opportunityAlertMinScore)
+    .slice(0, Math.min(20, Math.max(1, limit)));
+}
+
+export function buildOpportunityAlert(
+  search: SavedSourceFinderSearch,
+  result: SourceFinderSearchResult,
+  id: string,
+  nowIso = new Date().toISOString(),
+): SourceFinderOpportunityAlert {
+  return {
+    id,
+    tenantId: search.tenantId,
+    savedSearchId: search.id,
+    sourceRecordId: result.id,
+    sourceName: result.name,
+    sourceRole: result.role,
+    title: `Opportunity: ${result.name}`,
+    message: `${result.name} matches "${search.name}" with score ${result.score}.`,
+    score: result.score,
+    reasonCodes: result.reasonCodes,
+    createdAt: nowIso,
+  };
+}
+
+export function opportunityAlertKey(savedSearchId: string, sourceRecordId: string): string {
+  return `${savedSearchId}:${sourceRecordId}`;
+}

@@ -55,14 +55,22 @@ import {
   industryCategories,
   operationalRegions,
   attachApprovedRelationshipClaims,
+  buildOpportunityAlert,
   createRelationshipClaim,
+  createSavedSourceFinderSearch,
   decideRelationshipClaim,
+  isOpportunityAlertDue,
   isPublicGraphClaim,
+  opportunityAlertFrequencies,
   relationshipKinds,
   relationshipVisibilities,
+  type OpportunityAlertFrequency,
   type RelationshipClaim,
   type RelationshipKind,
   type RelationshipVisibility,
+  type SavedSourceFinderSearch,
+  type SourceFinderOpportunityAlert,
+  selectOpportunityMatches,
   pilotSourceFinderRecords,
   prohibitedCategorySummaries,
   searchSourceFinderRecords,
@@ -90,24 +98,14 @@ const counterpartTenantId = '22222222-2222-4222-8222-222222222222';
 const lifecycleDemoNow = new Date(Date.UTC(2026, 6, 10, 0, 0, 0)).toISOString();
 const conversationDemoOpenedAt = '2026-06-17T08:00:00.000Z';
 const conversationDemoNow = '2026-06-17T11:15:00.000Z';
+const opportunityAlertDemoNow = '2026-08-22T08:00:00.000Z';
 const analyticsApiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/v1';
-
-type SavedSearchFrequency = 'INSTANT' | 'DAILY' | 'WEEKLY';
-
-type SavedSearchPreview = {
-  id: string;
-  name: string;
-  query: string;
-  role: SupplyChainRole | 'ALL';
-  industryCode: string;
-  frequency: SavedSearchFrequency;
-};
 
 type SavedSearchAlertPreview = {
   id: string;
-  savedSearch: SavedSearchPreview;
+  savedSearch: SavedSourceFinderSearch;
   result: SourceFinderSearchResult | null;
-  status: 'READY' | 'BLOCKED';
+  status: 'READY' | 'BLOCKED' | 'WAITING';
 };
 
 type AnalyticsExportFormat = 'CSV' | 'JSON' | 'PDF';
@@ -364,25 +362,35 @@ function buildHierarchyAnalyticsApiPath(input: {
 export default function Home() {
   const [query, setQuery] = useState('fresh produce');
   const [savedSearchName, setSavedSearchName] = useState('Fresh produce buyers');
-  const [savedSearchFrequency, setSavedSearchFrequency] = useState<SavedSearchFrequency>('DAILY');
-  const [savedSearches, setSavedSearches] = useState<SavedSearchPreview[]>([
-    {
-      id: 'saved-fresh-produce',
-      name: 'Fresh produce buyers',
-      query: 'fresh produce hotel buyers',
-      role: 'BUYER',
-      industryCode: 'ALL',
-      frequency: 'DAILY',
-    },
-    {
-      id: 'saved-packaging',
-      name: 'Packaging distributors',
-      query: 'food packaging distributors',
-      role: 'DISTRIBUTOR',
-      industryCode: 'MANUFACTURING',
-      frequency: 'WEEKLY',
-    },
+  const [savedSearchFrequency, setSavedSearchFrequency] =
+    useState<OpportunityAlertFrequency>('DAILY');
+  const [savedSearches, setSavedSearches] = useState<SavedSourceFinderSearch[]>([
+    createSavedSourceFinderSearch(
+      {
+        name: 'Fresh produce buyers',
+        query: 'fresh produce hotel buyers',
+        role: 'BUYER',
+        industryCode: 'ALL',
+        countryCode: 'KE',
+        alertFrequency: 'DAILY',
+      },
+      { tenantId, id: 'saved-fresh-produce' },
+      '2026-08-21T08:00:00.000Z',
+    ),
+    createSavedSourceFinderSearch(
+      {
+        name: 'Packaging distributors',
+        query: 'food packaging distributors',
+        role: 'DISTRIBUTOR',
+        industryCode: 'MANUFACTURING',
+        countryCode: 'KE',
+        alertFrequency: 'WEEKLY',
+      },
+      { tenantId, id: 'saved-packaging' },
+      '2026-08-21T08:00:00.000Z',
+    ),
   ]);
+  const [opportunityAlerts, setOpportunityAlerts] = useState<SourceFinderOpportunityAlert[]>([]);
   const [role, setRole] = useState<SupplyChainRole | 'ALL'>('ALL');
   const [industryCode, setIndustryCode] = useState('ALL');
   const [sortBy, setSortBy] = useState<SourceFinderSortOption>('RELEVANCE');
@@ -521,18 +529,67 @@ export default function Home() {
   const saveCurrentSearch = () => {
     if (!canSaveSearch) return;
 
-    const id = `saved-${Date.now()}`;
-    setSavedSearches((current) => [
+    const saved = createSavedSourceFinderSearch(
       {
-        id,
         name: savedSearchName.trim() || query.trim(),
         query: query.trim(),
         role,
         industryCode,
-        frequency: savedSearchFrequency,
+        countryCode,
+        sortBy,
+        alertFrequency: savedSearchFrequency,
       },
-      ...current.filter((item) => item.query.toLowerCase() !== query.trim().toLowerCase()),
+      {
+        tenantId,
+        id: `saved-${savedSearches.length + 1}-${query.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+      },
+      opportunityAlertDemoNow,
+    );
+    setSavedSearches((current) => [
+      saved,
+      ...current.filter((item) => item.query.toLowerCase() !== saved.query.toLowerCase()),
     ]);
+  };
+
+  const runOpportunityAlertsNow = () => {
+    const now = opportunityAlertDemoNow;
+    const existingKeys = new Set(
+      opportunityAlerts.map((alert) => `${alert.savedSearchId}:${alert.sourceRecordId}`),
+    );
+    const created: SourceFinderOpportunityAlert[] = [];
+    const nextSearches = savedSearches.map((search) => {
+      if (!evaluateSafetyText(search.query).allowed || !isOpportunityAlertDue(search, now)) {
+        return search;
+      }
+
+      for (const result of selectOpportunityMatches(
+        searchSourceFinderRecords(
+          {
+            query: search.query,
+            role: search.role,
+            industryCode: search.industryCode,
+            countryCode: search.countryCode ?? countryCode,
+            sortBy: search.sortBy ?? 'RELEVANCE',
+          },
+          graphRecords,
+        ),
+        2,
+      )) {
+        const key = `${search.id}:${result.id}`;
+        if (existingKeys.has(key)) {
+          continue;
+        }
+        existingKeys.add(key);
+        created.push(buildOpportunityAlert(search, result, key, now));
+      }
+
+      return { ...search, lastAlertedAt: now, updatedAt: now };
+    });
+
+    setSavedSearches(nextSearches);
+    if (created.length > 0) {
+      setOpportunityAlerts((current) => [...created, ...current]);
+    }
   };
 
   const totals = filteredResults.reduce(
@@ -1973,12 +2030,14 @@ export default function Home() {
                 <select
                   value={savedSearchFrequency}
                   onChange={(event) =>
-                    setSavedSearchFrequency(event.target.value as SavedSearchFrequency)
+                    setSavedSearchFrequency(event.target.value as OpportunityAlertFrequency)
                   }
                 >
-                  <option value="INSTANT">Instant</option>
-                  <option value="DAILY">Daily</option>
-                  <option value="WEEKLY">Weekly</option>
+                  {opportunityAlertFrequencies.map((frequency) => (
+                    <option key={frequency} value={frequency}>
+                      {codeLabel(frequency)}
+                    </option>
+                  ))}
                 </select>
               </label>
               <div className="terms-actions">
@@ -1994,7 +2053,8 @@ export default function Home() {
                 <button
                   className="secondary-button"
                   type="button"
-                  disabled={savedSearchAlerts.length === 0}
+                  disabled={savedSearches.length === 0}
+                  onClick={runOpportunityAlertsNow}
                 >
                   <Search size={16} />
                   Run Alerts
@@ -2006,7 +2066,7 @@ export default function Home() {
                   <strong>{canSaveSearch ? 'Alert-ready' : 'Alert blocked'}</strong>
                   <span>
                     {canSaveSearch
-                      ? `${queryExpansion.expandedTerms.length} normalized search terms ready.`
+                      ? `${opportunityAlerts.length} delivered opportunities · ${queryExpansion.expandedTerms.length} search terms.`
                       : 'Saved alerts cannot be created for blocked or empty searches.'}
                   </span>
                 </div>
@@ -2020,37 +2080,53 @@ export default function Home() {
                     onClick={() => {
                       resetHierarchyReport();
                       setQuery(savedSearch.query);
-                      setRole(savedSearch.role);
-                      setIndustryCode(savedSearch.industryCode);
+                      setRole(savedSearch.role ?? 'ALL');
+                      setIndustryCode(savedSearch.industryCode ?? 'ALL');
                       setSavedSearchName(savedSearch.name);
-                      setSavedSearchFrequency(savedSearch.frequency);
+                      setSavedSearchFrequency(savedSearch.alertFrequency);
                     }}
                   >
                     <span>
                       <strong>{savedSearch.name}</strong>
                       {savedSearch.query}
                     </span>
-                    <em>{savedSearch.frequency.toLowerCase()}</em>
+                    <em>{savedSearch.alertFrequency.toLowerCase()}</em>
                   </button>
                 ))}
               </div>
               <div className="alert-list">
-                {savedSearchAlerts.slice(0, 4).map((alert) => (
-                  <div
-                    key={alert.id}
-                    className={alert.status === 'READY' ? 'alert-row ready' : 'alert-row blocked'}
-                  >
-                    {alert.status === 'READY' ? <Sparkles size={15} /> : <Ban size={15} />}
-                    <div>
-                      <strong>{alert.result ? alert.result.name : alert.savedSearch.name}</strong>
-                      <span>
-                        {alert.result
+                {(opportunityAlerts.length > 0 ? opportunityAlerts : savedSearchAlerts)
+                  .slice(0, 4)
+                  .map((alert) => {
+                    const ready =
+                      'sourceName' in alert
+                        ? true
+                        : alert.status === 'READY';
+                    const title =
+                      'sourceName' in alert
+                        ? alert.sourceName
+                        : alert.result
+                          ? alert.result.name
+                          : alert.savedSearch.name;
+                    const detail =
+                      'sourceName' in alert
+                        ? `${alert.title}: ${alert.score} match`
+                        : alert.result
                           ? `${alert.savedSearch.name}: ${alert.result.score} match`
-                          : 'Blocked by safety policy'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                          : 'Blocked by safety policy';
+                    return (
+                      <div
+                        key={alert.id}
+                        className={ready ? 'alert-row ready' : 'alert-row blocked'}
+                      >
+                        {ready ? <Sparkles size={15} /> : <Ban size={15} />}
+                        <div>
+                          <strong>{title}</strong>
+                          <span>{detail}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
               </div>
             </section>
 
@@ -2345,6 +2421,13 @@ export default function Home() {
                   pendingRelationshipClaims.length > 0
                     ? `${pendingRelationshipClaims.length} relationship claims need counterparty approval.`
                     : 'Approved supplier, logistics, and buyer links can now rank in Source Finder.'
+                }
+              />
+              <Signal
+                text={
+                  opportunityAlerts.length > 0
+                    ? `${opportunityAlerts.length} Source Finder opportunity alerts are ready to deliver.`
+                    : 'Saved Source Finder searches can alert on new high-fit matches.'
                 }
               />
             </section>

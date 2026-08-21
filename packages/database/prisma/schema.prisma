@@ -245,6 +245,8 @@ model Tenant {
   advertDrafts                 AdvertDraft[]
   publishedAdverts             PublishedAdvert[]
   relationshipClaims           RelationshipClaim[]
+  savedSourceFinderSearches    SavedSourceFinderSearch[]
+  sourceFinderOpportunityAlerts SourceFinderOpportunityAlert[]
   advertLifecycleNotifications AdvertLifecycleNotification[]
   advertDiscoveryIndexes       AdvertDiscoveryIndex[]
   savedAdvertSearches          SavedAdvertSearch[]
@@ -669,6 +671,46 @@ model RelationshipClaim {
   @@index([tenantId, status])
   @@index([counterpartTenantId, status])
   @@index([status, visibility])
+}
+
+model SavedSourceFinderSearch {
+  id             String                          @id @default(uuid())
+  tenantId       String
+  name           String                          @db.VarChar(120)
+  query          String                          @db.VarChar(200)
+  role           String?                         @db.VarChar(80)
+  industryCode   String?                         @db.VarChar(80)
+  countryCode    String?                         @db.VarChar(2)
+  sortBy         String?                         @db.VarChar(40)
+  alertFrequency String                          @default("DAILY") @db.VarChar(40)
+  isActive       Boolean                         @default(true)
+  lastAlertedAt  DateTime?
+  createdAt      DateTime                        @default(now())
+  updatedAt      DateTime                        @updatedAt
+  tenant         Tenant                          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  alerts         SourceFinderOpportunityAlert[]
+
+  @@index([tenantId, isActive])
+  @@index([tenantId, updatedAt])
+}
+
+model SourceFinderOpportunityAlert {
+  id             String                   @id @default(uuid())
+  tenantId       String
+  savedSearchId  String
+  sourceRecordId String                   @db.VarChar(120)
+  sourceName     String                   @db.VarChar(200)
+  sourceRole     String                   @db.VarChar(80)
+  title          String                   @db.VarChar(160)
+  message        String
+  score          Int
+  reasonCodes    Json?
+  createdAt      DateTime                 @default(now())
+  tenant         Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  savedSearch    SavedSourceFinderSearch  @relation(fields: [savedSearchId], references: [id], onDelete: Cascade)
+
+  @@unique([savedSearchId, sourceRecordId])
+  @@index([tenantId, createdAt])
 }
 
 model MediaAsset {

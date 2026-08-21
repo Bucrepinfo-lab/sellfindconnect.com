@@ -292,8 +292,11 @@ Progress (2026-08-21):
 - Approved public/verified claims now attach to Source Finder results and the
   web Graph panel. Opt-in Prisma persistence is available through
   `RELATIONSHIPS_REPOSITORY=prisma`.
-- Saved searches, opportunity alert delivery, and native mobile graph screens
-  remain next.
+- Added Source Finder saved searches, INSTANT/DAILY/WEEKLY cadence, de-duplicated
+  opportunity alerts, consent-aware delivery plans, and opt-in Prisma
+  persistence through `SOURCE_FINDER_REPOSITORY=prisma`.
+- Native mobile saved-search screens and provider-backed push/SMS/WhatsApp
+  delivery remain next.
 
 ## Epic 6: Matching and Lead Conversion
 

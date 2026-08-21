@@ -15,6 +15,8 @@ import { RunFinanceAlertsDto } from '../finance/dto/finance.dto';
 import { FinanceService } from '../finance/finance.service';
 import { RunMediaProcessingJobsDto } from '../media/dto/media-worker.dto';
 import { MediaWorkerService } from '../media/media-worker.service';
+import { RunSourceFinderOpportunityAlertsDto } from '../source-finder/dto/search-source-finder.dto';
+import { SourceFinderService } from '../source-finder/source-finder.service';
 import { InternalJobGuard } from './internal-job.guard';
 
 @ApiTags('operations')
@@ -31,6 +33,7 @@ export class OperationsController {
     private readonly conversations: ConversationsService,
     private readonly finance: FinanceService,
     private readonly mediaWorker: MediaWorkerService,
+    private readonly sourceFinder: SourceFinderService,
   ) {}
 
   @Post('adverts/lifecycle/run')
@@ -66,5 +69,10 @@ export class OperationsController {
   @Post('finance/alerts/run')
   runFinanceAlerts(@Body() body: RunFinanceAlertsDto) {
     return this.finance.runFinanceAlerts(body);
+  }
+
+  @Post('source-finder/alerts/run')
+  runSourceFinderOpportunityAlerts(@Body() body: RunSourceFinderOpportunityAlertsDto) {
+    return this.sourceFinder.runAllOpportunityAlerts(body);
   }
 }

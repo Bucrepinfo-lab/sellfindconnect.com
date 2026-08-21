@@ -49,4 +49,53 @@ describe('SourceFinderService', () => {
       service.search({ query: 'fresh produce', countryCode: 'KE', industryCode: 'UNKNOWN' }),
     ).rejects.toThrow();
   });
+
+  it('saves a Source Finder search and delivers de-duplicated opportunity alerts', async () => {
+    const service = new SourceFinderService();
+    const tenantId = '11111111-1111-4111-8111-111111111111';
+    const saved = await service.createSavedSearch(tenantId, {
+      name: 'Fresh produce buyers',
+      query: 'fresh produce',
+      role: 'BUYER',
+      countryCode: 'KE',
+      alertFrequency: 'DAILY',
+    });
+
+    const firstRun = await service.runOpportunityAlerts(tenantId, {
+      savedSearchId: saved.id,
+      now: '2026-08-21T08:00:00.000Z',
+    });
+    const secondRun = await service.runOpportunityAlerts(tenantId, {
+      savedSearchId: saved.id,
+      now: '2026-08-21T12:00:00.000Z',
+    });
+    const nextDay = await service.runOpportunityAlerts(tenantId, {
+      savedSearchId: saved.id,
+      now: '2026-08-22T08:00:00.000Z',
+    });
+
+    expect(firstRun.alertsCreated.length).toBeGreaterThan(0);
+    expect(firstRun.deliveryPlans[0]?.eventType).toBe('SOURCE_FINDER_OPPORTUNITY');
+    expect(firstRun.deliveryPlans[0]?.selectedChannels).toContain('IN_APP');
+    expect(secondRun.alertsCreated).toHaveLength(0);
+    expect(nextDay.alertsCreated).toHaveLength(0);
+    await expect(service.listSavedSearches(tenantId)).resolves.toEqual([
+      expect.objectContaining({ id: saved.id, lastAlertedAt: '2026-08-22T08:00:00.000Z' }),
+    ]);
+    await expect(service.listOpportunityAlerts(tenantId)).resolves.toHaveLength(
+      firstRun.alertsCreated.length,
+    );
+  });
+
+  it('blocks prohibited saved-search queries', async () => {
+    const service = new SourceFinderService();
+
+    await expect(
+      service.createSavedSearch('11111111-1111-4111-8111-111111111111', {
+        name: 'Weapons sourcing',
+        query: 'ammunition supplier',
+        countryCode: 'KE',
+      }),
+    ).rejects.toThrow();
+  });
 });

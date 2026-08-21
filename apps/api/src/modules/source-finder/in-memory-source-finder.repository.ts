@@ -1,0 +1,59 @@
+import { Injectable } from '@nestjs/common';
+import type { SavedSourceFinderSearch, SourceFinderOpportunityAlert } from '@telpen/domain';
+import { opportunityAlertKey } from '@telpen/domain';
+
+import type { SourceFinderRepository } from './source-finder.repository';
+
+@Injectable()
+export class InMemorySourceFinderRepository implements SourceFinderRepository {
+  private readonly savedSearches = new Map<string, SavedSourceFinderSearch>();
+  private readonly alerts = new Map<string, SourceFinderOpportunityAlert>();
+
+  createSavedSearch(search: SavedSourceFinderSearch): void {
+    this.savedSearches.set(this.key(search.tenantId, search.id), search);
+  }
+
+  updateSavedSearch(search: SavedSourceFinderSearch): void {
+    this.savedSearches.set(this.key(search.tenantId, search.id), search);
+  }
+
+  findSavedSearch(tenantId: string, id: string): SavedSourceFinderSearch | undefined {
+    return this.savedSearches.get(this.key(tenantId, id));
+  }
+
+  listSavedSearches(tenantId: string): SavedSourceFinderSearch[] {
+    return Array.from(this.savedSearches.values())
+      .filter((search) => search.tenantId === tenantId)
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  }
+
+  listAllSavedSearches(): SavedSourceFinderSearch[] {
+    return Array.from(this.savedSearches.values());
+  }
+
+  createOpportunityAlert(alert: SourceFinderOpportunityAlert): void {
+    this.alerts.set(this.alertKey(alert.tenantId, alert.savedSearchId, alert.sourceRecordId), alert);
+  }
+
+  findOpportunityAlert(
+    tenantId: string,
+    savedSearchId: string,
+    sourceRecordId: string,
+  ): SourceFinderOpportunityAlert | undefined {
+    return this.alerts.get(this.alertKey(tenantId, savedSearchId, sourceRecordId));
+  }
+
+  listOpportunityAlerts(tenantId: string): SourceFinderOpportunityAlert[] {
+    return Array.from(this.alerts.values())
+      .filter((alert) => alert.tenantId === tenantId)
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  }
+
+  private key(tenantId: string, id: string): string {
+    return `${tenantId}:${id}`;
+  }
+
+  private alertKey(tenantId: string, savedSearchId: string, sourceRecordId: string): string {
+    return `${tenantId}:${opportunityAlertKey(savedSearchId, sourceRecordId)}`;
+  }
+}

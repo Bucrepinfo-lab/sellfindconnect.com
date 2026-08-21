@@ -203,6 +203,10 @@ The production service settings were further optimized on 2026-06-16:
   scheduling: `POST /v1/operations/conversations/sla/run` with the same
   `x-internal-job-key` header. Run it frequently enough to create due-soon and
   breached response-time alerts.
+- The API exposes a protected Source Finder opportunity-alert sweep:
+  `POST /v1/operations/source-finder/alerts/run` with the same
+  `x-internal-job-key` header. Run it at least daily so DAILY/WEEKLY saved
+  searches can emit de-duplicated match alerts.
 - The API exposes a protected analytics retention endpoint for future
   scheduling: `POST /v1/operations/analytics/retention/run` with the same
   `x-internal-job-key` header. Start with `dryRun: true`; pass `countryCode`
