@@ -40,8 +40,9 @@ Exit: clean install, type check, tests, and production builds pass.
 
 Progress:
 
-- Deployment migration is paused while coding continues.
-- Added `docs/DIGITALOCEAN_DEPLOYMENT.md` as the leading candidate runbook for
+- Deployment: Fly.io Frankfurt is live (`docs/FLY_DEPLOYMENT.md`). DigitalOcean
+  remains a candidate runbook. Historical Railway URLs no longer serve traffic.
+- Added `docs/DIGITALOCEAN_DEPLOYMENT.md` as a candidate runbook for
   DigitalOcean evaluation, with Cape Town/South Africa latency as the main
   driver and service-availability verification as a required gate.
 - Added a checked-in baseline Prisma migration plus root database commands for
@@ -164,8 +165,11 @@ Progress:
   `databaseConfigured` without the URL.
 - Broader non-auth product audit coverage now includes analytics exports,
   privacy/retention/rollup jobs, invoices, and payment checkout/payout.
-  `GET /v1/audit` filters by action or entity type. Native mobile and app-store
-  billing remain out of scope.
+  `GET /v1/audit` filters by action or entity type. Native mobile and Play
+  Billing remain out of scope; see `docs/PLAY_STORE.md`.
+- Account deletion and privacy policy routes are mounted: `GET /privacy`,
+  `/account/delete`, and tenant-session `/v1/privacy/*`. Deletion still
+  persists in process memory until a durable privacy worker is added.
 
 ## Epic 3: Advertiser Profile Vertical Slice
 
@@ -322,8 +326,6 @@ Progress:
 - Updated the web Source Finder to use the shared ranking engine, show match
   reasons, sort by relevance/newest/most visited/verified/response time, and
   show related supplier/buyer/service links.
-- Persistence, relationship claim approval, saved searches, opportunity alerts,
-  search analytics feedback, and graph dashboards remain next.
 
 Progress (2026-08-21):
 
@@ -353,8 +355,9 @@ Progress (2026-08-21):
   enables `text-embedding-3-small` on reindex and search; named
   `SOURCE_FINDER_EMBEDDING_PROVIDER=openai` fail-closes without the key.
   Matches add `SEMANTIC_MATCH`. Tests do not require live OpenAI credentials.
-- Native mobile saved-search screens remain out of scope. Hosted Prisma
-  enablement remains next.
+- Native mobile saved-search screens remain out of scope. Hosted Prisma overlay
+  (`PERSISTENCE_DRIVER`) is implemented; production Fly still needs a redeploy
+  before that overlay is live.
 
 ## Epic 6: Matching and Lead Conversion
 
@@ -518,7 +521,9 @@ Progress:
   remains the default; `stripe`, `africastalking`, and `live` select Stripe
   PaymentIntents and/or Africa's Talking M-Pesa checkout, reject raw card
   numbers, keep pending captures as `REQUIRES_CAPTURE` until settlement, and
-  fail closed without credentials. App-store billing remains next.
+  fail closed without credentials. Play Billing is required before any Google
+  Play Android listing can charge the SaaS subscription (`docs/PLAY_STORE.md`).
+  STK Push on the verified login phone remains the web/PWA rail.
 
 ## Epic 9: Mobile, Localization, and Launch
 
@@ -530,6 +535,15 @@ Progress:
 - Run Kenya pilot readiness gate.
 
 Exit: web/PWA and mobile clients pass pilot acceptance tests.
+
+Progress:
+
+- Web/PWA is the launch surface. Native Android/iOS remain out of scope.
+- Google Play constraints are locked in `docs/PLAY_STORE.md`: Play Billing for
+  the digital SaaS subscription, STK only to the login phone, no `READ_SMS` /
+  `READ_CALL_LOG`, public `/privacy` plus signed-in `/account/delete`.
+- Privacy API is mounted at `/v1/privacy` behind the tenant session guard.
+  Durable erase-after-grace-period remains before a Play listing.
 
 ## Epic 10: Legal Terms and Policy Operations
 
@@ -563,10 +577,9 @@ Progress:
 
 ## Immediate Sprint
 
-1. Repository foundation.
-2. Initial Prisma schema.
-3. Geography, industry, and supply-chain role seeds.
-4. Shared zero-tolerance policy validator.
-5. Public API health/geography/industry endpoints.
-6. First usable web screen for Source Finder and advertiser setup.
-7. First terms acceptance gate wired to publish locking in the web screen.
+1. Redeploy Fly web + API from current `main` (`docs/FLY_DEPLOYMENT.md`).
+2. Enable `PERSISTENCE_DRIVER=prisma` only after hosted `DATABASE_URL` and
+   migrations/seed are verified; confirm `/v1/health` persistence mode.
+3. Turn on scheduled jobs against `https://api.sellfindconnect.com/v1`.
+4. Durable account-deletion worker (Play User Data) before any Play listing.
+5. Do not start a native Play app until Play Billing exists.

@@ -49,7 +49,10 @@ export class PaymentsService {
     private readonly authRepository?: AuthRepository,
   ) {}
 
-  /** STK push to the signed-in user's OWN phone (their login number = payer). */
+  /**
+   * STK push to the signed-in user's OWN phone. The login number is the payer;
+   * CheckoutDto has no phone field and a different number must never be accepted.
+   */
   async requestCheckout(sessionToken: string, input: CheckoutDto): Promise<CheckoutResult> {
     const context = await this.auth.getSession(sessionToken); // throws 401 if invalid
     const phone = context.user?.phone;

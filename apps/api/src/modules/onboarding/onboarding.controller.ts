@@ -1,19 +1,47 @@
-﻿import { Body, Controller, Post, Req } from "@nestjs/common";
+﻿import { Body, Controller, Post } from '@nestjs/common';
+import { ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
+import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 
-interface IntentDto { intent: "SELL"|"FIND"|"BOTH"; role?: string; industry?: string; query?: string; }
+class OnboardingIntentDto {
+  @ApiProperty({ enum: ['SELL', 'FIND', 'BOTH'] })
+  @IsIn(['SELL', 'FIND', 'BOTH'])
+  declare intent: 'SELL' | 'FIND' | 'BOTH';
 
-@Controller("v1/onboarding")
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  declare role?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  declare industry?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  declare query?: string;
+}
+
+@ApiTags('onboarding')
+@Controller('onboarding')
 export class OnboardingController {
-  @Post("intent")
-  async recordIntent(@Req() req: any, @Body() body: IntentDto) {
+  @Post('intent')
+  recordIntent(@Body() body: OnboardingIntentDto) {
+    const role = body.role ?? '';
+    const industry = body.industry ?? '';
+    const query = body.query ?? '';
     return {
-      tenantId: req.tenantId,
       intent: body.intent,
       role: body.role ?? null,
       industry: body.industry ?? null,
-      redirectTo: body.intent === "SELL"
-        ? "/dashboard/adverts/new?onboarding=1&role=" + (body.role ?? "")
-        : "/dashboard/discover?onboarding=1&industry=" + (body.industry ?? "") + "&q=" + encodeURIComponent(body.query ?? ""),
+      redirectTo:
+        body.intent === 'SELL'
+          ? `/dashboard/adverts/new?onboarding=1&role=${encodeURIComponent(role)}`
+          : `/dashboard/discover?onboarding=1&industry=${encodeURIComponent(industry)}&q=${encodeURIComponent(query)}`,
     };
   }
 }

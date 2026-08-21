@@ -60,8 +60,18 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - Safety: moderation queue, media scanning, malware scanning, keyword/synonym libraries, evidence preservation, audit logs, and escalation workflow.
 - Observability: Sentry/OpenTelemetry/Prometheus/Grafana or equivalent.
 - Local development environment: Docker Desktop with WSL 2 for PostgreSQL, Redis, Meilisearch, and Mailpit; Volta with Node.js 24 LTS to keep runtime versions consistent; DBeaver Community recommended for database inspection.
-- Deployment posture: pause new deployment migration work until core coding is further along. Railway remains the current proven fallback/staging deployment. DigitalOcean is the leading candidate to evaluate next because the first country launch needs strong Africa latency and a Cape Town/South Africa deployment location would be valuable if the required products are available there.
-- Production domains: `SellFindConnect.com`, `www.SellFindConnect.com`, and `api.SellFindConnect.com` remain the primary public domain targets. `adverts.telpen.net` and existing Railway URLs remain technical fallback/staging surfaces until final platform cutover is complete.
+- Deployment posture: Fly.io Frankfurt (`fra`) is the live production host for
+  `sellfindconnect.com`, `www.sellfindconnect.com`, and `api.sellfindconnect.com`.
+  DigitalOcean App Platform remains a documented candidate. Historical Railway
+  URLs and `adverts.telpen.net` no longer serve this product. Do not onboard
+  paying subscribers until the live Fly image matches `main`, persistence health
+  is configured, and scheduled jobs run.
+- Login phone = STK Push phone: the verified E.164 number used for SMS OTP is
+  the only Africa's Talking / M-Pesa checkout destination. Checkout must not
+  accept a different payer phone. Google Play listings, if ever submitted, must
+  use Play Billing for the digital SaaS subscription (`docs/PLAY_STORE.md`).
+- Production domains: `SellFindConnect.com`, `www.SellFindConnect.com`, and
+  `api.SellFindConnect.com` are the live public surfaces.
 - Recommended market domain portfolio: buy `SellFindConnect.com` first; also buy `SellFindConnect.app`, `FindSellConnect.com`, and `FindSellConnect.app` as defensive/app companions if budget allows. Campaign line: "Sell it. Find it. Connect."
 - SEO/growth direction: position Sell Find Connect around supplier finder, buyer-seller connection, business advertising app, source finder, local business directory, B2B marketplace, and country/industry business matching. Growth should combine organic SEO, country/industry landing pages, app-store optimization, social video demos, partnerships, referrals, opportunity digests, and safety/trust positioning.
 - GitHub repository: use `https://github.com/Bucrepinfo-lab/sellfindconnect.com.git` as the source repository for the Sell Find Connect codebase and future production deployments after the final platform decision.
@@ -71,6 +81,8 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - First launch country or countries.
 - Exact payment providers and mobile money rails for launch countries.
 - Whether native apps are required on day one or whether web + PWA launches first.
+  Current delivery is web + PWA. A Play listing is blocked on Play Billing, durable
+  account deletion, and the SMS-permission rules in `docs/PLAY_STORE.md`.
 - Which countries need fallback pricing because provider/app-store minimums prevent exactly 10 local currency units.
 - Which launch countries require specific legal reporting channels for child safety, trafficking, weapons, drugs, or violent extremist content.
 - Whether to include public reviews in MVP or Phase 2.
@@ -213,3 +225,4 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - 2026-08-21: Continued Listing and Media review-case management. Cases now present computed SLAs (CRITICAL 24h, HIGH 72h, MEDIUM 168h), support GET by id, job-type and overdue filters, and reopen of dismissed cases only. HIGH/CRITICAL restore or dismiss requires mistaken-classification confirmation plus a reviewer note. Audit metadata stores the flag and omits note bodies. Production identity remains next.
 - 2026-08-21: Continued hosted Prisma enablement. `PERSISTENCE_DRIVER=prisma` overlays PostgreSQL for repositories and media queues when `DATABASE_URL` is set, and fail-closes without it. Per-repository `memory` overrides still win. Unset driver keeps the in-memory default even if `DATABASE_URL` exists. `GET /v1/health` reports driver and `databaseConfigured` without the URL. Broader non-auth product audit coverage remains next.
 - 2026-08-21: Continued broader non-auth product audit coverage. Analytics exports, privacy/retention/rollup jobs, invoice create/receipt/capture/refund, provider capture settlement, and mobile checkout/payout now append tenant audit records. Metadata omits emails, phones, invoice numbers, payment references, and secrets. `GET /v1/audit` filters by action or entity type. Native mobile and app-store billing remain out of scope.
+- 2026-08-21: Reviewed live deployment and Google Play constraints. Fly.io Frankfurt serves `sellfindconnect.com` / `www` (HTTP 200) and `api.sellfindconnect.com/v1/health` (HTTP 200). The live API image still reports `telpen-api` without persistence health, and `/privacy` plus `/account/delete` 404 until web is redeployed. Railway URLs 404; `adverts.telpen.net` does not resolve. CORS now pairs apex and www. Privacy routes are mounted at `/v1/privacy` behind the tenant session guard. Locked rule: the verified login phone is the only STK Push destination; a Play Android listing would need Google Play Billing for the SaaS subscription and must not request `READ_SMS` or `READ_CALL_LOG`. See `docs/FLY_DEPLOYMENT.md` and `docs/PLAY_STORE.md`.

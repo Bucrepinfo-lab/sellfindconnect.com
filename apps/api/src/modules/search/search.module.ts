@@ -1,4 +1,9 @@
-﻿import { Module } from "@nestjs/common";
+﻿/**
+ * Not mounted in AppModule. Live discovery uses Source Finder
+ * (`/v1/source-finder/*`). Keep this module unmounted until a dedicated
+ * advert-index adapter is wired with a real Prisma token.
+ */
+import { Module } from "@nestjs/common";
 import { SearchService } from "./search.service";
 import { SearchController } from "./search.controller";
 import { PostgresSearchAdapter } from "./adapters/postgres-search.adapter";

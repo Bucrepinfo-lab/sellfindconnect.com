@@ -1,21 +1,26 @@
 # Sell Find Connect DigitalOcean Deployment Runbook
 
-Status: Active — DigitalOcean selected; production domain `sellfindconnect.com`
+Status: Candidate only — Fly.io Frankfurt is the live production host
 Date: 2026-06-18
-Last updated: 2026-06-24
+Last updated: 2026-08-21
 
 ## Current Decision
 
-DigitalOcean App Platform is the chosen production host. The canonical domain is
-**`sellfindconnect.com`**, owned by the project owner through **GoDaddy**. This
-runbook is the executable path to first launch; the App Platform spec lives at
-`deploy/digitalocean/app.yaml` and builds from the existing
-`deploy/web.Dockerfile` and `deploy/api.Dockerfile`.
+Fly.io (`fra`) is the live production host. See `docs/FLY_DEPLOYMENT.md`.
 
-DigitalOcean was chosen because the first country launch needs strong Africa
-latency. Pick the closest available App Platform region (e.g. `fra1`) until a
-South Africa point of presence is available; keep latency-critical web/API close
-to users and durable services in the nearest stable region.
+DigitalOcean App Platform remains a checked-in **candidate** if the owner later
+wants managed Postgres + App Platform in a closer African region. The spec at
+`deploy/digitalocean/app.yaml` builds from `deploy/web.Dockerfile` and
+`deploy/api.Dockerfile`, but it is **not** what `sellfindconnect.com` currently
+serves.
+
+The canonical domain is **`sellfindconnect.com`**, owned through **GoDaddy**.
+Live DNS points the apex/www at Fly web and `api.sellfindconnect.com` at Fly API.
+
+If DigitalOcean is selected later, pick the closest available App Platform
+region (e.g. `fra1`) until a South Africa point of presence exists. Keep
+latency-critical web/API close to users and durable services in the nearest
+stable region.
 
 ## Verification Gate
 
@@ -199,10 +204,11 @@ Before onboarding any paying subscriber, verify on the live domains:
 
 ## Current Deployment Posture
 
-- DigitalOcean App Platform is the selected production host; spec checked in at
+- Fly.io Frankfurt is the live production host (`docs/FLY_DEPLOYMENT.md`).
+- DigitalOcean App Platform remains a candidate; spec checked in at
   `deploy/digitalocean/app.yaml`.
-- `sellfindconnect.com` (GoDaddy) is the canonical domain; `api.` subdomain for
-  the API, `www.` redirects to apex.
-- Railway remains available as a fallback/staging target until DigitalOcean is
-  verified stable. Render is not used.
-- Go live only after the cutover smoke checklist passes.
+- `sellfindconnect.com` (GoDaddy) is the canonical domain; live API is
+  `api.sellfindconnect.com`, not path-routed `/api`.
+- Railway URLs and `adverts.telpen.net` are historical and no longer serve traffic.
+- Go live for paying subscribers only after the Fly cutover smoke checklist
+  in `docs/FLY_DEPLOYMENT.md` passes.

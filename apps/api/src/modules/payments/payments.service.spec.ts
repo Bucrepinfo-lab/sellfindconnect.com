@@ -53,4 +53,22 @@ describe('PaymentsService product audit', () => {
     expect(JSON.stringify(audits)).not.toContain('owner@example.com');
     expect(JSON.stringify(audits)).not.toContain('Ad campaign');
   });
+
+  it('refuses checkout when the login phone is missing', async () => {
+    const service = new PaymentsService(
+      {
+        getSession: async () => ({
+          session: { userId: 'user-1', tenantId, role: 'OWNER' },
+          user: {},
+        }),
+        recordTenantAudit: async () => undefined,
+      } as unknown as AuthService,
+      new InMemoryPaymentsRepository(),
+    );
+
+    await expect(service.requestCheckout('session-token', { amount: 1500 })).resolves.toEqual({
+      ok: false,
+      reason: 'no_phone',
+    });
+  });
 });

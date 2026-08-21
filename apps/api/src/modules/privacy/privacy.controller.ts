@@ -1,21 +1,54 @@
-import { Body, Controller, Delete, Get, Post, Req } from "@nestjs/common";
-import { PrivacyService } from "./privacy.service";
+import { Body, Controller, Delete, Get, Post, UseGuards } from '@nestjs/common';
+import { ApiHeader, ApiTags } from '@nestjs/swagger';
 
-interface AuthenticatedRequest {
-  tenantId: string;
-  userId: string;
-}
+import { TenantAuthSession, TenantId } from '../tenant/tenant-context.decorator';
+import { TenantSessionGuard, type TenantSessionDecision } from '../tenant/tenant-session.guard';
+import { PrivacyService } from './privacy.service';
 
 interface DeletionRequestBody {
   reason?: string;
 }
 
-@Controller("v1/privacy")
+@ApiTags('privacy')
+@ApiHeader({
+  name: 'x-tenant-id',
+  description: 'Tenant UUID for the authenticated session.',
+})
+@ApiHeader({
+  name: 'x-session-token',
+  description: 'Issued session token. MFA must be verified before privacy routes are available.',
+})
+@UseGuards(TenantSessionGuard)
+@Controller('privacy')
 export class PrivacyController {
   constructor(private readonly svc: PrivacyService) {}
-  @Get("data-summary") dataSummary(@Req() req: AuthenticatedRequest) { return this.svc.dataSummary(req.tenantId, req.userId); }
-  @Post("export") requestExport(@Req() req: AuthenticatedRequest) { return this.svc.requestExport(req.tenantId, req.userId); }
-  @Post("deletion") requestDeletion(@Req() req: AuthenticatedRequest, @Body() body: DeletionRequestBody) { return this.svc.requestDeletion(req.tenantId, req.userId, body.reason); }
-  @Delete("deletion") cancelDeletion(@Req() req: AuthenticatedRequest) { return this.svc.cancelDeletion(req.tenantId, req.userId); }
-  @Get("deletion") getDeletion(@Req() req: AuthenticatedRequest) { return this.svc.getDeletion(req.tenantId, req.userId); }
+
+  @Get('data-summary')
+  dataSummary(@TenantId() tenantId: string, @TenantAuthSession() session: TenantSessionDecision) {
+    return this.svc.dataSummary(tenantId, session.userId);
+  }
+
+  @Post('export')
+  requestExport(@TenantId() tenantId: string, @TenantAuthSession() session: TenantSessionDecision) {
+    return this.svc.requestExport(tenantId, session.userId);
+  }
+
+  @Post('deletion')
+  requestDeletion(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Body() body: DeletionRequestBody,
+  ) {
+    return this.svc.requestDeletion(tenantId, session.userId, body.reason);
+  }
+
+  @Delete('deletion')
+  cancelDeletion(@TenantId() tenantId: string, @TenantAuthSession() session: TenantSessionDecision) {
+    return this.svc.cancelDeletion(tenantId, session.userId);
+  }
+
+  @Get('deletion')
+  getDeletion(@TenantId() tenantId: string, @TenantAuthSession() session: TenantSessionDecision) {
+    return this.svc.getDeletion(tenantId, session.userId);
+  }
 }

@@ -9,15 +9,12 @@ Status: Draft for validation
 > Implementation status (2026-08-21): MVP vertical slices are in place across
 > auth/tenancy, advertiser profiles, listings + media pipeline, Source Finder,
 > matching/lead conversion, conversations, analytics (with daily rollups and
-> hierarchy reports), and finance/tax. Relationship claims now support structured
-> supplier/buyer/logistics links with counterpart or moderator approval before
-> they enter the public graph. Advert publish can be scheduled for a future
-> go-live time, then promoted by the existing 40-day lifecycle sweep. The
-> finance engine also covers a provider-neutral payment adapter, invoices/
-> receipts, refunds, and provider/bank reconciliation. An AI-native agent
-> system (Research, Operation, Support, Sales, Finance, Legal) operates the
-> platform from `.agents/`. See `docs/IMPLEMENTATION_BACKLOG.md` for per-epic
-> progress and `Product_Memory.md` for the dated decision log.
+> hierarchy reports), and finance/tax. Fly.io Frankfurt is the live host for
+> `sellfindconnect.com` and `api.sellfindconnect.com`; the live image still
+> lags `main` (see `docs/FLY_DEPLOYMENT.md`). Google Play constraints and the
+> login-phone = STK Push identity rule are locked in `docs/PLAY_STORE.md`.
+> Native mobile remains out of scope. See `docs/IMPLEMENTATION_BACKLOG.md` for
+> per-epic progress and `Product_Memory.md` for the dated decision log.
 
 ## 1. Executive Summary
 
@@ -301,7 +298,9 @@ Implementation progress on 2026-06-18:
 - Added RFC 6238 authenticator TOTP enrollment. MFA-verified owners can start and confirm enrollment, later logins use `AUTHENTICATOR` delivery, and reused time-steps are rejected. Confirmation issues 10 hashed single-use recovery codes; regenerate invalidates the prior set.
 - Added hosted identity overlay for Auth0, Clerk, or generic OIDC. `POST /v1/auth/identity/session` verifies an RS256 ID token via JWKS and issues a first-party session for an existing tenant account. `AUTH_IDENTITY_PROVIDER=auth0|clerk|oidc|live` fail-closes without issuer and audience. Unverified emails and unknown accounts are rejected. New tenants still accept terms through owner signup.
 - Added `PERSISTENCE_DRIVER=prisma` overlay so production can select Prisma for all repositories and media queues with one env var when `DATABASE_URL` is set. Named `live` fail-closes without the URL. Per-repository `memory` overrides still win. Unset driver keeps the in-memory default even if `DATABASE_URL` exists. `GET /v1/health` reports driver, mode, and `databaseConfigured` without the URL.
-- Remaining hardening: native mobile clients remain out of scope.
+- Remaining hardening: native mobile clients remain out of scope. The verified
+  E.164 login phone is also the STK Push destination; checkout must not accept a
+  different payer number (`docs/PLAY_STORE.md`).
 
 Acceptance criteria:
 
@@ -1102,7 +1101,8 @@ Implementation progress on 2026-06-17:
 - Continued implementation on 2026-08-21 with `PERSISTENCE_DRIVER=prisma` overlay for finance and payment repositories. Named `live` fail-closes without `DATABASE_URL`; `FINANCE_REPOSITORY=memory` still wins.
 - Continued implementation on 2026-08-21 with product-audit events for invoice create/receipt/capture/refund, provider capture settlement, and mobile checkout/payout. Metadata stores amounts and status only.
 - Remaining hardening: app-store billing rails are out of scope while native
-  mobile is not in delivery.
+  mobile is not in delivery. A future Google Play listing must use Play Billing
+  for the digital SaaS subscription. Web/PWA STK Push stays on the login phone.
 
 ### 7.11 Moderation, Trust, and Safety
 
@@ -1150,7 +1150,8 @@ Requirements:
 - Push notifications for inquiry, chat, match, trial ending, subscription, moderation, and account security.
 - App-store metadata must accurately describe core experience.
 - Demo account/demo mode required for app review.
-- Privacy policy and account deletion links must be available inside app and on public web.
+- Privacy policy and account deletion links must be available inside app and on public web
+  (`/privacy`, `/account/delete`, `POST /v1/privacy/deletion`).
 - Country flag and local currency must be visible in onboarding, billing, and profile contexts.
 
 ### 7.14 Administration

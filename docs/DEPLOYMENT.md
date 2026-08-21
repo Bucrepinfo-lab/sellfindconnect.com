@@ -1,8 +1,34 @@
 # Telpen Adverts Deployment Plan
 
-Status: Deployment migration paused; Railway remains current fallback; DigitalOcean is the leading candidate to evaluate after coding completion
+Status: Live on Fly.io Frankfurt; DigitalOcean remains a documented candidate; Railway fallbacks are gone
 Date: 2026-06-15
-Last updated: 2026-06-18
+Last updated: 2026-08-21
+
+Production runbook: `docs/FLY_DEPLOYMENT.md`
+Play Store constraints: `docs/PLAY_STORE.md`
+DigitalOcean candidate spec: `docs/DIGITALOCEAN_DEPLOYMENT.md`
+
+## Current Production (verified 2026-08-21)
+
+Fly.io is the live host (`server: Fly` on both web and API):
+
+- Web: `https://sellfindconnect.com` and `https://www.sellfindconnect.com` — HTTP 200
+- API: `https://api.sellfindconnect.com/v1/health` — HTTP 200
+- API docs: `https://api.sellfindconnect.com/docs` — HTTP 200
+- Path-routed `https://sellfindconnect.com/api/v1/health` is **not** used (Next.js 404)
+- Historical Railway URLs return 404 Application not found
+- `adverts.telpen.net` / `api.adverts.telpen.net` no longer resolve
+
+The live API still reports `service: "telpen-api"` without a `persistence` block, so
+the Fly image is behind GitHub `main`. Redeploy `fly.api.toml` and `fly.web.toml`
+before onboarding paying subscribers. After redeploy, health must report
+`sellfindconnect-api` plus `persistence.mode`. Web `/privacy` and
+`/account/delete` must return HTTP 200 (they 404 on the stale image).
+
+Do not onboard paying subscribers until persistence, migrations/seed, scheduled
+jobs, login-phone STK, and the privacy/deletion URLs are verified on Fly.
+
+## Proposed Production Domains
 
 ## Proposed Production Domains
 
@@ -27,13 +53,15 @@ domains on the web service.
 
 ## Deployment Direction
 
-Do not start a new deployment migration now. Finish the core product coding
-first, then activate the final production platform before onboarding paying
-subscribers.
+Do not treat DigitalOcean as the live host. Fly.io Frankfurt is production
+(`docs/FLY_DEPLOYMENT.md`). Keep this file as the candidate cutover if the owner
+later moves off Fly. The live layout is two apps (`sellfindconnect.com` +
+`api.sellfindconnect.com`), not path-routed `/api`.
 
-DigitalOcean is now the leading candidate to evaluate because the first country
-launch needs excellent Africa latency and a Cape Town/South Africa deployment
-location would be valuable if the required products are available there.
+DigitalOcean App Platform remains a **candidate** host. Fly.io Frankfurt is
+what is live today (`docs/FLY_DEPLOYMENT.md`). Evaluate DigitalOcean only if
+the owner wants Cape Town latency or managed Postgres on DO; do not assume the
+checked-in `app.yaml` matches production.
 
 DigitalOcean planning file:
 
@@ -49,8 +77,9 @@ deployment resumes:
 - `npm run db:migrate:deploy`
 - `npm run db:seed`
 
-Railway remains the current proven fallback/staging deployment because it
-already supports and has successfully run:
+Railway **was** the 2026-06 proven staging host. Those temporary URLs no longer
+serve this product (HTTP 404 as of 2026-08-21). Keep the historical notes below
+for DNS/account archaeology only.
 
 - Next.js
 - NestJS

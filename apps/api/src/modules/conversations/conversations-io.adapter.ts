@@ -5,7 +5,7 @@ import type { ServerOptions } from 'socket.io';
 export class ConversationsIoAdapter extends IoAdapter {
   constructor(
     app: INestApplication,
-    private readonly webOrigin: string,
+    private readonly webOrigin: string | string[],
   ) {
     super(app);
   }

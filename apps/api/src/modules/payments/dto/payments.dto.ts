@@ -8,7 +8,11 @@ export class CheckoutDto {
   @Max(999_999)
   declare amount: number;
 
-  @ApiPropertyOptional({ example: 'Ad campaign top-up' })
+  @ApiPropertyOptional({
+    example: 'Ad campaign top-up',
+    description:
+      'Optional ledger note. Do not send a phone number — STK Push always uses the verified login phone on the session.',
+  })
   @IsOptional()
   @IsString()
   @Length(1, 200)

@@ -4,8 +4,8 @@ Date: 2026-06-16
 Repository: `https://github.com/Bucrepinfo-lab/sellfindconnect.com.git`
 Railway project: `84794ef4-c31c-41cd-8048-089f59040f1f`
 
-Status: Archived while deployment is paused. Do not use this runbook to deploy
-until the owner reopens deployment work.
+Status: Archived. Fly.io is the live production host (`docs/FLY_DEPLOYMENT.md`).
+Do not use this runbook to deploy.
 
 On 2026-06-18, the root Railway deployment scripts and local `@railway/cli`
 dev dependency were removed to keep normal installs focused on coding and to

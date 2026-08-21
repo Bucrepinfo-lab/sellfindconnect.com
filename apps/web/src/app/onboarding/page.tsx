@@ -3,6 +3,7 @@ import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { SELL_QUICK_STARTS, FIND_QUICK_INDUSTRIES } from "@telpen/domain";
 import type { OnboardingIntent } from "@telpen/domain";
+import { publicApiBaseUrl } from "../../lib/public-api";
 
 type Step = "INTENT"|"SELL_ROLE"|"FIND_INDUSTRY"|"LAUNCHING";
 
@@ -22,7 +23,7 @@ export default function OnboardingPage() {
 
   const launchSell = async (role: string) => {
     setSelectedRole(role); setLoading(true); setStep("LAUNCHING");
-    await fetch("/api/v1/onboarding/intent", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ intent: "SELL", role }) });
+    await fetch(`${publicApiBaseUrl}/onboarding/intent`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ intent: "SELL", role }) });
     router.push("/dashboard/adverts/new?onboarding=1");
   };
 
@@ -31,7 +32,7 @@ export default function OnboardingPage() {
     const p = new URLSearchParams({ onboarding: "1" });
     if (selectedIndustry) p.set("industry", selectedIndustry);
     if (query.trim()) p.set("q", query.trim());
-    await fetch("/api/v1/onboarding/intent", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ intent: "FIND", industry: selectedIndustry, query: query.trim() }) });
+    await fetch(`${publicApiBaseUrl}/onboarding/intent`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ intent: "FIND", industry: selectedIndustry, query: query.trim() }) });
     router.push("/dashboard/discover?" + p.toString());
   };
 

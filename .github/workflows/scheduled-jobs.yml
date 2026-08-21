@@ -1,17 +1,17 @@
 ﻿name: Scheduled jobs
 
-# Production scheduler for Sell Find Connect. DigitalOcean App Platform has no
-# native cron, so GitHub Actions triggers the protected internal maintenance
-# endpoints (guarded by the shared x-internal-job-key) on a schedule.
+# Production scheduler for Sell Find Connect. Fly.io has no app-level cron in
+# the checked-in toml files, so GitHub Actions can trigger the protected
+# internal maintenance endpoints (guarded by x-internal-job-key).
 #
 # Required repository secrets (Settings -> Secrets and variables -> Actions):
-#   API_BASE_URL      e.g. https://sellfindconnect.com/api/v1
-#   INTERNAL_JOB_KEY  the same secret set on the API service
+#   API_BASE_URL      https://api.sellfindconnect.com/v1
+#   INTERNAL_JOB_KEY  the same secret set on the Fly API app
 #
 # Note: cron times are UTC. GitHub may delay scheduled runs under load.
 
 on:
-  # schedule: # disabled until API is deployed - re-enable after Step 7 of DEPLOYMENT-RUNBOOK.md
+  # schedule: # disabled until Fly persistence + INTERNAL_JOB_KEY are verified
   #   - cron: '*/15 * * * *' # frequent: conversation SLA + media processing
   #   - cron: '0 2 * * *'    # daily: advert lifecycle + analytics rollups
   #   - cron: '0 3 * * 0'    # weekly: analytics retention sweep

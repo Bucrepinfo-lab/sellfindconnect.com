@@ -27,6 +27,9 @@ packages/
 docs/
   ARCHITECTURE.md
   IMPLEMENTATION_BACKLOG.md
+  FLY_DEPLOYMENT.md
+  PLAY_STORE.md
+  DIGITALOCEAN_DEPLOYMENT.md
 ```
 
 ## Runtime Components
@@ -330,10 +333,10 @@ enabled only where consent, country rules, and provider support allow them.
 
 ## Initial Deployment Shape
 
-The MVP begins as a modular monolith. Deployment migration is paused while core
-coding continues; DigitalOcean is the leading production candidate to evaluate
-next because of the Africa latency requirement, while Railway remains the
-current proven fallback/staging deployment.
+The MVP begins as a modular monolith. **Fly.io Frankfurt is the live production
+host** (`docs/FLY_DEPLOYMENT.md`). DigitalOcean App Platform remains a documented
+candidate (`docs/DIGITALOCEAN_DEPLOYMENT.md`). Historical Railway URLs no longer
+serve traffic.
 
 - One NestJS API web service.
 - One Next.js web/PWA service.
