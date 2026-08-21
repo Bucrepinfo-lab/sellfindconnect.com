@@ -69,6 +69,7 @@ import {
   attachApprovedRelationshipClaims,
   applySourceFinderOutcomes,
   buildOpportunityAlert,
+  buildSourceFinderHierarchyReport,
   buildProductAuditRecord,
   buildTaxReturnExport,
   canViewTenantAuditLogs,
@@ -554,6 +555,11 @@ export default function Home() {
     pilotSourceFinderRecords,
     relationshipClaims,
   );
+  const sourceFinderHierarchy = buildSourceFinderHierarchyReport(graphRecords, {
+    countryCode,
+    industryCode: industryCode === 'ALL' ? undefined : industryCode,
+    role,
+  });
   const rankedResults: SourceFinderSearchResult[] = querySafetyDecision.allowed
     ? searchSourceFinderRecords(
         {
@@ -1888,6 +1894,30 @@ export default function Home() {
                 <h2>Relationship Graph</h2>
                 <span>{graphRelationshipClaims.length} live</span>
               </div>
+              <FinanceRow
+                label="Catalog sources"
+                value={String(sourceFinderHierarchy.totals.sources)}
+              />
+              <FinanceRow
+                label="Verified"
+                value={String(sourceFinderHierarchy.totals.verified)}
+              />
+              <FinanceRow
+                label="Graph links"
+                value={String(sourceFinderHierarchy.totals.relationshipLinks)}
+              />
+              <FinanceRow
+                label="Top country"
+                value={sourceFinderHierarchy.byCountry[0]?.label ?? country.name}
+              />
+              <FinanceRow
+                label="Top industry"
+                value={sourceFinderHierarchy.byIndustry[0]?.label ?? 'All industries'}
+              />
+              <FinanceRow
+                label="Top source"
+                value={sourceFinderHierarchy.topSources[0]?.name ?? 'No sources'}
+              />
               <label className="lead-select-row">
                 <span>Link type</span>
                 <select

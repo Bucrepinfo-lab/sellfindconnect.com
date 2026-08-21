@@ -199,4 +199,16 @@ describe('SourceFinderService', () => {
       expect.objectContaining({ id: 'r1' }),
     ]) });
   });
+
+  it('summarizes catalog records into a Source Finder hierarchy dashboard', async () => {
+    const service = new SourceFinderService();
+    const report = await service.hierarchy({ countryCode: 'KE' });
+
+    expect(report.totals.sources).toBeGreaterThanOrEqual(4);
+    expect(report.byCountry).toEqual([expect.objectContaining({ key: 'KE' })]);
+    expect(report.topSources[0]?.id).toBe('r1');
+    expect(report.byRelationship.length).toBeGreaterThan(0);
+
+    await expect(service.hierarchy({ countryCode: 'ZZ' })).rejects.toThrow();
+  });
 });

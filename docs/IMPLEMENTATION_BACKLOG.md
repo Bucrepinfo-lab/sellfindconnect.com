@@ -302,8 +302,10 @@ Progress (2026-08-21):
   vectors, tenant and operations reindex commands, and Prisma persistence
   through `SOURCE_FINDER_REPOSITORY=prisma`. Search uses indexed documents when
   present and falls back to the in-memory catalog otherwise.
+- Added Source Finder hierarchy dashboards with country, industry, role, and
+  relationship-link rollups via `GET /v1/source-finder/hierarchy`.
 - Native mobile saved-search screens, provider-backed push/SMS/WhatsApp
-  delivery, Postgres full-text/pgvector, and hierarchy dashboards remain next.
+  delivery, and Postgres full-text/pgvector remain next.
 
 ## Epic 6: Matching and Lead Conversion
 

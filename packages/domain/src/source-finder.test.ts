@@ -5,6 +5,7 @@ import {
   createSavedSourceFinderSearch,
   createSourceFinderOutcomeFeedback,
   applySourceFinderOutcomes,
+  buildSourceFinderHierarchyReport,
   buildSourceFinderIndexDocument,
   isOpportunityAlertDue,
   searchSourceFinderRecords,
@@ -204,5 +205,24 @@ describe('source finder outcome feedback', () => {
       offers: record!.offers,
     });
     expect(toSourceFinderRecord(indexed)).not.toHaveProperty('searchText');
+  });
+
+  it('rolls Source Finder catalog records into country, industry, and role hierarchy buckets', () => {
+    const report = buildSourceFinderHierarchyReport(searchSourceFinderRecords({ query: '', countryCode: 'KE' }));
+    const kenyaScoped = buildSourceFinderHierarchyReport(
+      searchSourceFinderRecords({ query: 'fresh produce' }),
+      { countryCode: 'KE', role: 'BUYER' },
+    );
+
+    expect(report.totals.sources).toBeGreaterThanOrEqual(4);
+    expect(report.byCountry[0]?.key).toBe('KE');
+    expect(report.byRole.map((bucket) => bucket.key)).toEqual(
+      expect.arrayContaining(['SUPPLIER', 'BUYER', 'LOGISTICS_PROVIDER']),
+    );
+    expect(report.topSources[0]?.id).toBe('r1');
+    expect(kenyaScoped.totals.sources).toBe(1);
+    expect(kenyaScoped.byRole).toEqual([
+      expect.objectContaining({ key: 'BUYER', sources: 1 }),
+    ]);
   });
 });

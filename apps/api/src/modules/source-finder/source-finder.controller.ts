@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 
 import { TenantAuthSession, TenantId } from '../tenant/tenant-context.decorator';
@@ -9,6 +9,7 @@ import {
   RebuildSourceFinderIndexDto,
   RunSourceFinderOpportunityAlertsDto,
   SearchSourceFinderDto,
+  SourceFinderHierarchyQueryDto,
 } from './dto/search-source-finder.dto';
 import { SourceFinderService } from './source-finder.service';
 
@@ -44,6 +45,11 @@ export class SourceFinderController {
   @Get('index')
   listIndex() {
     return this.sourceFinder.listIndex();
+  }
+
+  @Get('hierarchy')
+  hierarchy(@Query() query: SourceFinderHierarchyQueryDto) {
+    return this.sourceFinder.hierarchy(query);
   }
 
   @Post('saved-searches')

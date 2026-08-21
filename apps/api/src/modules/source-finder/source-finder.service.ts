@@ -11,6 +11,7 @@ import {
   attachApprovedRelationshipClaims,
   buildNotificationDeliveryPlan,
   buildOpportunityAlert,
+  buildSourceFinderHierarchyReport,
   buildSourceFinderIndexDocument,
   createSavedSourceFinderSearch,
   createSourceFinderOutcomeFeedback,
@@ -41,6 +42,7 @@ import type {
   RebuildSourceFinderIndexDto,
   RunSourceFinderOpportunityAlertsDto,
   SearchSourceFinderDto,
+  SourceFinderHierarchyQueryDto,
 } from './dto/search-source-finder.dto';
 import { InMemorySourceFinderRepository } from './in-memory-source-finder.repository';
 import { SOURCE_FINDER_REPOSITORY, type SourceFinderRepository } from './source-finder.repository';
@@ -122,6 +124,12 @@ export class SourceFinderService {
       total: documents.length,
       documents: documents.map((document) => this.indexSummary(document)),
     };
+  }
+
+  async hierarchy(input: SourceFinderHierarchyQueryDto = {}) {
+    this.assertSupportedFilters(input);
+    const records = await this.graphRecords();
+    return buildSourceFinderHierarchyReport(records, input);
   }
 
   async recordOutcome(

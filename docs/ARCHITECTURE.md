@@ -117,6 +117,8 @@ without validating it against the authenticated user's assignments.
   Prisma persistence is selected with `SOURCE_FINDER_REPOSITORY=prisma`.
   Catalog search documents persist through the same flag, with
   `POST /v1/source-finder/index/reindex` rebuilding the index.
+  `GET /v1/source-finder/hierarchy` rolls catalog records into country,
+  industry, role, and relationship-link dashboards.
   Hide/report always suppress a tenant's results; accept/save ranking boosts
   require behavioral matching consent.
 - Relationships: structured claims (`SUPPLIES_TO`, `BUYS_FROM`, `PRODUCES`,

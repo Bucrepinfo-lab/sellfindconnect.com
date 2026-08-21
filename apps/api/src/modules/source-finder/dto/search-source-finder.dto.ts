@@ -74,6 +74,25 @@ export class RebuildSourceFinderIndexDto {
   declare includePilot?: boolean;
 }
 
+export class SourceFinderHierarchyQueryDto {
+  @ApiPropertyOptional({ enum: roleOptions, example: 'SUPPLIER' })
+  @IsOptional()
+  @IsIn(roleOptions)
+  declare role?: SupplyChainRole | 'ALL';
+
+  @ApiPropertyOptional({ example: 'AGRICULTURE' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  declare industryCode?: string;
+
+  @ApiPropertyOptional({ example: 'KE' })
+  @IsOptional()
+  @IsString()
+  @Length(2, 2)
+  declare countryCode?: string;
+}
+
 export class CreateSavedSourceFinderSearchDto {
   @ApiProperty({ example: 'Fresh produce buyers' })
   @IsString()

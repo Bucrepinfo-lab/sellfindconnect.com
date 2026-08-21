@@ -533,7 +533,7 @@ Implementation progress on 2026-06-17:
 - Added reason codes and human-readable match reasons so users understand why a producer, supplier, buyer, logistics provider, or related service appears.
 - Added a tenant-scoped Source Finder API endpoint with server-side zero-tolerance blocking for prohibited searches.
 - Updated the web Source Finder to use the shared ranking engine, expose sort modes, show match reasons, and display related commercial links.
-- Remaining hardening: hierarchy dashboards.
+- Remaining hardening: Postgres full-text/pgvector.
 
 Implementation progress on 2026-08-21:
 
@@ -558,7 +558,10 @@ Implementation progress on 2026-08-21:
   scheduler job. Search uses indexed documents when present and falls back to
   the in-memory catalog otherwise. Opt-in Prisma persistence reuses
   `SOURCE_FINDER_REPOSITORY=prisma`.
-- Remaining hardening: hierarchy dashboards, Postgres full-text/pgvector or an
+- Added Source Finder hierarchy dashboards: country, industry, role, and
+  relationship-link rollups from the indexed catalog, exposed as
+  `GET /v1/source-finder/hierarchy` and shown on the Relationship Graph panel.
+- Remaining hardening: Postgres full-text/pgvector or an
   external search provider, and native mobile screens.
 
 Implementation progress on 2026-06-20:
@@ -1044,7 +1047,7 @@ Implementation progress on 2026-06-17:
 - Continued implementation on 2026-08-21 with an in-memory finance repository plus opt-in Prisma persistence through `FINANCE_REPOSITORY=prisma`. Country tax profiles, rules, snapshots, ledger entries, invoices, receipts, adjustments, tax returns, payments, and reconciliation runs survive process restarts when PostgreSQL is enabled.
 - Continued implementation on 2026-08-21 with controlled post-lock tax-return corrections. Locked periods stay locked; finance admins can post signed correction entries with `PERIOD_CORRECTION` evidence, ledger impact, dual-control above 10,000 units, and product-audit events that omit notes and authority references.
 - Continued implementation on 2026-08-21 with live payment-provider adapters. Invoice capture stays on the manual development adapter by default. `PAYMENT_PROVIDER=stripe`, `africastalking`, or `live` selects Stripe PaymentIntents and/or Africa's Talking M-Pesa checkout, rejects raw card numbers, records `REQUIRES_CAPTURE` until `POST /v1/finance/payments/settle`, and fail-closes when credentials are missing.
-- Remaining hardening: app-store billing rails and Source Finder hierarchy dashboards.
+- Remaining hardening: app-store billing rails and Postgres full-text/pgvector for Source Finder.
 
 ### 7.11 Moderation, Trust, and Safety
 

@@ -1,5 +1,6 @@
 import { buildDiscoveryIndexDocument, type DiscoveryVector } from './discovery';
-import type { SupplyChainRole } from './industries';
+import { getCountry } from './geography';
+import { industryCategories, type SupplyChainRole } from './industries';
 
 export const sourceFinderSortOptions = [
   'RELEVANCE',
@@ -121,6 +122,173 @@ export function toSourceFinderRecord(document: SourceFinderIndexDocument): Sourc
     responseTimeMinutes: document.responseTimeMinutes,
     analytics: document.analytics,
   };
+}
+
+export type SourceFinderHierarchyScope = {
+  countryCode?: string;
+  industryCode?: string;
+  role?: SupplyChainRole | 'ALL';
+};
+
+export type SourceFinderHierarchyBucket = {
+  key: string;
+  label: string;
+  sources: number;
+  verified: number;
+  relationshipLinks: number;
+  views: number;
+  inquiries: number;
+};
+
+export type SourceFinderHierarchyReport = {
+  totals: {
+    sources: number;
+    verified: number;
+    relationshipLinks: number;
+    countries: number;
+    industries: number;
+    roles: number;
+  };
+  byCountry: SourceFinderHierarchyBucket[];
+  byIndustry: SourceFinderHierarchyBucket[];
+  byRole: SourceFinderHierarchyBucket[];
+  byRelationship: SourceFinderHierarchyBucket[];
+  topSources: Array<{
+    id: string;
+    name: string;
+    role: SupplyChainRole;
+    countryCode: string;
+    views: number;
+    relationshipLinks: number;
+  }>;
+};
+
+export function buildSourceFinderHierarchyReport(
+  records: SourceFinderRecord[],
+  scope: SourceFinderHierarchyScope = {},
+): SourceFinderHierarchyReport {
+  const scoped = records
+    .filter((record) => !scope.countryCode || record.countryCode === scope.countryCode)
+    .filter(
+      (record) =>
+        !scope.industryCode ||
+        scope.industryCode === 'ALL' ||
+        record.industryCode === scope.industryCode,
+    )
+    .filter((record) => !scope.role || scope.role === 'ALL' || record.role === scope.role);
+
+  const byCountry = new Map<string, SourceFinderHierarchyBucket>();
+  const byIndustry = new Map<string, SourceFinderHierarchyBucket>();
+  const byRole = new Map<string, SourceFinderHierarchyBucket>();
+  const byRelationship = new Map<string, SourceFinderHierarchyBucket>();
+
+  for (const record of scoped) {
+    addHierarchyBucket(
+      byCountry,
+      record.countryCode,
+      getCountry(record.countryCode)?.name ?? record.countryCode,
+      record,
+    );
+    addHierarchyBucket(
+      byIndustry,
+      record.industryCode,
+      industryCategories.find((industry) => industry.code === record.industryCode)?.name ??
+        record.industryCode,
+      record,
+    );
+    addHierarchyBucket(byRole, record.role, record.role.replaceAll('_', ' '), record);
+    for (const link of record.relatedLinks) {
+      const current = byRelationship.get(link.relationship) ?? {
+        key: link.relationship,
+        label: link.relationship.replaceAll('_', ' '),
+        sources: 0,
+        verified: 0,
+        relationshipLinks: 0,
+        views: 0,
+        inquiries: 0,
+      };
+      current.relationshipLinks += 1;
+      byRelationship.set(link.relationship, current);
+    }
+  }
+
+  for (const record of scoped) {
+    const seen = new Set<string>();
+    for (const link of record.relatedLinks) {
+      if (seen.has(link.relationship)) {
+        continue;
+      }
+      seen.add(link.relationship);
+      const current = byRelationship.get(link.relationship);
+      if (!current) {
+        continue;
+      }
+      current.sources += 1;
+      current.verified += record.verified ? 1 : 0;
+      current.views += record.analytics.views;
+      current.inquiries += record.analytics.inquiries;
+    }
+  }
+
+  return {
+    totals: {
+      sources: scoped.length,
+      verified: scoped.filter((record) => record.verified).length,
+      relationshipLinks: scoped.reduce((sum, record) => sum + record.relatedLinks.length, 0),
+      countries: byCountry.size,
+      industries: byIndustry.size,
+      roles: byRole.size,
+    },
+    byCountry: sortHierarchyBuckets(byCountry),
+    byIndustry: sortHierarchyBuckets(byIndustry),
+    byRole: sortHierarchyBuckets(byRole),
+    byRelationship: sortHierarchyBuckets(byRelationship),
+    topSources: [...scoped]
+      .sort((left, right) => right.analytics.views - left.analytics.views || left.name.localeCompare(right.name))
+      .slice(0, 5)
+      .map((record) => ({
+        id: record.id,
+        name: record.name,
+        role: record.role,
+        countryCode: record.countryCode,
+        views: record.analytics.views,
+        relationshipLinks: record.relatedLinks.length,
+      })),
+  };
+}
+
+function addHierarchyBucket(
+  buckets: Map<string, SourceFinderHierarchyBucket>,
+  key: string,
+  label: string,
+  record: SourceFinderRecord,
+): void {
+  const current = buckets.get(key) ?? {
+    key,
+    label,
+    sources: 0,
+    verified: 0,
+    relationshipLinks: 0,
+    views: 0,
+    inquiries: 0,
+  };
+  current.sources += 1;
+  current.verified += record.verified ? 1 : 0;
+  current.relationshipLinks += record.relatedLinks.length;
+  current.views += record.analytics.views;
+  current.inquiries += record.analytics.inquiries;
+  buckets.set(key, current);
+}
+
+function sortHierarchyBuckets(
+  buckets: Map<string, SourceFinderHierarchyBucket>,
+): SourceFinderHierarchyBucket[] {
+  return [...buckets.values()].sort(
+    (left, right) =>
+      right.sources - left.sources ||
+      right.views - left.views ||
+      left.label.localeCompare(right.label),
+  );
 }
 
 export const pilotSourceFinderRecords: SourceFinderRecord[] = [
