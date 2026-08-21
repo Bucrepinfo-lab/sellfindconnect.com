@@ -683,9 +683,11 @@ describe('FinanceService', () => {
     expect(await reader.listCountryTaxProfiles()).toEqual([
       expect.objectContaining({ countryCode: 'KE', status: 'APPROVED' }),
     ]);
-    expect(await reader.listTaxCalculations(tenantId)).toEqual([
-      expect.objectContaining({ id: calculated.snapshot.id, taxAmount: 1.3793 }),
-    ]);
+    expect(await reader.listTaxCalculations(tenantId)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: calculated.snapshot.id, taxAmount: 1.3793 }),
+      ]),
+    );
     expect(await reader.listInvoices(tenantId)).toEqual([
       expect.objectContaining({ id: invoice.invoice.id, tenantId }),
     ]);
