@@ -20,7 +20,7 @@
     "db:generate": "npm run generate -w @telpen/database",
     "db:migrate:deploy": "npm run migrate:deploy -w @telpen/database",
     "db:migrate:status": "npm run migrate:status -w @telpen/database",
-    "db:seed": "npm run seed -w @telpen/database"
+    "db:seed": "npm run build -w @telpen/domain && npm run seed -w @telpen/database"
   },
   "devDependencies": {
     "concurrently": "10.0.3",

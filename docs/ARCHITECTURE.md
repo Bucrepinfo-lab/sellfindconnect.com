@@ -246,12 +246,16 @@ provider captures stay `REQUIRES_CAPTURE` until `POST /v1/finance/payments/settl
   nested payload traversal, and preserves secret fields such as passwords and
   session tokens.
 - Prisma migrations are checked in and deployed with
-  `npm run db:migrate:deploy`; baseline domain data is loaded with
-  `npm run db:seed` before enabling hosted Prisma with
-  `PERSISTENCE_DRIVER=prisma` and `DATABASE_URL`. Per-repository keys such as
+  `npm run db:migrate:deploy` (Fly `release_command` runs
+  `deploy/api-release.sh` before traffic shifts); baseline domain data is loaded
+  with `npm run db:seed` as part of that release unless `SKIP_DB_SEED=true`.
+  Hosted Prisma is selected with `PERSISTENCE_DRIVER=prisma` and `DATABASE_URL`.
+  Per-repository keys such as
   `AUTH_REPOSITORY=memory` still override the overlay. Unset driver keeps the
   in-memory default even if `DATABASE_URL` exists. `GET /v1/health` reports
   `persistence.driver`, `mode`, and `databaseConfigured` without the URL.
+  Production scheduled jobs are `.github/workflows/scheduled-jobs.yml` against
+  `https://api.sellfindconnect.com/v1` using `INTERNAL_JOB_KEY`.
 - Media processing queue persistence is enabled with
   `PERSISTENCE_DRIVER=prisma` or `MEDIA_JOB_QUEUE_DRIVER=prisma` after applying
   the database migrations and setting `DATABASE_URL`; development and tests use

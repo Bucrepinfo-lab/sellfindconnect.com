@@ -1,20 +1,21 @@
 ﻿name: Scheduled jobs
 
 # Production scheduler for Sell Find Connect. Fly.io has no app-level cron in
-# the checked-in toml files, so GitHub Actions can trigger the protected
+# the checked-in toml files, so GitHub Actions triggers the protected
 # internal maintenance endpoints (guarded by x-internal-job-key).
 #
-# Required repository secrets (Settings -> Secrets and variables -> Actions):
+# Cron runs only after this workflow is on the default branch (main).
+# Set repository secrets before merge so the first scheduled run can succeed:
 #   API_BASE_URL      https://api.sellfindconnect.com/v1
 #   INTERNAL_JOB_KEY  the same secret set on the Fly API app
 #
 # Note: cron times are UTC. GitHub may delay scheduled runs under load.
 
 on:
-  # schedule: # disabled until Fly persistence + INTERNAL_JOB_KEY are verified
-  #   - cron: '*/15 * * * *' # frequent: conversation SLA + media processing
-  #   - cron: '0 2 * * *'    # daily: advert lifecycle + analytics rollups
-  #   - cron: '0 3 * * 0'    # weekly: analytics retention sweep
+  schedule:
+    - cron: '*/15 * * * *' # frequent: conversation SLA + media + notifications
+    - cron: '0 2 * * *'    # daily: advert lifecycle + privacy + analytics + finance
+    - cron: '0 3 * * 0'    # weekly: analytics retention sweep
   workflow_dispatch:
     inputs:
       group:
@@ -71,6 +72,14 @@ jobs:
             -H "content-type: application/json" \
             -d '{"workerId":"github-scheduler","limit":25}'
 
+      - name: Source Finder opportunity alerts
+        if: env.FREQUENT == 'true'
+        run: |
+          curl -fsS --retry 3 --retry-delay 5 -X POST \
+            "$API_BASE_URL/operations/source-finder/alerts/run" \
+            -H "x-internal-job-key: $INTERNAL_JOB_KEY" \
+            -H "content-type: application/json" -d '{}'
+
       - name: Advert lifecycle (day-35/39 alerts, day-40 delete)
         if: env.DAILY == 'true'
         run: |
@@ -110,4 +119,3 @@ jobs:
             "$API_BASE_URL/operations/analytics/retention/run" \
             -H "x-internal-job-key: $INTERNAL_JOB_KEY" \
             -H "content-type: application/json" -d '{}'
-

@@ -1,5 +1,5 @@
 ﻿# SellFindConnect - Project Summary
-Date: 2026-08-21 | Status: Core product coded; Fly.io live but image behind `main`
+Date: 2026-08-22 | Status: Core product coded; Fly.io live; hosted Prisma + scheduled jobs ready to deploy
 
 ## What it is
 Multi-tenant B2B advertising + discovery + matchmaking SaaS. Tagline: "Sell it. Find it. Connect."
@@ -17,19 +17,19 @@ Web/PWA rails: Stripe and/or Africa's Talking M-Pesa. A Google Play APK would ne
 ## What is built (on GitHub `main`)
 - Epics 1-8 vertical slices: auth+RBAC+MFA+phone OTP, profiles+media, adverts+lifecycle, Source Finder, leads+conversations, analytics, finance/tax, notifications
 - `PERSISTENCE_DRIVER=prisma` overlay; in-memory remains the test default
+- Fly API `release_command` migrates and seeds before flipping the driver
 - Product audit for analytics, invoices, and payment writes (no raw phones)
 - Privacy policy page + signed-in account deletion API (`/v1/privacy`)
 - Health: `GET /v1/health` reports persistence without leaking `DATABASE_URL`
+- GitHub Actions scheduled jobs (SLA, media, privacy deletions, finance alerts)
 
-## Live vs `main` (probed 2026-08-21)
+## Live vs `main` (probed 2026-08-22)
 - `https://sellfindconnect.com` and `www` → HTTP 200 (Fly, Next.js)
-- `https://api.sellfindconnect.com/v1/health` → HTTP 200, still `service: telpen-api` (old image)
-- `/privacy` and `/account/delete` → HTTP 404 on live web (routes exist on `main`)
+- `/privacy` and `/account/delete` → HTTP 200
+- `https://api.sellfindconnect.com/v1/health` → HTTP 200, `sellfindconnect-api`, `persistence.driver: memory`, `databaseConfigured: true`
 - Railway temp URLs → 404; `adverts.telpen.net` DNS missing
-- GitHub scheduled jobs still disabled
 
 ## Next (do not onboard paying subscribers until)
-1. `fly deploy` web + API from current `main`
-2. Hosted Postgres + migrations/seed + `PERSISTENCE_DRIVER=prisma` only when `DATABASE_URL` is set
-3. Enable scheduled jobs against `https://api.sellfindconnect.com/v1`
-4. Durable account-deletion worker is in code; enable the daily sweep after Fly redeploy + `INTERNAL_JOB_KEY`
+1. `fly deploy --config fly.api.toml` from Telpen Adverts so migrate/seed run, then confirm `persistence.mode: prisma`
+2. Set Fly `INTERNAL_JOB_KEY` and GitHub Actions `API_BASE_URL` / `INTERNAL_JOB_KEY`
+3. Smoke-test **Scheduled jobs** via workflow_dispatch after merge to `main`

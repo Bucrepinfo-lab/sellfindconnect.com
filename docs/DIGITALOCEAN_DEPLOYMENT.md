@@ -93,8 +93,11 @@ No paying subscriber should be onboarded until:
 ## Database Readiness Commands
 
 Run these from the repository root after the target PostgreSQL `DATABASE_URL`
-is configured in the environment and before enabling `PERSISTENCE_DRIVER=prisma`
-(or per-repository keys such as `AUTH_REPOSITORY=prisma`) in production:
+is configured in the environment. Fly and DigitalOcean both run
+`sh /app/deploy/api-release.sh` before the new API image receives traffic
+(migrate, then idempotent seed). Do not set `PERSISTENCE_DRIVER=prisma` on a
+running memory image; let the release command finish first. For a manual
+console run against hosted PostgreSQL:
 
 - `npm run db:validate`
 - `npm run db:generate`
@@ -125,8 +128,8 @@ Prerequisites: a DigitalOcean account, `doctl` installed and authenticated
    - Any live `PAYMENT_PROVIDER` / media-storage secrets only after approval.
    `DATABASE_URL` is auto-injected from the managed DB (`${sfc-postgres.DATABASE_URL}`).
 4. **First deploy runs migrations** automatically via the `db-migrate`
-   PRE_DEPLOY job (`npm run db:migrate:deploy`). Seed once, manually, from a
-   console or a one-off job: `npm run db:seed`.
+   PRE_DEPLOY job (`sh /app/deploy/api-release.sh`: migrate, then seed). Set
+   `SKIP_DB_SEED=true` on that job only if you must skip seed.
 5. **Add the custom domains** (App → Settings → Domains): `sellfindconnect.com`
    (primary) and `www.sellfindconnect.com`. The API is path-routed on the same
    domain (`/api`), so no API subdomain is needed in this layout. DO displays the
