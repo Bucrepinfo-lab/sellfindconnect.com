@@ -129,5 +129,5 @@ DigitalOcean App Platform remains a documented **candidate**
 path-routed `/api`. That layout is **not** what is live. The same
 `deploy/api-release.sh` path is the DigitalOcean pre-deploy job.
 
-Railway temporary URLs and `adverts.telpen.net` are historical fallbacks and are
-no longer serving this product. See `docs/GIT_RAILWAY_RUNBOOK.md` (archived).
+Railway temporary URLs and `adverts.telpen.net` are archived. They are not a
+fallback or recovery path. See `docs/GIT_RAILWAY_RUNBOOK.md`.

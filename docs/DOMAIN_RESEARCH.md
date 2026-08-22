@@ -1,7 +1,14 @@
 # Telpen Adverts Domain Research
 
 Date: 2026-06-16
+Last updated: 2026-08-22
 Purpose: Shortlist marketable domain names around the platform promise: sell it, find it here, and connect.
+
+Status: The purchase outcome is current (`SellFindConnect.com` on GoDaddy).
+Railway connection steps below are **historical** and must not be followed.
+Live DNS is GoDaddy → Fly.io (`docs/FLY_DEPLOYMENT.md`). Railway is archived
+(`docs/GIT_RAILWAY_RUNBOOK.md`). DigitalOcean App Platform is a candidate only
+(`docs/DIGITALOCEAN_DEPLOYMENT.md`).
 
 ## Recommendation
 
@@ -56,10 +63,10 @@ Recommended defensive buys:
 3. Do not buy GoDaddy email until SPF, DKIM, DMARC, admin mailbox, support mailbox, and deliverability requirements are agreed.
 4. Buy `SellFindConnect.app` if budget allows after the primary `.com` is secured.
 5. If budget allows, also buy `FindSellConnect.com` and `FindSellConnect.app`.
-6. Connect `SellFindConnect.com` to Railway after choosing how to handle Railway's Trial-plan custom domain limit.
-7. Preferred path: upgrade Railway or otherwise increase the custom-domain limit so `adverts.telpen.net` can remain as the technical fallback while `SellFindConnect.com` is verified.
-8. Budget path: remove/replace the existing `adverts.telpen.net` custom domain on the web service and use Railway's `web-production-32b7d.up.railway.app` URL as the technical fallback until a paid Railway plan is approved.
-9. Redirect the new domain to the current Telpen deployment first, then later make it the primary domain after legal/trademark review.
+6. Historical (do not do this): connect `SellFindConnect.com` to Railway after choosing how to handle Railway's Trial-plan custom domain limit.
+7. Historical (do not do this): upgrade Railway so `adverts.telpen.net` remains a technical fallback while `SellFindConnect.com` is verified.
+8. Historical (do not do this): use Railway's `web-production-32b7d.up.railway.app` URL as a fallback. Those apps return HTTP 404.
+9. Done: `sellfindconnect.com` / `www` / `api` are the live public names on Fly.
 10. Run a trademark and country-name-conflict search before heavy public advertising.
 
 ## Suggested Brand Copy

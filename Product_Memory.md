@@ -234,3 +234,9 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - 2026-08-22: The BOM-fix image then failed with Prisma P3009 (failed `finance_durability` row still present; recovery only handled P3018). Release now runs `migrate resolve --rolled-back` for that migration before `migrate deploy`. Production still stays on memory until this image deploys.
 - 2026-08-22: After finance/privacy applied, `20260627000000_search_hardening` failed because `to_tsvector("english", coalesce(...,""))` and `" "` are identifiers in Postgres, not strings. SQL now uses `'english'` / `''` / `' '`. Release also rolls back that failed row before migrate. Production stays on memory until this image deploys.
 - 2026-08-22: Hosted Prisma cutover completed on Fly. Health reports `sellfindconnect-api`, `persistence.mode: prisma`, `databaseConfigured: true`. `/privacy` and `/account/delete` return HTTP 200. Scheduled jobs cron is on; a manual workflow_dispatch on `main` ran every operations job green after Fly and GitHub `INTERNAL_JOB_KEY` values were matched. Paying-subscriber onboarding still waits on tax/finance and live payment credentials, not infra. Audit cleanup: unused empty runbook, one-off commit script, duplicate Next config, unused notification alias, unused tenant-session decorator, and broken unused country-pricing seed removed. Privacy CSS is imported; `/dashboard` routes redirect into the existing home workspace so onboarding and deletion no longer 404.
+- 2026-08-22: Rewrote the DigitalOcean and Railway files so they match
+  production. `docs/DIGITALOCEAN_DEPLOYMENT.md` and `deploy/digitalocean/app.yaml`
+  are a candidate only (same Dockerfiles and Prisma release as Fly; no
+  `sellfindconnect.com` DNS while Fly is live). `docs/GIT_RAILWAY_RUNBOOK.md` is
+  an archive: do not deploy Railway. `docs/DEPLOYMENT.md` is a short index. The
+  paying-subscriber gate is tax/STK review, not a DigitalOcean launch.
