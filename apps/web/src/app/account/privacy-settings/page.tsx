@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
+import "../../../styles/privacy.css";
 import { publicApiBaseUrl, tenantSessionHeaders } from "../../../lib/public-api";
 
 type DeletedWith = "ACCOUNT" | "MANUAL" | "RETENTION_POLICY";

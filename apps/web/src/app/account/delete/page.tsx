@@ -3,6 +3,7 @@
 import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 
+import "../../../styles/privacy.css";
 import { publicApiBaseUrl, readTenantSession, tenantSessionHeaders } from "../../../lib/public-api";
 
 type Step = "CONFIRM" | "REASON" | "SCHEDULED" | "CANCELLED";

@@ -58,6 +58,7 @@ Play User Data requires:
 - An accurate Data Safety form (account data, phone number used for login and
   mobile-money, approximate location if collected, UGC, diagnostics).
 - A public privacy policy URL. In this repo: `/privacy`.
+- A public terms and subscription URL. In this repo: `/terms` and `/subscription`.
 - **In-app and web-accessible account deletion** for any account the app creates.
   In this repo: `/account/delete` plus `POST/DELETE/GET /v1/privacy/deletion`.
 

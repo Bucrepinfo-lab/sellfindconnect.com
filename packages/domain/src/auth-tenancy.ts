@@ -55,11 +55,17 @@ export type TenantOnboardingSnapshot = {
 };
 
 export const activePolicyVersions: ActivePolicyVersions = {
-  termsVersion: 'terms-2026-06-18',
+  termsVersion: 'terms-2026-08-22',
   privacyVersion: 'privacy-2026-06-18',
   prohibitedContentVersion: 'zero-tolerance-2026-06-18',
-  subscriptionTermsVersion: 'subscription-2026-06-18',
+  subscriptionTermsVersion: 'subscription-2026-08-22',
 };
+
+export const publicPolicyDocuments = [
+  { slug: 'terms', path: '/terms', version: 'terms-2026-08-22' },
+  { slug: 'privacy', path: '/privacy', version: 'privacy-2026-06-18' },
+  { slug: 'subscription', path: '/subscription', version: 'subscription-2026-08-22' },
+] as const;
 
 export function evaluatePasswordPolicy(password: string): PasswordPolicyDecision {
   const checks: string[] = [];
