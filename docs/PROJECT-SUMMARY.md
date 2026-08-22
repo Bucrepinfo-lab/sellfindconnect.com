@@ -30,6 +30,6 @@ Web/PWA rails: Stripe and/or Africa's Talking M-Pesa. A Google Play APK would ne
 - Railway temp URLs → 404; `adverts.telpen.net` DNS missing
 
 ## Next (do not onboard paying subscribers until)
-1. `fly deploy --config fly.api.toml` from Telpen Adverts so migrate/seed run, then confirm `persistence.mode: prisma`
+1. Merge the migration BOM fix, then `fly deploy --config fly.api.toml` so migrate/seed can finish, then confirm `persistence.mode: prisma`
 2. Set Fly `INTERNAL_JOB_KEY` and GitHub Actions `API_BASE_URL` / `INTERNAL_JOB_KEY`
 3. Smoke-test **Scheduled jobs** via workflow_dispatch after merge to `main`
