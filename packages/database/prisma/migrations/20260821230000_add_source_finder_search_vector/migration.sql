@@ -14,8 +14,12 @@ SET "searchVector" = to_tsvector(
 CREATE INDEX IF NOT EXISTS "SourceFinderIndex_searchVector_idx"
   ON "SourceFinderIndex" USING GIN ("searchVector");
 
-CREATE INDEX IF NOT EXISTS "SourceFinderIndex_embedding_idx"
-  ON "SourceFinderIndex" USING ivfflat ("embedding" vector_cosine_ops) WITH (lists = 100);
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM "SourceFinderIndex" LIMIT 1) THEN
+    EXECUTE 'CREATE INDEX IF NOT EXISTS "SourceFinderIndex_embedding_idx" ON "SourceFinderIndex" USING ivfflat ("embedding" vector_cosine_ops) WITH (lists = 1)';
+  END IF;
+END $$;
 
 CREATE OR REPLACE FUNCTION update_source_finder_search_vector() RETURNS TRIGGER AS $$
 BEGIN
