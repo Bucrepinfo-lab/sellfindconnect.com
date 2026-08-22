@@ -58,3 +58,4 @@ export * from './phone';
 export * from './payments';
 export * from './product-audit';
 export * from './totp';
+export * from './ugc-moderation';

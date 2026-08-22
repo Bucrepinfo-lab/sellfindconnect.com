@@ -60,6 +60,7 @@ Play User Data requires:
 - A public privacy policy URL. In this repo: `/privacy`.
 - A public terms and subscription URL. In this repo: `/terms` and `/subscription`.
 - A public prohibited-content URL. In this repo: `/prohibited`.
+- In-product report and block for UGC (`POST /v1/ugc/reports`, `POST /v1/ugc/blocks`).
 - **In-app and web-accessible account deletion** for any account the app creates.
   In this repo: `/account/delete` plus `POST/DELETE/GET /v1/privacy/deletion`.
 

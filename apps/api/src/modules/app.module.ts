@@ -21,6 +21,7 @@ import { ProfilesModule } from './profiles/profiles.module';
 import { RelationshipsModule } from './relationships/relationships.module';
 import { SafetyModule } from './safety/safety.module';
 import { SourceFinderModule } from './source-finder/source-finder.module';
+import { UgcModule } from './ugc/ugc.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { SourceFinderModule } from './source-finder/source-finder.module';
     PaymentsModule,
     FinanceModule,
     SourceFinderModule,
+    UgcModule,
     LeadsModule,
     ConversationsModule,
     NotificationsModule,

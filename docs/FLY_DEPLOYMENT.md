@@ -132,6 +132,8 @@ Do not onboard paying subscribers until:
 - `/dashboard` redirects into the home workspace
 - Home `/` honors `view=discover|adverts`, `q`, `industry`, and `role` so
   onboarding sell/find land on Advertiser Setup or Source Finder
+- `POST /v1/ugc/reports` and `POST /v1/ugc/blocks` exist (API image with the
+  UGC migration)
 - A manual **Scheduled jobs** workflow_dispatch succeeds
 - STK Push uses the login phone only (`PAYMENT_PROVIDER` live credentials
   reviewed)

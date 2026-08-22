@@ -275,6 +275,8 @@ model Tenant {
   authMfaChallenges            AuthMfaChallenge[]
   tenantInvites                TenantInvite[]
   termsAcceptanceEvidence      TermsAcceptanceEvidence[]
+  userContentReports           UserContentReport[]
+  userBlocks                   UserBlock[]
 
   @@index([countryCode])
   @@index([status])
@@ -1393,6 +1395,40 @@ model DataExportRequest {
 
   @@index([tenantId, userId])
   @@index([status, expiresAt])
+}
+
+model UserContentReport {
+  id               String   @id @default(uuid())
+  reporterTenantId String
+  reporterUserId   String
+  targetType       String   @db.VarChar(40)
+  targetId         String   @db.VarChar(120)
+  targetTenantId   String?  @db.VarChar(120)
+  reason           String   @db.VarChar(80)
+  details          String?
+  status           String   @db.VarChar(40)
+  countryCode      String   @db.VarChar(2)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  reporterTenant   Tenant   @relation(fields: [reporterTenantId], references: [id], onDelete: Cascade)
+
+  @@index([reporterTenantId, createdAt])
+  @@index([status, createdAt])
+  @@index([targetType, targetId])
+}
+
+model UserBlock {
+  id              String   @id @default(uuid())
+  tenantId        String
+  blockedTargetId String   @db.VarChar(120)
+  blockedTenantId String?  @db.VarChar(120)
+  createdByUserId String
+  reason          String   @db.VarChar(80)
+  createdAt       DateTime @default(now())
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, blockedTargetId])
+  @@index([tenantId])
 }
 
 // ─── Payments (M-Pesa / mobile money via Africa's Talking) ─────────────────────

@@ -284,3 +284,9 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   from those dashboard redirects. Find onboarding maps AGRI-style quick
   codes onto catalog industries and focuses Source Finder; sell onboarding
   focuses Advertiser Setup. This is a web deploy.
+- 2026-08-22: Added UGC report and block. Tenants can report or block a
+  Source Finder target after terms acceptance. Blocked ids leave that
+  tenant’s results. `POST /v1/ugc/reports` and `POST /v1/ugc/blocks` persist
+  in memory by default and Prisma when `PERSISTENCE_DRIVER=prisma`.
+  Moderators use `GET/POST /v1/platform/ugc/reports`. Audit stores reason
+  and target id, never report details. API then web deploy.

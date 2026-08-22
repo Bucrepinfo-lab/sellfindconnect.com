@@ -33,6 +33,10 @@ export const productAuditActions = [
   'PAYMENT_CHECKOUT_BLOCKED',
   'PAYMENT_PAYOUT_REQUESTED',
   'ACCOUNT_DELETION_COMPLETED',
+  'USER_CONTENT_REPORTED',
+  'USER_BLOCKED',
+  'USER_UNBLOCKED',
+  'USER_CONTENT_REPORT_RESOLVED',
 ] as const;
 
 export type ProductAuditAction = (typeof productAuditActions)[number];
@@ -97,6 +101,7 @@ const deniedExactKeys = new Set([
   'billingreference',
   'customerreference',
   'authorityreference',
+  'details',
 ]);
 
 export function canViewTenantAuditLogs(role: TenantAccessRole): boolean {
@@ -169,6 +174,14 @@ export function describeProductAuditAction(action: string): string {
       return 'Mobile payout requested';
     case 'ACCOUNT_DELETION_COMPLETED':
       return 'Account deletion completed';
+    case 'USER_CONTENT_REPORTED':
+      return 'User content reported';
+    case 'USER_BLOCKED':
+      return 'User blocked';
+    case 'USER_UNBLOCKED':
+      return 'User unblocked';
+    case 'USER_CONTENT_REPORT_RESOLVED':
+      return 'User content report resolved';
     default:
       return action.replaceAll('_', ' ').toLowerCase();
   }

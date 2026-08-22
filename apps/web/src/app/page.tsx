@@ -122,7 +122,15 @@ import {
   type HomeWorkspaceView,
   supplyChainRoles,
   type SupplyChainRole,
+  createUserBlock,
+  createUserContentReport,
+  filterBlockedSourceFinderResults,
+  ugcReportReasons,
+  type UgcReportReason,
+  type UserBlock,
+  type UserContentReport,
 } from '@telpen/domain';
+import { publicApiBaseUrl, readTenantSession, tenantSessionHeaders } from '../lib/public-api';
 import { useHomeWorkspaceLanding } from '../lib/use-home-workspace-landing';
 
 const tenantId = '11111111-1111-4111-8111-111111111111';
@@ -493,6 +501,9 @@ export default function Home() {
   );
   const [relationshipError, setRelationshipError] = useState('');
   const [relationshipClaims, setRelationshipClaims] = useState<RelationshipClaim[]>([]);
+  const [userBlocks, setUserBlocks] = useState<UserBlock[]>([]);
+  const [userReports, setUserReports] = useState<UserContentReport[]>([]);
+  const [reportReason, setReportReason] = useState<UgcReportReason>('HARASSMENT');
   const [workspaceViewDraft, setWorkspaceView] = useState<HomeWorkspaceView | undefined>();
   const workspaceView = workspaceViewDraft ?? landing.view;
   const onboardingLanding = landing.onboarding;
@@ -617,9 +628,13 @@ export default function Home() {
         ),
       )
     : [];
-  const filteredResults = applySourceFinderOutcomes(rankedResults, sourceFinderOutcomes, {
-    behavioralMatchingConsent,
-  });
+  const filteredResults = filterBlockedSourceFinderResults(
+    applySourceFinderOutcomes(rankedResults, sourceFinderOutcomes, {
+      behavioralMatchingConsent,
+    }),
+    userBlocks,
+    tenantId,
+  );
   const canSaveSearch = querySafetyDecision.allowed && query.trim().length >= 2;
   const savedSearchAlerts: SavedSearchAlertPreview[] = savedSearches.flatMap(
     (savedSearch): SavedSearchAlertPreview[] => {
@@ -1258,6 +1273,62 @@ export default function Home() {
     .filter((item) => item.lifecycle.status !== 'LIVE')
     .sort((a, b) => b.lifecycle.daysLive - a.lifecycle.daysLive);
 
+  const persistUgc = async (path: string, body: unknown) => {
+    const session = readTenantSession();
+    if (!session.sessionToken || !session.tenantId) {
+      return;
+    }
+    await fetch(`${publicApiBaseUrl}${path}`, {
+      method: 'POST',
+      headers: tenantSessionHeaders(),
+      body: JSON.stringify(body),
+    });
+  };
+
+  const reportSource = (targetId: string) => {
+    if (!termsAccepted) {
+      return;
+    }
+    const report = createUserContentReport(
+      {
+        targetType: 'USER',
+        targetId,
+        reason: reportReason,
+        acceptedTerms: true,
+      },
+      { tenantId, userId: 'demo-owner', countryCode: 'KE' },
+      crypto.randomUUID(),
+    );
+    setUserReports((current) => [report, ...current]);
+    void persistUgc('/ugc/reports', {
+      targetType: 'USER',
+      targetId,
+      reason: reportReason,
+      acceptedTerms: true,
+    });
+  };
+
+  const blockSource = (targetId: string) => {
+    if (!termsAccepted || userBlocks.some((block) => block.blockedTargetId === targetId)) {
+      return;
+    }
+    const block = createUserBlock(
+      {
+        blockedTargetId: targetId,
+        reason: reportReason,
+        acceptedTerms: true,
+      },
+      { tenantId, userId: 'demo-owner', countryCode: 'KE' },
+      crypto.randomUUID(),
+    );
+    setUserBlocks((current) => [block, ...current]);
+    void persistUgc('/ugc/blocks', {
+      blockedTargetId: targetId,
+      reason: reportReason,
+      acceptedTerms: true,
+    });
+  };
+
   return (
     <main className="app-shell">
       <aside className="sidebar" aria-label="Workspace navigation">
@@ -1589,6 +1660,22 @@ export default function Home() {
                         <span>{result.analytics.inquiries} inquiries</span>
                         <span>{formatResponseTime(result.responseTimeMinutes)} response</span>
                         <span>{lifecycle.daysLive} days live</span>
+                        <button
+                          className="link-button"
+                          type="button"
+                          disabled={!termsAccepted}
+                          onClick={() => reportSource(result.id)}
+                        >
+                          <Flag size={14} /> Report
+                        </button>
+                        <button
+                          className="link-button"
+                          type="button"
+                          disabled={!termsAccepted}
+                          onClick={() => blockSource(result.id)}
+                        >
+                          <Ban size={14} /> Block
+                        </button>
                         <button className="link-button">
                           Open <ChevronRight size={14} />
                         </button>
@@ -1767,6 +1854,39 @@ export default function Home() {
                     and audience are set; AUTH_IDENTITY_PROVIDER=auth0 or clerk fail-closes
                     without those values. PERSISTENCE_DRIVER=prisma overlays hosted PostgreSQL
                     when DATABASE_URL is set; AUTH_REPOSITORY=memory still wins.
+                  </span>
+                </div>
+              </div>
+            </section>
+
+            <section className="side-panel">
+              <div className="panel-heading tight">
+                <h2>Reports and blocks</h2>
+                <span>
+                  {userReports.length} reports · {userBlocks.length} blocked
+                </span>
+              </div>
+              <label className="lead-select-row">
+                <span>Reason</span>
+                <select
+                  value={reportReason}
+                  onChange={(event) => setReportReason(event.target.value as UgcReportReason)}
+                >
+                  {ugcReportReasons.map((reason) => (
+                    <option key={reason} value={reason}>
+                      {codeLabel(reason)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className={termsAccepted ? 'policy-box ok compact' : 'policy-box block compact'}>
+                {termsAccepted ? <ShieldCheck size={16} /> : <CircleAlert size={18} />}
+                <div>
+                  <strong>{termsAccepted ? 'Report and block unlocked' : 'Accept terms first'}</strong>
+                  <span>
+                    {termsAccepted
+                      ? 'Use Report or Block on a Source Finder card. Blocked sources leave this tenant’s results. Moderators review POST /v1/platform/ugc/reports.'
+                      : 'Community standards require current terms before reporting or blocking.'}
                   </span>
                 </div>
               </div>
