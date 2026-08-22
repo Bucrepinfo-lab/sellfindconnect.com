@@ -6,6 +6,7 @@
     "generate": "prisma generate",
     "migrate:deploy": "prisma migrate deploy",
     "migrate:resolve:finance-durability": "prisma migrate resolve --rolled-back 20260625000000_finance_durability",
+    "migrate:resolve:search-hardening": "prisma migrate resolve --rolled-back 20260627000000_search_hardening",
     "migrate:status": "prisma migrate status",
     "seed": "node prisma/seed.mjs",
     "validate": "prisma validate",

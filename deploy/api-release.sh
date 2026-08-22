@@ -11,11 +11,11 @@ if [ -z "${DATABASE_URL:-}" ]; then
 fi
 
 echo "Applying Prisma migrations..."
-# The first hosted deploy recorded 20260625000000_finance_durability as failed
-# (UTF-8 BOM at byte 0; no SQL ran). Prisma then reports P3009 until that row
-# is marked rolled back. This is a no-op when the row is not in a failed state.
+# Recover known failed rows from earlier hosted attempts. Each resolve is a
+# no-op when that migration is not in a failed state.
 set +e
 npm run migrate:resolve:finance-durability -w @telpen/database
+npm run migrate:resolve:search-hardening -w @telpen/database
 set -e
 npm run db:migrate:deploy
 

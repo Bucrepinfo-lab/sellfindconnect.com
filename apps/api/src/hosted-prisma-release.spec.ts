@@ -29,12 +29,32 @@ describe('hosted Prisma release path', () => {
     expect(dockerfile).toContain('--workspace @telpen/database');
   });
 
-  it('clears the failed finance_durability Prisma row before migrate deploy', () => {
+  it('clears known failed Prisma rows before migrate deploy', () => {
     const script = readFileSync(path.join(repoRoot, 'deploy', 'api-release.sh'), 'utf8');
     expect(script).toContain('migrate:resolve:finance-durability');
-    expect(script.indexOf('migrate:resolve:finance-durability')).toBeLessThan(
+    expect(script).toContain('migrate:resolve:search-hardening');
+    expect(script.indexOf('migrate:resolve:search-hardening')).toBeLessThan(
       script.indexOf('db:migrate:deploy'),
     );
+  });
+
+  it('uses Postgres string literals in search_hardening SQL', () => {
+    const sql = readFileSync(
+      path.join(
+        repoRoot,
+        'packages',
+        'database',
+        'prisma',
+        'migrations',
+        '20260627000000_search_hardening',
+        'migration.sql',
+      ),
+      'utf8',
+    );
+    expect(sql).not.toContain('to_tsvector("english"');
+    expect(sql).not.toContain('|| " " ||');
+    expect(sql).not.toMatch(/coalesce\([^)]+""\)/);
+    expect(sql).toContain("to_tsvector(\n  'english'");
   });
 
   it('fail-closes the release command without DATABASE_URL', () => {
