@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  assertTargetNotBlocked,
+  blockedTargetContinueMessage,
   createUserBlock,
   createUserContentReport,
   filterBlockedSourceFinderResults,
@@ -101,6 +103,10 @@ describe('UGC report and block', () => {
         (item) => item.id,
       ),
     ).toEqual(['r1']);
+    expect(() => assertTargetNotBlocked([block], actor.tenantId, 'r2')).toThrow(
+      blockedTargetContinueMessage,
+    );
+    expect(() => assertTargetNotBlocked([block], actor.tenantId, 'r1')).not.toThrow();
   });
 
   it('lets a moderator close an open report once', () => {

@@ -136,6 +136,8 @@ Do not onboard paying subscribers until:
 - Web `/community` returns HTTP 200 (UGC user policy)
 - `POST /v1/ugc/reports` and `POST /v1/ugc/blocks` exist (API image with the
   UGC migration)
+- Blocked tenants cannot create or send conversations, inquiries, or Source
+  Finder outcomes for that target (`userBlocked` on conversation GET)
 - A manual **Scheduled jobs** workflow_dispatch succeeds
 - STK Push uses the login phone only (`PAYMENT_PROVIDER` live credentials
   reviewed)
