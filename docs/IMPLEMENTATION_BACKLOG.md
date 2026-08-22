@@ -531,6 +531,11 @@ Progress:
   fail closed without credentials. Play Billing is required before any Google
   Play Android listing can charge the SaaS subscription (`docs/PLAY_STORE.md`).
   STK Push on the verified login phone remains the web/PWA rail.
+- Seeded a DRAFT Kenya tax profile (KRA 16% VAT, monthly iTax, digital-marketplace
+  threshold 0) into `FinanceWorkbenchRecord`. Seed never overwrites an APPROVED
+  profile. `GET /v1/finance/launch-readiness` reports the gate. STK checkout
+  returns `tax_profile` until a human sets `approvedBy`. The web Finance
+  Readiness panel no longer claims the profile is approved.
 
 ## Epic 9: Mobile, Localization, and Launch
 
@@ -584,9 +589,11 @@ Progress:
 
 ## Immediate Sprint
 
-1. Redeploy the hosted-Prisma API image after the `search_hardening` SQL
-   quote fix so `release_command` can finish migrate/seed, then confirm
-   `GET /v1/health` `persistence.mode` is `prisma` (`docs/FLY_DEPLOYMENT.md`).
-2. Set Fly `INTERNAL_JOB_KEY` and GitHub Actions secrets `API_BASE_URL` +
-   `INTERNAL_JOB_KEY`, then smoke-test **Scheduled jobs** via workflow_dispatch.
+1. Hosted Prisma on Fly — **done** (`persistence.mode: prisma`).
+2. `INTERNAL_JOB_KEY` + scheduled-jobs smoke-test — **done**.
 3. Do not start a native Play app until Play Billing exists.
+4. Kenya tax profile — **draft seeded, checkout blocked**. Owner/CPA must
+   review KRA VAT 16%, name a Country Finance Admin, and approve via
+   `POST /v1/finance/country-tax-profiles` with `approvedBy` before paid
+   subscribers. Do not auto-approve. Live STK credentials remain a separate
+   review. After merge, redeploy the API image so seed writes the draft.

@@ -31,6 +31,33 @@ async function configuredService(paymentAdapter?: PaymentAdapter) {
 }
 
 describe('FinanceService', () => {
+  it('reports Kenya paid launch as blocked until a human approves the draft profile', async () => {
+    const service = new FinanceService();
+
+    await expect(service.getPaidLaunchReadiness('KE')).resolves.toMatchObject({
+      countryCode: 'KE',
+      allowed: false,
+      status: null,
+      reason: 'missing_profile',
+      proposedVatRate: 0.16,
+    });
+
+    await service.configureCountryTaxProfile({
+      countryCode: 'KE',
+      taxAuthorityName: 'Kenya Revenue Authority',
+      taxRegistrationStatus: 'PENDING_REVIEW',
+      localFinanceOwner: 'Unassigned',
+      filingFrequency: 'MONTHLY',
+      recordRetentionYears: 7,
+    });
+
+    await expect(service.getPaidLaunchReadiness('KE')).resolves.toMatchObject({
+      allowed: false,
+      status: 'DRAFT',
+      reason: 'profile_not_approved',
+    });
+  });
+
   it('requires an approved country tax profile before calculating tax', async () => {
     const service = new FinanceService();
 

@@ -1101,6 +1101,13 @@ Implementation progress on 2026-06-17:
 - Continued implementation on 2026-08-21 with live payment-provider adapters. Invoice capture stays on the manual development adapter by default. `PAYMENT_PROVIDER=stripe`, `africastalking`, or `live` selects Stripe PaymentIntents and/or Africa's Talking M-Pesa checkout, rejects raw card numbers, records `REQUIRES_CAPTURE` until `POST /v1/finance/payments/settle`, and fail-closes when credentials are missing.
 - Continued implementation on 2026-08-21 with `PERSISTENCE_DRIVER=prisma` overlay for finance and payment repositories. Named `live` fail-closes without `DATABASE_URL`; `FINANCE_REPOSITORY=memory` still wins.
 - Continued implementation on 2026-08-21 with product-audit events for invoice create/receipt/capture/refund, provider capture settlement, and mobile checkout/payout. Metadata stores amounts and status only.
+- Continued implementation on 2026-08-22 with a DRAFT Kenya tax profile
+  (KRA 16% VAT, monthly iTax due on the 20th, digital-marketplace registration
+  threshold 0) seeded into the finance workbench store. Paid STK checkout
+  fail-closes with `tax_profile` until a human approves the profile.
+  `GET /v1/finance/launch-readiness` reports the gate. The Finance Readiness
+  panel shows Draft — not approved. Significant Economic Presence tax and KRA
+  PIN / eTIMS registration remain owner/CPA open questions.
 - Remaining hardening: app-store billing rails are out of scope while native
   mobile is not in delivery. A future Google Play listing must use Play Billing
   for the digital SaaS subscription. Web/PWA STK Push stays on the login phone.

@@ -2,7 +2,13 @@ import 'dotenv/config';
 
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
-import { continents, countries, industryCategories } from '@telpen/domain';
+import {
+  continents,
+  countries,
+  industryCategories,
+  kenyaPilotTaxProfileDraft,
+  kenyaPilotVatRuleId,
+} from '@telpen/domain';
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -70,12 +76,113 @@ for (const industry of industryCategories) {
   });
 }
 
+const now = new Date().toISOString();
+const existingKenyaProfile = await prisma.financeWorkbenchRecord.findUnique({
+  where: {
+    collection_recordId: { collection: 'countryProfile', recordId: 'KE' },
+  },
+});
+const existingKenyaPayload =
+  existingKenyaProfile &&
+  typeof existingKenyaProfile.payload === 'object' &&
+  existingKenyaProfile.payload !== null &&
+  !Array.isArray(existingKenyaProfile.payload)
+    ? existingKenyaProfile.payload
+    : null;
+const kenyaAlreadyApproved =
+  existingKenyaPayload?.status === 'APPROVED' || Boolean(existingKenyaPayload?.approvedBy);
+
+if (!kenyaAlreadyApproved) {
+  const profilePayload = {
+    id: kenyaPilotTaxProfileDraft.id,
+    countryCode: kenyaPilotTaxProfileDraft.countryCode,
+    taxAuthorityName: kenyaPilotTaxProfileDraft.taxAuthorityName,
+    taxRegistrationStatus: kenyaPilotTaxProfileDraft.taxRegistrationStatus,
+    filingPortalUrl: kenyaPilotTaxProfileDraft.filingPortalUrl,
+    localFinanceOwner: kenyaPilotTaxProfileDraft.localFinanceOwner,
+    filingFrequency: kenyaPilotTaxProfileDraft.filingFrequency,
+    recordRetentionYears: kenyaPilotTaxProfileDraft.recordRetentionYears,
+    taxInclusivePricing: kenyaPilotTaxProfileDraft.taxInclusivePricing,
+    status: kenyaPilotTaxProfileDraft.status,
+    createdAt:
+      typeof existingKenyaPayload?.createdAt === 'string' ? existingKenyaPayload.createdAt : now,
+    updatedAt: now,
+  };
+
+  await prisma.financeWorkbenchRecord.upsert({
+    where: {
+      collection_recordId: { collection: 'countryProfile', recordId: 'KE' },
+    },
+    create: {
+      collection: 'countryProfile',
+      recordId: 'KE',
+      countryCode: 'KE',
+      payload: profilePayload,
+    },
+    update: {
+      countryCode: 'KE',
+      payload: profilePayload,
+    },
+  });
+
+  const existingVatRule = await prisma.financeWorkbenchRecord.findUnique({
+    where: {
+      collection_recordId: { collection: 'taxRule', recordId: kenyaPilotVatRuleId },
+    },
+  });
+  const existingVatPayload =
+    existingVatRule &&
+    typeof existingVatRule.payload === 'object' &&
+    existingVatRule.payload !== null &&
+    !Array.isArray(existingVatRule.payload)
+      ? existingVatRule.payload
+      : null;
+
+  await prisma.financeWorkbenchRecord.upsert({
+    where: {
+      collection_recordId: { collection: 'taxRule', recordId: kenyaPilotVatRuleId },
+    },
+    create: {
+      collection: 'taxRule',
+      recordId: kenyaPilotVatRuleId,
+      countryCode: 'KE',
+      payload: {
+        id: kenyaPilotVatRuleId,
+        countryCode: 'KE',
+        taxType: 'VAT',
+        taxRate: kenyaPilotTaxProfileDraft.proposedVatRate,
+        productTaxCode: kenyaPilotTaxProfileDraft.proposedProductTaxCode,
+        registrationThreshold: kenyaPilotTaxProfileDraft.registrationThresholdKes,
+        effectiveFrom: '2023-07-01T00:00:00.000Z',
+        notes: 'Proposed KRA general VAT rate for the SaaS subscription. Draft only.',
+        createdAt: now,
+      },
+    },
+    update: {
+      countryCode: 'KE',
+      payload: {
+        id: kenyaPilotVatRuleId,
+        countryCode: 'KE',
+        taxType: 'VAT',
+        taxRate: kenyaPilotTaxProfileDraft.proposedVatRate,
+        productTaxCode: kenyaPilotTaxProfileDraft.proposedProductTaxCode,
+        registrationThreshold: kenyaPilotTaxProfileDraft.registrationThresholdKes,
+        effectiveFrom: '2023-07-01T00:00:00.000Z',
+        notes: 'Proposed KRA general VAT rate for the SaaS subscription. Draft only.',
+        createdAt:
+          typeof existingVatPayload?.createdAt === 'string' ? existingVatPayload.createdAt : now,
+      },
+    },
+  });
+}
+
 console.log(
   JSON.stringify({
     status: 'seeded',
     continents: continents.length,
     countries: countries.length,
     industryCategories: industryCategories.length,
+    kenyaTaxProfile: kenyaAlreadyApproved ? 'APPROVED_PRESERVED' : 'DRAFT',
   }),
 );
 

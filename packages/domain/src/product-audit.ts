@@ -30,6 +30,7 @@ export const productAuditActions = [
   'INVOICE_REFUNDED',
   'PAYMENT_CAPTURE_SETTLED',
   'PAYMENT_CHECKOUT_REQUESTED',
+  'PAYMENT_CHECKOUT_BLOCKED',
   'PAYMENT_PAYOUT_REQUESTED',
   'ACCOUNT_DELETION_COMPLETED',
 ] as const;
@@ -162,6 +163,8 @@ export function describeProductAuditAction(action: string): string {
       return 'Provider payment capture settled';
     case 'PAYMENT_CHECKOUT_REQUESTED':
       return 'Mobile checkout requested';
+    case 'PAYMENT_CHECKOUT_BLOCKED':
+      return 'Mobile checkout blocked';
     case 'PAYMENT_PAYOUT_REQUESTED':
       return 'Mobile payout requested';
     case 'ACCOUNT_DELETION_COMPLETED':

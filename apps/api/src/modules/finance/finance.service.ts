@@ -16,6 +16,8 @@ import {
   createFinanceDocumentNumber,
   evaluateSafetyFields,
   evaluateTaxPeriodCompletion,
+  evaluatePaidLaunchReadiness,
+  kenyaPilotTaxProfileDraft,
   getDunningNoticeDecision,
   getCountry,
   looksLikeCardPan,
@@ -142,6 +144,20 @@ export class FinanceService {
     return (await this.repository.listCountryProfiles()).sort((a, b) =>
       a.countryCode.localeCompare(b.countryCode),
     );
+  }
+
+  async getPaidLaunchReadiness(countryCode: string) {
+    const profile = await this.repository.getCountryProfile(countryCode);
+    const readiness = evaluatePaidLaunchReadiness(countryCode, profile);
+    return {
+      ...readiness,
+      taxAuthorityName: profile?.taxAuthorityName,
+      taxRegistrationStatus: profile?.taxRegistrationStatus,
+      proposedVatRate:
+        countryCode.trim().toUpperCase() === kenyaPilotTaxProfileDraft.countryCode
+          ? kenyaPilotTaxProfileDraft.proposedVatRate
+          : undefined,
+    };
   }
 
   async createTaxRule(input: CreateTaxRuleDto): Promise<TaxRuleRecord> {

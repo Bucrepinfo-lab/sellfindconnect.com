@@ -125,6 +125,9 @@ Do not onboard paying subscribers until:
 - A manual **Scheduled jobs** workflow_dispatch succeeds
 - STK Push uses the login phone only (`PAYMENT_PROVIDER` live credentials
   reviewed)
+- A human approves the Kenya country tax profile. Seed writes it as DRAFT
+  (KRA 16% VAT). Checkout returns `tax_profile` until `approvedBy` is set.
+  `GET /v1/finance/launch-readiness?country=KE` must report `allowed: true`.
 
 ## DigitalOcean and Railway
 

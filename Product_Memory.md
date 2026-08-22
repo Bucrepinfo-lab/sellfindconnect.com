@@ -1,7 +1,7 @@
 # Telpen Adverts Product Memory
 
 Date started: 2026-06-15
-Last updated: 2026-08-21
+Last updated: 2026-08-22
 Purpose: Persistent decision log and strategic memory for the Telpen Adverts multi-tenant advertising SaaS.
 
 This file must be updated whenever product strategy, pricing, compliance, architecture, market positioning, or execution decisions change.
@@ -231,3 +231,12 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - 2026-08-22: First hosted Prisma Fly release failed on `20260625000000_finance_durability` because three checked-in SQL files started with a UTF-8 BOM (`U+FEFF`). Postgres rejected the file at byte 0, so no statements ran. The BOM is stripped; the release command marks that failed Prisma row rolled back and retries migrate. Production stays on memory until that image deploys.
 - 2026-08-22: The BOM-fix image then failed with Prisma P3009 (failed `finance_durability` row still present; recovery only handled P3018). Release now runs `migrate resolve --rolled-back` for that migration before `migrate deploy`. Production still stays on memory until this image deploys.
 - 2026-08-22: After finance/privacy applied, `20260627000000_search_hardening` failed because `to_tsvector("english", coalesce(...,""))` and `" "` are identifiers in Postgres, not strings. SQL now uses `'english'` / `''` / `' '`. Release also rolls back that failed row before migrate. Production stays on memory until this image deploys.
+- 2026-08-22: Prepared the Kenya paid-launch tax gate. Seed writes a DRAFT
+  Kenya Revenue Authority profile (16% VAT, monthly iTax, digital-marketplace
+  threshold 0) into the finance workbench store and never overwrites an
+  APPROVED row. STK checkout fail-closes with `tax_profile` and
+  `PAYMENT_CHECKOUT_BLOCKED` until a human sets `approvedBy`.
+  `GET /v1/finance/launch-readiness` reports the gate. The web Finance
+  Readiness panel no longer claims the profile is approved. Owner/CPA still
+  must name a Country Finance Admin, decide Significant Economic Presence tax,
+  and complete KRA PIN / eTIMS registration before paid subscribers.

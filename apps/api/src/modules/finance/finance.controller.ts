@@ -54,6 +54,11 @@ export class FinanceController {
     return this.finance.listCountryTaxProfiles();
   }
 
+  @Get('launch-readiness')
+  getPaidLaunchReadiness(@Query('country') country = 'KE') {
+    return this.finance.getPaidLaunchReadiness(country);
+  }
+
   @Post('tax-rules')
   createTaxRule(@Body() body: CreateTaxRuleDto) {
     return this.finance.createTaxRule(body);

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 
 import { requireDatabaseUrl, resolvePersistenceMode } from '../../persistence';
 import { AuthModule } from '../auth/auth.module';
+import { FinanceModule } from '../finance/finance.module';
 import { AT_PAYMENTS, AfricasTalkingPaymentsProvider } from './africastalking-payments';
 import { InMemoryPaymentsRepository } from './in-memory-payments.repository';
 import { PaymentsController } from './payments.controller';
@@ -10,7 +11,7 @@ import { PAYMENTS_REPOSITORY } from './payments.repository';
 import { PaymentsService } from './payments.service';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, FinanceModule],
   controllers: [PaymentsController],
   providers: [
     InMemoryPaymentsRepository,

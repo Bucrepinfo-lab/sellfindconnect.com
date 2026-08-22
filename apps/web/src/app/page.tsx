@@ -41,6 +41,9 @@ import {
   calculateConversationSlaDecision,
   calculateTaxSnapshotAmounts,
   calculateTrialSubscription,
+  describePaidLaunchReadiness,
+  evaluatePaidLaunchReadiness,
+  kenyaPilotTaxProfileDraft,
   canExportCountryTaxReport,
   canOperateTaxReturnWorkbench,
   conversationStatuses,
@@ -486,10 +489,14 @@ export default function Home() {
 
   const country = getCountry('KE') ?? countries[0]!;
   const countryCode = country.code;
+  const paidLaunchReadiness = evaluatePaidLaunchReadiness(
+    country.code,
+    kenyaPilotTaxProfileDraft,
+  );
   const pilotTaxSnapshot = calculateTaxSnapshotAmounts({
     amount: country.monthlySubscriptionAmount,
-    taxRate: 0.16,
-    taxInclusivePricing: true,
+    taxRate: kenyaPilotTaxProfileDraft.proposedVatRate,
+    taxInclusivePricing: kenyaPilotTaxProfileDraft.taxInclusivePricing,
   });
   const nextRemittanceAlert = getRemittanceAlertDecision(
     '2026-07-31T00:00:00.000Z',
@@ -1848,7 +1855,10 @@ export default function Home() {
                 <h2>Finance Readiness</h2>
                 <span>{country.currencyCode}</span>
               </div>
-              <FinanceRow label="Country tax profile" value="Approved" />
+              <FinanceRow
+                label="Country tax profile"
+                value={describePaidLaunchReadiness(paidLaunchReadiness)}
+              />
               <FinanceRow
                 label="Subscription"
                 value={formatMoney(
@@ -1858,40 +1868,64 @@ export default function Home() {
                 )}
               />
               <FinanceRow
+                label="Proposed VAT"
+                value={`${Math.round(kenyaPilotTaxProfileDraft.proposedVatRate * 100)}% KRA general rate`}
+              />
+              <FinanceRow
                 label="Computed tax"
-                value={formatMoney(
-                  pilotTaxSnapshot.taxAmount,
-                  country.currencyCode,
-                  country.locale,
-                )}
+                value={
+                  paidLaunchReadiness.allowed
+                    ? formatMoney(
+                        pilotTaxSnapshot.taxAmount,
+                        country.currencyCode,
+                        country.locale,
+                      )
+                    : `Proposed ${formatMoney(
+                        pilotTaxSnapshot.taxAmount,
+                        country.currencyCode,
+                        country.locale,
+                      )}`
+                }
               />
               <FinanceRow
                 label="Net revenue"
-                value={formatMoney(
-                  pilotTaxSnapshot.netRevenueAmount,
-                  country.currencyCode,
-                  country.locale,
-                )}
+                value={
+                  paidLaunchReadiness.allowed
+                    ? formatMoney(
+                        pilotTaxSnapshot.netRevenueAmount,
+                        country.currencyCode,
+                        country.locale,
+                      )
+                    : 'Blocked until approved'
+                }
               />
               <FinanceRow
                 label="Next remittance"
                 value={
-                  nextRemittanceAlert
+                  paidLaunchReadiness.allowed && nextRemittanceAlert
                     ? `${nextRemittanceAlert.alertType.replaceAll('_', ' ')} T-${nextRemittanceAlert.daysUntilDue}`
-                    : 'Calendar clear'
+                    : 'No calendar until approved'
                 }
               />
               <FinanceRow
                 label="Tax return"
-                value={taxPeriodCompletion.complete ? 'June VAT locked' : 'Workbench incomplete'}
+                value={
+                  paidLaunchReadiness.allowed
+                    ? taxPeriodCompletion.complete
+                      ? 'June VAT locked'
+                      : 'Workbench incomplete'
+                    : 'Blocked until approved'
+                }
               />
               <FinanceRow
                 label="Filing evidence"
-                value="Confirmation, remittance, authority ref"
+                value={paidLaunchReadiness.allowed ? 'Confirmation, remittance, authority ref' : 'Not filed'}
               />
               <FinanceRow
                 label="Dual approval"
-                value="Country then global finance"
+                value={
+                  paidLaunchReadiness.allowed ? 'Country then global finance' : 'Required after approval'
+                }
               />
               <FinanceRow
                 label="Tax export"
@@ -1911,9 +1945,24 @@ export default function Home() {
               />
               <FinanceRow
                 label="Payment adapter"
-                value="PAYMENT_PROVIDER=live"
+                value={
+                  paidLaunchReadiness.allowed
+                    ? 'Checkout unlocked'
+                    : 'Checkout blocked until tax profile approved'
+                }
               />
-              {canManageTaxReturn ? (
+              {!paidLaunchReadiness.allowed ? (
+                <div className="policy-box block compact">
+                  <CircleAlert size={18} />
+                  <div>
+                    <strong>Paid launch blocked</strong>
+                    <span>
+                      Kenya VAT 16% is proposed from KRA rules. A Country Finance Admin must
+                      approve the tax profile before STK checkout can run.
+                    </span>
+                  </div>
+                </div>
+              ) : canManageTaxReturn ? (
                 <div className="policy-box ok compact">
                   <FileCheck2 size={16} />
                   <div>
