@@ -29,6 +29,14 @@ describe('hosted Prisma release path', () => {
     expect(dockerfile).toContain('--workspace @telpen/database');
   });
 
+  it('clears the failed finance_durability Prisma row before migrate deploy', () => {
+    const script = readFileSync(path.join(repoRoot, 'deploy', 'api-release.sh'), 'utf8');
+    expect(script).toContain('migrate:resolve:finance-durability');
+    expect(script.indexOf('migrate:resolve:finance-durability')).toBeLessThan(
+      script.indexOf('db:migrate:deploy'),
+    );
+  });
+
   it('fail-closes the release command without DATABASE_URL', () => {
     const script = path.join(repoRoot, 'deploy', 'api-release.sh');
     expect(() =>

@@ -59,10 +59,9 @@ receive traffic.
 
 That script fail-closes without `DATABASE_URL`, then:
 
-1. `npm run db:migrate:deploy`. If hosted Postgres still has a failed
-   `20260625000000_finance_durability` row from the UTF-8 BOM (Postgres
-   rejected the file at byte 0; no SQL ran), the script marks that
-   migration rolled back and retries.
+1. Mark `20260625000000_finance_durability` rolled back if Prisma still has
+   it as failed (P3009 after the UTF-8 BOM; no SQL ran), then
+   `npm run db:migrate:deploy`.
 2. `node packages/database/prisma/seed.mjs` (idempotent continents, countries,
    industry categories). Set `SKIP_DB_SEED=true` only if you must skip seed.
 
