@@ -1,0 +1,15 @@
+{
+  "name": "Telpen Adverts (Sell Find Connect)",
+  "install": "npm ci && npm run db:generate && npm run build:domain",
+  "terminals": [
+    {
+      "name": "dev",
+      "command": "npm run dev",
+      "description": "Runs the NestJS API (http://localhost:4000/v1, OpenAPI docs at /docs) and the Next.js web app (http://localhost:3000) together with hot reload. Uses in-memory persistence by default; set PERSISTENCE_DRIVER=prisma with DATABASE_URL to overlay PostgreSQL."
+    }
+  ],
+  "ports": [
+    { "name": "web", "port": 3000 },
+    { "name": "api", "port": 4000 }
+  ]
+}
