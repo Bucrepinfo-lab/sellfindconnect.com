@@ -1,3 +1,4 @@
+import { communityStandardsVersion } from './community-standards';
 import type { SupplyChainRole } from './industries';
 
 export const onboardingUserTypes = ['ADVERTISER', 'BUYER_SEARCHER', 'BOTH', 'ADMIN_INVITED'] as const;
@@ -66,6 +67,7 @@ export const publicPolicyDocuments = [
   { slug: 'privacy', path: '/privacy', version: 'privacy-2026-06-18' },
   { slug: 'subscription', path: '/subscription', version: 'subscription-2026-08-22' },
   { slug: 'prohibited', path: '/prohibited', version: 'zero-tolerance-2026-06-18' },
+  { slug: 'community', path: '/community', version: communityStandardsVersion },
 ] as const;
 
 export function evaluatePasswordPolicy(password: string): PasswordPolicyDecision {

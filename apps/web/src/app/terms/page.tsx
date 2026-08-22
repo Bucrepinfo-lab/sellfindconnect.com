@@ -18,8 +18,8 @@ export default function TermsOfServicePage() {
         <p>
           These terms govern use of Sell Find Connect (also called Telpen Adverts), operated by
           Telpen Systems Ltd. By creating an account, publishing, messaging, promoting, or paying,
-          you accept the current terms, privacy policy, subscription terms, and prohibited-content
-          policy. Acceptance never overrides zero-tolerance blocking or hosting-provider acceptable
+          you accept the current terms, privacy policy, subscription terms, prohibited-content
+          policy, and community standards. Acceptance never overrides zero-tolerance blocking or hosting-provider acceptable
           use.
         </p>
       </LegalSection>
@@ -54,7 +54,8 @@ export default function TermsOfServicePage() {
           pornography, human trafficking, child exploitation, illegal drugs, violent extremism,
           hate, graphic violence, criminal services, counterfeit or stolen goods, illegal wildlife
           trafficking, spam, scams, and related abuse are blocked entirely. The public list is at{' '}
-          <a href="/prohibited">prohibited content</a>. We may remove content, suspend accounts,
+          <a href="/prohibited">prohibited content</a> and{' '}
+          <a href="/community">community standards</a>. We may remove content, suspend accounts,
           preserve evidence, and report to KE-CIRT, NCMEC, or hosting providers.
         </p>
       </LegalSection>
