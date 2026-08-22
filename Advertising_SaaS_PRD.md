@@ -1188,7 +1188,7 @@ Requirements:
 - App-store metadata must accurately describe core experience.
 - Demo account/demo mode required for app review.
 - Privacy policy, terms, subscription terms, and account deletion links must be available inside app and on public web
-  (`/privacy`, `/terms`, `/subscription`, `/prohibited`, `/account/delete`, `POST /v1/privacy/deletion`). After the
+  (`/privacy`, `/terms`, `/subscription`, `/prohibited`, `/community`, `/account/delete`, `POST /v1/privacy/deletion`). After the
   30-day grace period, `POST /v1/operations/privacy/deletions/run` erases
   profile, adverts, conversations, and media, revokes sessions, and retains
   billing, analytics, and auth-audit records required by tax and security law.
