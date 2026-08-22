@@ -125,6 +125,13 @@ Do not onboard paying subscribers until:
 - A manual **Scheduled jobs** workflow_dispatch succeeds
 - STK Push uses the login phone only (`PAYMENT_PROVIDER` live credentials
   reviewed)
+- A human approves the Kenya country tax profile after remote iTax simplified
+  VAT registration (or a Kenyan tax representative). eTIMS is not required
+  for that non-resident path. Seed writes the profile as DRAFT (KRA 16% VAT).
+  Checkout returns `tax_profile` until `approvedBy` is set.
+  `GET /v1/finance/launch-readiness?country=KE` must report `allowed: true`.
+  The operator stays merchant of record; `PAYMENT_PROVIDER` must not be a
+  merchant-of-record checkout. See `docs/GROUP_TAX_OPERATING_MODEL.md`.
 
 ## DigitalOcean and Railway
 

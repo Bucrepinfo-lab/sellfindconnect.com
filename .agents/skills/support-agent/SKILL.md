@@ -34,6 +34,9 @@ reusable knowledge that feeds the context layer.
 
 ## Guardrails
 - Never take a payment action (refund/credit) without explicit owner approval.
+- This operator is the merchant of record. Do not tell a tenant to pay Paddle
+  or another MoR for the SaaS fee. Tax profile must be APPROVED before paid
+  checkout works.
 - Honour privacy: don't expose another tenant's data; minimise personal data.
 - For distress or safety-sensitive messages, respond with care and route to the
   right human/resource rather than automating a canned reply.

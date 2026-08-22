@@ -1030,7 +1030,10 @@ Core requirements:
 - Calculate tax at checkout, subscription renewal, invoice generation, credit note, refund, adjustment, manual payment, app-store receipt import, and off-platform payment import.
 - Use seller/platform location, customer billing country, customer tax ID, business/consumer status, product tax code, performance/location-of-supply rules, payment method evidence, currency, exemption certificate, reverse-charge status, and marketplace liability rules to compute tax.
 - Store an immutable tax calculation snapshot per transaction: gross amount, taxable amount, non-taxable amount, net revenue, tax type, tax rate, tax amount, filing currency, exchange rate, jurisdiction, customer evidence, rule version, calculation provider, and timestamp.
-- Support external tax engines such as Stripe Tax, TaxJar, Taxually, Avalara, or local providers through an adapter layer. The product must not depend on a single provider's data model.
+- Support Stripe Tax through the finance adapter as the rate engine. The
+  operator stays merchant of record; Stripe Tax does not file or remit.
+  Paddle / Lemon Squeezy / Dodo are forbidden. See
+  `docs/GROUP_TAX_OPERATING_MODEL.md`.
 - Support manual tax-rule override only with dual approval, reason, document attachment, effective date, expiry date, and audit log.
 - Reconcile payment provider data, app-store proceeds, local payment rails, bank deposits, refunds, failed payments, chargebacks, and tax liability.
 - Separate collected tax from platform revenue in reports and ledgers.
@@ -1081,6 +1084,7 @@ Finance roles and controls:
 Acceptance criteria:
 
 - Before any country becomes paid-live, it must have an approved country tax profile, pricing row, payment provider setup, invoice template, tax calendar, responsible finance owner, and filing/remittance workflow.
+- The operator stays merchant of record. Kenya files on iTax (or through one Kenyan tax representative). STK remains the local rail. Rates come from the finance module and Stripe Tax. EU OSS is later expansion. Merchant-of-record checkouts are forbidden.
 - Every paid transaction must produce an invoice/receipt and an immutable tax snapshot.
 - Finance users can see the exact VAT/GST/sales tax or other obliged tax computed for each country and period.
 - The system alerts responsible users before every filing and remittance deadline.
@@ -1101,6 +1105,19 @@ Implementation progress on 2026-06-17:
 - Continued implementation on 2026-08-21 with live payment-provider adapters. Invoice capture stays on the manual development adapter by default. `PAYMENT_PROVIDER=stripe`, `africastalking`, or `live` selects Stripe PaymentIntents and/or Africa's Talking M-Pesa checkout, rejects raw card numbers, records `REQUIRES_CAPTURE` until `POST /v1/finance/payments/settle`, and fail-closes when credentials are missing.
 - Continued implementation on 2026-08-21 with `PERSISTENCE_DRIVER=prisma` overlay for finance and payment repositories. Named `live` fail-closes without `DATABASE_URL`; `FINANCE_REPOSITORY=memory` still wins.
 - Continued implementation on 2026-08-21 with product-audit events for invoice create/receipt/capture/refund, provider capture settlement, and mobile checkout/payout. Metadata stores amounts and status only.
+- Continued implementation on 2026-08-22 with a DRAFT Kenya tax profile
+  (KRA 16% VAT, monthly iTax due on the 20th, digital-marketplace registration
+  threshold 0) seeded into the finance workbench store. Paid STK checkout
+  fail-closes with `tax_profile` until a human approves the profile.
+  `GET /v1/finance/launch-readiness` reports the gate. The Finance Readiness
+  panel shows Draft — not approved. Remote iTax simplified VAT (or a Kenyan
+  tax representative) is the intended compliance path; eTIMS is not required
+  for non-resident digital suppliers. The group operating model is locked:
+  stay merchant of record, Kenya iTax or one Kenyan agent, keep STK, finance
+  module + Stripe Tax for rates, EU OSS later
+  (`docs/GROUP_TAX_OPERATING_MODEL.md`). `PAYMENT_PROVIDER=paddle` and other
+  merchant-of-record checkouts fail closed.
+  Significant Economic Presence tax remains an owner/CPA question.
 - Remaining hardening: app-store billing rails are out of scope while native
   mobile is not in delivery. A future Google Play listing must use Play Billing
   for the digital SaaS subscription. Web/PWA STK Push stays on the login phone.
@@ -1479,7 +1496,7 @@ Tooling and vendor candidates:
 - Realtime chat: WebSockets/Socket.IO for custom MVP; evaluate Twilio Conversations, Stream, or similar if cross-channel chat and agent workflows need faster launch.
 - Notifications: Firebase Cloud Messaging for Android/web, APNs for iOS, plus email/SMS/WhatsApp providers by country.
 - Payments: Stripe where supported, Google Play Billing and Apple In-App Purchase where required, and local payment rails such as mobile money providers for launch countries.
-- Tax automation: Stripe Tax for calculation/threshold monitoring where supported; TaxJar, Taxually, Avalara, Marosa, or local tax providers for filing/remittance; controlled manual tax profiles for unsupported countries until an approved provider is available.
+- Tax automation: finance-module country tax rules plus Stripe Tax for rates; Kenyan iTax or one tax representative files; EU Non-Union OSS later. Stripe Tax does not become the seller. Paddle / Lemon Squeezy / Dodo are forbidden merchant-of-record checkouts.
 - Media: S3-compatible object storage, CDN, image resizing, video transcoding, malware scanning, and content moderation APIs.
 - Analytics: event collector, warehouse, BI dashboard, and product analytics. Candidate tools include PostHog, Mixpanel, Amplitude, Segment, ClickHouse, BigQuery, Metabase, and Superset.
 - Safety operations: moderation queue, audit log, blocked keyword libraries, media review tools, report handling, escalation workflow, and evidence preservation.
@@ -1761,20 +1778,22 @@ Risk register status: updated. Each risk below has required controls that must b
 
 ## 16. Open Decisions
 
-1. What is the first launch country or region?
-2. Which countries need fallback pricing because payment-provider or app-store minimums prevent charging exactly 10 local currency units?
-3. Which payment methods are mandatory for launch countries?
-4. Will advertisers only subscribe, or will buyers/searchers also have paid plans later?
-5. Will the platform allow public reviews in MVP?
-6. Kenya pilot reporting uses KE-CIRT incident and youth-protection forms, the
+1. Which countries need fallback pricing because payment-provider or app-store minimums prevent charging exactly 10 local currency units?
+2. Will advertisers only subscribe, or will buyers/searchers also have paid plans later?
+3. Will the platform allow public reviews in MVP?
+4. Kenya pilot reporting uses KE-CIRT incident and youth-protection forms, the
    NCMEC CyberTipline, hosting-provider abuse, and an internal legal hold.
    Other countries fail closed until an approved playbook is added. Counsel must
    still confirm named contacts before paid launch.
-7. Is the initial mobile app required on day one, or can the first launch use web + PWA while native apps are built?
-8. Which tax provider or combination of providers will be used for each launch country?
-9. Which accounting system must the finance module export to or integrate with?
-10. Who is the named Country Finance Admin and external tax advisor for each launch country?
-11. What is the approved fallback process where an external tax provider does not support a country or tax type?
+5. Is the initial mobile app required on day one, or can the first launch use web + PWA while native apps are built?
+6. Which accounting system must the finance module export to or integrate with?
+7. Who is the named Country Finance Admin and Kenyan tax advisor (iTax contact)?
+8. What is the approved fallback process where Stripe Tax does not support a country or tax type (finance-module rules remain the fail-closed rate source)?
+
+Locked (no longer open): first paid-launch country is Kenya; payment rails are
+STK + Stripe; tax operating model is self merchant of record, iTax or one
+Kenyan agent, finance module + Stripe Tax, EU OSS later
+(`docs/GROUP_TAX_OPERATING_MODEL.md`).
 
 ## 17. Build Readiness Checklist
 

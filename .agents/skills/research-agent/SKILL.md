@@ -43,3 +43,7 @@ five-step delivery loop (research → spec → design → build → ship).
 - Respect the zero-tolerance taxonomy — do not research or surface prohibited
   categories as opportunities.
 - Convert relative dates to absolute before storing.
+- Do not recommend merchant-of-record checkouts (Paddle / Lemon Squeezy /
+  Dodo) for the SaaS subscription. The locked model is self merchant of
+  record, Kenya iTax or one Kenyan agent, STK, finance module + Stripe Tax,
+  EU OSS later (`docs/GROUP_TAX_OPERATING_MODEL.md`).

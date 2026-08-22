@@ -56,5 +56,8 @@ it shipped. Steps 3–5 of the delivery loop (build → harness subagents → de
 ## Guardrails
 - Tenant isolation, zero-tolerance, acceptable-use, terms gating, and
   finance/tax controls are acceptance criteria — never skip them.
+- Tax operating model is locked: self merchant of record, Kenya iTax or one
+  Kenyan agent, STK + Stripe, finance module + Stripe Tax, EU OSS later.
+  Do not wire a merchant-of-record checkout.
 - No malicious code; fail closed on safety/moderation paths.
 - Keep changes reviewable: small, coherent, well-described commits.

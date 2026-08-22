@@ -1,7 +1,7 @@
 # Telpen Adverts Product Memory
 
 Date started: 2026-06-15
-Last updated: 2026-08-21
+Last updated: 2026-08-22
 Purpose: Persistent decision log and strategic memory for the Telpen Adverts multi-tenant advertising SaaS.
 
 This file must be updated whenever product strategy, pricing, compliance, architecture, market positioning, or execution decisions change.
@@ -21,6 +21,7 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - Zero-tolerance categories: weapons, pornography, human trafficking/human trade, child exploitation, illegal drugs, violent extremism, hate/threats, graphic violence/self-harm encouragement, criminal services, counterfeit/stolen goods, illegal wildlife trafficking, platform abuse, spam/scams, intellectual-property abuse, and prohibited infrastructure use are blocked entirely across taxonomy, profiles, listings, media, search, matching, relationship links, chat, payment, and analytics exports.
 - Terms gate: publishing, media upload, messaging, paid promotion, and payment enablement require current terms/privacy/subscription/prohibited-policy acceptance. Acceptance never overrides zero-tolerance or hosting-provider acceptable-use blocking. User responsibility and indemnity clauses are required, but Telpen cannot waive non-waivable platform, privacy, tax, consumer, app-store, hosting-provider, or safety duties.
 - Finance/tax: paid launch in any country requires an approved country tax profile, tax calculation snapshots for every paid transaction, finance ledger, reconciliation dashboard, remittance calendar, computed VAT/GST/sales tax/DST/withholding/levy alerts, approval workflow, filing/remittance evidence, and exportable tax reports.
+- Tax operating model (all five owner products' SaaS subscriptions): this platform stays merchant of record (not Paddle / Lemon Squeezy / Dodo). Kenya first via iTax simplified digital-marketplace VAT or one Kenyan tax representative. Keep STK (login phone) plus Stripe. Rates from the finance module and Stripe Tax. Add EU Non-Union OSS later. See `docs/GROUP_TAX_OPERATING_MODEL.md`.
 
 ## Competitive Advantage Strategy
 
@@ -54,8 +55,8 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - Matching: rules first, then embeddings/vector search, then graph ranking and ML ranking as data grows.
 - Chat: custom WebSocket/Socket.IO for MVP or Twilio/Stream-style managed chat if speed and cross-channel support matter more.
 - Notifications: FCM, APNs, email, SMS, and WhatsApp where compliant.
-- Payments: Stripe where supported, app-store billing where required, and local mobile money/payment providers per launch country.
-- Tax automation: use an adapter layer. Stripe Tax is a preferred candidate where supported; TaxJar, Taxually, Avalara, Marosa, local country providers, or finance-approved manual rules may be needed for unsupported countries/tax types.
+- Payments: Stripe where supported, Africa's Talking STK / M-Pesa on the verified login phone, app-store billing where a native listing exists. Merchant-of-record checkouts (Paddle, Lemon Squeezy, Dodo) are forbidden.
+- Tax automation: finance-module country tax rules plus Stripe Tax for rates; Kenyan iTax or one tax representative files; EU Non-Union OSS later. Stripe Tax does not become the seller.
 - Analytics: event pipeline, warehouse, BI dashboard, product analytics, and exportable reports.
 - Safety: moderation queue, media scanning, malware scanning, keyword/synonym libraries, evidence preservation, audit logs, and escalation workflow.
 - Observability: Sentry/OpenTelemetry/Prometheus/Grafana or equivalent.
@@ -75,11 +76,23 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - Recommended market domain portfolio: buy `SellFindConnect.com` first; also buy `SellFindConnect.app`, `FindSellConnect.com`, and `FindSellConnect.app` as defensive/app companions if budget allows. Campaign line: "Sell it. Find it. Connect."
 - SEO/growth direction: position Sell Find Connect around supplier finder, buyer-seller connection, business advertising app, source finder, local business directory, B2B marketplace, and country/industry business matching. Growth should combine organic SEO, country/industry landing pages, app-store optimization, social video demos, partnerships, referrals, opportunity digests, and safety/trust positioning.
 - GitHub repository: use `https://github.com/Bucrepinfo-lab/sellfindconnect.com.git` as the source repository for the Sell Find Connect codebase and future production deployments after the final platform decision.
+- Owner portfolio (five products, five Desktop folders). This cloud agent
+  only mounts `sellfindconnect.com`. The owner's Windows Desktop is not
+  visible here. Folder names as given on 2026-08-21:
+
+  | Product | Desktop folder | GitHub today |
+  | --- | --- | --- |
+  | Sell Find Connect / Telpen Adverts | this repo | `Bucrepinfo-lab/sellfindconnect.com` (write works) |
+  | InsurOS | `insurance` | `Bucrepinfo-lab/InsurOS` exists but is a stub README only |
+  | Telpen Edu | `telpen-edu` | no GitHub repo under `Bucrepinfo-lab` |
+  | Stawi | `Mvendoh` | `Bucrepinfo-lab/Stawi` exists; Cursor push is 403. An older Desktop `Chamaa App` snapshot was already consolidated into that repo. |
+
+  Do not invent remotes for `telpen-edu` or `Mvendoh`. The locked SaaS
+  subscription tax model for all five is in `docs/GROUP_TAX_OPERATING_MODEL.md`.
+  Paste that file's copy blocks into InsurOS, Telpen Edu, and Stawi on Desktop.
 
 ## Open Decisions
 
-- First launch country or countries.
-- Exact payment providers and mobile money rails for launch countries.
 - Whether native apps are required on day one or whether web + PWA launches first.
   Current delivery is web + PWA. A Play listing is blocked on Play Billing, durable
   account deletion, and the SMS-permission rules in `docs/PLAY_STORE.md`.
@@ -87,10 +100,12 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - Which launch countries require specific legal reporting channels for child safety, trafficking, weapons, drugs, or violent extremist content.
 - Whether to include public reviews in MVP or Phase 2.
 - Whether to use managed search/chat/analytics providers for speed or self-hosted/open-source components for control.
-- Which tax provider or provider combination will be used for each launch country.
 - Which accounting system the finance module must export to or integrate with.
-- Named Country Finance Admin and external tax advisor for each launch country.
-- Approved fallback process where external tax providers do not support a country or tax type.
+- Named Country Finance Admin and external Kenyan tax advisor (iTax contact).
+  This is a remote role (owner + local tax agent), not a requirement to travel
+  or incorporate in that country.
+- Approved fallback process where Stripe Tax does not support a country or tax type
+  (finance-module rules remain the fail-closed rate source).
 
 ## Decision Log
 
@@ -231,3 +246,22 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - 2026-08-22: First hosted Prisma Fly release failed on `20260625000000_finance_durability` because three checked-in SQL files started with a UTF-8 BOM (`U+FEFF`). Postgres rejected the file at byte 0, so no statements ran. The BOM is stripped; the release command marks that failed Prisma row rolled back and retries migrate. Production stays on memory until that image deploys.
 - 2026-08-22: The BOM-fix image then failed with Prisma P3009 (failed `finance_durability` row still present; recovery only handled P3018). Release now runs `migrate resolve --rolled-back` for that migration before `migrate deploy`. Production still stays on memory until this image deploys.
 - 2026-08-22: After finance/privacy applied, `20260627000000_search_hardening` failed because `to_tsvector("english", coalesce(...,""))` and `" "` are identifiers in Postgres, not strings. SQL now uses `'english'` / `''` / `' '`. Release also rolls back that failed row before migrate. Production stays on memory until this image deploys.
+- 2026-08-22: Prepared the Kenya paid-launch tax gate. Seed writes a DRAFT
+  Kenya Revenue Authority profile (16% VAT, monthly iTax, digital-marketplace
+  threshold 0) into the finance workbench store and never overwrites an
+  APPROVED row. STK checkout fail-closes with `tax_profile` and
+  `PAYMENT_CHECKOUT_BLOCKED` until a human sets `approvedBy`.
+- 2026-08-22: Researched remote multi-country tax remittance. Digital-service
+  competitors (Google/Meta/Netflix-style and Stripe Tax SaaS) register on
+  non-resident portals and file online; they do not travel or open an office
+  per customer country. Kenya: iTax simplified DMS VAT or a tax representative;
+  eTIMS is not required for that path (KRA DMS FAQ). Jumia/Jiji local-entity
+  models are for on-the-ground marketplaces. Merchant-of-Record (Paddle)
+  remits Kenya 16% VAT but conflicts with login-phone STK as seller of record.
+- 2026-08-22: Locked the group tax operating model for all five owner-product
+  SaaS subscriptions: stay merchant of record, Kenya first on iTax (or one
+  Kenyan agent), keep STK, finance module + Stripe Tax for rates, EU OSS later.
+  Executable in this repo (`packages/domain/src/tax-operating-model.ts`);
+  `PAYMENT_PROVIDER=paddle|lemonsqueezy|dodo` fail-closes. Copy-paste blocks
+  for InsurOS, Telpen Edu, and Stawi are in `docs/GROUP_TAX_OPERATING_MODEL.md`.
+  This does not auto-approve the Kenya tax profile.

@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 
 import { AUTH_REPOSITORY, type AuthRepository } from '../auth/auth.repository';
 import { AuthService } from '../auth/auth.service';
+import { FinanceService } from '../finance/finance.service';
 import {
   AT_PAYMENTS,
   AfricasTalkingPaymentsProvider,
@@ -16,7 +17,7 @@ import type { CheckoutDto, PayoutDto } from './dto/payments.dto';
 
 export type CheckoutResult =
   | { ok: true; txnId: string; providerTxnId: string | null }
-  | { ok: false; reason: 'no_phone' | 'invalid_amount' | 'provider_error'; txnId?: string };
+  | { ok: false; reason: 'no_phone' | 'invalid_amount' | 'provider_error' | 'tax_profile'; txnId?: string };
 
 export type PayoutResult =
   | { ok: true; txnId: string }
@@ -47,6 +48,8 @@ export class PaymentsService {
     @Optional()
     @Inject(AUTH_REPOSITORY)
     private readonly authRepository?: AuthRepository,
+    @Optional()
+    private readonly finance?: FinanceService,
   ) {}
 
   /**
@@ -61,6 +64,26 @@ export class PaymentsService {
     }
     if (!isValidPaymentAmount(input.amount)) {
       return { ok: false, reason: 'invalid_amount' };
+    }
+
+    const launch = await this.finance?.getPaidLaunchReadiness('KE');
+    if (!launch?.allowed) {
+      await this.auth.recordTenantAudit({
+        tenantId: context.session.tenantId,
+        actorUserId: context.session.userId,
+        action: 'PAYMENT_CHECKOUT_BLOCKED',
+        entityType: 'PAYMENT',
+        entityId: context.session.tenantId,
+        metadata: {
+          kind: 'CHECKOUT',
+          amount: input.amount,
+          currency: 'KES',
+          ok: false,
+          status: 'BLOCKED',
+          reason: 'tax_profile',
+        },
+      });
+      return { ok: false, reason: 'tax_profile' };
     }
 
     const txn = this.newTxn({
