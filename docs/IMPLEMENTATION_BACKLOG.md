@@ -601,6 +601,9 @@ Progress:
 - Published public `/prohibited` from `prohibitedCategorySummaries` and
   redirected `/dashboard`, `/dashboard/adverts/new`, and `/dashboard/discover`
   into the home workspace so onboarding no longer 404s.
+- Home now applies `view`, `q`, `industry`, and `role` from those redirects:
+  find onboarding filters Source Finder, sell onboarding focuses Advertiser
+  Setup. Quick-industry codes such as `AGRI` map onto catalog codes.
 
 ## Immediate Sprint
 
@@ -617,6 +620,6 @@ Progress:
 7. Do not onboard paying subscribers until the Kenya profile is APPROVED and
    live STK credentials are reviewed.
 8. Public `/terms` and `/subscription` — **live** (HTTP 200).
-9. Public `/prohibited` plus `/dashboard` redirects — onboarding currently 404s
-   `/dashboard/adverts/new` and `/dashboard/discover`. After merge,
-   `fly deploy --config fly.web.toml --remote-only`.
+9. Public `/prohibited` plus `/dashboard` redirects — **live**. Home now
+   honors `view=discover|adverts`, `q`, `industry`, and `role` after the next
+   web deploy (`fly deploy --config fly.web.toml --remote-only`).

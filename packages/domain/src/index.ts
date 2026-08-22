@@ -19,6 +19,7 @@ export * from './media-review-policy';
 export * from './notifications';
 export * from './notification-dispatch';
 export * from './onboarding';
+export * from './home-workspace';
 export {
   NotificationAdapterRegistry,
 } from './notification-adapter';

@@ -1129,6 +1129,10 @@ Implementation progress on 2026-06-17:
 - Continued implementation on 2026-08-22 with public `/prohibited` from the
   shared zero-tolerance summaries, `/dashboard` redirects into the home
   workspace, and onboarding links to the public policies.
+- Continued implementation on 2026-08-22 so home honors `view`, `q`,
+  `industry`, and `role` query params from those dashboard redirects. Find
+  onboarding maps AGRI-style quick codes onto catalog industries and opens
+  Source Finder; sell onboarding opens Advertiser Setup.
 - Remaining hardening: app-store billing rails are out of scope while native
   mobile is not in delivery. A future Google Play listing must use Play Billing
   for the digital SaaS subscription. Web/PWA STK Push stays on the login phone.

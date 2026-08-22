@@ -1,11 +1,35 @@
 ﻿"use client";
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { SELL_QUICK_STARTS, FIND_QUICK_INDUSTRIES } from "@telpen/domain";
+import { SELL_QUICK_STARTS, FIND_QUICK_INDUSTRIES, safeInternalRedirect } from "@telpen/domain";
 import type { OnboardingIntent } from "@telpen/domain";
 import { publicApiBaseUrl } from "../../lib/public-api";
 
 type Step = "INTENT"|"SELL_ROLE"|"FIND_INDUSTRY"|"LAUNCHING";
+
+async function recordOnboardingLaunch(
+  body: { intent: OnboardingIntent; role?: string; industry?: string; query?: string },
+  fallback: string,
+): Promise<string> {
+  try {
+    const response = await fetch(`${publicApiBaseUrl}/onboarding/intent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const payload: unknown = await response.json();
+    const redirectTo =
+      payload &&
+      typeof payload === "object" &&
+      "redirectTo" in payload &&
+      typeof payload.redirectTo === "string"
+        ? payload.redirectTo
+        : undefined;
+    return safeInternalRedirect(redirectTo, fallback);
+  } catch {
+    return fallback;
+  }
+}
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -23,8 +47,8 @@ export default function OnboardingPage() {
 
   const launchSell = async (role: string) => {
     setSelectedRole(role); setLoading(true); setStep("LAUNCHING");
-    await fetch(`${publicApiBaseUrl}/onboarding/intent`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ intent: "SELL", role }) });
-    router.push("/dashboard/adverts/new?onboarding=1");
+    const fallback = `/dashboard/adverts/new?onboarding=1&role=${encodeURIComponent(role)}`;
+    router.push(await recordOnboardingLaunch({ intent: "SELL", role }, fallback));
   };
 
   const launchFind = async () => {
@@ -32,8 +56,8 @@ export default function OnboardingPage() {
     const p = new URLSearchParams({ onboarding: "1" });
     if (selectedIndustry) p.set("industry", selectedIndustry);
     if (query.trim()) p.set("q", query.trim());
-    await fetch(`${publicApiBaseUrl}/onboarding/intent`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ intent: "FIND", industry: selectedIndustry, query: query.trim() }) });
-    router.push("/dashboard/discover?" + p.toString());
+    const fallback = `/dashboard/discover?${p.toString()}`;
+    router.push(await recordOnboardingLaunch({ intent: "FIND", industry: selectedIndustry, query: query.trim() }, fallback));
   };
 
   return (

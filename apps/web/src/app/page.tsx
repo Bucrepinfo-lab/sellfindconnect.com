@@ -26,7 +26,7 @@ import {
   UserCheck,
   Sparkles,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import {
   accessPermissions,
@@ -119,9 +119,11 @@ import {
   type SourceFinderSearchResult,
   type SourceFinderSortOption,
   type SourceFinderOutcomeAction,
+  type HomeWorkspaceView,
   supplyChainRoles,
   type SupplyChainRole,
 } from '@telpen/domain';
+import { useHomeWorkspaceLanding } from '../lib/use-home-workspace-landing';
 
 const tenantId = '11111111-1111-4111-8111-111111111111';
 const counterpartTenantId = '22222222-2222-4222-8222-222222222222';
@@ -391,7 +393,9 @@ function buildHierarchyAnalyticsApiPath(input: {
 }
 
 export default function Home() {
-  const [query, setQuery] = useState('fresh produce');
+  const landing = useHomeWorkspaceLanding();
+  const [queryDraft, setQuery] = useState<string | undefined>();
+  const query = queryDraft ?? landing.query ?? 'fresh produce';
   const [savedSearchName, setSavedSearchName] = useState('Fresh produce buyers');
   const [savedSearchFrequency, setSavedSearchFrequency] =
     useState<OpportunityAlertFrequency>('DAILY');
@@ -422,8 +426,10 @@ export default function Home() {
     ),
   ]);
   const [opportunityAlerts, setOpportunityAlerts] = useState<SourceFinderOpportunityAlert[]>([]);
-  const [role, setRole] = useState<SupplyChainRole | 'ALL'>('ALL');
-  const [industryCode, setIndustryCode] = useState('ALL');
+  const [roleDraft, setRole] = useState<SupplyChainRole | 'ALL' | undefined>();
+  const role = roleDraft ?? landing.role ?? 'ALL';
+  const [industryDraft, setIndustryCode] = useState<string | undefined>();
+  const industryCode = industryDraft ?? landing.industryCode ?? 'ALL';
   const [sortBy, setSortBy] = useState<SourceFinderSortOption>('RELEVANCE');
   const [matchFeedback, setMatchFeedback] = useState<MatchFeedbackAction>('SAVE');
   const [behavioralMatchingConsent, setBehavioralMatchingConsent] = useState(false);
@@ -487,6 +493,24 @@ export default function Home() {
   );
   const [relationshipError, setRelationshipError] = useState('');
   const [relationshipClaims, setRelationshipClaims] = useState<RelationshipClaim[]>([]);
+  const [workspaceViewDraft, setWorkspaceView] = useState<HomeWorkspaceView | undefined>();
+  const workspaceView = workspaceViewDraft ?? landing.view;
+  const onboardingLanding = landing.onboarding;
+
+  useEffect(() => {
+    if (!landing.panelId) {
+      return;
+    }
+
+    const panelId = landing.panelId;
+    const frame = window.requestAnimationFrame(() => {
+      const focusId = landing.view === 'discover' ? 'source-finder-query' : panelId;
+      document.getElementById(focusId)?.focus({ preventScroll: true });
+      document.getElementById(panelId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [landing.panelId, landing.view]);
 
   const country = getCountry('KE') ?? countries[0]!;
   const countryCode = country.code;
@@ -1242,7 +1266,15 @@ export default function Home() {
           <span>Telpen</span>
         </div>
         <nav className="nav-stack">
-          <button className="nav-item active" title="Source Finder">
+          <button
+            className={workspaceView === 'adverts' ? 'nav-item' : 'nav-item active'}
+            title="Source Finder"
+            type="button"
+            onClick={() => {
+              setWorkspaceView('discover');
+              document.getElementById('source-finder')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+          >
             <Search size={18} />
             <span>Source Finder</span>
           </button>
@@ -1300,6 +1332,14 @@ export default function Home() {
           </div>
         </header>
 
+        {onboardingLanding ? (
+          <div className="onboarding-landing-banner" role="status">
+            {workspaceView === 'adverts'
+              ? 'Welcome — accept terms, describe your business, then publish a draft.'
+              : 'Welcome — Source Finder is using your onboarding search.'}
+          </div>
+        ) : null}
+
         <section className="metric-grid" aria-label="Performance metrics">
           <Metric label="Views" value={formatNumber(totals.views)} icon={<Eye size={18} />} />
           <Metric
@@ -1325,7 +1365,15 @@ export default function Home() {
         </section>
 
         <section className="work-grid">
-          <div className="finder-panel">
+          <div
+            className={
+              workspaceView === 'discover' && onboardingLanding
+                ? 'finder-panel workspace-target'
+                : 'finder-panel'
+            }
+            id="source-finder"
+            tabIndex={-1}
+          >
             <div className="panel-heading">
               <div>
                 <h2>Source Finder</h2>
@@ -1338,6 +1386,7 @@ export default function Home() {
               <label className="search-box">
                 <Search size={18} />
                 <input
+                  id="source-finder-query"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Search item, source, buyer or service"
@@ -1552,7 +1601,15 @@ export default function Home() {
           </div>
 
           <aside className="right-rail">
-            <section className="side-panel">
+            <section
+              className={
+                workspaceView === 'adverts' && onboardingLanding
+                  ? 'side-panel workspace-target'
+                  : 'side-panel'
+              }
+              id="advertiser-setup"
+              tabIndex={-1}
+            >
               <div className="panel-heading tight">
                 <h2>Advertiser Setup</h2>
                 <span>{selectedIndustry?.code ?? 'ALL'}</span>

@@ -280,3 +280,7 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   routes into the home workspace so onboarding sell/find launches no longer
   404. Onboarding now links to terms, subscription, privacy, and prohibited
   policies.
+- 2026-08-22: Home workspace now reads `view`, `q`, `industry`, and `role`
+  from those dashboard redirects. Find onboarding maps AGRI-style quick
+  codes onto catalog industries and focuses Source Finder; sell onboarding
+  focuses Advertiser Setup. This is a web deploy.
