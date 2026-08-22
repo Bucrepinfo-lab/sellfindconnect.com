@@ -5,6 +5,7 @@ import {
   buildTermsAcceptanceEvidence,
   calculateTrialSubscription,
   evaluatePasswordPolicy,
+  publicPolicyDocuments,
 } from './auth-tenancy';
 
 describe('auth and tenancy policy helpers', () => {
@@ -42,6 +43,13 @@ describe('auth and tenancy policy helpers', () => {
 
     expect(evidence?.termsVersion).toBe(activePolicyVersions.termsVersion);
     expect(evidence?.prohibitedContentVersion).toBe(activePolicyVersions.prohibitedContentVersion);
+    expect(activePolicyVersions.termsVersion).toBe('terms-2026-08-22');
+    expect(activePolicyVersions.subscriptionTermsVersion).toBe('subscription-2026-08-22');
+    expect(publicPolicyDocuments.map((document) => document.path)).toEqual([
+      '/terms',
+      '/privacy',
+      '/subscription',
+    ]);
   });
 
   it('does not create acceptance evidence when terms were not accepted', () => {

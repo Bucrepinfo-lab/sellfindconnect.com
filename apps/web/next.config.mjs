@@ -16,6 +16,7 @@ const nextConfig = {
   experimental: {
     serverActions: { allowedOrigins: ["sellfindconnect.com", "www.sellfindconnect.com"] },
   },
+  transpilePackages: ["@telpen/domain"],
   async headers() {
     return [
       {

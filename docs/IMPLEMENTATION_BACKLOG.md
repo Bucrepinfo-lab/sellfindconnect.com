@@ -595,6 +595,9 @@ Progress:
 - Added Kenya media reporting playbooks with KE-CIRT, NCMEC CyberTipline, and
   hosting-abuse channels. Other countries fail closed until a playbook is
   approved.
+- Published public `/terms` and `/subscription` pages at the active policy
+  versions (`terms-2026-08-22`, `subscription-2026-08-22`). Privacy CSS is
+  imported on those legal pages. This is not a counsel sign-off.
 
 ## Immediate Sprint
 
@@ -610,3 +613,6 @@ Progress:
 6. Named Kenyan tax agent / iTax contact still unassigned (human).
 7. Do not onboard paying subscribers until the Kenya profile is APPROVED and
    live STK credentials are reviewed.
+8. Public `/terms` and `/subscription` — **in this change**. After merge,
+   `fly deploy --config fly.web.toml --remote-only`. Live still 404s those
+   paths until that web image.

@@ -270,3 +270,8 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   `POST /v1/tax/calculations` for digital software (`txcd_10103000`), and
   fail-closes on a zero or mismatched quote. Finance-module rules remain the
   source of truth. Stripe Tax does not become the seller and does not file iTax.
+- 2026-08-22: Published public Terms of Service and subscription terms at
+  `/terms` and `/subscription`, versions `terms-2026-08-22` and
+  `subscription-2026-08-22`. Existing tenants must re-accept before gated
+  actions. This is not counsel sign-off. A web deploy is required before the
+  live URLs leave 404.
