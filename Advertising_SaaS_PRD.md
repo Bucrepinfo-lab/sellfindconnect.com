@@ -1133,6 +1133,10 @@ Implementation progress on 2026-06-17:
   `industry`, and `role` query params from those dashboard redirects. Find
   onboarding maps AGRI-style quick codes onto catalog industries and opens
   Source Finder; sell onboarding opens Advertiser Setup.
+- Continued implementation on 2026-08-22 with public `/community` community
+  standards (`community-2026-08-22`). Play UGC requires a user policy that
+  defines objectionable content and behavior, report/block, and
+  child-safety. Sexual content stays fully prohibited. Not counsel sign-off.
 - Remaining hardening: app-store billing rails are out of scope while native
   mobile is not in delivery. A future Google Play listing must use Play Billing
   for the digital SaaS subscription. Web/PWA STK Push stays on the login phone.

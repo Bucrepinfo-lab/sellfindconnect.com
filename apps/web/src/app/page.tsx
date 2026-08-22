@@ -49,6 +49,7 @@ import {
   canOperateTaxReturnWorkbench,
   conversationStatuses,
   conversationRealtimeNamespace,
+  communityStandardSummaries,
   countUnreadMessagesForRole,
   describeConversationPresenceStatus,
   describeMessageDeliveryStatus,
@@ -227,41 +228,6 @@ type AuthSessionPayload = {
     displayName: string;
   };
 };
-
-const termsClauses = [
-  {
-    title: 'Accurate authority',
-    text: 'The advertiser confirms lawful authority to post, sell, promote, source and communicate about every item, service, profile, link and media asset.',
-  },
-  {
-    title: 'Zero-tolerance scope',
-    text: 'Blocked goods, services, searches, media, links, messages, payments and relationship claims are never allowed and cannot be approved by accepting terms.',
-  },
-  {
-    title: 'Platform acceptable use',
-    text: 'Users must not use Telpen for illegal activity, exploitation, terrorism, trafficking, fraud, phishing, malware, DDoS, botnets, scraping abuse, spam, crypto mining, torrenting, proxy abuse or compute resale.',
-  },
-  {
-    title: 'Truthful advertising',
-    text: 'Claims, prices, offers, endorsements, guarantees, taxes, availability and disclosures must be accurate, current and compliant in the advertiser country.',
-  },
-  {
-    title: 'Rights and permissions',
-    text: 'Users must own or have permission for all names, brands, images, clips, files, links, code, descriptions and intellectual-property claims they submit.',
-  },
-  {
-    title: 'Data and consent',
-    text: 'Contacts, biodata, buyer signals and uploaded personal data must be collected, shared and messaged only with lawful notice, consent or another valid basis.',
-  },
-  {
-    title: 'Transaction responsibility',
-    text: 'Users are responsible for their own listings, communications, contracts, deliveries, payments, taxes and disputes; Telpen is not a party to user transactions.',
-  },
-  {
-    title: 'Moderation rights',
-    text: 'Telpen may block, remove, restrict, preserve evidence, suspend accounts, rate-limit abuse and report severe violations while honoring mandatory platform, hosting-provider and regulatory duties.',
-  },
-];
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat('en-KE').format(value);
@@ -1643,12 +1609,12 @@ export default function Home() {
                 </span>
               </div>
               <div className="terms-list">
-                {termsClauses.map((clause) => (
-                  <div className="terms-row" key={clause.title}>
+                {communityStandardSummaries.map((clause) => (
+                  <div className="terms-row" key={clause.id}>
                     <UserCheck size={15} />
                     <div>
                       <strong>{clause.title}</strong>
-                      <span>{clause.text}</span>
+                      <span>{clause.summary}</span>
                     </div>
                   </div>
                 ))}

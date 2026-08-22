@@ -15,7 +15,8 @@ Verified: 2026-08-22
 | Privacy policy | https://sellfindconnect.com/privacy | HTTP 200 |
 | Terms of Service | https://sellfindconnect.com/terms | HTTP 200 |
 | Subscription terms | https://sellfindconnect.com/subscription | HTTP 200 |
-| Prohibited content | https://sellfindconnect.com/prohibited | HTTP 200 after this web image |
+| Prohibited content | https://sellfindconnect.com/prohibited | HTTP 200 |
+| Community standards | https://sellfindconnect.com/community | HTTP 200 after this web image |
 | Account deletion | https://sellfindconnect.com/account/delete | HTTP 200 |
 | Path-routed API | https://sellfindconnect.com/api/v1/health | HTTP 404 (Next.js HTML — there is no `/api` path route) |
 | Historical Railway web | https://web-production-32b7d.up.railway.app/ | HTTP 404 Application not found |
@@ -132,6 +133,7 @@ Do not onboard paying subscribers until:
 - `/dashboard` redirects into the home workspace
 - Home `/` honors `view=discover|adverts`, `q`, `industry`, and `role` so
   onboarding sell/find land on Advertiser Setup or Source Finder
+- Web `/community` returns HTTP 200 (UGC user policy)
 - A manual **Scheduled jobs** workflow_dispatch succeeds
 - STK Push uses the login phone only (`PAYMENT_PROVIDER` live credentials
   reviewed)
