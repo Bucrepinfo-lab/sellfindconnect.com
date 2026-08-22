@@ -61,6 +61,13 @@ export default function OnboardingPage() {
             </button>
           </div>
           <p className="ob__reassure">Free for 30 days · No card required · Cancel anytime</p>
+          <p className="ob__legal">
+            By continuing you accept the{' '}
+            <a href="/terms">Terms</a>,{' '}
+            <a href="/subscription">Subscription</a>,{' '}
+            <a href="/privacy">Privacy</a>, and{' '}
+            <a href="/prohibited">Prohibited content</a> policies.
+          </p>
         </div>
       )}
 

@@ -20,7 +20,7 @@ export default function PrivacyPolicyPage() {
         <Section id="retention" title="Data Retention">Account and profile data is deleted within 30 days of a confirmed deletion request. Billing records are retained for the period required by your country tax authority (7 years for Kenya KRA).</Section>
         <Section id="rights" title="Your Rights">Under the Kenya Data Protection Act and GDPR you have the right to access, correct, export, erase, restrict, and object to processing of your data. Exercise these rights from Settings then Data and Privacy in-app or email privacy@sellfindconnect.com.</Section>
         <Section id="security" title="Security">Data is encrypted in transit (TLS 1.3) and at rest. Passwords are hashed and never stored in plain text. MFA is required for all sensitive account actions.</Section>
-        <Section id="contact" title="Contact">Telpen Systems Ltd · privacy@sellfindconnect.com · Ruiru, Kiambu County, Kenya. Complaints: <a href="https://www.odpc.go.ke" target="_blank" rel="noopener noreferrer">odpc.go.ke</a>. Related: <a href="/terms">Terms of Service</a> · <a href="/subscription">Subscription terms</a> · <a href="/account/delete">Delete account</a>.</Section>
+        <Section id="contact" title="Contact">Telpen Systems Ltd · privacy@sellfindconnect.com · Ruiru, Kiambu County, Kenya. Complaints: <a href="https://www.odpc.go.ke" target="_blank" rel="noopener noreferrer">odpc.go.ke</a>. Related: <a href="/terms">Terms of Service</a> · <a href="/subscription">Subscription terms</a> · <a href="/prohibited">Prohibited content</a> · <a href="/account/delete">Delete account</a>.</Section>
       </div>
     </main>
   );

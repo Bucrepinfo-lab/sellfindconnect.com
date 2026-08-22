@@ -275,3 +275,8 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   `subscription-2026-08-22`. Existing tenants must re-accept before gated
   actions. This is not counsel sign-off. A web deploy is required before the
   live URLs leave 404.
+- 2026-08-22: Published public prohibited-content policy at `/prohibited`
+  from the shared zero-tolerance summaries, and redirected `/dashboard`
+  routes into the home workspace so onboarding sell/find launches no longer
+  404. Onboarding now links to terms, subscription, privacy, and prohibited
+  policies.

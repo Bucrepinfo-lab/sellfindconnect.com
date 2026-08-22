@@ -13,8 +13,9 @@ Verified: 2026-08-22
 | API health | https://api.sellfindconnect.com/v1/health | HTTP 200 JSON `service: sellfindconnect-api`, `persistence.mode: prisma`, `databaseConfigured: true` |
 | API docs | https://api.sellfindconnect.com/docs | HTTP 200 |
 | Privacy policy | https://sellfindconnect.com/privacy | HTTP 200 |
-| Terms of Service | https://sellfindconnect.com/terms | HTTP 200 after this web image |
-| Subscription terms | https://sellfindconnect.com/subscription | HTTP 200 after this web image |
+| Terms of Service | https://sellfindconnect.com/terms | HTTP 200 |
+| Subscription terms | https://sellfindconnect.com/subscription | HTTP 200 |
+| Prohibited content | https://sellfindconnect.com/prohibited | HTTP 200 after this web image |
 | Account deletion | https://sellfindconnect.com/account/delete | HTTP 200 |
 | Path-routed API | https://sellfindconnect.com/api/v1/health | HTTP 404 (Next.js HTML — there is no `/api` path route) |
 | Historical Railway web | https://web-production-32b7d.up.railway.app/ | HTTP 404 Application not found |
@@ -126,8 +127,9 @@ Do not onboard paying subscribers until:
 
 - API health returns `service: "sellfindconnect-api"` and
   `persistence.mode: "prisma"`
-- Web `/privacy` and `/account/delete` return HTTP 200
-- Web `/terms` and `/subscription` return HTTP 200
+- Web `/privacy`, `/terms`, `/subscription`, and `/account/delete` return HTTP 200
+- Web `/prohibited` returns HTTP 200
+- `/dashboard` redirects into the home workspace
 - A manual **Scheduled jobs** workflow_dispatch succeeds
 - STK Push uses the login phone only (`PAYMENT_PROVIDER` live credentials
   reviewed)

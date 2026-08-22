@@ -65,6 +65,7 @@ export const publicPolicyDocuments = [
   { slug: 'terms', path: '/terms', version: 'terms-2026-08-22' },
   { slug: 'privacy', path: '/privacy', version: 'privacy-2026-06-18' },
   { slug: 'subscription', path: '/subscription', version: 'subscription-2026-08-22' },
+  { slug: 'prohibited', path: '/prohibited', version: 'zero-tolerance-2026-06-18' },
 ] as const;
 
 export function evaluatePasswordPolicy(password: string): PasswordPolicyDecision {
