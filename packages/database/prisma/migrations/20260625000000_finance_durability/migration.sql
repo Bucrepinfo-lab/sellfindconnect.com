@@ -1,4 +1,4 @@
-﻿-- Migration: 20260625000000_finance_durability
+-- Migration: 20260625000000_finance_durability
 CREATE TABLE "FinanceIdempotency" (
   "id"        TEXT NOT NULL DEFAULT gen_random_uuid(),
   "tenantId"  TEXT NOT NULL,

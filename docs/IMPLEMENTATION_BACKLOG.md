@@ -584,8 +584,8 @@ Progress:
 
 ## Immediate Sprint
 
-1. Deploy the hosted-Prisma API image (`fly deploy --config fly.api.toml`)
-   so `release_command` migrates/seeds, then confirm
+1. Redeploy the hosted-Prisma API image after the migration BOM fix so
+   `release_command` can finish migrate/seed, then confirm
    `GET /v1/health` `persistence.mode` is `prisma` (`docs/FLY_DEPLOYMENT.md`).
 2. Set Fly `INTERNAL_JOB_KEY` and GitHub Actions secrets `API_BASE_URL` +
    `INTERNAL_JOB_KEY`, then smoke-test **Scheduled jobs** via workflow_dispatch.

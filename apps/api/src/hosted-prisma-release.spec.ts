@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -38,6 +38,25 @@ describe('hosted Prisma release path', () => {
         cwd: repoRoot,
       }),
     ).toThrow(/DATABASE_URL is required before hosted Prisma migrate deploy/);
+  });
+
+  it('keeps Prisma migration SQL free of a UTF-8 BOM', () => {
+    const migrationsDir = path.join(repoRoot, 'packages', 'database', 'prisma', 'migrations');
+    const bomFiles: string[] = [];
+    for (const entry of readdirSync(migrationsDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) {
+        continue;
+      }
+      const sqlPath = path.join(migrationsDir, entry.name, 'migration.sql');
+      if (!existsSync(sqlPath)) {
+        continue;
+      }
+      const head = readFileSync(sqlPath);
+      if (head[0] === 0xef && head[1] === 0xbb && head[2] === 0xbf) {
+        bomFiles.push(entry.name);
+      }
+    }
+    expect(bomFiles).toEqual([]);
   });
 
   it('schedules production maintenance jobs on the default branch', () => {

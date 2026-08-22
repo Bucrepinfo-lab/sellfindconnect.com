@@ -16,6 +16,7 @@ package-lock.json -diff linguist-generated=true
 *.yml  text eol=lf
 *.yaml text eol=lf
 *.prisma text eol=lf
+*.sql  text eol=lf
 *.css  text eol=lf
 *.html text eol=lf
 

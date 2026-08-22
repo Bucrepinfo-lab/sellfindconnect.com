@@ -11,7 +11,22 @@ if [ -z "${DATABASE_URL:-}" ]; then
 fi
 
 echo "Applying Prisma migrations..."
-npm run db:migrate:deploy
+set +e
+migrate_out="$(npm run db:migrate:deploy 2>&1)"
+migrate_status=$?
+set -e
+printf '%s\n' "$migrate_out"
+
+if [ "$migrate_status" -ne 0 ]; then
+  if printf '%s\n' "$migrate_out" | grep -q '20260625000000_finance_durability' \
+    && printf '%s\n' "$migrate_out" | grep -q 'P3018'; then
+    echo "Marking failed finance_durability as rolled back (UTF-8 BOM; no SQL applied)..."
+    npm run migrate:resolve:finance-durability -w @telpen/database
+    npm run db:migrate:deploy
+  else
+    exit "$migrate_status"
+  fi
+fi
 
 if [ "${SKIP_DB_SEED:-}" = "true" ]; then
   echo "Skipping reference-data seed (SKIP_DB_SEED=true)."

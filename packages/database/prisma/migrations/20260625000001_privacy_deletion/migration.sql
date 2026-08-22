@@ -1,4 +1,4 @@
-﻿CREATE TABLE "AccountDeletionRequest" (
+CREATE TABLE "AccountDeletionRequest" (
   "id" TEXT NOT NULL DEFAULT gen_random_uuid(),
   "tenantId" TEXT NOT NULL,
   "userId" TEXT NOT NULL,
