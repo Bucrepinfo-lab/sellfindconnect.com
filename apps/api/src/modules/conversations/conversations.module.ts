@@ -5,6 +5,7 @@ import { requireDatabaseUrl, resolvePersistenceMode } from '../../persistence';
 import { AuthModule } from '../auth/auth.module';
 import { MediaModule } from '../media/media.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { UgcModule } from '../ugc/ugc.module';
 import { ConversationsController } from './conversations.controller';
 import { ConversationsGateway } from './conversations.gateway';
 import { CONVERSATIONS_REPOSITORY } from './conversations.repository';
@@ -13,7 +14,7 @@ import { ConversationsService } from './conversations.service';
 import { InMemoryConversationsRepository } from './in-memory-conversations.repository';
 
 @Module({
-  imports: [AuthModule, MediaModule, NotificationsModule],
+  imports: [AuthModule, MediaModule, NotificationsModule, UgcModule],
   controllers: [ConversationsController],
   providers: [
     InMemoryConversationsRepository,

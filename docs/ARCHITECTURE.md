@@ -128,7 +128,9 @@ without validating it against the authenticated user's assignments.
   See `docs/MEDIA_PIPELINE.md` for storage mode and worker queue configuration.
 - Safety: blocked categories, policy decisions, media review cases, and
   tenant UGC reports/blocks (`POST /v1/ugc/reports`, `POST /v1/ugc/blocks`,
-  moderator `GET /v1/platform/ugc/reports`).
+  moderator `GET /v1/platform/ugc/reports`). Blocked Source Finder ids are
+  omitted from that tenant’s search and alerts. Conversation create/send,
+  media, typing, and lead inquiry fail closed until the tenant unblocks.
 - Discovery: Source Finder, search, filters, reason codes, saved searches,
   cadence-backed opportunity alerts, and consent-gated outcome feedback.
   Tenant Source Finder routes require an MFA-verified tenant session. Opt-in
@@ -153,7 +155,8 @@ without validating it against the authenticated user's assignments.
   routes require an MFA-verified tenant session.
 - Matching: rules first, then semantic and graph ranking.
 - Conversations: inquiries, chat, RFQs, quotes, assignment, saved replies,
-  response SLAs, message safety checks, delivery/read receipts, typing
+  response SLAs, message safety checks, tenant UGC block enforcement,
+  delivery/read receipts, typing
   indicators, unread counts, tenant-only attachments with malware/moderation
   gates, session-authenticated Socket.IO delivery, online presence, and
   notification alerts. Lead and conversation
@@ -198,6 +201,7 @@ Zero-tolerance policy validation runs at:
 5. Matching and recommendation generation.
 6. Chat and inquiry submission.
 7. Paid promotion and payment eligibility.
+8. Tenant UGC blocks on conversation, inquiry, and Source Finder writes.
 
 Policy decisions are audit logged with rule identifier, matched signal, source
 surface, action, reviewer when applicable, and timestamp.

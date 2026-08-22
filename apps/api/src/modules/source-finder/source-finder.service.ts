@@ -19,6 +19,7 @@ import {
   defaultNotificationPreferences,
   evaluateSafetyFields,
   evaluateSafetyText,
+  filterBlockedSourceFinderResults,
   getCountry,
   industryCategories,
   isOpportunityAlertDue,
@@ -39,6 +40,7 @@ import { randomUUID } from 'node:crypto';
 import type { AuthService } from '../auth/auth.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RelationshipsService } from '../relationships/relationships.service';
+import { UgcService } from '../ugc/ugc.service';
 import type {
   CreateSavedSourceFinderSearchDto,
   RecordSourceFinderOutcomeDto,
@@ -69,6 +71,7 @@ export class SourceFinderService {
     @Optional()
     @Inject(SOURCE_FINDER_EMBEDDER)
     embedder?: SourceFinderEmbedder | null,
+    @Optional() private readonly ugc?: UgcService,
   ) {
     this.repository = repository ?? new InMemorySourceFinderRepository();
     this.embedder = embedder ?? undefined;
@@ -90,9 +93,13 @@ export class SourceFinderService {
     const rankedHits = attachSourceFinderEmbeddingRanks(hits, indexedDocuments, queryEmbedding);
     const ranked = rankSourceFinderWithFullText(input, records, rankedHits);
     const feedback = tenantId ? await this.repository.listOutcomeFeedback(tenantId) : [];
-    const results = applySourceFinderOutcomes(ranked, feedback, {
+    const rankedResults = applySourceFinderOutcomes(ranked, feedback, {
       behavioralMatchingConsent: input.behavioralMatchingConsent === true,
     });
+    const blocks = tenantId && this.ugc ? await this.ugc.listBlocks(tenantId) : [];
+    const results = tenantId
+      ? filterBlockedSourceFinderResults(rankedResults, blocks, tenantId)
+      : rankedResults;
     const ftsHitCount = rankedHits.filter((hit) => hit.ftsRank > 0).length;
     const embeddingHitCount = rankedHits.filter((hit) => (hit.embeddingRank ?? 0) > 0).length;
     const searchMode = resolveSourceFinderSearchMode({
@@ -176,6 +183,9 @@ export class SourceFinderService {
   ): Promise<SourceFinderOutcomeFeedback> {
     this.assertSafe(input, 'Source Finder outcome contains blocked content.');
     await this.requireSource(input.sourceRecordId);
+    if (tenantId) {
+      await this.ugc?.requireUnblocked(tenantId, input.sourceRecordId);
+    }
 
     const feedback = this.runDomain(() =>
       createSourceFinderOutcomeFeedback(input, { tenantId, id: randomUUID() }),
@@ -236,7 +246,15 @@ export class SourceFinderService {
   }
 
   async listOpportunityAlerts(tenantId: string): Promise<SourceFinderOpportunityAlert[]> {
-    return this.repository.listOpportunityAlerts(tenantId);
+    const alerts = await this.repository.listOpportunityAlerts(tenantId);
+    if (!this.ugc) {
+      return alerts;
+    }
+
+    const blocked = new Set(
+      (await this.ugc.listBlocks(tenantId)).map((block) => block.blockedTargetId),
+    );
+    return alerts.filter((alert) => !blocked.has(alert.sourceRecordId));
   }
 
   async runOpportunityAlerts(
@@ -275,8 +293,10 @@ export class SourceFinderService {
         ),
         limit,
       );
+      const blocks = this.ugc ? await this.ugc.listBlocks(tenantId) : [];
+      const visibleResults = filterBlockedSourceFinderResults(results, blocks, tenantId);
 
-      for (const result of results) {
+      for (const result of visibleResults) {
         const existing = await this.repository.findOpportunityAlert(
           tenantId,
           search.id,

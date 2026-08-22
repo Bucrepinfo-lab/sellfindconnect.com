@@ -7,6 +7,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import {
+  blockedTargetContinueMessage,
   createUserBlock,
   createUserContentReport,
   resolveUserContentReport,
@@ -114,6 +115,16 @@ export class UgcService {
 
   async listBlocks(tenantId: string): Promise<UserBlock[]> {
     return this.repository.listBlocks(tenantId);
+  }
+
+  async isBlocked(tenantId: string, targetId: string): Promise<boolean> {
+    return Boolean(await this.repository.findBlock(tenantId, targetId));
+  }
+
+  async requireUnblocked(tenantId: string, targetId: string): Promise<void> {
+    if (await this.isBlocked(tenantId, targetId)) {
+      throw new UnprocessableEntityException(blockedTargetContinueMessage);
+    }
   }
 
   async removeBlock(tenantId: string, userId: string, blockedTargetId: string): Promise<UserBlock> {

@@ -190,6 +190,9 @@ export function createUserBlock(
   };
 }
 
+export const blockedTargetContinueMessage =
+  'This account is blocked. Unblock it before continuing.';
+
 export function isTargetBlocked(
   blocks: UserBlock[],
   tenantId: string,
@@ -198,6 +201,16 @@ export function isTargetBlocked(
   return blocks.some(
     (block) => block.tenantId === tenantId && block.blockedTargetId === targetId,
   );
+}
+
+export function assertTargetNotBlocked(
+  blocks: UserBlock[],
+  tenantId: string,
+  targetId: string,
+): void {
+  if (isTargetBlocked(blocks, tenantId, targetId)) {
+    throw new UgcModerationError(blockedTargetContinueMessage);
+  }
 }
 
 export function filterBlockedSourceFinderResults<T extends { id: string }>(

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional, UnprocessableEntityException } from '@nestjs/common';
 import {
   buildLeadConversionIntelligence,
   evaluateSafetyFields,
@@ -11,6 +11,7 @@ import {
 } from '@telpen/domain';
 import { randomUUID } from 'node:crypto';
 
+import { UgcService } from '../ugc/ugc.service';
 import type {
   CreateInquiryDto,
   CreateMatchFeedbackDto,
@@ -31,9 +32,12 @@ export class LeadsService {
   private readonly feedback = new Map<string, MatchFeedbackRecord>();
   private readonly leads = new Map<string, LeadRecord>();
 
-  recordMatchFeedback(tenantId: string, input: CreateMatchFeedbackDto): MatchFeedbackRecord {
+  constructor(@Optional() private readonly ugc?: UgcService) {}
+
+  async recordMatchFeedback(tenantId: string, input: CreateMatchFeedbackDto): Promise<MatchFeedbackRecord> {
     this.assertSafe(input, 'Match feedback contains blocked content.');
     this.requireSource(input.sourceRecordId);
+    await this.ugc?.requireUnblocked(tenantId, input.sourceRecordId);
 
     const now = new Date().toISOString();
     const feedback: MatchFeedbackRecord = {
@@ -55,12 +59,13 @@ export class LeadsService {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
-  createInquiry(tenantId: string, input: CreateInquiryDto): LeadRecord {
+  async createInquiry(tenantId: string, input: CreateInquiryDto): Promise<LeadRecord> {
     if (!input.acceptedTerms) {
       throw new UnprocessableEntityException('Current terms acceptance is required before inquiry.');
     }
 
     this.assertSafe(input, 'Inquiry contains blocked content.');
+    await this.ugc?.requireUnblocked(tenantId, input.sourceRecordId);
     const source = this.getSourceResult(input.sourceRecordId, input.query);
     const intelligence = buildLeadConversionIntelligence(source);
     const now = new Date().toISOString();

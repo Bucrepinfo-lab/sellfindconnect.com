@@ -1,7 +1,7 @@
 # Product Requirements Document: Multi-Tenant Advertising SaaS
 
 Date: 2026-06-15
-Last updated: 2026-08-21
+Last updated: 2026-08-22
 Owner: Telpen Adverts
 Working name: Telpen Adverts Platform
 Status: Draft for validation
@@ -1141,6 +1141,10 @@ Implementation progress on 2026-06-17:
   APIs plus Source Finder Report/Block controls. Moderators close reports.
   Product audit omits report details. This is the Play UGC report/block
   control; native Play remains out of scope.
+- Continued implementation on 2026-08-22 so a tenant block is enforced on
+  conversation create/send/media/typing, lead inquiry, Source Finder search
+  and opportunity alerts, not only the home result list. Unblock restores
+  messaging; SLA checks skip blocked targets.
 - Remaining hardening: app-store billing rails are out of scope while native
   mobile is not in delivery. A future Google Play listing must use Play Billing
   for the digital SaaS subscription. Web/PWA STK Push stays on the login phone.
