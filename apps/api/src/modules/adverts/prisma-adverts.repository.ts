@@ -332,6 +332,24 @@ export class PrismaAdvertsRepository implements AdvertsRepository {
     return records.map((record) => this.mapDiscoveryAlert(record));
   }
 
+  async eraseTenantHoldings(tenantId: string): Promise<{ adverts: number; media: number }> {
+    const [, , , , media, published, drafts] = await this.prisma.$transaction([
+        this.prisma.advertDiscoveryAlert.deleteMany({ where: { tenantId } }),
+        this.prisma.savedAdvertSearch.deleteMany({ where: { tenantId } }),
+        this.prisma.advertDiscoveryIndex.deleteMany({ where: { tenantId } }),
+        this.prisma.advertLifecycleNotification.deleteMany({ where: { tenantId } }),
+        this.prisma.mediaAsset.deleteMany({
+          where: { tenantId, ownerType: { in: ['ADVERT', 'ADVERT_DRAFT'] } },
+        }),
+        this.prisma.publishedAdvert.deleteMany({ where: { tenantId } }),
+        this.prisma.advertDraft.deleteMany({ where: { tenantId } }),
+      ]);
+    return {
+      adverts: published.count + drafts.count,
+      media: media.count,
+    };
+  }
+
   private mapDraftToPrisma(draft: AdvertDraft): Prisma.AdvertDraftUncheckedCreateInput {
     return {
       id: draft.id,

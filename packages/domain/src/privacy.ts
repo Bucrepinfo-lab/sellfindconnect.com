@@ -16,6 +16,50 @@ export interface DataExportRequest {
 
 export const DELETION_GRACE_DAYS = 30;
 
+export const ACCOUNT_ERASE_CATEGORIES = [
+  'PROFILE',
+  'ADVERTS',
+  'CONVERSATIONS',
+  'MEDIA',
+] as const satisfies readonly DataCategory[];
+
+export const ACCOUNT_RETAIN_CATEGORIES = [
+  'ANALYTICS',
+  'BILLING',
+  'AUTH_LOGS',
+] as const satisfies readonly DataCategory[];
+
+export type AccountEraseCounts = {
+  profiles: number;
+  adverts: number;
+  conversations: number;
+  media: number;
+};
+
+export function emptyAccountEraseCounts(): AccountEraseCounts {
+  return { profiles: 0, adverts: 0, conversations: 0, media: 0 };
+}
+
+export function planAccountErase(): {
+  erase: readonly DataCategory[];
+  retain: readonly DataCategory[];
+} {
+  return {
+    erase: ACCOUNT_ERASE_CATEGORIES,
+    retain: ACCOUNT_RETAIN_CATEGORIES,
+  };
+}
+
+export function isDeletionDue(
+  request: Pick<DeletionRequest, 'status' | 'scheduledAt'>,
+  now: string,
+): boolean {
+  if (request.status !== 'REQUESTED' && request.status !== 'PROCESSING') {
+    return false;
+  }
+  return Date.parse(request.scheduledAt) <= Date.parse(now);
+}
+
 export const DATA_INVENTORY = {
   PROFILE:       { label: 'Business profile',    description: 'Your public profile, contact details, service area, and industry classification.', deletedWith: 'ACCOUNT' as const },
   ADVERTS:       { label: 'Adverts and listings', description: 'All adverts you have published, including drafts, expired, and archived listings.', deletedWith: 'ACCOUNT' as const },

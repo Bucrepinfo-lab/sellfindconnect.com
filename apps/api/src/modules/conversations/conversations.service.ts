@@ -940,4 +940,8 @@ export class ConversationsService {
       throw error;
     }
   }
+
+  async eraseTenantAccountHoldings(tenantId: string) {
+    return this.repository.eraseTenantHoldings(tenantId);
+  }
 }

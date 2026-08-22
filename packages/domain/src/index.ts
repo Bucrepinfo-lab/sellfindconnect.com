@@ -29,14 +29,20 @@ export * from './notification-templates';
 export {
   DELETION_GRACE_DAYS,
   DATA_INVENTORY,
+  ACCOUNT_ERASE_CATEGORIES,
+  ACCOUNT_RETAIN_CATEGORIES,
   formatDate,
   addDays as addDaysIso,
+  planAccountErase,
+  isDeletionDue,
+  emptyAccountEraseCounts,
 } from './privacy';
 export type {
   DeletionStatus,
   DataCategory,
   DeletionRequest,
   DataExportRequest,
+  AccountEraseCounts,
 } from './privacy';
 export * from './search';
 export * from './profiles';

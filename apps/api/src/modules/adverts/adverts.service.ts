@@ -1597,4 +1597,8 @@ export class AdvertsService {
       Object.entries(input).filter(([, value]) => value !== undefined),
     ) as Partial<CreateAdvertDto>;
   }
+
+  async eraseTenantAccountHoldings(tenantId: string) {
+    return this.repository.eraseTenantHoldings(tenantId);
+  }
 }

@@ -1104,6 +1104,10 @@ export class AuthService {
     await this.recordAudit(input);
   }
 
+  async revokeSessionsForAccountDeletion(userId: string): Promise<void> {
+    await this.repository.revokeSessionsForUser(userId, new Date().toISOString());
+  }
+
   async hasCurrentTermsAcceptance(userId: string, tenantId: string): Promise<boolean> {
     const evidence = await this.repository.findTermsAcceptance(userId, tenantId);
     return Boolean(

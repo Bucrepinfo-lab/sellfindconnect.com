@@ -867,4 +867,8 @@ export class ProfilesService {
       Object.entries(input).filter(([, value]) => value !== undefined),
     ) as Partial<CreateProfileDraftDto>;
   }
+
+  async eraseTenantAccountHoldings(tenantId: string) {
+    return this.repository.eraseTenantHoldings(tenantId);
+  }
 }

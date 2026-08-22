@@ -63,10 +63,12 @@ Play User Data requires:
 
 Current gaps before a Play listing:
 
-- Privacy APIs persist in process memory only. A Play listing needs durable
-  deletion (grace period, erase profile/adverts/media/conversations, retain
-  billing/audit per tax law) and a worker that completes `PROCESSING` →
-  `COMPLETED`.
+- Durable deletion exists in code: 30-day grace, then
+  `POST /v1/operations/privacy/deletions/run` erases profile/adverts/media/
+  conversations, revokes sessions, retains billing/analytics/auth-audit, and
+  writes `ACCOUNT_DELETION_COMPLETED` without the user's reason text. Persist
+  it with `PRIVACY_REPOSITORY=prisma` or `PERSISTENCE_DRIVER=prisma` against
+  the existing `AccountDeletionRequest` tables.
 - Production Fly web (verified 2026-08-21) still 404s `/privacy` and
   `/account/delete` because the live image is behind `main`. Redeploy web before
   pointing Play Console at those URLs.

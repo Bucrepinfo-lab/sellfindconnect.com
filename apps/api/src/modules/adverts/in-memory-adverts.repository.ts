@@ -177,6 +177,50 @@ export class InMemoryAdvertsRepository implements AdvertsRepository {
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
   }
 
+  eraseTenantHoldings(tenantId: string): { adverts: number; media: number } {
+    let adverts = 0;
+    let media = 0;
+    for (const [key, draft] of this.drafts) {
+      if (draft.tenantId === tenantId) {
+        this.drafts.delete(key);
+        adverts += 1;
+      }
+    }
+    for (const [key, advert] of this.publishedAdverts) {
+      if (advert.tenantId === tenantId) {
+        this.publishedAdverts.delete(key);
+        adverts += 1;
+      }
+    }
+    for (const [key, asset] of this.mediaAssets) {
+      if (asset.tenantId === tenantId) {
+        this.mediaAssets.delete(key);
+        media += 1;
+      }
+    }
+    for (const [key, notification] of this.notifications) {
+      if (notification.tenantId === tenantId) {
+        this.notifications.delete(key);
+      }
+    }
+    for (const [key, record] of this.discoveryIndex) {
+      if (record.tenantId === tenantId) {
+        this.discoveryIndex.delete(key);
+      }
+    }
+    for (const [key, record] of this.savedSearches) {
+      if (record.tenantId === tenantId) {
+        this.savedSearches.delete(key);
+      }
+    }
+    for (const [key, record] of this.discoveryAlerts) {
+      if (record.tenantId === tenantId) {
+        this.discoveryAlerts.delete(key);
+      }
+    }
+    return { adverts, media };
+  }
+
   private key(tenantId: string, id: string): string {
     return `${tenantId}:${id}`;
   }

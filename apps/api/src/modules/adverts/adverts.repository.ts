@@ -134,4 +134,5 @@ export interface AdvertsRepository {
     advertId: string,
   ): RepositoryResult<AdvertDiscoveryAlertRecord | undefined>;
   listDiscoveryAlerts(tenantId: string): RepositoryResult<AdvertDiscoveryAlertRecord[]>;
+  eraseTenantHoldings(tenantId: string): RepositoryResult<{ adverts: number; media: number }>;
 }

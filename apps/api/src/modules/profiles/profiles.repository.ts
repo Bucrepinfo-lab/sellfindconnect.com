@@ -27,4 +27,5 @@ export interface ProfilesRepository {
   publishProfile(records: ProfilePublishRecords): RepositoryResult<void>;
   findLiveProfile(tenantId: string): RepositoryResult<PublishedProfile | undefined>;
   listPublishedProfiles(tenantId: string): RepositoryResult<PublishedProfile[]>;
+  eraseTenantHoldings(tenantId: string): RepositoryResult<{ profiles: number; media: number }>;
 }

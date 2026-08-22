@@ -32,4 +32,4 @@ Web/PWA rails: Stripe and/or Africa's Talking M-Pesa. A Google Play APK would ne
 1. `fly deploy` web + API from current `main`
 2. Hosted Postgres + migrations/seed + `PERSISTENCE_DRIVER=prisma` only when `DATABASE_URL` is set
 3. Enable scheduled jobs against `https://api.sellfindconnect.com/v1`
-4. Durable account-deletion worker before any Play listing
+4. Durable account-deletion worker is in code; enable the daily sweep after Fly redeploy + `INTERNAL_JOB_KEY`

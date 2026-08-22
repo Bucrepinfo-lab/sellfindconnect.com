@@ -234,6 +234,17 @@ export class PrismaProfilesRepository implements ProfilesRepository {
     return profiles.map((profile) => this.mapPublishedProfile(profile));
   }
 
+  async eraseTenantHoldings(tenantId: string): Promise<{ profiles: number; media: number }> {
+    const [media, published, drafts] = await this.prisma.$transaction([
+      this.prisma.mediaAsset.deleteMany({
+        where: { tenantId, ownerType: { in: ['PROFILE_DRAFT', 'PUBLISHED_PROFILE'] } },
+      }),
+      this.prisma.publishedProfile.deleteMany({ where: { tenantId } }),
+      this.prisma.profileDraft.deleteMany({ where: { tenantId } }),
+    ]);
+    return { profiles: published.count + drafts.count, media: media.count };
+  }
+
   private mapDraft(draft: PrismaProfileDraft): ProfileDraft {
     return {
       id: draft.id,

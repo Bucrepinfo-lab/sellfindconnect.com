@@ -236,6 +236,16 @@ export class PrismaConversationsRepository implements ConversationsRepository {
     return records.map((record) => this.fromMediaAsset(record));
   }
 
+  async eraseTenantHoldings(tenantId: string): Promise<{ conversations: number; media: number }> {
+    const [media, notifications, messages, conversations] = await this.prisma.$transaction([
+      this.prisma.mediaAsset.deleteMany({ where: { tenantId, ownerType: 'CONVERSATION' } }),
+      this.prisma.conversationNotification.deleteMany({ where: { tenantId } }),
+      this.prisma.conversationMessage.deleteMany({ where: { tenantId } }),
+      this.prisma.conversation.deleteMany({ where: { tenantId } }),
+    ]);
+    return { conversations: conversations.count, media: media.count };
+  }
+
   private toConversationData(conversation: ConversationRecord) {
     return {
       id: conversation.id,

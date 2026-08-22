@@ -45,4 +45,5 @@ export interface ConversationsRepository {
     mediaId: string,
   ): RepositoryResult<MediaAsset | undefined>;
   listMediaAssets(tenantId: string, conversationId: string): RepositoryResult<MediaAsset[]>;
+  eraseTenantHoldings(tenantId: string): RepositoryResult<{ conversations: number; media: number }>;
 }

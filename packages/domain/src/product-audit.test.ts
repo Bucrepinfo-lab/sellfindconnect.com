@@ -91,6 +91,9 @@ describe('product audit helpers', () => {
     expect(describeProductAuditAction('PAYMENT_CHECKOUT_REQUESTED')).toBe(
       'Mobile checkout requested',
     );
+    expect(describeProductAuditAction('ACCOUNT_DELETION_COMPLETED')).toBe(
+      'Account deletion completed',
+    );
   });
 
   it('filters tenant audit lookups by action and entity type', () => {

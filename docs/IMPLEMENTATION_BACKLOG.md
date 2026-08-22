@@ -168,8 +168,11 @@ Progress:
   `GET /v1/audit` filters by action or entity type. Native mobile and Play
   Billing remain out of scope; see `docs/PLAY_STORE.md`.
 - Account deletion and privacy policy routes are mounted: `GET /privacy`,
-  `/account/delete`, and tenant-session `/v1/privacy/*`. Deletion still
-  persists in process memory until a durable privacy worker is added.
+  `/account/delete`, and tenant-session `/v1/privacy/*`. A grace-period worker
+  at `POST /v1/operations/privacy/deletions/run` now completes due deletions:
+  erase profile/adverts/conversations/media, revoke sessions, retain
+  billing/analytics/auth-audit. Default store is in-memory; Prisma overlays
+  the existing `AccountDeletionRequest` tables.
 
 ## Epic 3: Advertiser Profile Vertical Slice
 
@@ -581,5 +584,6 @@ Progress:
 2. Enable `PERSISTENCE_DRIVER=prisma` only after hosted `DATABASE_URL` and
    migrations/seed are verified; confirm `/v1/health` persistence mode.
 3. Turn on scheduled jobs against `https://api.sellfindconnect.com/v1`.
-4. Durable account-deletion worker (Play User Data) before any Play listing.
+4. Redeploy Fly so `/privacy` and `/account/delete` return HTTP 200, then
+   enable the daily deletion sweep with `INTERNAL_JOB_KEY`.
 5. Do not start a native Play app until Play Billing exists.

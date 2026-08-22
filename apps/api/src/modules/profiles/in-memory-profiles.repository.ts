@@ -79,6 +79,31 @@ export class InMemoryProfilesRepository implements ProfilesRepository {
       .sort((a, b) => b.version - a.version);
   }
 
+  eraseTenantHoldings(tenantId: string): { profiles: number; media: number } {
+    let profiles = 0;
+    let media = 0;
+    for (const [key, draft] of this.drafts) {
+      if (draft.tenantId === tenantId) {
+        this.drafts.delete(key);
+        profiles += 1;
+      }
+    }
+    for (const [key, profile] of this.publishedProfiles) {
+      if (profile.tenantId === tenantId) {
+        this.publishedProfiles.delete(key);
+        profiles += 1;
+      }
+    }
+    for (const [key, asset] of this.mediaAssets) {
+      if (asset.tenantId === tenantId) {
+        this.mediaAssets.delete(key);
+        media += 1;
+      }
+    }
+    this.liveProfileByTenant.delete(tenantId);
+    return { profiles, media };
+  }
+
   private key(tenantId: string, id: string): string {
     return `${tenantId}:${id}`;
   }

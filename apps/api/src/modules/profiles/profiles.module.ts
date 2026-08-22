@@ -33,5 +33,6 @@ import { ProfilesService } from './profiles.service';
     },
     ProfilesService,
   ],
+  exports: [ProfilesService],
 })
 export class ProfilesModule {}

@@ -127,6 +127,39 @@ export class InMemoryConversationsRepository implements ConversationsRepository 
       .sort((left, right) => left.displayOrder - right.displayOrder || left.createdAt.localeCompare(right.createdAt));
   }
 
+  eraseTenantHoldings(tenantId: string): { conversations: number; media: number } {
+    let conversations = 0;
+    let media = 0;
+    for (const [key, conversation] of this.conversations) {
+      if (conversation.tenantId === tenantId) {
+        this.conversations.delete(key);
+        conversations += 1;
+      }
+    }
+    for (const key of this.messages.keys()) {
+      if (key.startsWith(`${tenantId}:`)) {
+        this.messages.delete(key);
+      }
+    }
+    for (const [key, notification] of this.notifications) {
+      if (notification.tenantId === tenantId) {
+        this.notifications.delete(key);
+      }
+    }
+    for (const [key, asset] of this.mediaAssets) {
+      if (asset.tenantId === tenantId) {
+        this.mediaAssets.delete(key);
+        media += 1;
+      }
+    }
+    for (const key of [...this.slaAlertKeys]) {
+      if (key.startsWith(`${tenantId}:`)) {
+        this.slaAlertKeys.delete(key);
+      }
+    }
+    return { conversations, media };
+  }
+
   private key(tenantId: string, id: string): string {
     return `${tenantId}:${id}`;
   }

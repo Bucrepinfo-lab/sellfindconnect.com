@@ -31,6 +31,7 @@ export const productAuditActions = [
   'PAYMENT_CAPTURE_SETTLED',
   'PAYMENT_CHECKOUT_REQUESTED',
   'PAYMENT_PAYOUT_REQUESTED',
+  'ACCOUNT_DELETION_COMPLETED',
 ] as const;
 
 export type ProductAuditAction = (typeof productAuditActions)[number];
@@ -163,6 +164,8 @@ export function describeProductAuditAction(action: string): string {
       return 'Mobile checkout requested';
     case 'PAYMENT_PAYOUT_REQUESTED':
       return 'Mobile payout requested';
+    case 'ACCOUNT_DELETION_COMPLETED':
+      return 'Account deletion completed';
     default:
       return action.replaceAll('_', ' ').toLowerCase();
   }

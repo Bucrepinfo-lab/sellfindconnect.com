@@ -1361,6 +1361,38 @@ model FinanceWorkbenchRecord {
   @@index([collection, countryCode])
 }
 
+model AccountDeletionRequest {
+  id          String    @id @default(uuid())
+  tenantId    String
+  userId      String
+  status      String    @default("REQUESTED") @db.VarChar(20)
+  reason      String?
+  requestedAt DateTime  @default(now())
+  scheduledAt DateTime
+  cancelledAt DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([tenantId, userId])
+  @@index([status, scheduledAt])
+}
+
+model DataExportRequest {
+  id          String    @id @default(uuid())
+  tenantId    String
+  userId      String
+  status      String    @default("QUEUED") @db.VarChar(20)
+  downloadUrl String?   @db.VarChar(1000)
+  expiresAt   DateTime?
+  requestedAt DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([tenantId, userId])
+  @@index([status, expiresAt])
+}
+
 // ─── Payments (M-Pesa / mobile money via Africa's Talking) ─────────────────────
 
 model PaymentTxn {
