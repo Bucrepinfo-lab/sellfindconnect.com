@@ -163,6 +163,10 @@ Progress:
   without `DATABASE_URL`. Per-repository `memory` overrides still win. Tests
   stay on the in-memory default. `GET /v1/health` reports driver and
   `databaseConfigured` without the URL.
+- Fly `sellfindconnect-api` now copies Prisma schema/migrations into the image
+  and runs `deploy/api-release.sh` as `release_command` (migrate, then
+  idempotent seed) before traffic shifts. `fly.api.toml` sets
+  `PERSISTENCE_DRIVER=prisma`. GitHub Actions cron for scheduled jobs is on.
 - Broader non-auth product audit coverage now includes analytics exports,
   privacy/retention/rollup jobs, invoices, and payment checkout/payout.
   `GET /v1/audit` filters by action or entity type. Native mobile and Play
@@ -580,10 +584,9 @@ Progress:
 
 ## Immediate Sprint
 
-1. Redeploy Fly web + API from current `main` (`docs/FLY_DEPLOYMENT.md`).
-2. Enable `PERSISTENCE_DRIVER=prisma` only after hosted `DATABASE_URL` and
-   migrations/seed are verified; confirm `/v1/health` persistence mode.
-3. Turn on scheduled jobs against `https://api.sellfindconnect.com/v1`.
-4. Redeploy Fly so `/privacy` and `/account/delete` return HTTP 200, then
-   enable the daily deletion sweep with `INTERNAL_JOB_KEY`.
-5. Do not start a native Play app until Play Billing exists.
+1. Deploy the hosted-Prisma API image (`fly deploy --config fly.api.toml`)
+   so `release_command` migrates/seeds, then confirm
+   `GET /v1/health` `persistence.mode` is `prisma` (`docs/FLY_DEPLOYMENT.md`).
+2. Set Fly `INTERNAL_JOB_KEY` and GitHub Actions secrets `API_BASE_URL` +
+   `INTERNAL_JOB_KEY`, then smoke-test **Scheduled jobs** via workflow_dispatch.
+3. Do not start a native Play app until Play Billing exists.

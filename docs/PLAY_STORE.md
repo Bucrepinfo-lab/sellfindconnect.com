@@ -66,12 +66,13 @@ Current gaps before a Play listing:
 - Durable deletion exists in code: 30-day grace, then
   `POST /v1/operations/privacy/deletions/run` erases profile/adverts/media/
   conversations, revokes sessions, retains billing/analytics/auth-audit, and
-  writes `ACCOUNT_DELETION_COMPLETED` without the user's reason text. Persist
-  it with `PRIVACY_REPOSITORY=prisma` or `PERSISTENCE_DRIVER=prisma` against
-  the existing `AccountDeletionRequest` tables.
-- Production Fly web (verified 2026-08-21) still 404s `/privacy` and
-  `/account/delete` because the live image is behind `main`. Redeploy web before
-  pointing Play Console at those URLs.
+  writes `ACCOUNT_DELETION_COMPLETED` without the user's reason text. Hosted
+  Prisma (`PERSISTENCE_DRIVER=prisma`) plus the daily scheduled-jobs sweep
+  make that durable in production after the Fly API image in this change is
+  deployed.
+- Production Fly web (verified 2026-08-22) serves `/privacy` and
+  `/account/delete` (HTTP 200). Keep those URLs live before a Play Console
+  listing.
 - Deletion UI must send `x-session-token` and `x-tenant-id`; it must not be a
   dead form.
 

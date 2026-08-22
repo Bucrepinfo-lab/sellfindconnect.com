@@ -342,7 +342,8 @@ GitHub source connection status on 2026-06-16:
   - `NODE_ENV=production`
   - `WEB_ORIGIN=https://adverts.telpen.net`
   - `DATABASE_URL` supplied by the production PostgreSQL service
-  - `PERSISTENCE_DRIVER=prisma` after migrations are deployed. Named `live`
+  - `PERSISTENCE_DRIVER=prisma` after the API image `release_command` has
+    applied migrations (and seed). Named `live`
     fail-closes without `DATABASE_URL`. Per-repository keys such as
     `AUTH_REPOSITORY=memory` still override the overlay. `GET /v1/health`
     reports driver, mode, and `databaseConfigured` without the URL.

@@ -6,10 +6,17 @@ primary_region = "fra"
 [build]
 dockerfile = "deploy/api.Dockerfile"
 
+[deploy]
+  # Runs on a throwaway machine with Fly secrets before traffic shifts.
+  # Applies Prisma migrations, then seeds continents/countries/industries.
+  release_command = "sh /app/deploy/api-release.sh"
+
 [env]
 PORT = "8080"
 NODE_ENV = "production"
-# WEB_ORIGIN + repository/provider flags are set via `fly secrets` (see deploy notes).
+# Selected only after release_command succeeds. DATABASE_URL stays a Fly secret.
+PERSISTENCE_DRIVER = "prisma"
+# WEB_ORIGIN + INTERNAL_JOB_KEY + provider flags are set via `fly secrets`.
 
 [http_service]
 internal_port = 8080

@@ -1216,7 +1216,8 @@ model FinanceAlert {
   createdAt           DateTime           @default(now())
   countryTaxProfile   CountryTaxProfile  @relation(fields: [countryTaxProfileId], references: [id], onDelete: Cascade)
   assignedTo          User?              @relation("FinanceAlertAssignee", fields: [assignedToUserId], references: [id])
-dedupeKey String? @unique
+  dedupeKey           String?            @unique
+
   @@index([status, dueAt])
   @@index([assignedToUserId])
 }
@@ -1232,9 +1233,10 @@ model ReconciliationRun {
   varianceAmount Decimal  @db.Decimal(18, 4)
   status         String   @db.VarChar(80)
   createdAt      DateTime @default(now())
-tenantId     String?
-  variances    Json?
-  matchedCount Int     @default(0)
+  tenantId       String?
+  variances      Json?
+  matchedCount   Int      @default(0)
+
   @@index([countryCode, periodStart, periodEnd])
 }
 
