@@ -88,8 +88,13 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - Whether to include public reviews in MVP or Phase 2.
 - Whether to use managed search/chat/analytics providers for speed or self-hosted/open-source components for control.
 - Which tax provider or provider combination will be used for each launch country.
+  Recommended default: stay merchant of record; Stripe Tax / finance-module
+  rules for rates; Kenyan tax agent files iTax. Merchant-of-Record (Paddle)
+  only if STK is dropped as the SaaS seller. See `docs/TAX_COMPLIANCE_RESEARCH.md`.
 - Which accounting system the finance module must export to or integrate with.
 - Named Country Finance Admin and external tax advisor for each launch country.
+  This is a remote role (owner + local tax agent), not a requirement to travel
+  or incorporate in that country.
 - Approved fallback process where external tax providers do not support a country or tax type.
 
 ## Decision Log
@@ -236,7 +241,12 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   threshold 0) into the finance workbench store and never overwrites an
   APPROVED row. STK checkout fail-closes with `tax_profile` and
   `PAYMENT_CHECKOUT_BLOCKED` until a human sets `approvedBy`.
-  `GET /v1/finance/launch-readiness` reports the gate. The web Finance
-  Readiness panel no longer claims the profile is approved. Owner/CPA still
-  must name a Country Finance Admin, decide Significant Economic Presence tax,
-  and complete KRA PIN / eTIMS registration before paid subscribers.
+- 2026-08-22: Researched remote multi-country tax remittance. Digital-service
+  competitors (Google/Meta/Netflix-style and Stripe Tax SaaS) register on
+  non-resident portals and file online; they do not travel or open an office
+  per customer country. Kenya: iTax simplified DMS VAT or a tax representative;
+  eTIMS is not required for that path (KRA DMS FAQ). Jumia/Jiji local-entity
+  models are for on-the-ground marketplaces. Merchant-of-Record (Paddle)
+  remits Kenya 16% VAT but conflicts with login-phone STK as seller of record.
+  Recommended: stay merchant of record, Kenya-first remote iTax plus one
+  Kenyan agent, OSS later for the EU. See `docs/TAX_COMPLIANCE_RESEARCH.md`.

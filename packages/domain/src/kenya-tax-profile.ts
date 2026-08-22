@@ -14,9 +14,13 @@ import type { FilingFrequency, TaxProfileStatus } from './finance';
  *   register for VAT even below the KES 5 million resident threshold.
  *
  * Open questions for the owner/CPA (do not invent answers in code):
- * - Whether Significant Economic Presence tax applies to this operator.
- * - KRA PIN / eTIMS registration before the first paid invoice.
- * - Named Country Finance Admin and external tax advisor.
+ * - Confirm the operator is a non-resident with no Kenyan permanent establishment.
+ * - File KRA simplified digital-marketplace VAT on iTax (or appoint a Kenyan
+ *   tax representative). eTIMS is not required on that non-resident path
+ *   (KRA DMS FAQ Q20 / Q27). See `docs/TAX_COMPLIANCE_RESEARCH.md`.
+ * - Whether Significant Economic Presence tax (successor to DST; effective 3%
+ *   of gross per PwC Kenya 2026 notes) applies to this entity.
+ * - Named iTax contact / remote Country Finance Admin (owner + tax agent).
  */
 export const kenyaPilotTaxProfileId = 'ke-pilot-country-tax-profile';
 export const kenyaPilotVatRuleId = 'ke-vat-sfc-subscription';

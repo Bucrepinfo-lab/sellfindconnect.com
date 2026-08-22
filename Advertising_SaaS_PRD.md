@@ -1108,6 +1108,15 @@ Implementation progress on 2026-06-17:
   `GET /v1/finance/launch-readiness` reports the gate. The Finance Readiness
   panel shows Draft — not approved. Significant Economic Presence tax and KRA
   PIN / eTIMS registration remain owner/CPA open questions.
+- Continued implementation on 2026-08-22 with a DRAFT Kenya tax profile
+  (KRA 16% VAT, monthly iTax due on the 20th, digital-marketplace registration
+  threshold 0) seeded into the finance workbench store. Paid STK checkout
+  fail-closes with `tax_profile` until a human approves the profile.
+  `GET /v1/finance/launch-readiness` reports the gate. The Finance Readiness
+  panel shows Draft — not approved. Remote iTax simplified VAT (or a Kenyan
+  tax representative) is the intended compliance path; eTIMS is not required
+  for non-resident digital suppliers. See `docs/TAX_COMPLIANCE_RESEARCH.md`.
+  Significant Economic Presence tax remains an owner/CPA question.
 - Remaining hardening: app-store billing rails are out of scope while native
   mobile is not in delivery. A future Google Play listing must use Play Billing
   for the digital SaaS subscription. Web/PWA STK Push stays on the login phone.
