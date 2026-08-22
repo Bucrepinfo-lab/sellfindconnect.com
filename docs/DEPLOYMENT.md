@@ -2,33 +2,28 @@
 
 Status: Live on Fly.io Frankfurt; DigitalOcean remains a documented candidate; Railway fallbacks are gone
 Date: 2026-06-15
-Last updated: 2026-08-21
+Last updated: 2026-08-22
 
 Production runbook: `docs/FLY_DEPLOYMENT.md`
 Play Store constraints: `docs/PLAY_STORE.md`
 DigitalOcean candidate spec: `docs/DIGITALOCEAN_DEPLOYMENT.md`
 
-## Current Production (verified 2026-08-21)
+## Current Production (verified 2026-08-22)
 
-Fly.io is the live host (`server: Fly` on both web and API):
+Fly.io is the live host. Full runbook: `docs/FLY_DEPLOYMENT.md`.
 
 - Web: `https://sellfindconnect.com` and `https://www.sellfindconnect.com` — HTTP 200
-- API: `https://api.sellfindconnect.com/v1/health` — HTTP 200
+- API: `https://api.sellfindconnect.com/v1/health` — HTTP 200, `service: sellfindconnect-api`, `persistence.mode: prisma`, `databaseConfigured: true`
 - API docs: `https://api.sellfindconnect.com/docs` — HTTP 200
+- `/privacy` and `/account/delete` — HTTP 200
+- Scheduled jobs: cron enabled on `main`; manual workflow_dispatch green; `INTERNAL_JOB_KEY` on Fly and GitHub
 - Path-routed `https://sellfindconnect.com/api/v1/health` is **not** used (Next.js 404)
 - Historical Railway URLs return 404 Application not found
 - `adverts.telpen.net` / `api.adverts.telpen.net` no longer resolve
 
-The live API still reports `service: "telpen-api"` without a `persistence` block, so
-the Fly image is behind GitHub `main`. Redeploy `fly.api.toml` and `fly.web.toml`
-before onboarding paying subscribers. After redeploy, health must report
-`sellfindconnect-api` plus `persistence.mode`. Web `/privacy` and
-`/account/delete` must return HTTP 200 (they 404 on the stale image).
-
-Do not onboard paying subscribers until persistence, migrations/seed, scheduled
-jobs, login-phone STK, and the privacy/deletion URLs are verified on Fly.
-
-## Proposed Production Domains
+Do not onboard paying subscribers until country tax profile, live payment/STK
+credentials (login phone only), and finance approval are verified. Infra
+cutover (Prisma, jobs, privacy URLs) is complete.
 
 ## Proposed Production Domains
 

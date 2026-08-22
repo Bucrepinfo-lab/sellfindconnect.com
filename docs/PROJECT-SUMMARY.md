@@ -1,5 +1,5 @@
 ﻿# SellFindConnect - Project Summary
-Date: 2026-08-22 | Status: Core product coded; Fly.io live; hosted Prisma + scheduled jobs ready to deploy
+Date: 2026-08-22 | Status: Core product coded; Fly.io live; hosted Prisma + scheduled jobs operational
 
 ## What it is
 Multi-tenant B2B advertising + discovery + matchmaking SaaS. Tagline: "Sell it. Find it. Connect."
@@ -26,10 +26,11 @@ Web/PWA rails: Stripe and/or Africa's Talking M-Pesa. A Google Play APK would ne
 ## Live vs `main` (probed 2026-08-22)
 - `https://sellfindconnect.com` and `www` → HTTP 200 (Fly, Next.js)
 - `/privacy` and `/account/delete` → HTTP 200
-- `https://api.sellfindconnect.com/v1/health` → HTTP 200, `sellfindconnect-api`, `persistence.driver: memory`, `databaseConfigured: true`
+- `https://api.sellfindconnect.com/v1/health` → HTTP 200, `sellfindconnect-api`, `persistence.mode: prisma`, `databaseConfigured: true`
+- Scheduled jobs: cron on `main`; manual workflow_dispatch green
 - Railway temp URLs → 404; `adverts.telpen.net` DNS missing
 
 ## Next (do not onboard paying subscribers until)
-1. Merge the `search_hardening` SQL fix, then `fly deploy --config fly.api.toml` so migrate/seed can finish, then confirm `persistence.mode: prisma`
-2. Set Fly `INTERNAL_JOB_KEY` and GitHub Actions `API_BASE_URL` / `INTERNAL_JOB_KEY`
-3. Smoke-test **Scheduled jobs** via workflow_dispatch after merge to `main`
+1. Confirm an approved country tax profile and finance readiness for the pilot country
+2. Review live `PAYMENT_PROVIDER` / STK credentials (login phone only)
+3. Do not start native Play / APK work (Play Billing still required)

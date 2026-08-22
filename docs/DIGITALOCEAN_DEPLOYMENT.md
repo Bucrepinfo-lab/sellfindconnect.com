@@ -208,10 +208,11 @@ Before onboarding any paying subscriber, verify on the live domains:
 ## Current Deployment Posture
 
 - Fly.io Frankfurt is the live production host (`docs/FLY_DEPLOYMENT.md`).
+  Hosted Prisma and scheduled jobs are operational there.
 - DigitalOcean App Platform remains a candidate; spec checked in at
   `deploy/digitalocean/app.yaml`.
 - `sellfindconnect.com` (GoDaddy) is the canonical domain; live API is
   `api.sellfindconnect.com`, not path-routed `/api`.
 - Railway URLs and `adverts.telpen.net` are historical and no longer serve traffic.
-- Go live for paying subscribers only after the Fly cutover smoke checklist
-  in `docs/FLY_DEPLOYMENT.md` passes.
+- Paying-subscriber onboarding still requires the finance/tax and payment gates
+  in `docs/FLY_DEPLOYMENT.md`, not a DigitalOcean migration.

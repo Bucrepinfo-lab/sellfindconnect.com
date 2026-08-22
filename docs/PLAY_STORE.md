@@ -68,8 +68,7 @@ Current gaps before a Play listing:
   conversations, revokes sessions, retains billing/analytics/auth-audit, and
   writes `ACCOUNT_DELETION_COMPLETED` without the user's reason text. Hosted
   Prisma (`PERSISTENCE_DRIVER=prisma`) plus the daily scheduled-jobs sweep
-  make that durable in production after the Fly API image in this change is
-  deployed.
+  make that durable in production on Fly.
 - Production Fly web (verified 2026-08-22) serves `/privacy` and
   `/account/delete` (HTTP 200). Keep those URLs live before a Play Console
   listing.

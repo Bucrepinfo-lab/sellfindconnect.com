@@ -2,7 +2,7 @@
 
 Status: Execution backlog
 Date: 2026-06-15
-Last updated: 2026-08-21
+Last updated: 2026-08-22
 
 ## Delivery Principles
 
@@ -363,8 +363,8 @@ Progress (2026-08-21):
   `SOURCE_FINDER_EMBEDDING_PROVIDER=openai` fail-closes without the key.
   Matches add `SEMANTIC_MATCH`. Tests do not require live OpenAI credentials.
 - Native mobile saved-search screens remain out of scope. Hosted Prisma overlay
-  (`PERSISTENCE_DRIVER`) is implemented; production Fly still needs a redeploy
-  before that overlay is live.
+  (`PERSISTENCE_DRIVER=prisma`) is live on Fly production
+  (`GET /v1/health` → `persistence.mode: prisma`).
 
 ## Epic 6: Matching and Lead Conversion
 
@@ -550,7 +550,10 @@ Progress:
   the digital SaaS subscription, STK only to the login phone, no `READ_SMS` /
   `READ_CALL_LOG`, public `/privacy` plus signed-in `/account/delete`.
 - Privacy API is mounted at `/v1/privacy` behind the tenant session guard.
-  Durable erase-after-grace-period remains before a Play listing.
+  Durable erase-after-grace-period runs on Fly Prisma via the daily scheduled
+  sweep (`POST /v1/operations/privacy/deletions/run`). Play listing is still
+  blocked on native app, Play Billing, and in-app report/block — not on
+  deletion durability.
 
 ## Epic 10: Legal Terms and Policy Operations
 
@@ -584,9 +587,7 @@ Progress:
 
 ## Immediate Sprint
 
-1. Redeploy the hosted-Prisma API image after the `search_hardening` SQL
-   quote fix so `release_command` can finish migrate/seed, then confirm
-   `GET /v1/health` `persistence.mode` is `prisma` (`docs/FLY_DEPLOYMENT.md`).
-2. Set Fly `INTERNAL_JOB_KEY` and GitHub Actions secrets `API_BASE_URL` +
-   `INTERNAL_JOB_KEY`, then smoke-test **Scheduled jobs** via workflow_dispatch.
+1. Hosted Prisma on Fly — **done** (`persistence.mode: prisma`).
+2. `INTERNAL_JOB_KEY` + scheduled-jobs smoke-test — **done** (cron enabled;
+   manual workflow_dispatch green on 2026-08-22).
 3. Do not start a native Play app until Play Billing exists.

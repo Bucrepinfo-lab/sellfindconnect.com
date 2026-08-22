@@ -1,7 +1,7 @@
 # Telpen Adverts Product Memory
 
 Date started: 2026-06-15
-Last updated: 2026-08-21
+Last updated: 2026-08-22
 Purpose: Persistent decision log and strategic memory for the Telpen Adverts multi-tenant advertising SaaS.
 
 This file must be updated whenever product strategy, pricing, compliance, architecture, market positioning, or execution decisions change.
@@ -62,10 +62,12 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - Local development environment: Docker Desktop with WSL 2 for PostgreSQL, Redis, Meilisearch, and Mailpit; Volta with Node.js 24 LTS to keep runtime versions consistent; DBeaver Community recommended for database inspection.
 - Deployment posture: Fly.io Frankfurt (`fra`) is the live production host for
   `sellfindconnect.com`, `www.sellfindconnect.com`, and `api.sellfindconnect.com`.
-  DigitalOcean App Platform remains a documented candidate. Historical Railway
-  URLs and `adverts.telpen.net` no longer serve this product. Do not onboard
-  paying subscribers until the live Fly image matches `main`, persistence health
-  is configured, and scheduled jobs run.
+  Hosted Prisma (`persistence.mode: prisma`) and scheduled jobs (cron plus a
+  successful manual workflow_dispatch) are operational. DigitalOcean App
+  Platform remains a documented candidate. Historical Railway URLs and
+  `adverts.telpen.net` no longer serve this product. Do not onboard paying
+  subscribers until country tax/finance gates and live payment credentials are
+  approved.
 - Login phone = STK Push phone: the verified E.164 number used for SMS OTP is
   the only Africa's Talking / M-Pesa checkout destination. Checkout must not
   accept a different payer phone. Google Play listings, if ever submitted, must
@@ -231,3 +233,4 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - 2026-08-22: First hosted Prisma Fly release failed on `20260625000000_finance_durability` because three checked-in SQL files started with a UTF-8 BOM (`U+FEFF`). Postgres rejected the file at byte 0, so no statements ran. The BOM is stripped; the release command marks that failed Prisma row rolled back and retries migrate. Production stays on memory until that image deploys.
 - 2026-08-22: The BOM-fix image then failed with Prisma P3009 (failed `finance_durability` row still present; recovery only handled P3018). Release now runs `migrate resolve --rolled-back` for that migration before `migrate deploy`. Production still stays on memory until this image deploys.
 - 2026-08-22: After finance/privacy applied, `20260627000000_search_hardening` failed because `to_tsvector("english", coalesce(...,""))` and `" "` are identifiers in Postgres, not strings. SQL now uses `'english'` / `''` / `' '`. Release also rolls back that failed row before migrate. Production stays on memory until this image deploys.
+- 2026-08-22: Hosted Prisma cutover completed on Fly. Health reports `sellfindconnect-api`, `persistence.mode: prisma`, `databaseConfigured: true`. `/privacy` and `/account/delete` return HTTP 200. Scheduled jobs cron is on; a manual workflow_dispatch on `main` ran every operations job green after Fly and GitHub `INTERNAL_JOB_KEY` values were matched. Paying-subscriber onboarding still waits on tax/finance and live payment credentials, not infra. Audit cleanup: unused empty runbook, one-off commit script, duplicate Next config, unused notification alias, unused tenant-session decorator, and broken unused country-pricing seed removed. Privacy CSS is imported; `/dashboard` routes redirect into the existing home workspace so onboarding and deletion no longer 404.
