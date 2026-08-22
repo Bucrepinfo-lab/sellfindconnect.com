@@ -50,6 +50,7 @@ describe('auth and tenancy policy helpers', () => {
       '/privacy',
       '/subscription',
       '/prohibited',
+      '/community',
     ]);
   });
 

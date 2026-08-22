@@ -89,8 +89,9 @@ export default function OnboardingPage() {
             By continuing you accept the{' '}
             <a href="/terms">Terms</a>,{' '}
             <a href="/subscription">Subscription</a>,{' '}
-            <a href="/privacy">Privacy</a>, and{' '}
-            <a href="/prohibited">Prohibited content</a> policies.
+            <a href="/privacy">Privacy</a>,{' '}
+            <a href="/prohibited">Prohibited content</a>, and{' '}
+            <a href="/community">Community standards</a> policies.
           </p>
         </div>
       )}

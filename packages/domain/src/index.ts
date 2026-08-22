@@ -1,6 +1,7 @@
 export * from './access-control';
 export * from './analytics';
 export * from './auth-tenancy';
+export * from './community-standards';
 export * from './discovery';
 export * from './finance';
 export * from './kenya-tax-profile';

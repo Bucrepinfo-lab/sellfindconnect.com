@@ -284,6 +284,11 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   from those dashboard redirects. Find onboarding maps AGRI-style quick
   codes onto catalog industries and focuses Source Finder; sell onboarding
   focuses Advertiser Setup. This is a web deploy.
+- 2026-08-22: Published public community standards at `/community`
+  (`community-2026-08-22`) from shared domain summaries. The page is the
+  Play UGC user policy: report/block, harassment, not-for-children, and
+  sexual content fully prohibited (not incidental). This is not a counsel
+  sign-off. Live `/community` is HTTP 200.
 - 2026-08-22: Added UGC report and block. Tenants can report or block a
   Source Finder target after terms acceptance. Blocked ids leave that
   tenant’s results. `POST /v1/ugc/reports` and `POST /v1/ugc/blocks` persist

@@ -1133,6 +1133,10 @@ Implementation progress on 2026-06-17:
   `industry`, and `role` query params from those dashboard redirects. Find
   onboarding maps AGRI-style quick codes onto catalog industries and opens
   Source Finder; sell onboarding opens Advertiser Setup.
+- Continued implementation on 2026-08-22 with public `/community` community
+  standards (`community-2026-08-22`). Play UGC requires a user policy that
+  defines objectionable content and behavior, report/block, and
+  child-safety. Sexual content stays fully prohibited. Not counsel sign-off.
 - Continued implementation on 2026-08-22 with tenant UGC report and block
   APIs plus Source Finder Report/Block controls. Moderators close reports.
   Product audit omits report details. This is the Play UGC report/block
@@ -1188,7 +1192,7 @@ Requirements:
 - App-store metadata must accurately describe core experience.
 - Demo account/demo mode required for app review.
 - Privacy policy, terms, subscription terms, and account deletion links must be available inside app and on public web
-  (`/privacy`, `/terms`, `/subscription`, `/prohibited`, `/account/delete`, `POST /v1/privacy/deletion`). After the
+  (`/privacy`, `/terms`, `/subscription`, `/prohibited`, `/community`, `/account/delete`, `POST /v1/privacy/deletion`). After the
   30-day grace period, `POST /v1/operations/privacy/deletions/run` erases
   profile, adverts, conversations, and media, revokes sessions, and retains
   billing, analytics, and auth-audit records required by tax and security law.

@@ -55,6 +55,8 @@ export function LegalDocument({
               {' · '}
               <a href="/prohibited">Prohibited content</a>
               {' · '}
+              <a href="/community">Community standards</a>
+              {' · '}
               <a href="/account/delete">Delete account</a>
             </p>
           </div>

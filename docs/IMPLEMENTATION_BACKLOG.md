@@ -604,6 +604,9 @@ Progress:
 - Home now applies `view`, `q`, `industry`, and `role` from those redirects:
   find onboarding filters Source Finder, sell onboarding focuses Advertiser
   Setup. Quick-industry codes such as `AGRI` map onto catalog codes.
+- Published public `/community` community standards from shared domain
+  summaries so Play UGC “user policy” has a URL: report/block, harassment,
+  not-for-children, and full sexual-content prohibition.
 - Added tenant report and block controls. `POST /v1/ugc/reports` and
   `POST /v1/ugc/blocks` require MFA, terms acceptance, and zero-tolerance
   clearance. Blocked Source Finder ids leave that tenant’s results.
@@ -628,6 +631,7 @@ Progress:
 8. Public `/terms` and `/subscription` — **live** (HTTP 200).
 9. Public `/prohibited` plus `/dashboard` redirects — **live**. Home honors
    `view=discover|adverts`, `q`, `industry`, and `role`.
-10. UGC report/block — after merge, API then web:
+10. Public `/community` community standards — **live** (HTTP 200).
+11. UGC report/block — after merge, API then web:
     `fly deploy --config fly.api.toml --remote-only` (Prisma migrate) then
     `fly deploy --config fly.web.toml --remote-only`.
