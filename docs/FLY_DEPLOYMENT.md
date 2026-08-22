@@ -130,6 +130,8 @@ Do not onboard paying subscribers until:
 - Web `/privacy`, `/terms`, `/subscription`, and `/account/delete` return HTTP 200
 - Web `/prohibited` returns HTTP 200
 - `/dashboard` redirects into the home workspace
+- Home `/` honors `view=discover|adverts`, `q`, `industry`, and `role` so
+  onboarding sell/find land on Advertiser Setup or Source Finder
 - A manual **Scheduled jobs** workflow_dispatch succeeds
 - STK Push uses the login phone only (`PAYMENT_PROVIDER` live credentials
   reviewed)

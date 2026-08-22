@@ -11,12 +11,12 @@ export const SELL_QUICK_STARTS = [
 ];
 
 export const FIND_QUICK_INDUSTRIES = [
-  { icon: "🌾", label: "Agriculture", code: "AGRI" },
-  { icon: "🏗️", label: "Construction", code: "CONST" },
-  { icon: "🛒", label: "Retail and FMCG", code: "RETAIL" },
-  { icon: "💻", label: "Technology", code: "TECH" },
-  { icon: "🏥", label: "Healthcare", code: "HEALTH" },
-  { icon: "⚡", label: "Energy", code: "ENERGY" },
-  { icon: "🚢", label: "Import and Export", code: "TRADE" },
-  { icon: "🏭", label: "Manufacturing", code: "MFG" },
-];
+  { icon: "🌾", label: "Agriculture", code: "AGRI", catalogCode: "AGRICULTURE" },
+  { icon: "🏗️", label: "Construction", code: "CONST", catalogCode: "CONSTRUCTION" },
+  { icon: "🛒", label: "Retail and FMCG", code: "RETAIL", catalogCode: "TRADE" },
+  { icon: "💻", label: "Technology", code: "TECH", catalogCode: "TECHNOLOGY" },
+  { icon: "🏥", label: "Healthcare", code: "HEALTH", catalogCode: "HEALTH" },
+  { icon: "⚡", label: "Energy", code: "ENERGY", catalogCode: "UTILITIES" },
+  { icon: "🚢", label: "Import and Export", code: "TRADE", catalogCode: "TRADE" },
+  { icon: "🏭", label: "Manufacturing", code: "MFG", catalogCode: "MANUFACTURING" },
+] as const;

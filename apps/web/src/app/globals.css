@@ -94,6 +94,21 @@ button {
   padding: 20px;
 }
 
+.onboarding-landing-banner {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--green-soft);
+  border-radius: 8px;
+  background: var(--green-soft);
+  color: var(--green);
+  font-size: 14px;
+}
+
+.workspace-target {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
 .topbar {
   display: flex;
   justify-content: space-between;
@@ -255,6 +270,7 @@ h3 {
 .side-panel {
   padding: 16px;
   min-width: 0;
+  scroll-margin-top: 16px;
 }
 
 .panel-heading {
