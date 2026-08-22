@@ -27,6 +27,7 @@ describe('product audit helpers', () => {
         sessionToken: 'secret-session',
         attachmentCount: 1,
         industryCode: 'AGRICULTURE',
+        details: 'Copied our company name and phone.',
       }),
     ).toEqual({
       senderRole: 'TENANT_AGENT',
@@ -97,6 +98,8 @@ describe('product audit helpers', () => {
     expect(describeProductAuditAction('ACCOUNT_DELETION_COMPLETED')).toBe(
       'Account deletion completed',
     );
+    expect(describeProductAuditAction('USER_CONTENT_REPORTED')).toBe('User content reported');
+    expect(describeProductAuditAction('USER_BLOCKED')).toBe('User blocked');
   });
 
   it('filters tenant audit lookups by action and entity type', () => {

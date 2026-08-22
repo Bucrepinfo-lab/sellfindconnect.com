@@ -126,7 +126,9 @@ without validating it against the authenticated user's assignments.
   `publishedAt` keeps the listing `SCHEDULED` and out of public discovery until
   the lifecycle sweep promotes it to `LIVE`.
   See `docs/MEDIA_PIPELINE.md` for storage mode and worker queue configuration.
-- Safety: blocked categories, policy decisions, moderation cases, and reports.
+- Safety: blocked categories, policy decisions, media review cases, and
+  tenant UGC reports/blocks (`POST /v1/ugc/reports`, `POST /v1/ugc/blocks`,
+  moderator `GET /v1/platform/ugc/reports`).
 - Discovery: Source Finder, search, filters, reason codes, saved searches,
   cadence-backed opportunity alerts, and consent-gated outcome feedback.
   Tenant Source Finder routes require an MFA-verified tenant session. Opt-in

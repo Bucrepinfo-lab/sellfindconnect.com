@@ -1137,6 +1137,10 @@ Implementation progress on 2026-06-17:
   standards (`community-2026-08-22`). Play UGC requires a user policy that
   defines objectionable content and behavior, report/block, and
   child-safety. Sexual content stays fully prohibited. Not counsel sign-off.
+- Continued implementation on 2026-08-22 with tenant UGC report and block
+  APIs plus Source Finder Report/Block controls. Moderators close reports.
+  Product audit omits report details. This is the Play UGC report/block
+  control; native Play remains out of scope.
 - Remaining hardening: app-store billing rails are out of scope while native
   mobile is not in delivery. A future Google Play listing must use Play Billing
   for the digital SaaS subscription. Web/PWA STK Push stays on the login phone.

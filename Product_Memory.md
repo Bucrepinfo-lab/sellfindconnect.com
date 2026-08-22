@@ -288,4 +288,10 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   (`community-2026-08-22`) from shared domain summaries. The page is the
   Play UGC user policy: report/block, harassment, not-for-children, and
   sexual content fully prohibited (not incidental). This is not a counsel
-  sign-off. A web deploy is required before the live URL leaves 404.
+  sign-off. Live `/community` is HTTP 200.
+- 2026-08-22: Added UGC report and block. Tenants can report or block a
+  Source Finder target after terms acceptance. Blocked ids leave that
+  tenant’s results. `POST /v1/ugc/reports` and `POST /v1/ugc/blocks` persist
+  in memory by default and Prisma when `PERSISTENCE_DRIVER=prisma`.
+  Moderators use `GET/POST /v1/platform/ugc/reports`. Audit stores reason
+  and target id, never report details. API then web deploy.
