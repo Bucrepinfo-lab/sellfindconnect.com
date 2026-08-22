@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 
 import { publicApiBaseUrl, tenantSessionHeaders } from "../../../lib/public-api";
+import "../../../styles/privacy.css";
 
 type DeletedWith = "ACCOUNT" | "MANUAL" | "RETENTION_POLICY";
 interface Item {

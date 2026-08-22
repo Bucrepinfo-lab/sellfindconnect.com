@@ -298,7 +298,7 @@ Implementation progress on 2026-06-18:
 - Added RFC 6238 authenticator TOTP enrollment. MFA-verified owners can start and confirm enrollment, later logins use `AUTHENTICATOR` delivery, and reused time-steps are rejected. Confirmation issues 10 hashed single-use recovery codes; regenerate invalidates the prior set.
 - Added hosted identity overlay for Auth0, Clerk, or generic OIDC. `POST /v1/auth/identity/session` verifies an RS256 ID token via JWKS and issues a first-party session for an existing tenant account. `AUTH_IDENTITY_PROVIDER=auth0|clerk|oidc|live` fail-closes without issuer and audience. Unverified emails and unknown accounts are rejected. New tenants still accept terms through owner signup.
 - Added `PERSISTENCE_DRIVER=prisma` overlay so production can select Prisma for all repositories and media queues with one env var when `DATABASE_URL` is set. Named `live` fail-closes without the URL. Per-repository `memory` overrides still win. Unset driver keeps the in-memory default even if `DATABASE_URL` exists. `GET /v1/health` reports driver, mode, and `databaseConfigured` without the URL.
-- Fly API deploys now run `deploy/api-release.sh` as `release_command` (migrate, then idempotent country/industry seed) and set `PERSISTENCE_DRIVER=prisma` only after that command succeeds. GitHub Actions scheduled jobs are enabled against `https://api.sellfindconnect.com/v1` once `INTERNAL_JOB_KEY` is set on Fly and in repository secrets. Migration SQL must not start with a UTF-8 BOM; a failed `finance_durability` apply from that BOM is marked rolled back and retried.
+- Fly API deploys now run `deploy/api-release.sh` as `release_command` (migrate, then idempotent country/industry seed) and set `PERSISTENCE_DRIVER=prisma` only after that command succeeds. GitHub Actions scheduled jobs run against `https://api.sellfindconnect.com/v1` with `INTERNAL_JOB_KEY` set on Fly and in repository secrets (cron enabled; manual workflow_dispatch verified on `main`). Migration SQL must not start with a UTF-8 BOM.
 - Remaining hardening: native mobile clients remain out of scope. The verified
   E.164 login phone is also the STK Push destination; checkout must not accept a
   different payer number (`docs/PLAY_STORE.md`).
@@ -1451,13 +1451,12 @@ Backend:
 Infrastructure:
 
 - Cloud-hosted, containerized services.
-- Deployment migration is paused while core coding continues.
-- DigitalOcean is the leading production candidate to evaluate before paid
-  subscriber onboarding because the first country launch needs strong Africa
-  latency and a Cape Town/South Africa deployment location would be valuable if
-  the required managed services are available there.
-- Railway remains the current proven fallback/staging deployment until the
-  final platform is selected, verified, and cut over.
+- **Live production:** Fly.io Frankfurt (`sellfindconnect.com`,
+  `api.sellfindconnect.com`). Hosted Prisma and GitHub Actions scheduled jobs
+  are operational.
+- DigitalOcean App Platform remains a documented candidate
+  (`docs/DIGITALOCEAN_DEPLOYMENT.md`).
+- Railway and `adverts.telpen.net` are historical only (404 / NXDOMAIN).
 - CI/CD with automated tests and security scans.
 - Infrastructure as code.
 - Feature flags.

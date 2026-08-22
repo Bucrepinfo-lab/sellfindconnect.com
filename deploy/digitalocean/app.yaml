@@ -1,20 +1,21 @@
-# DigitalOcean App Platform spec for Sell Find Connect (sellfindconnect.com).
+# CANDIDATE ONLY — Fly.io is the live host (docs/FLY_DEPLOYMENT.md).
+# Do not create this app or point sellfindconnect.com here until a written
+# decision to leave Fly. Railway is archived (docs/GIT_RAILWAY_RUNBOOK.md).
 #
-# Usage:
+# Usage (after that decision):
 #   doctl apps create --spec deploy/digitalocean/app.yaml
 #   doctl apps update <APP_ID> --spec deploy/digitalocean/app.yaml
 #
-# Model: ONE app, path-based routing (App Platform routes by path, not by host).
+# Layout: ONE App Platform app, path routing (not the live Fly hostnames).
 #   web -> https://sellfindconnect.com/
-#   api -> https://sellfindconnect.com/api  (prefix stripped; NestJS sees /v1/...)
-# So the public API base is https://sellfindconnect.com/api/v1.
-# A two-app, api.sellfindconnect.com subdomain layout is the documented
-# alternative — see docs/DIGITALOCEAN_DEPLOYMENT.md.
+#   api -> https://sellfindconnect.com/api  (prefix stripped; Nest sees /v1/...)
+#   public API base -> https://sellfindconnect.com/api/v1
+# Two-app api.sellfindconnect.com layout: docs/DIGITALOCEAN_DEPLOYMENT.md
 #
-# Secrets (type: SECRET) must be set in the DO dashboard or via `doctl` — never
-# commit real values.
+# Secrets: set INTERNAL_JOB_KEY in the DO dashboard. Never commit real values.
+# PRE_DEPLOY runs the same migrate+seed script as Fly: deploy/api-release.sh
 name: sellfindconnect
-region: # set to the closest available region (e.g. fra1) until a ZA PoP exists
+region: # set only when creating the candidate app (e.g. fra1)
 features:
   - buildpack-stack=ubuntu-22
 
@@ -32,9 +33,6 @@ databases:
     production: true
 
 services:
-  # ---------------------------------------------------------------------------
-  # Next.js web / PWA  ->  https://sellfindconnect.com/
-  # ---------------------------------------------------------------------------
   - name: web
     dockerfile_path: deploy/web.Dockerfile
     source_dir: /
@@ -53,14 +51,9 @@ services:
       - key: NODE_ENV
         value: production
       - key: NEXT_PUBLIC_API_URL
-        # Build-time + runtime API base (path-routed through the same domain).
         value: https://sellfindconnect.com/api/v1
         scope: BUILD_AND_RUN_TIME
 
-  # ---------------------------------------------------------------------------
-  # NestJS API  ->  https://sellfindconnect.com/api  (NestJS global prefix: v1)
-  # The /api prefix is stripped before forwarding, so the API receives /v1/...
-  # ---------------------------------------------------------------------------
   - name: api
     dockerfile_path: deploy/api.Dockerfile
     source_dir: /
@@ -88,32 +81,12 @@ services:
         scope: RUN_TIME
       - key: PERSISTENCE_DRIVER
         value: prisma
-      - key: AUTH_REPOSITORY
-        value: prisma
-      - key: PROFILE_REPOSITORY
-        value: prisma
-      - key: ANALYTICS_REPOSITORY
-        value: prisma
       - key: PAYMENT_PROVIDER
-        value: manual # switch to a live provider only after finance approval
+        value: manual
       - key: INTERNAL_JOB_KEY
         type: SECRET
-        value: REPLACE_WITH_LONG_RANDOM_SECRET
-      # Optional once enabled (DigitalOcean Spaces media storage / durable queue):
-      # - key: MEDIA_STORAGE_DRIVER
-      #   value: s3
-      # - key: MEDIA_S3_ENDPOINT
-      #   value: https://<region>.digitaloceanspaces.com
-      # - key: MEDIA_S3_BUCKET
-      #   value: sellfindconnect-media
-      # - key: MEDIA_S3_ACCESS_KEY_ID
-      #   type: SECRET
-      # - key: MEDIA_S3_SECRET_ACCESS_KEY
-      #   type: SECRET
-      # - key: MEDIA_JOB_QUEUE_DRIVER
-      #   value: prisma
+        # Set in the dashboard to the same value as the GitHub Actions secret.
 
-# Database migrations run automatically before each deploy.
 jobs:
   - name: db-migrate
     kind: PRE_DEPLOY
