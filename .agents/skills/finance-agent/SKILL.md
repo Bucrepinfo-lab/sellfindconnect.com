@@ -41,8 +41,9 @@ Pure logic lives in `packages/domain/src/finance.ts`; wiring in
   `:close-management`, `:journal-entry`, `:audit-support`.
 - `small-business:cash-flow-snapshot`, `:month-end-prep`, `:tax-prep`,
   `:invoice-chase`, `:margin-analyzer`.
-- Stripe Tax is a **rate engine**, not the remitter or seller. Connect it
-  behind the finance adapter; iTax / the Kenyan agent files.
+- Stripe Tax is a **rate engine**, not the remitter or seller. Enable it with
+  `TAX_RATE_PROVIDER=stripe_tax` after Kenya is registered in the Stripe
+  Dashboard; iTax / the Kenyan agent files. Unset keeps finance-module rules.
 
 ## Workflow
 1. **Confirm** the country, period, and goal with the owner.

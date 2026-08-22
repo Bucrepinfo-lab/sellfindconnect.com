@@ -20,8 +20,9 @@ tax profile.
 3. **Keep STK** (Africa's Talking / M-Pesa to the verified login phone) plus
    Stripe for cards. Checkout has no phone field.
 4. **Rates** come from the **finance module** (approved country tax rules and
-   immutable snapshots) **and Stripe Tax** as the rate engine. Stripe Tax does
-   not become the seller and does not file iTax.
+   immutable snapshots) **and Stripe Tax** as the rate engine when
+   `TAX_RATE_PROVIDER=stripe_tax`. Stripe Tax does not become the seller and
+   does not file iTax. A zero or mismatched quote fail-closes.
 5. **Add EU Non-Union OSS later**, when a paying EU consumer actually exists.
    Do not pre-register 27 member states.
 

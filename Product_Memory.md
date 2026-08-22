@@ -265,3 +265,8 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   `PAYMENT_PROVIDER=paddle|lemonsqueezy|dodo` fail-closes. Copy-paste blocks
   for InsurOS, Telpen Edu, and Stawi are in `docs/GROUP_TAX_OPERATING_MODEL.md`.
   This does not auto-approve the Kenya tax profile.
+- 2026-08-22: Wired Stripe Tax as an optional rate overlay.
+  `TAX_RATE_PROVIDER=stripe_tax` requires `STRIPE_SECRET_KEY`, quotes
+  `POST /v1/tax/calculations` for digital software (`txcd_10103000`), and
+  fail-closes on a zero or mismatched quote. Finance-module rules remain the
+  source of truth. Stripe Tax does not become the seller and does not file iTax.

@@ -19,6 +19,8 @@ import {
   evaluatePaidLaunchReadiness,
   kenyaPilotTaxProfileDraft,
   TAX_OPERATING_MODEL,
+  describeStripeTaxReconcileFailure,
+  reconcileFinanceAndStripeTax,
   getDunningNoticeDecision,
   getCountry,
   looksLikeCardPan,
@@ -70,6 +72,10 @@ import {
   createConfiguredPaymentAdapter,
   type PaymentAdapter,
 } from './payment.adapter';
+import {
+  createConfiguredTaxRateAdapter,
+  type TaxRateAdapter,
+} from './tax-rate.adapter';
 import type {
   CountryTaxProfileRecord,
   DunningNoticeRecord,
@@ -94,6 +100,7 @@ import type { FinanceRepository } from './finance.repository';
 @Injectable()
 export class FinanceService {
   private readonly paymentAdapter: PaymentAdapter;
+  private readonly taxRateAdapter?: TaxRateAdapter;
   private readonly auth?: AuthService;
   private readonly repository: FinanceRepository;
 
@@ -101,12 +108,15 @@ export class FinanceService {
     paymentAdapter?: PaymentAdapter,
     auth?: AuthService,
     repository?: FinanceRepository,
+    taxRateAdapter?: TaxRateAdapter,
   ) {
     this.paymentAdapter =
       paymentAdapter ??
       createConfiguredPaymentAdapter({ get: (key) => process.env[key] });
     this.auth = auth;
     this.repository = repository ?? new InMemoryFinanceRepository();
+    this.taxRateAdapter =
+      taxRateAdapter ?? createConfiguredTaxRateAdapter({ get: (key) => process.env[key] });
   }
 
   async configureCountryTaxProfile(input: ConfigureCountryTaxProfileDto): Promise<CountryTaxProfileRecord> {
@@ -200,6 +210,46 @@ export class FinanceService {
       taxRate: rule.taxRate,
       taxInclusivePricing: profile.taxInclusivePricing,
     });
+    let provider = input.provider ?? 'MANUAL_RULE';
+    let providerReference = input.providerReference;
+    let calculationReason = `${rule.taxType} ${rule.productTaxCode} rule active at ${transactionAt}`;
+
+    if (this.taxRateAdapter) {
+      try {
+        const billingCountry =
+          typeof input.customerEvidence?.billingCountry === 'string'
+            ? input.customerEvidence.billingCountry
+            : input.countryCode;
+        const quote = await this.taxRateAdapter.quote({
+          countryCode: input.countryCode,
+          billingCountry,
+          currencyCode: input.presentmentCurrency,
+          grossAmount: input.grossAmount,
+          taxInclusivePricing: profile.taxInclusivePricing,
+          productTaxCode: rule.productTaxCode,
+          idempotencyKey: `tax:${tenantId}:${input.countryCode}:${transactionAt}`,
+        });
+        const reconciled = reconcileFinanceAndStripeTax({
+          financeTaxAmount: amounts.taxAmount,
+          stripeTaxAmount: quote.taxAmount,
+          currencyCode: input.presentmentCurrency,
+        });
+        if (!reconciled.ok) {
+          throw new UnprocessableEntityException(describeStripeTaxReconcileFailure(reconciled.reason));
+        }
+        provider = this.taxRateAdapter.provider;
+        providerReference = quote.id;
+        calculationReason = `STRIPE_TAX matched ${rule.taxType} ${rule.productTaxCode} finance rule at ${transactionAt}`;
+      } catch (error) {
+        if (error instanceof UnprocessableEntityException) {
+          throw error;
+        }
+        throw new UnprocessableEntityException(
+          'Stripe Tax is unavailable. Tax calculation fail-closed. The finance-module rule was not skipped.',
+        );
+      }
+    }
+
     const now = new Date().toISOString();
     const snapshot: TaxCalculationSnapshotRecord = {
       id: randomUUID(),
@@ -207,8 +257,8 @@ export class FinanceService {
       countryCode: input.countryCode,
       taxRuleVersionId: rule.id,
       taxType: rule.taxType,
-      provider: input.provider ?? 'MANUAL_RULE',
-      providerReference: input.providerReference,
+      provider,
+      providerReference,
       grossAmount: amounts.grossAmount,
       taxableAmount: amounts.taxableAmount,
       taxAmount: amounts.taxAmount,
@@ -217,7 +267,7 @@ export class FinanceService {
       filingCurrency: (input.filingCurrency ?? input.presentmentCurrency).toUpperCase(),
       exchangeRate: input.exchangeRate ?? 1,
       customerEvidence: input.customerEvidence,
-      calculationReason: `${rule.taxType} ${rule.productTaxCode} rule active at ${transactionAt}`,
+      calculationReason,
       transactionAt,
       createdAt: now,
     };

@@ -1118,6 +1118,10 @@ Implementation progress on 2026-06-17:
   (`docs/GROUP_TAX_OPERATING_MODEL.md`). `PAYMENT_PROVIDER=paddle` and other
   merchant-of-record checkouts fail closed.
   Significant Economic Presence tax remains an owner/CPA question.
+- Continued implementation on 2026-08-22 with a fail-closed Stripe Tax rate
+  overlay. Unset `TAX_RATE_PROVIDER` keeps finance-module rules.
+  `TAX_RATE_PROVIDER=stripe_tax` quotes Stripe Tax Calculations and must match
+  the approved finance rate. Stripe Tax does not remit, file, or approve Kenya.
 - Remaining hardening: app-store billing rails are out of scope while native
   mobile is not in delivery. A future Google Play listing must use Play Billing
   for the digital SaaS subscription. Web/PWA STK Push stays on the login phone.

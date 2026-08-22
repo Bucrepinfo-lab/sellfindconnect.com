@@ -116,6 +116,9 @@ Set on the API app via `fly secrets` (never commit values):
 - `DATABASE_URL` (already present when health reports `databaseConfigured: true`)
 - `INTERNAL_JOB_KEY` before relying on scheduled jobs
 - Payment / SMS / email / media secrets only after finance and safety approval
+- `TAX_RATE_PROVIDER=stripe_tax` only after a Kenya tax registration exists in
+  the Stripe Dashboard **and** `STRIPE_SECRET_KEY` is set. Unset keeps
+  finance-module rates. Stripe Tax does not file iTax.
 
 Do not onboard paying subscribers until:
 
