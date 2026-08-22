@@ -49,6 +49,7 @@ describe('auth and tenancy policy helpers', () => {
       '/terms',
       '/privacy',
       '/subscription',
+      '/prohibited',
     ]);
   });
 

@@ -29,7 +29,7 @@ zero-tolerance clearance. Owns Epic 10.
   review or accept Paddle / Lemon Squeezy / Dodo as the seller of record.
   Kenya files on iTax or through one Kenyan representative
   (`docs/GROUP_TAX_OPERATING_MODEL.md`).
-- Public policy URLs: `/terms`, `/subscription`, `/privacy`. Version bumps
+- Public policy URLs: `/terms`, `/subscription`, `/privacy`, `/prohibited`. Version bumps
   force re-acceptance. Counsel still reviews before treating them as a signed
   production contract.
 

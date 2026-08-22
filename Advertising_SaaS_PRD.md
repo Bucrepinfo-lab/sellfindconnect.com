@@ -1126,6 +1126,9 @@ Implementation progress on 2026-06-17:
   `/subscription` pages at versions `terms-2026-08-22` and
   `subscription-2026-08-22`. Material version bump forces re-acceptance.
   Counsel still reviews before treating them as a signed production contract.
+- Continued implementation on 2026-08-22 with public `/prohibited` from the
+  shared zero-tolerance summaries, `/dashboard` redirects into the home
+  workspace, and onboarding links to the public policies.
 - Remaining hardening: app-store billing rails are out of scope while native
   mobile is not in delivery. A future Google Play listing must use Play Billing
   for the digital SaaS subscription. Web/PWA STK Push stays on the login phone.
@@ -1177,7 +1180,7 @@ Requirements:
 - App-store metadata must accurately describe core experience.
 - Demo account/demo mode required for app review.
 - Privacy policy, terms, subscription terms, and account deletion links must be available inside app and on public web
-  (`/privacy`, `/terms`, `/subscription`, `/account/delete`, `POST /v1/privacy/deletion`). After the
+  (`/privacy`, `/terms`, `/subscription`, `/prohibited`, `/account/delete`, `POST /v1/privacy/deletion`). After the
   30-day grace period, `POST /v1/operations/privacy/deletions/run` erases
   profile, adverts, conversations, and media, revokes sessions, and retains
   billing, analytics, and auth-audit records required by tax and security law.

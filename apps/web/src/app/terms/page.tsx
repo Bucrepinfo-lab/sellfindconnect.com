@@ -53,8 +53,9 @@ export default function TermsOfServicePage() {
           You are responsible for profiles, listings, media, and messages you submit. Weapons,
           pornography, human trafficking, child exploitation, illegal drugs, violent extremism,
           hate, graphic violence, criminal services, counterfeit or stolen goods, illegal wildlife
-          trafficking, spam, scams, and related abuse are blocked entirely. We may remove content,
-          suspend accounts, preserve evidence, and report to KE-CIRT, NCMEC, or hosting providers.
+          trafficking, spam, scams, and related abuse are blocked entirely. The public list is at{' '}
+          <a href="/prohibited">prohibited content</a>. We may remove content, suspend accounts,
+          preserve evidence, and report to KE-CIRT, NCMEC, or hosting providers.
         </p>
       </LegalSection>
       <LegalSection id="duties" title="6. Responsibility and non-waivable duties">

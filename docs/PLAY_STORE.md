@@ -59,6 +59,7 @@ Play User Data requires:
   mobile-money, approximate location if collected, UGC, diagnostics).
 - A public privacy policy URL. In this repo: `/privacy`.
 - A public terms and subscription URL. In this repo: `/terms` and `/subscription`.
+- A public prohibited-content URL. In this repo: `/prohibited`.
 - **In-app and web-accessible account deletion** for any account the app creates.
   In this repo: `/account/delete` plus `POST/DELETE/GET /v1/privacy/deletion`.
 
