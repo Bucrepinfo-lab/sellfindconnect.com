@@ -180,6 +180,8 @@ without validating it against the authenticated user's assignments.
   an MFA-verified tenant session. Opt-in Prisma persistence is selected with
   `FINANCE_REPOSITORY=prisma`. `GET /v1/finance/launch-readiness` reports the
   locked operating model (`docs/GROUP_TAX_OPERATING_MODEL.md`).
+  `TAX_RATE_PROVIDER=stripe_tax` overlays Stripe Tax Calculations as a rate
+  engine; unset keeps finance-module rules.
 - Analytics: privacy-aware product and business events. Tenant analytics routes
   require an MFA-verified tenant session.
 

@@ -164,9 +164,9 @@ for VAT.** This is no longer a recommendation. See
 1. **Kenya first**, remote iTax (or a Nairobi CPA as representative). Approve
    the DRAFT 16% VAT profile only after that packet exists.
 2. Keep **STK + Stripe** as payment adapters. Use Stripe Tax (or the existing
-   finance rule table) for rates. The finance workbench already stores
-   snapshots, returns, and remittance evidence. Stripe Tax is a rate engine,
-   not the remitter.
+   finance rule table) for rates. Named overlay: `TAX_RATE_PROVIDER=stripe_tax`.
+   The finance workbench already stores snapshots, returns, and remittance
+   evidence. Stripe Tax is a rate engine, not the remitter.
 3. Hire **one Kenyan tax agent** (email + iTax), not a Country Finance
    department in every market.
 4. Add the next country only when a paying tenant's billing country requires

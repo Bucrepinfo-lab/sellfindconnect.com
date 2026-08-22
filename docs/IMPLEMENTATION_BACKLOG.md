@@ -2,7 +2,7 @@
 
 Status: Execution backlog
 Date: 2026-06-15
-Last updated: 2026-08-21
+Last updated: 2026-08-22
 
 ## Delivery Principles
 
@@ -540,6 +540,11 @@ Progress:
   or one Kenyan agent, STK + Stripe, finance module + Stripe Tax, EU OSS later.
   `PAYMENT_PROVIDER=paddle|lemonsqueezy|dodo` fail-closes. Copy-paste policy
   for InsurOS, Telpen Edu, and Stawi is in `docs/GROUP_TAX_OPERATING_MODEL.md`.
+- Added a fail-closed Stripe Tax rate overlay. Unset `TAX_RATE_PROVIDER` keeps
+  finance-module rules. `TAX_RATE_PROVIDER=stripe_tax` requires
+  `STRIPE_SECRET_KEY`, quotes `POST /v1/tax/calculations`, and rejects a zero
+  or mismatched quote. Stripe Tax does not remit, file iTax, or approve the
+  Kenya profile.
 
 ## Epic 9: Mobile, Localization, and Launch
 
@@ -596,12 +601,12 @@ Progress:
 1. Hosted Prisma on Fly — **done** (`persistence.mode: prisma`).
 2. `INTERNAL_JOB_KEY` + scheduled-jobs smoke-test — **done**.
 3. Do not start a native Play app until Play Billing exists.
-4. Kenya tax profile — **draft in code, not yet on live API**. Operating
-   model is locked (`docs/GROUP_TAX_OPERATING_MODEL.md`): stay merchant of
-   record, Kenya iTax or one Kenyan agent, keep STK, finance module + Stripe
-   Tax, EU OSS later. Do not travel and do not open a Kenyan office for VAT.
-   eTIMS is not required on the non-resident path. Approve via
-   `POST /v1/finance/country-tax-profiles` with `approvedBy` only after that
-   packet exists. After merge, redeploy the API image so seed writes the draft.
-   Paste the group-model copy blocks into InsurOS, Telpen Edu, and Stawi on
-   Desktop (this repo cannot push those remotes).
+4. Kenya tax profile — **live DRAFT** on the API. Checkout returns `tax_profile`
+   until a human sets `approvedBy` after the iTax / Kenyan-agent packet exists.
+   Operating model is locked (`docs/GROUP_TAX_OPERATING_MODEL.md`).
+5. Stripe Tax — optional rate overlay (`TAX_RATE_PROVIDER=stripe_tax`) after a
+   Kenya registration exists in the Stripe Dashboard. Finance-module 16% remains
+   the source of truth. Do not treat Stripe Tax as remitter.
+6. Named Kenyan tax agent / iTax contact still unassigned (human).
+7. Do not onboard paying subscribers until the Kenya profile is APPROVED and
+   live STK credentials are reviewed.

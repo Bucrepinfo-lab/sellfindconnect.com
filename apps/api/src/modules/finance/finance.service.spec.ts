@@ -116,6 +116,88 @@ describe('FinanceService', () => {
     expect(await service.listTaxCalculations(tenantId)).toHaveLength(1);
   });
 
+  it('records a Stripe Tax quote when it matches the finance-module rate', async () => {
+    const service = new FinanceService(undefined, undefined, undefined, {
+      provider: 'STRIPE_TAX',
+      quote: async () => ({
+        id: 'taxcalc_ke_16',
+        currencyCode: 'KES',
+        taxAmount: 1.38,
+        percentageDecimal: 16,
+      }),
+    });
+    await service.configureCountryTaxProfile({
+      countryCode: 'KE',
+      taxAuthorityName: 'Pilot Tax Authority',
+      taxRegistrationStatus: 'REGISTERED',
+      localFinanceOwner: 'Country Finance Admin',
+      filingFrequency: 'MONTHLY',
+      recordRetentionYears: 7,
+      taxInclusivePricing: true,
+      approvedBy: 'global-finance-admin',
+    });
+    await service.createTaxRule({
+      countryCode: 'KE',
+      taxType: 'VAT',
+      taxRate: 0.16,
+      productTaxCode: 'SFC_SUBSCRIPTION',
+      effectiveFrom: '2026-01-01T00:00:00.000Z',
+    });
+
+    const result = await service.calculateTax(tenantId, {
+      countryCode: 'KE',
+      grossAmount: 10,
+      presentmentCurrency: 'KES',
+      productTaxCode: 'SFC_SUBSCRIPTION',
+      customerEvidence: { billingCountry: 'KE' },
+    });
+
+    expect(result.snapshot).toMatchObject({
+      provider: 'STRIPE_TAX',
+      providerReference: 'taxcalc_ke_16',
+      taxAmount: 1.3793,
+    });
+    expect(result.snapshot.calculationReason).toContain('STRIPE_TAX matched');
+  });
+
+  it('fail-closes tax calculation when Stripe Tax returns no VAT', async () => {
+    const service = new FinanceService(undefined, undefined, undefined, {
+      provider: 'STRIPE_TAX',
+      quote: async () => ({
+        id: 'taxcalc_zero',
+        currencyCode: 'KES',
+        taxAmount: 0,
+      }),
+    });
+    await service.configureCountryTaxProfile({
+      countryCode: 'KE',
+      taxAuthorityName: 'Pilot Tax Authority',
+      taxRegistrationStatus: 'REGISTERED',
+      localFinanceOwner: 'Country Finance Admin',
+      filingFrequency: 'MONTHLY',
+      recordRetentionYears: 7,
+      taxInclusivePricing: true,
+      approvedBy: 'global-finance-admin',
+    });
+    await service.createTaxRule({
+      countryCode: 'KE',
+      taxType: 'VAT',
+      taxRate: 0.16,
+      productTaxCode: 'SFC_SUBSCRIPTION',
+      effectiveFrom: '2026-01-01T00:00:00.000Z',
+    });
+
+    await expect(
+      service.calculateTax(tenantId, {
+        countryCode: 'KE',
+        grossAmount: 10,
+        presentmentCurrency: 'KES',
+        productTaxCode: 'SFC_SUBSCRIPTION',
+        customerEvidence: { billingCountry: 'KE' },
+      }),
+    ).rejects.toThrow(/unset TAX_RATE_PROVIDER/);
+  });
+
   it('generates a tax return and approval alerts from stored snapshots', async () => {
     const service = await configuredService();
 
