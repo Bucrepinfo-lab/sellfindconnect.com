@@ -28,6 +28,9 @@ Pure logic lives in `packages/domain/src/finance.ts`; wiring in
 
 ## Non-negotiables
 - **No paid use in a country without an APPROVED tax profile.**
+- Stay merchant of record. Kenya first on iTax (or one Kenyan agent). Keep
+  STK. Rates from the finance module and Stripe Tax. EU OSS later. Never
+  enable Paddle / Lemon Squeezy / Dodo (`docs/GROUP_TAX_OPERATING_MODEL.md`).
 - Every paid transaction produces a tax snapshot + ledger entry.
 - Pricing: first month free, then 10 local-currency units/month.
 - The agent **analyses and prepares**; it never moves money autonomously —
@@ -38,8 +41,8 @@ Pure logic lives in `packages/domain/src/finance.ts`; wiring in
   `:close-management`, `:journal-entry`, `:audit-support`.
 - `small-business:cash-flow-snapshot`, `:month-end-prep`, `:tax-prep`,
   `:invoice-chase`, `:margin-analyzer`.
-- Free to connect QuickBooks / Stripe / PayPal / Square and a tax provider
-  (Stripe Tax / Avalara / local) via the MCP registry — behind the adapter.
+- Stripe Tax is a **rate engine**, not the remitter or seller. Connect it
+  behind the finance adapter; iTax / the Kenyan agent files.
 
 ## Workflow
 1. **Confirm** the country, period, and goal with the owner.

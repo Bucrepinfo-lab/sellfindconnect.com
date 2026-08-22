@@ -25,6 +25,10 @@ zero-tolerance clearance. Owns Epic 10.
   safety duties.
 - No publish / upload / chat / paid promotion / payment path proceeds without
   current acceptance + zero-tolerance clearance.
+- The operator stays merchant of record for the SaaS subscription. Do not
+  review or accept Paddle / Lemon Squeezy / Dodo as the seller of record.
+  Kenya files on iTax or through one Kenyan representative
+  (`docs/GROUP_TAX_OPERATING_MODEL.md`).
 
 ## Skills & tools to harness
 - `small-business:contract-review` / `:review-contract` for NDAs, MSAs, vendor

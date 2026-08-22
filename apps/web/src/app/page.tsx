@@ -42,6 +42,7 @@ import {
   calculateTaxSnapshotAmounts,
   calculateTrialSubscription,
   describePaidLaunchReadiness,
+  describeTaxOperatingModel,
   evaluatePaidLaunchReadiness,
   kenyaPilotTaxProfileDraft,
   canExportCountryTaxReport,
@@ -1860,6 +1861,10 @@ export default function Home() {
                 value={describePaidLaunchReadiness(paidLaunchReadiness)}
               />
               <FinanceRow
+                label="Merchant of record"
+                value={describeTaxOperatingModel()}
+              />
+              <FinanceRow
                 label="Subscription"
                 value={formatMoney(
                   country.monthlySubscriptionAmount,
@@ -1957,8 +1962,9 @@ export default function Home() {
                   <div>
                     <strong>Paid launch blocked</strong>
                     <span>
-                      Kenya VAT 16% is proposed from KRA rules. A Country Finance Admin must
-                      approve the tax profile before STK checkout can run.
+                      Kenya VAT 16% is proposed from KRA rules. This platform stays merchant
+                      of record (iTax or one Kenyan agent, STK + Stripe Tax). A Country
+                      Finance Admin must approve the tax profile before STK checkout can run.
                     </span>
                   </div>
                 </div>

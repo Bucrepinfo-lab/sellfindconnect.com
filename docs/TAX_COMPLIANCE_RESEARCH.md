@@ -111,8 +111,8 @@ Handing the SaaS subscription to Paddle would also split tax snapshots away
 from the finance module and still leave **SEP** (income tax on the operator)
 as the operator's problem in Kenya.
 
-Do not adopt MoR for the Kenya web/PWA subscription unless finance and product
-explicitly drop STK as the SaaS seller of record.
+Do not adopt MoR for the Kenya web/PWA subscription. Login-phone STK is the
+locked SaaS rail, and this operator stays the seller of record.
 
 ## Kenya specifically (pilot)
 
@@ -154,22 +154,25 @@ that country's threshold is met.
 | Nigeria / Ghana / others | FIRS / GRA simplified non-resident VAT | When that country's published digital-services threshold is crossed. |
 | US sales tax | Economic-nexus engines (Stripe Tax / Avalara) | Only if you sell to US buyers and hit a state's nexus; not the Kenya pilot. |
 
-## Recommended operating model for Sell Find Connect
+## Locked operating model for Sell Find Connect (and the other four owner products)
 
 **Stay the merchant of record. Do not travel. Do not incorporate per country
-for VAT.**
+for VAT.** This is no longer a recommendation. See
+`docs/GROUP_TAX_OPERATING_MODEL.md` and
+`packages/domain/src/tax-operating-model.ts`.
 
 1. **Kenya first**, remote iTax (or a Nairobi CPA as representative). Approve
    the DRAFT 16% VAT profile only after that packet exists.
 2. Keep **STK + Stripe** as payment adapters. Use Stripe Tax (or the existing
    finance rule table) for rates. The finance workbench already stores
-   snapshots, returns, and remittance evidence.
+   snapshots, returns, and remittance evidence. Stripe Tax is a rate engine,
+   not the remitter.
 3. Hire **one Kenyan tax agent** (email + iTax), not a Country Finance
    department in every market.
 4. Add the next country only when a paying tenant's billing country requires
    it. Use OSS for the EU instead of 27 PINs.
-5. Revisit Merchant of Record only if you launch a **card-only** international
-   plan that is allowed to abandon STK as the SaaS seller.
+5. Do not adopt Merchant of Record (Paddle / Lemon Squeezy / Dodo). Those
+   providers are rejected in the payment adapter factory.
 
 ## What this does not decide
 

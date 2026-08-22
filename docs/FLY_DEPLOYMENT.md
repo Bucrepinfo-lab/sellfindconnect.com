@@ -130,7 +130,8 @@ Do not onboard paying subscribers until:
   for that non-resident path. Seed writes the profile as DRAFT (KRA 16% VAT).
   Checkout returns `tax_profile` until `approvedBy` is set.
   `GET /v1/finance/launch-readiness?country=KE` must report `allowed: true`.
-  See `docs/TAX_COMPLIANCE_RESEARCH.md`.
+  The operator stays merchant of record; `PAYMENT_PROVIDER` must not be a
+  merchant-of-record checkout. See `docs/GROUP_TAX_OPERATING_MODEL.md`.
 
 ## DigitalOcean and Railway
 

@@ -38,3 +38,5 @@ them. Aligns with the product's growth engine and SEO strategy.
 - No spam or prohibited-category outreach; respect consent and local rules.
 - Don't over-promise: claims about the product must match shipped reality.
 - Hand billing/tax specifics to the Finance Agent and contract terms to Legal.
+  Paid launch is blocked until the Kenya tax profile is APPROVED. Do not sell
+  a Paddle/MoR checkout; this operator stays merchant of record.

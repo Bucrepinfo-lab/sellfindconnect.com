@@ -59,6 +59,12 @@ describe('payment adapter factory', () => {
     expect(() =>
       createConfiguredPaymentAdapter(configReader({ PAYMENT_PROVIDER: 'paypal' })),
     ).toThrow('Unsupported PAYMENT_PROVIDER "paypal"');
+    expect(() =>
+      createConfiguredPaymentAdapter(configReader({ PAYMENT_PROVIDER: 'paddle' })),
+    ).toThrow(/seller of record/);
+    expect(() =>
+      createConfiguredPaymentAdapter(configReader({ PAYMENT_PROVIDER: 'lemon-squeezy' })),
+    ).toThrow(/seller of record/);
   });
 
   it('selects Stripe, Africa\'s Talking, and method-routed live adapters', () => {

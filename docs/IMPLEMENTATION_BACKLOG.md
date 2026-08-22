@@ -536,6 +536,10 @@ Progress:
   profile. `GET /v1/finance/launch-readiness` reports the gate. STK checkout
   returns `tax_profile` until a human sets `approvedBy`. The web Finance
   Readiness panel no longer claims the profile is approved.
+- Locked the group tax operating model: self merchant of record, Kenya iTax
+  or one Kenyan agent, STK + Stripe, finance module + Stripe Tax, EU OSS later.
+  `PAYMENT_PROVIDER=paddle|lemonsqueezy|dodo` fail-closes. Copy-paste policy
+  for InsurOS, Telpen Edu, and Stawi is in `docs/GROUP_TAX_OPERATING_MODEL.md`.
 
 ## Epic 9: Mobile, Localization, and Launch
 
@@ -592,10 +596,12 @@ Progress:
 1. Hosted Prisma on Fly — **done** (`persistence.mode: prisma`).
 2. `INTERNAL_JOB_KEY` + scheduled-jobs smoke-test — **done**.
 3. Do not start a native Play app until Play Billing exists.
-4. Kenya tax profile — **draft in code, not yet on live API**. Do not travel
-   and do not open a Kenyan office for VAT. Use KRA iTax simplified
-   digital-marketplace registration **or** a Kenyan tax representative
-   (`docs/TAX_COMPLIANCE_RESEARCH.md`). eTIMS is not required on that
-   non-resident path. Approve via `POST /v1/finance/country-tax-profiles`
-   with `approvedBy` only after that packet exists. After merge, redeploy
-   the API image so seed writes the draft.
+4. Kenya tax profile — **draft in code, not yet on live API**. Operating
+   model is locked (`docs/GROUP_TAX_OPERATING_MODEL.md`): stay merchant of
+   record, Kenya iTax or one Kenyan agent, keep STK, finance module + Stripe
+   Tax, EU OSS later. Do not travel and do not open a Kenyan office for VAT.
+   eTIMS is not required on the non-resident path. Approve via
+   `POST /v1/finance/country-tax-profiles` with `approvedBy` only after that
+   packet exists. After merge, redeploy the API image so seed writes the draft.
+   Paste the group-model copy blocks into InsurOS, Telpen Edu, and Stawi on
+   Desktop (this repo cannot push those remotes).

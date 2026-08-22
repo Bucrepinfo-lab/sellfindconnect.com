@@ -30,6 +30,8 @@ docs/
   FLY_DEPLOYMENT.md
   PLAY_STORE.md
   DIGITALOCEAN_DEPLOYMENT.md
+  TAX_COMPLIANCE_RESEARCH.md
+  GROUP_TAX_OPERATING_MODEL.md
 ```
 
 ## Runtime Components
@@ -171,10 +173,13 @@ without validating it against the authenticated user's assignments.
   with optional `action` and `entityType` filters. Auth, profile, advert, and
   safety events continue to use the same `AuditLog` trail.
 - Billing: trial, subscription, invoice, payment, refund, and chargeback.
+  `PAYMENT_PROVIDER` selects Stripe and/or Africa's Talking STK. Merchant-of-record
+  names are rejected.
 - Finance: country tax profiles, tax snapshots, ledger, reconciliation, returns,
   remittances, alerts, approvals, and evidence. Tenant finance routes require
   an MFA-verified tenant session. Opt-in Prisma persistence is selected with
-  `FINANCE_REPOSITORY=prisma`.
+  `FINANCE_REPOSITORY=prisma`. `GET /v1/finance/launch-readiness` reports the
+  locked operating model (`docs/GROUP_TAX_OPERATING_MODEL.md`).
 - Analytics: privacy-aware product and business events. Tenant analytics routes
   require an MFA-verified tenant session.
 
@@ -211,7 +216,9 @@ flowchart TD
 
 Paid launch is blocked for a country until its pricing row, tax profile, tax
 calendar, payment adapter, invoice template, finance owner, and remittance
-workflow are approved.
+workflow are approved. The operator stays merchant of record (Kenya iTax or
+one Kenyan agent, STK + Stripe, finance module + Stripe Tax, EU OSS later).
+Merchant-of-record checkouts are rejected in the payment adapter factory.
 
 The current finance command API can generate tenant-scoped invoices, receipts,
 refund credit notes, chargeback records, dunning notices, and related tax or

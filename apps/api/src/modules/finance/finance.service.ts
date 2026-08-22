@@ -18,6 +18,7 @@ import {
   evaluateTaxPeriodCompletion,
   evaluatePaidLaunchReadiness,
   kenyaPilotTaxProfileDraft,
+  TAX_OPERATING_MODEL,
   getDunningNoticeDecision,
   getCountry,
   looksLikeCardPan,
@@ -151,6 +152,7 @@ export class FinanceService {
     const readiness = evaluatePaidLaunchReadiness(countryCode, profile);
     return {
       ...readiness,
+      operatingModel: TAX_OPERATING_MODEL,
       taxAuthorityName: profile?.taxAuthorityName,
       taxRegistrationStatus: profile?.taxRegistrationStatus,
       proposedVatRate:

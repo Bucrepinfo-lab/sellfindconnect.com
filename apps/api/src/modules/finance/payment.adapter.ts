@@ -1,4 +1,5 @@
 import {
+  assertSelfMerchantOfRecordProvider,
   fromPaymentProviderMinorUnits,
   looksLikeCardPan,
   mapAfricasTalkingCheckoutToFinanceStatus,
@@ -17,10 +18,11 @@ import { createHash } from 'node:crypto';
 
 /**
  * Provider-neutral payment adapter contract. Real providers (Stripe, local
- * mobile money, app-store billing) implement this interface behind an
- * env-selected factory, mirroring the media adapter pattern. The adapter never
- * decides tax: it only captures/refunds an already-computed, tax-snapshotted
- * amount and returns provider evidence.
+ * mobile money) implement this interface behind an env-selected factory,
+ * mirroring the media adapter pattern. The adapter never decides tax: it only
+ * captures/refunds an already-computed, tax-snapshotted amount and returns
+ * provider evidence. Merchant-of-record checkouts (Paddle, Lemon Squeezy,
+ * Dodo) are rejected so this product stays the seller of record.
  */
 export interface PaymentAdapter {
   readonly provider: string;
@@ -469,6 +471,9 @@ export function createConfiguredPaymentAdapter(
   fetchImpl: PaymentAdapterFetch = fetch as PaymentAdapterFetch,
 ): PaymentAdapter {
   const provider = config?.get('PAYMENT_PROVIDER')?.trim().toLowerCase();
+  if (provider) {
+    assertSelfMerchantOfRecordProvider(provider);
+  }
 
   switch (provider) {
     case undefined:
