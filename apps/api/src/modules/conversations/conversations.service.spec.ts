@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import type { AuthService } from '../auth/auth.service';
+import { UgcService } from '../ugc/ugc.service';
 import { ConversationsRealtimeService } from './conversations.realtime.service';
 import { ConversationsService } from './conversations.service';
+import { InMemoryConversationsRepository } from './in-memory-conversations.repository';
 
 const tenantId = '11111111-1111-4111-8111-111111111111';
 
@@ -318,5 +320,56 @@ describe('ConversationsService', () => {
     expect(auditLogs.some((record) => record.action === 'CONVERSATION_MESSAGE_SENT')).toBe(true);
     expect(JSON.stringify(auditLogs)).not.toContain(opener.message);
     expect(JSON.stringify(auditLogs)).not.toContain('Please share delivery coverage');
+  });
+
+  it('refuses create, send, and SLA for a blocked Source Finder target', async () => {
+    const ugc = new UgcService();
+    await ugc.createBlock(tenantId, 'owner-1', {
+      blockedTargetId: 'r1',
+      reason: 'HARASSMENT',
+      acceptedTerms: true,
+    });
+    const service = new ConversationsService(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      ugc,
+    );
+
+    await expect(service.createConversation(tenantId, opener)).rejects.toThrow(/blocked/);
+
+    const repository = new InMemoryConversationsRepository();
+    const openService = new ConversationsService(repository);
+    const conversation = await openService.createConversation(tenantId, opener);
+    const blockedThread = new ConversationsService(
+      repository,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      ugc,
+    );
+
+    await expect(
+      blockedThread.sendMessage(tenantId, conversation.id, {
+        senderRole: 'TENANT_AGENT',
+        body: 'Thank you. Please share delivery coverage and price terms.',
+        acceptedTerms: true,
+      }),
+    ).rejects.toThrow(/blocked/);
+    await expect(
+      blockedThread.recordTyping(tenantId, conversation.id, 'TENANT_AGENT'),
+    ).rejects.toThrow(/blocked/);
+
+    const presented = await blockedThread.getConversation(tenantId, conversation.id);
+    expect(presented.userBlocked).toBe(true);
+    expect(presented.status).toBe('BLOCKED');
+    expect(presented.sla.state).toBe('PAUSED');
+
+    const dueAt = new Date(Date.parse(conversation.firstResponseDueAt) + 60_000).toISOString();
+    const sla = await blockedThread.runSlaChecks(tenantId, { now: dueAt });
+    expect(sla.notificationsCreated).toHaveLength(0);
   });
 });

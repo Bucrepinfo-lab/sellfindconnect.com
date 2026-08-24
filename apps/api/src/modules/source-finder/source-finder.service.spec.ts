@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { UgcService } from '../ugc/ugc.service';
 import { SourceFinderService } from './source-finder.service';
 
 describe('SourceFinderService', () => {
@@ -274,5 +275,32 @@ describe('SourceFinderService', () => {
     expect(report.byRelationship.length).toBeGreaterThan(0);
 
     await expect(service.hierarchy({ countryCode: 'ZZ' })).rejects.toThrow();
+  });
+
+  it('omits blocked sources from search and opportunity alerts', async () => {
+    const ugc = new UgcService();
+    const tenantId = '11111111-1111-4111-8111-111111111111';
+    await ugc.createBlock(tenantId, 'owner-1', {
+      blockedTargetId: 'r1',
+      reason: 'HARASSMENT',
+      acceptedTerms: true,
+    });
+    const service = new SourceFinderService(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      ugc,
+    );
+
+    const response = await service.search(
+      { query: 'fresh produce', countryCode: 'KE', sortBy: 'RELEVANCE' },
+      tenantId,
+    );
+    expect(response.results.map((result) => result.id)).not.toContain('r1');
+    await expect(
+      service.recordOutcome(tenantId, { sourceRecordId: 'r1', action: 'SAVE' }),
+    ).rejects.toThrow(/blocked/);
   });
 });

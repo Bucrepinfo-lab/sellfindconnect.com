@@ -24,6 +24,10 @@ describe('UgcService', () => {
     expect((await service.listReports(tenantId))[0]?.id).toBe(report.id);
     expect((await service.listBlocks(tenantId)).map((item) => item.blockedTargetId)).toEqual(['r2']);
     expect(block.blockedTargetId).toBe('r2');
+    expect(await service.isBlocked(tenantId, 'r2')).toBe(true);
+    expect(await service.isBlocked(tenantId, 'r1')).toBe(false);
+    await expect(service.requireUnblocked(tenantId, 'r2')).rejects.toThrow(/blocked/);
+    await expect(service.requireUnblocked(tenantId, 'r1')).resolves.toBeUndefined();
   });
 
   it('rejects missing terms, self-blocks, and duplicate blocks', async () => {

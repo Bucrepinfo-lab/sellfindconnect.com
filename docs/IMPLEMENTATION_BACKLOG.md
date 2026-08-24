@@ -613,6 +613,9 @@ Progress:
   Moderators list and close reports at `/v1/platform/ugc/reports`. Prisma
   overlays with `PERSISTENCE_DRIVER=prisma`. Audit stores reason and target
   id, never report details.
+- Conversation create/send/media/typing, lead inquiry, and Source Finder
+  search/alerts now refuse or hide blocked targets. Unblock restores
+  messaging; SLA sweeps skip blocked sources.
 
 ## Immediate Sprint
 
@@ -632,6 +635,8 @@ Progress:
 9. Public `/prohibited` plus `/dashboard` redirects — **live**. Home honors
    `view=discover|adverts`, `q`, `industry`, and `role`.
 10. Public `/community` community standards — **live** (HTTP 200).
-11. UGC report/block — after merge, API then web:
-    `fly deploy --config fly.api.toml --remote-only` (Prisma migrate) then
+11. UGC report/block — **live** (API + web).
+12. Enforce tenant blocks on conversation, inquiry, and Source Finder APIs —
+    after merge, API then web:
+    `fly deploy --config fly.api.toml --remote-only` then
     `fly deploy --config fly.web.toml --remote-only`.

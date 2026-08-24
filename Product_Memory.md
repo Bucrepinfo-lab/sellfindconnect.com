@@ -295,3 +295,7 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   in memory by default and Prisma when `PERSISTENCE_DRIVER=prisma`.
   Moderators use `GET/POST /v1/platform/ugc/reports`. Audit stores reason
   and target id, never report details. API then web deploy.
+- 2026-08-22: Tenant blocks now stop conversation create/send/media/typing,
+  lead inquiry, Source Finder search, opportunity alerts, and outcome
+  writes. Existing threads present as `BLOCKED` with paused SLA until the
+  tenant unblocks. No new Prisma migration. API then web deploy.

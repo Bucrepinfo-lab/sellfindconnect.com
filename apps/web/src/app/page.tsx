@@ -126,6 +126,7 @@ import {
   createUserBlock,
   createUserContentReport,
   filterBlockedSourceFinderResults,
+  isTargetBlocked,
   ugcReportReasons,
   type UgcReportReason,
   type UserBlock,
@@ -627,6 +628,7 @@ export default function Home() {
         pilotSourceFinderRecords,
       )
         .slice(0, 2)
+        .filter((result) => !isTargetBlocked(userBlocks, tenantId, result.id))
         .map((result) => ({
           id: `${savedSearch.id}-${result.id}`,
           savedSearch,
@@ -716,7 +718,12 @@ export default function Home() {
   );
   const selectedMatch = filteredResults[0];
   const leadIntelligence = selectedMatch ? buildLeadConversionIntelligence(selectedMatch) : null;
-  const canCreateLead = Boolean(termsAccepted && querySafetyDecision.allowed && selectedMatch);
+  const canCreateLead = Boolean(
+    termsAccepted &&
+      querySafetyDecision.allowed &&
+      selectedMatch &&
+      !isTargetBlocked(userBlocks, tenantId, selectedMatch.id),
+  );
   const relationshipSafety = evaluateSafetyText(
     `${tenantDisplayName} ${relationshipNote} Rift Valley Cold Chain Logistics`,
   );

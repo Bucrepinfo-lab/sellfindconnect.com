@@ -5,6 +5,7 @@ import { requireDatabaseUrl, resolvePersistenceMode } from '../../persistence';
 import { AuthModule } from '../auth/auth.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { RelationshipsModule } from '../relationships/relationships.module';
+import { UgcModule } from '../ugc/ugc.module';
 import { InMemorySourceFinderRepository } from './in-memory-source-finder.repository';
 import {
   SOURCE_FINDER_EMBEDDER,
@@ -15,7 +16,7 @@ import { SourceFinderController } from './source-finder.controller';
 import { SourceFinderService } from './source-finder.service';
 
 @Module({
-  imports: [AuthModule, RelationshipsModule, NotificationsModule],
+  imports: [AuthModule, RelationshipsModule, NotificationsModule, UgcModule],
   controllers: [SourceFinderController],
   providers: [
     InMemorySourceFinderRepository,

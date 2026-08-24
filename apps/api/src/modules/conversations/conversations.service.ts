@@ -61,6 +61,7 @@ import {
   type MediaAdapters,
 } from '../media/media.adapters';
 import { NotificationsService } from '../notifications/notifications.service';
+import { UgcService } from '../ugc/ugc.service';
 
 @Injectable()
 export class ConversationsService {
@@ -83,6 +84,8 @@ export class ConversationsService {
     notifications?: NotificationsService,
     @Optional()
     auth?: AuthService,
+    @Optional()
+    private readonly ugc?: UgcService,
   ) {
     this.repository = repository ?? new InMemoryConversationsRepository();
     this.mediaAdapters = mediaAdapters ?? createDefaultMediaAdapters();
@@ -94,6 +97,7 @@ export class ConversationsService {
   async createConversation(tenantId: string, input: CreateConversationDto, actorUserId?: string) {
     this.requireTerms(input.acceptedTerms);
     this.assertSafe(input, 'Conversation contains blocked content.');
+    await this.requireUnblockedSource(tenantId, input.sourceRecordId);
 
     const source = this.getSourceResult(input.sourceRecordId, input.query);
     const intelligence = buildLeadConversionIntelligence(source);
@@ -155,12 +159,16 @@ export class ConversationsService {
   }
 
   async listConversations(tenantId: string) {
-    const conversations = await this.repository.listConversations(tenantId);
+    const [conversations, blockedIds] = await Promise.all([
+      this.repository.listConversations(tenantId),
+      this.blockedSourceIds(tenantId),
+    ]);
     return Promise.all(
       conversations.map(async (conversation) =>
         this.presentConversation(
           conversation,
           await this.repository.listMessages(tenantId, conversation.id),
+          blockedIds.has(conversation.sourceRecordId),
         ),
       ),
     );
@@ -171,6 +179,7 @@ export class ConversationsService {
     return this.presentConversation(
       conversation,
       await this.repository.listMessages(tenantId, conversationId),
+      await this.isSourceBlocked(tenantId, conversation.sourceRecordId),
     );
   }
 
@@ -192,6 +201,7 @@ export class ConversationsService {
     if (conversation.status === 'BLOCKED' || conversation.status === 'RESOLVED') {
       throw new UnprocessableEntityException('Conversation is closed for new messages.');
     }
+    await this.requireUnblockedSource(tenantId, conversation.sourceRecordId);
 
     const now = new Date().toISOString();
     const attachments = await this.requireSendableAttachments(
@@ -323,6 +333,7 @@ export class ConversationsService {
     typingRole: ConversationParticipantRole,
   ) {
     const conversation = await this.requireConversation(tenantId, conversationId);
+    await this.requireUnblockedSource(tenantId, conversation.sourceRecordId);
     const updated = this.runReceipt(() => recordConversationTyping(conversation, typingRole));
     await this.repository.updateConversation(updated);
     this.realtime.publishEvent({
@@ -387,7 +398,8 @@ export class ConversationsService {
     conversationId: string,
     input: PrepareConversationMediaUploadDto,
   ) {
-    await this.requireConversation(tenantId, conversationId);
+    const conversation = await this.requireConversation(tenantId, conversationId);
+    await this.requireUnblockedSource(tenantId, conversation.sourceRecordId);
     const existingMedia = await this.repository.listMediaAssets(tenantId, conversationId);
     if (existingMedia.length >= mediaPolicy.maxItemsPerOwner) {
       throw new UnprocessableEntityException(
@@ -424,7 +436,8 @@ export class ConversationsService {
   }
 
   async addMedia(tenantId: string, conversationId: string, input: CreateConversationMediaDto) {
-    await this.requireConversation(tenantId, conversationId);
+    const conversation = await this.requireConversation(tenantId, conversationId);
+    await this.requireUnblockedSource(tenantId, conversation.sourceRecordId);
     const existingMedia = await this.repository.listMediaAssets(tenantId, conversationId);
     if (existingMedia.length >= mediaPolicy.maxItemsPerOwner) {
       throw new UnprocessableEntityException(
@@ -590,6 +603,7 @@ export class ConversationsService {
     this.assertSafe(input, 'Assignment contains blocked content.');
 
     const conversation = await this.requireConversation(tenantId, conversationId);
+    await this.requireUnblockedSource(tenantId, conversation.sourceRecordId);
     const now = new Date().toISOString();
     const updated: ConversationRecord = {
       ...conversation,
@@ -650,8 +664,12 @@ export class ConversationsService {
     const checkedAt = input.now ?? new Date().toISOString();
     const notificationsCreated: ConversationNotification[] = [];
     const conversations = await this.repository.listConversations(tenantId);
+    const blockedIds = await this.blockedSourceIds(tenantId);
 
     for (const conversation of conversations) {
+      if (blockedIds.has(conversation.sourceRecordId)) {
+        continue;
+      }
       const decision = calculateConversationSlaDecision(
         {
           openedAt: conversation.openedAt,
@@ -721,6 +739,7 @@ export class ConversationsService {
   private presentConversation(
     conversation: ConversationRecord,
     messages: ConversationMessage[] = [],
+    userBlocked = false,
   ) {
     const sla = calculateConversationSlaDecision({
       openedAt: conversation.openedAt,
@@ -728,7 +747,7 @@ export class ConversationsService {
       firstResponseAt: conversation.firstResponseAt,
       responseSlaHours: conversation.responseSlaHours,
       priority: conversation.priority,
-      status: conversation.status,
+      status: userBlocked ? 'BLOCKED' : conversation.status,
     });
     const savedReplies = buildSavedReplySuggestions({
       sourceName: conversation.sourceName,
@@ -738,9 +757,11 @@ export class ConversationsService {
 
     return {
       ...conversation,
+      status: userBlocked && conversation.status !== 'RESOLVED' ? 'BLOCKED' : conversation.status,
       sla,
       savedReplies,
       unreadCount,
+      userBlocked,
       typingActive: isConversationTypingActive(conversation.typingAt),
       presence: this.realtime.snapshot(conversation.tenantId, conversation.id),
     };
@@ -846,6 +867,24 @@ export class ConversationsService {
     }
 
     return source;
+  }
+
+  private async requireUnblockedSource(tenantId: string, sourceRecordId: string): Promise<void> {
+    await this.ugc?.requireUnblocked(tenantId, sourceRecordId);
+  }
+
+  private async isSourceBlocked(tenantId: string, sourceRecordId: string): Promise<boolean> {
+    return this.ugc ? this.ugc.isBlocked(tenantId, sourceRecordId) : false;
+  }
+
+  private async blockedSourceIds(tenantId: string): Promise<Set<string>> {
+    if (!this.ugc) {
+      return new Set();
+    }
+
+    return new Set(
+      (await this.ugc.listBlocks(tenantId)).map((block) => block.blockedTargetId),
+    );
   }
 
   private async requireConversation(

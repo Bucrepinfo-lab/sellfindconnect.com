@@ -62,6 +62,7 @@ Play User Data requires:
 - A public prohibited-content URL. In this repo: `/prohibited`.
 - A public community-standards / UGC user-policy URL. In this repo: `/community`.
 - In-product report and block for UGC (`POST /v1/ugc/reports`, `POST /v1/ugc/blocks`).
+  Tenant blocks also stop conversation, inquiry, and Source Finder outreach.
 - **In-app and web-accessible account deletion** for any account the app creates.
   In this repo: `/account/delete` plus `POST/DELETE/GET /v1/privacy/deletion`.
 
