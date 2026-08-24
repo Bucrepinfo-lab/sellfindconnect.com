@@ -128,7 +128,7 @@ without validating it against the authenticated user's assignments.
   See `docs/MEDIA_PIPELINE.md` for storage mode and worker queue configuration.
 - Safety: blocked categories, policy decisions, media review cases, and
   tenant UGC reports/blocks (`POST /v1/ugc/reports`, `POST /v1/ugc/blocks`,
-  moderator `GET /v1/platform/ugc/reports`). Blocked Source Finder ids are
+  moderator queue `GET /v1/platform/ugc/reports` with severity/SLA). Blocked Source Finder ids are
   omitted from that tenant’s search and alerts. Conversation create/send,
   media, typing, and lead inquiry fail closed until the tenant unblocks.
 - Discovery: Source Finder, search, filters, reason codes, saved searches,

@@ -20,7 +20,7 @@ export class UgcModerationController {
 
   @Get('reports')
   listReports() {
-    return this.ugc.listAllReports();
+    return this.ugc.listModeratorQueue();
   }
 
   @Post('reports/:id/resolve')

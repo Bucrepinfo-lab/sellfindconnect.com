@@ -85,10 +85,20 @@ describe('UgcService', () => {
     const closed = await service.resolveReport(report.id, 'mod-1', { resolution: 'RESOLVED' });
 
     expect(closed.status).toBe('RESOLVED');
+    expect(closed.open).toBe(false);
     expect(JSON.stringify(auditLogs)).not.toContain('Copied our company');
     expect(auditLogs.map((item) => item.action)).toEqual([
       'USER_CONTENT_REPORTED',
       'USER_CONTENT_REPORT_RESOLVED',
     ]);
+
+    const queue = await service.listModeratorQueue('2026-08-22T18:00:00.000Z');
+    expect(queue.openCount).toBe(0);
+    expect(queue.reports[0]).toMatchObject({
+      id: report.id,
+      severity: 'HIGH',
+      status: 'RESOLVED',
+      open: false,
+    });
   });
 });

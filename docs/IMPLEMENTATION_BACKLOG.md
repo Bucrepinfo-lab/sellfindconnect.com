@@ -2,7 +2,7 @@
 
 Status: Execution backlog
 Date: 2026-06-15
-Last updated: 2026-08-22
+Last updated: 2026-08-24
 
 ## Delivery Principles
 
@@ -616,6 +616,9 @@ Progress:
 - Conversation create/send/media/typing, lead inquiry, and Source Finder
   search/alerts now refuse or hide blocked targets. Unblock restores
   messaging; SLA sweeps skip blocked sources.
+- Added a UGC moderator queue: severity and SLA from report reason,
+  `GET /v1/platform/ugc/reports` returns open/overdue counts, and home can
+  load/resolve with an MFA `MODERATE_CONTENT` session.
 
 ## Immediate Sprint
 
@@ -637,6 +640,7 @@ Progress:
 10. Public `/community` community standards — **live** (HTTP 200).
 11. UGC report/block — **live** (API + web).
 12. Enforce tenant blocks on conversation, inquiry, and Source Finder APIs —
-    after merge, API then web:
+    **live** (API + web).
+13. UGC moderator queue — after merge, API then web:
     `fly deploy --config fly.api.toml --remote-only` then
     `fly deploy --config fly.web.toml --remote-only`.

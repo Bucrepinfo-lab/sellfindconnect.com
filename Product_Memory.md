@@ -1,7 +1,7 @@
 # Telpen Adverts Product Memory
 
 Date started: 2026-06-15
-Last updated: 2026-08-22
+Last updated: 2026-08-24
 Purpose: Persistent decision log and strategic memory for the Telpen Adverts multi-tenant advertising SaaS.
 
 This file must be updated whenever product strategy, pricing, compliance, architecture, market positioning, or execution decisions change.
@@ -299,3 +299,8 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   lead inquiry, Source Finder search, opportunity alerts, and outcome
   writes. Existing threads present as `BLOCKED` with paused SLA until the
   tenant unblocks. No new Prisma migration. API then web deploy.
+- 2026-08-24: Added a UGC moderator queue. Report reasons map to severity and
+  SLA (prohibited 24h, harassment/impersonation 72h). `GET /v1/platform/ugc/reports`
+  returns `{ openCount, overdueCount, reports }` sorted open/overdue/critical
+  first. Home loads and resolves the queue with an MFA `MODERATE_CONTENT`
+  session token. Audit still omits report details. API then web deploy.

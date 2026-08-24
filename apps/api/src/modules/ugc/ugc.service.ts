@@ -8,8 +8,10 @@ import {
 } from '@nestjs/common';
 import {
   blockedTargetContinueMessage,
+  buildUgcModeratorQueue,
   createUserBlock,
   createUserContentReport,
+  presentUgcModeratorQueueItem,
   resolveUserContentReport,
   UgcModerationError,
   type UserBlock,
@@ -65,6 +67,10 @@ export class UgcService {
     return this.repository.listAllReports();
   }
 
+  async listModeratorQueue(now = new Date().toISOString()) {
+    return buildUgcModeratorQueue(await this.repository.listAllReports(), now);
+  }
+
   async resolveReport(
     id: string,
     userId: string,
@@ -87,7 +93,7 @@ export class UgcService {
         reason: updated.reason,
       },
     });
-    return updated;
+    return presentUgcModeratorQueueItem(updated);
   }
 
   async createBlock(tenantId: string, userId: string, input: CreateUgcBlockDto): Promise<UserBlock> {
