@@ -138,6 +138,26 @@ describe('access control policy', () => {
     expect(deniedOtherCountry.reason).toBe('SCOPE_MISMATCH');
   });
 
+  it('lets country support look up tenant policy acceptance after MFA', () => {
+    const allowed = evaluateAccess({
+      subject: {
+        userId: 'support-1',
+        role: 'COUNTRY_SUPPORT_AGENT',
+        mfaVerified: true,
+        scope: { level: 'COUNTRY', countryCodes: ['KE'] },
+      },
+      permission: 'VIEW_TENANT',
+      resource: { tenantId, countryCode: 'KE' },
+    });
+
+    expect(getRolePermissions('COUNTRY_SUPPORT_AGENT')).toContain('VIEW_TENANT');
+    expect(getRolePermissions('COUNTRY_ADMIN')).toContain('VIEW_TENANT');
+    expect(getRolePermissions('COUNTRY_MODERATOR')).toContain('VIEW_TENANT');
+    expect(getRolePermissions('COUNTRY_FINANCE_ADMIN')).toContain('VIEW_TENANT');
+    expect(getRolePermissions('GLOBAL_FINANCE_ADMIN')).toContain('VIEW_TENANT');
+    expect(allowed.allowed).toBe(true);
+  });
+
   it('normalizes country resources into continent and operational region scope', () => {
     const resource = normalizeResourceScope({ countryCode: 'KE' });
 

@@ -100,6 +100,9 @@ describe('product audit helpers', () => {
     );
     expect(describeProductAuditAction('USER_CONTENT_REPORTED')).toBe('User content reported');
     expect(describeProductAuditAction('USER_BLOCKED')).toBe('User blocked');
+    expect(describeProductAuditAction('TERMS_ACCEPTANCE_LOOKED_UP')).toBe(
+      'Terms acceptance looked up',
+    );
   });
 
   it('filters tenant audit lookups by action and entity type', () => {

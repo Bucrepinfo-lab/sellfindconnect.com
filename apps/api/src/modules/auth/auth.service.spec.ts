@@ -513,6 +513,171 @@ describe('AuthService', () => {
     ).rejects.toThrow('scope');
   });
 
+  it('lets country support look up current terms acceptance without emails', async () => {
+    const repository = new InMemoryAuthRepository();
+    const service = new AuthService(repository);
+    const registered = await service.registerTenantOwner({
+      email: 'support@example.com',
+      password: strongPassword,
+      displayName: 'Mary Support',
+      tenantDisplayName: 'Support Home Tenant',
+      countryCode: 'KE',
+      industryCode: 'AGRICULTURE',
+      primaryRole: 'SUPPLIER',
+      userType: 'ADVERTISER',
+      acceptedTerms: true,
+    });
+    await service.verifyMfa({
+      sessionToken: registered.session.token,
+      code: registered.session.mfaChallenge?.developmentCode ?? '',
+    });
+    const now = new Date().toISOString();
+    repository.createAccessAssignment({
+      id: 'assignment-support',
+      userId: registered.user.id,
+      role: 'COUNTRY_SUPPORT_AGENT',
+      scopeLevel: 'COUNTRY',
+      countryCode: 'KE',
+      mfaRequired: true,
+      assignedBy: 'global-admin',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    expect(await service.hasCurrentTermsAcceptance(registered.user.id, registered.tenant.id)).toBe(
+      true,
+    );
+
+    const session = await service.checkPlatformSession({
+      sessionToken: registered.session.token,
+      permission: 'VIEW_TENANT',
+    });
+    const lookup = await service.lookupTermsAcceptance(session, {
+      tenantId: registered.tenant.id,
+    });
+
+    expect(lookup.currentCount).toBe(1);
+    expect(lookup.staleCount).toBe(0);
+    expect(lookup.records[0]).toMatchObject({
+      userId: registered.user.id,
+      tenantId: registered.tenant.id,
+      current: true,
+    });
+    expect(lookup.records[0]).not.toHaveProperty('accepted');
+    expect(JSON.stringify(lookup)).not.toContain('support@example.com');
+    expect(JSON.stringify(lookup)).not.toMatch(/ipHash|deviceHash/i);
+
+    const filtered = await service.lookupTermsAcceptance(session, {
+      tenantId: registered.tenant.id,
+      userId: registered.user.id,
+    });
+    expect(filtered.records).toHaveLength(1);
+
+    const empty = await service.lookupTermsAcceptance(session, {
+      tenantId: registered.tenant.id,
+      userId: 'missing-user',
+    });
+    expect(empty.records).toHaveLength(0);
+    expect(empty.currentCount).toBe(0);
+
+    const audit = await service.listAuditLogsForTenant(registered.tenant.id);
+    expect(audit.auditLogs.map((record) => record.action)).toContain('TERMS_ACCEPTANCE_LOOKED_UP');
+    expect(JSON.stringify(audit.auditLogs)).not.toContain('support@example.com');
+    expect(audit.auditLogs.find((record) => record.action === 'TERMS_ACCEPTANCE_LOOKED_UP')?.metadata)
+      .toMatchObject({
+        resultCount: 1,
+        currentCount: 1,
+        staleCount: 0,
+        filteredUser: false,
+      });
+
+    await expect(service.lookupTermsAcceptance(session, { tenantId: '  ' })).rejects.toThrow(
+      'tenant id',
+    );
+    await expect(
+      service.lookupTermsAcceptance(session, {
+        tenantId: '22222222-2222-4222-8222-222222222222',
+      }),
+    ).rejects.toThrow('Tenant not found');
+  });
+
+  it('rejects terms-acceptance lookup outside the assigned country', async () => {
+    const repository = new InMemoryAuthRepository();
+    const service = new AuthService(repository);
+    const registered = await service.registerTenantOwner({
+      email: 'support@example.com',
+      password: strongPassword,
+      displayName: 'Mary Support',
+      tenantDisplayName: 'Support Home Tenant',
+      countryCode: 'KE',
+      industryCode: 'AGRICULTURE',
+      primaryRole: 'SUPPLIER',
+      userType: 'ADVERTISER',
+      acceptedTerms: true,
+    });
+    await service.verifyMfa({
+      sessionToken: registered.session.token,
+      code: registered.session.mfaChallenge?.developmentCode ?? '',
+    });
+    const now = new Date().toISOString();
+    repository.createAccessAssignment({
+      id: 'assignment-ug',
+      userId: registered.user.id,
+      role: 'COUNTRY_SUPPORT_AGENT',
+      scopeLevel: 'COUNTRY',
+      countryCode: 'UG',
+      mfaRequired: true,
+      assignedBy: 'global-admin',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const session = await service.checkPlatformSession({
+      sessionToken: registered.session.token,
+      permission: 'VIEW_TENANT',
+    });
+    await expect(
+      service.lookupTermsAcceptance(session, { tenantId: registered.tenant.id }),
+    ).rejects.toThrow('scope');
+  });
+
+  it('requires MFA before looking up terms acceptance even when the assignment does not', async () => {
+    const repository = new InMemoryAuthRepository();
+    const service = new AuthService(repository);
+    const registered = await service.registerTenantOwner({
+      email: 'support@example.com',
+      password: strongPassword,
+      displayName: 'Mary Support',
+      tenantDisplayName: 'Support Home Tenant',
+      countryCode: 'KE',
+      industryCode: 'AGRICULTURE',
+      primaryRole: 'SUPPLIER',
+      userType: 'ADVERTISER',
+      acceptedTerms: true,
+    });
+    const now = new Date().toISOString();
+    repository.createAccessAssignment({
+      id: 'assignment-no-mfa-flag',
+      userId: registered.user.id,
+      role: 'COUNTRY_SUPPORT_AGENT',
+      scopeLevel: 'COUNTRY',
+      countryCode: 'KE',
+      mfaRequired: false,
+      assignedBy: 'global-admin',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const session = await service.checkPlatformSession({
+      sessionToken: registered.session.token,
+      permission: 'VIEW_TENANT',
+    });
+    expect(session.mfaVerified).toBe(false);
+    await expect(
+      service.lookupTermsAcceptance(session, { tenantId: registered.tenant.id }),
+    ).rejects.toThrow('MFA verification is required');
+  });
+
   it('blocks prohibited registration text', async () => {
     const service = new AuthService();
 

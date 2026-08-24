@@ -1,8 +1,10 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
+  NotFoundException,
   Optional,
   UnauthorizedException,
   UnprocessableEntityException,
@@ -10,12 +12,14 @@ import {
 import {
   activePolicyVersions,
   buildTermsAcceptanceEvidence,
+  buildTermsAcceptanceLookup,
   calculateTrialSubscription,
   evaluateAccess,
   evaluatePasswordPolicy,
   evaluateSafetyFields,
   getCountry,
   industryCategories,
+  isCurrentTermsAcceptance,
   normalizeResourceScope,
   requiresMfa,
   roleHasPermission,
@@ -1110,13 +1114,51 @@ export class AuthService {
 
   async hasCurrentTermsAcceptance(userId: string, tenantId: string): Promise<boolean> {
     const evidence = await this.repository.findTermsAcceptance(userId, tenantId);
-    return Boolean(
-      evidence?.accepted &&
-        evidence.termsVersion === activePolicyVersions.termsVersion &&
-        evidence.privacyVersion === activePolicyVersions.privacyVersion &&
-        evidence.prohibitedContentVersion === activePolicyVersions.prohibitedContentVersion &&
-        evidence.subscriptionTermsVersion === activePolicyVersions.subscriptionTermsVersion,
+    return Boolean(evidence && isCurrentTermsAcceptance(evidence));
+  }
+
+  async lookupTermsAcceptance(
+    session: PlatformAccessSession,
+    input: { tenantId: string; userId?: string },
+  ) {
+    const tenantId = input.tenantId.trim();
+    const userId = input.userId?.trim() || undefined;
+    if (!tenantId) {
+      throw new BadRequestException('A tenant id is required for policy-acceptance lookup.');
+    }
+
+    const tenant = await this.repository.findTenantById(tenantId);
+    if (!tenant) {
+      throw new NotFoundException('Tenant not found.');
+    }
+
+    if (!session.mfaVerified) {
+      throw new UnauthorizedException('MFA verification is required for policy-acceptance lookup.');
+    }
+
+    await this.requirePlatformAccess(session, 'VIEW_TENANT', {
+      tenantId,
+      countryCode: tenant.countryCode,
+    });
+
+    const lookup = buildTermsAcceptanceLookup(
+      await this.repository.listTermsAcceptance({ tenantId, userId }),
     );
+    await this.recordAudit({
+      tenantId,
+      actorUserId: session.userId,
+      action: 'TERMS_ACCEPTANCE_LOOKED_UP',
+      entityType: 'TERMS_ACCEPTANCE',
+      entityId: tenantId,
+      metadata: {
+        resultCount: lookup.records.length,
+        currentCount: lookup.currentCount,
+        staleCount: lookup.staleCount,
+        filteredUser: Boolean(userId),
+      },
+    });
+
+    return lookup;
   }
 
   private async createSession(

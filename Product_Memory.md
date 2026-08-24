@@ -304,3 +304,8 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   returns `{ openCount, overdueCount, reports }` sorted open/overdue/critical
   first. Home loads and resolves the queue with an MFA `MODERATE_CONTENT`
   session token. Audit still omits report details. API then web deploy.
+- 2026-08-24: Added legal/support lookup of accepted policy versions.
+  `GET /v1/platform/legal/terms-acceptances?tenantId=&userId=` requires an MFA
+  `VIEW_TENANT` platform assignment, marks current vs stale policies, and
+  records `TERMS_ACCEPTANCE_LOOKED_UP` without emails or hashes. Home loads
+  it from the Policy Lookup panel. API then web deploy.

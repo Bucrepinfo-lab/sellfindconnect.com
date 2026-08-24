@@ -81,7 +81,9 @@ without validating it against the authenticated user's assignments.
   authenticator TOTP enrollment (RFC 6238 SHA-1, 6 digits, 30s, ±1 window),
   hashed single-use recovery codes, and an OIDC hosted-identity overlay
   (Auth0/Clerk/generic) that exchanges a verified ID token for an existing
-  tenant session.
+  tenant session. Platform legal/support lookup is
+  `GET /v1/platform/legal/terms-acceptances` behind MFA `VIEW_TENANT`;
+  presented records omit emails and hashes and flag stale policy versions.
 - Profiles: draft, preview, publish, profile completeness, enriched contacts,
   service-area coverage, profile media display metadata, live version
   preservation, and publish audit evidence. Profile write/preview/publish/media

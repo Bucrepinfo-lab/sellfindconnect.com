@@ -20,6 +20,7 @@ import {
   Link2,
   MessageSquareText,
   Radio,
+  Scale,
   Search,
   Send,
   ShieldCheck,
@@ -77,6 +78,8 @@ import {
   buildOpportunityAlert,
   buildSourceFinderHierarchyReport,
   buildProductAuditRecord,
+  buildTermsAcceptanceEvidence,
+  buildTermsAcceptanceLookup,
   buildSourceFinderIndexDocument,
   buildTaxReturnExport,
   canViewTenantAuditLogs,
@@ -131,6 +134,7 @@ import {
   resolveUserContentReport,
   ugcReportReasons,
   ugcReportResolutions,
+  type TermsAcceptanceLookup,
   type UgcModeratorQueue,
   type UgcReportReason,
   type UgcReportResolution,
@@ -160,6 +164,7 @@ type AnalyticsExportFormat = 'CSV' | 'JSON' | 'PDF';
 type AnalyticsReportDataSource = 'AUTO' | 'RAW' | 'ROLLUP';
 type HierarchyReportStatus = 'PREVIEW' | 'LOADING' | 'LIVE' | 'BLOCKED' | 'ERROR';
 type ModeratorQueueStatus = 'PREVIEW' | 'LOADING' | 'LIVE' | 'ERROR';
+type PolicyLookupStatus = 'PREVIEW' | 'LOADING' | 'LIVE' | 'ERROR';
 type PlatformAuthStatus =
   | 'SIGNED_OUT'
   | 'LOGIN_PENDING'
@@ -480,6 +485,11 @@ export default function Home() {
   const [moderatorQueue, setModeratorQueue] = useState<UgcModeratorQueue | null>(null);
   const [moderatorQueueStatus, setModeratorQueueStatus] = useState<ModeratorQueueStatus>('PREVIEW');
   const [moderatorQueueError, setModeratorQueueError] = useState('');
+  const [termsLookupUserId, setTermsLookupUserId] = useState('');
+  const [termsAcceptanceLookup, setTermsAcceptanceLookup] =
+    useState<TermsAcceptanceLookup | null>(null);
+  const [termsLookupStatus, setTermsLookupStatus] = useState<PolicyLookupStatus>('PREVIEW');
+  const [termsLookupError, setTermsLookupError] = useState('');
   const [workspaceViewDraft, setWorkspaceView] = useState<HomeWorkspaceView | undefined>();
   const workspaceView = workspaceViewDraft ?? landing.view;
   const onboardingLanding = landing.onboarding;
@@ -907,6 +917,14 @@ export default function Home() {
       tenantId,
       createdAt: conversationDemoNow,
       metadata: { amount: 1500, phone: '+254700000001', ok: true },
+    }),
+    buildProductAuditRecord({
+      action: 'TERMS_ACCEPTANCE_LOOKED_UP',
+      entityType: 'TERMS_ACCEPTANCE',
+      tenantId,
+      entityId: tenantId,
+      createdAt: conversationDemoNow,
+      metadata: { resultCount: 1, currentCount: 1, staleCount: 0, filteredUser: false },
     }),
   ];
   const accessDecision = evaluateAccess({
@@ -1339,6 +1357,59 @@ export default function Home() {
     } catch (error) {
       setModeratorQueueStatus('ERROR');
       setModeratorQueueError(error instanceof Error ? error.message : 'Moderator queue load failed');
+    }
+  };
+
+  const previewTermsEvidence = termsAccepted
+    ? buildTermsAcceptanceEvidence({
+        accepted: true,
+        userId: 'demo-owner',
+        tenantId,
+        countryCode: 'KE',
+        locale: 'en-KE',
+        appSurface: 'WEB',
+        acceptanceSource: 'SIGNUP',
+        acceptedAt: '2026-08-22T12:00:00.000Z',
+      })
+    : undefined;
+  const previewTermsAcceptanceLookup = buildTermsAcceptanceLookup(
+    previewTermsEvidence ? [previewTermsEvidence] : [],
+  );
+  const displayTermsAcceptanceLookup =
+    termsAcceptanceLookup && (termsLookupStatus === 'LIVE' || termsLookupStatus === 'LOADING')
+      ? termsAcceptanceLookup
+      : previewTermsAcceptanceLookup;
+
+  const loadTermsAcceptanceLookup = async () => {
+    const sessionToken = platformSessionToken.trim();
+    if (!sessionToken || termsLookupStatus === 'LOADING') {
+      return;
+    }
+    setTermsLookupStatus('LOADING');
+    setTermsLookupError('');
+    try {
+      const params = new URLSearchParams({ tenantId });
+      const userId = termsLookupUserId.trim();
+      if (userId) {
+        params.set('userId', userId);
+      }
+      const response = await fetch(
+        `${publicApiBaseUrl.replace(/\/$/, '')}/platform/legal/terms-acceptances?${params.toString()}`,
+        {
+          headers: { 'x-session-token': sessionToken },
+        },
+      );
+      if (!response.ok) {
+        setTermsLookupStatus('ERROR');
+        setTermsLookupError(await readApiError(response, 'Policy lookup failed'));
+        return;
+      }
+      const lookup = (await response.json()) as TermsAcceptanceLookup;
+      setTermsAcceptanceLookup(lookup);
+      setTermsLookupStatus('LIVE');
+    } catch (error) {
+      setTermsLookupStatus('ERROR');
+      setTermsLookupError(error instanceof Error ? error.message : 'Policy lookup failed');
     }
   };
 
@@ -1831,6 +1902,86 @@ export default function Home() {
 
             <section className="side-panel">
               <div className="panel-heading tight">
+                <h2>Policy Lookup</h2>
+                <span>
+                  {displayTermsAcceptanceLookup.currentCount} current ·{' '}
+                  {displayTermsAcceptanceLookup.staleCount} stale
+                </span>
+              </div>
+              <FinanceRow label="Tenant" value={tenantId.slice(0, 8)} />
+              <label className="field compact-field">
+                <span>User id (optional)</span>
+                <input
+                  value={termsLookupUserId}
+                  onChange={(event) => setTermsLookupUserId(event.target.value)}
+                  autoComplete="off"
+                />
+              </label>
+              <FinanceRow label="Source" value={statusLabel(termsLookupStatus)} />
+              {termsLookupError ? (
+                <FinanceRow label="Lookup error" value={termsLookupError} />
+              ) : null}
+              <div className="terms-actions">
+                <button
+                  className="primary-button"
+                  type="button"
+                  disabled={!platformSessionToken.trim() || termsLookupStatus === 'LOADING'}
+                  onClick={() => {
+                    void loadTermsAcceptanceLookup();
+                  }}
+                >
+                  <Scale size={16} />
+                  {termsLookupStatus === 'LOADING' ? 'Loading' : 'Load Lookup'}
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={termsLookupStatus === 'PREVIEW'}
+                  onClick={() => {
+                    setTermsAcceptanceLookup(null);
+                    setTermsLookupStatus('PREVIEW');
+                    setTermsLookupError('');
+                  }}
+                >
+                  Preview
+                </button>
+              </div>
+              <div className="moderator-queue-list" aria-label="Policy acceptance lookup">
+                {displayTermsAcceptanceLookup.records.length === 0 ? (
+                  <p className="moderator-queue-empty">No acceptance records in this lookup yet.</p>
+                ) : (
+                  displayTermsAcceptanceLookup.records.slice(0, 6).map((item) => (
+                    <div className="moderator-row" key={`${item.userId}-${item.acceptedAt}`}>
+                      <FileCheck2 size={15} />
+                      <div>
+                        <strong>
+                          {item.current ? 'Current' : 'Stale'} · {item.termsVersion}
+                        </strong>
+                        <span>
+                          {item.userId} · {item.countryCode} · {item.appSurface.toLowerCase()}
+                          {item.stalePolicies.length > 0
+                            ? ` · stale ${item.stalePolicies.join(', ')}`
+                            : ''}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="policy-box ok compact">
+                <Scale size={16} />
+                <div>
+                  <strong>Legal and support lookup</strong>
+                  <span>
+                    MFA-verified VIEW_TENANT sessions load GET /v1/platform/legal/terms-acceptances.
+                    Preview uses this workspace’s local terms gate. Lookup omits emails and hashes.
+                  </span>
+                </div>
+              </div>
+            </section>
+
+            <section className="side-panel">
+              <div className="panel-heading tight">
                 <h2>Owner Onboarding</h2>
                 <span>{canCreateTenantOwner ? 'Ready' : 'Locked'}</span>
               </div>
@@ -2146,9 +2297,10 @@ export default function Home() {
                     <div>
                       <strong>Trail visible</strong>
                       <span>
-                        Chat copy, emails, phones, invoice numbers, and session secrets stay out of
-                        audit metadata. Analytics exports, privacy jobs, invoices, and checkout
-                        writes are on the same trail.
+                        Chat copy, emails, phones, invoice numbers, session secrets, and
+                        report details stay out of audit metadata. Analytics exports, privacy jobs,
+                        invoices, checkout writes, and policy-acceptance lookups are on the same
+                        trail.
                       </span>
                     </div>
                   </div>
@@ -3099,6 +3251,9 @@ export default function Home() {
                     setModeratorQueue(null);
                     setModeratorQueueStatus('PREVIEW');
                     setModeratorQueueError('');
+                    setTermsAcceptanceLookup(null);
+                    setTermsLookupStatus('PREVIEW');
+                    setTermsLookupError('');
                   }}
                 />
               </label>

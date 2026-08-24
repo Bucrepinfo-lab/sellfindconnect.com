@@ -33,6 +33,10 @@ export interface AuthRepository {
   ): RepositoryResult<TenantMembershipRecord | undefined>;
   findTenantById(tenantId: string): RepositoryResult<AuthTenantRecord | undefined>;
   findTermsAcceptance(userId: string, tenantId: string): RepositoryResult<TermsAcceptanceEvidence | undefined>;
+  listTermsAcceptance(input: {
+    tenantId: string;
+    userId?: string;
+  }): RepositoryResult<TermsAcceptanceEvidence[]>;
   findSessionByTokenHash(tokenHash: string): RepositoryResult<AuthSessionRecord | undefined>;
   findMfaChallengeBySessionId(sessionId: string): RepositoryResult<AuthMfaChallengeRecord | undefined>;
   findAccountChallengeByTokenHash(tokenHash: string): RepositoryResult<AuthAccountChallengeRecord | undefined>;
