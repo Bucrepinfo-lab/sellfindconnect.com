@@ -567,6 +567,18 @@ describe('AuthService', () => {
     expect(JSON.stringify(lookup)).not.toContain('support@example.com');
     expect(JSON.stringify(lookup)).not.toMatch(/ipHash|deviceHash/i);
 
+    const firstAudit = await service.listAuditLogsForTenant(registered.tenant.id);
+    expect(firstAudit.auditLogs.map((record) => record.action)).toContain('TERMS_ACCEPTANCE_LOOKED_UP');
+    expect(JSON.stringify(firstAudit.auditLogs)).not.toContain('support@example.com');
+    expect(
+      firstAudit.auditLogs.find((record) => record.action === 'TERMS_ACCEPTANCE_LOOKED_UP')?.metadata,
+    ).toMatchObject({
+      resultCount: 1,
+      currentCount: 1,
+      staleCount: 0,
+      filteredUser: false,
+    });
+
     const filtered = await service.lookupTermsAcceptance(session, {
       tenantId: registered.tenant.id,
       userId: registered.user.id,
@@ -579,17 +591,6 @@ describe('AuthService', () => {
     });
     expect(empty.records).toHaveLength(0);
     expect(empty.currentCount).toBe(0);
-
-    const audit = await service.listAuditLogsForTenant(registered.tenant.id);
-    expect(audit.auditLogs.map((record) => record.action)).toContain('TERMS_ACCEPTANCE_LOOKED_UP');
-    expect(JSON.stringify(audit.auditLogs)).not.toContain('support@example.com');
-    expect(audit.auditLogs.find((record) => record.action === 'TERMS_ACCEPTANCE_LOOKED_UP')?.metadata)
-      .toMatchObject({
-        resultCount: 1,
-        currentCount: 1,
-        staleCount: 0,
-        filteredUser: false,
-      });
 
     await expect(service.lookupTermsAcceptance(session, { tenantId: '  ' })).rejects.toThrow(
       'tenant id',
