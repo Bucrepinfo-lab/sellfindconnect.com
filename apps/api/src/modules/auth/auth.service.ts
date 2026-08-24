@@ -14,12 +14,15 @@ import {
   buildTermsAcceptanceEvidence,
   buildTermsAcceptanceLookup,
   calculateTrialSubscription,
+  describeTermsAcceptanceGate,
   evaluateAccess,
   evaluatePasswordPolicy,
   evaluateSafetyFields,
   getCountry,
   industryCategories,
   isCurrentTermsAcceptance,
+  presentTermsAcceptanceLookup,
+  staleTermsAcceptancePolicies,
   normalizeResourceScope,
   requiresMfa,
   roleHasPermission,
@@ -995,11 +998,16 @@ export class AuthService {
   async getSession(sessionToken: string) {
     const session = await this.requireSession(sessionToken);
     const user = await this.repository.findUserById(session.userId);
+    const termsAcceptance = await this.repository.findTermsAcceptance(
+      session.userId,
+      session.tenantId,
+    );
     return {
       session: this.presentSession(session),
       user: user ? this.presentUser(user) : undefined,
       tenant: await this.repository.findTenantById(session.tenantId),
-      termsAcceptance: await this.repository.findTermsAcceptance(session.userId, session.tenantId),
+      termsAcceptance,
+      termsGate: describeTermsAcceptanceGate(termsAcceptance),
     };
   }
 
@@ -1115,6 +1123,76 @@ export class AuthService {
   async hasCurrentTermsAcceptance(userId: string, tenantId: string): Promise<boolean> {
     const evidence = await this.repository.findTermsAcceptance(userId, tenantId);
     return Boolean(evidence && isCurrentTermsAcceptance(evidence));
+  }
+
+  async requireCurrentStoredTerms(
+    userId: string,
+    tenantId: string,
+    message = 'Current stored terms acceptance is required.',
+  ): Promise<void> {
+    if (!(await this.hasCurrentTermsAcceptance(userId, tenantId))) {
+      throw new UnprocessableEntityException(message);
+    }
+  }
+
+  async acceptCurrentTerms(input: { sessionToken: string; acceptedTerms: boolean }) {
+    const session = await this.requireSession(input.sessionToken);
+    if (session.mfaRequired && !session.mfaVerified) {
+      throw new UnauthorizedException('MFA verification is required before accepting updated terms.');
+    }
+
+    const user = await this.repository.findUserById(session.userId);
+    const tenant = await this.repository.findTenantById(session.tenantId);
+    if (!user || !tenant) {
+      throw new NotFoundException('Tenant session not found.');
+    }
+
+    const previous = await this.repository.findTermsAcceptance(session.userId, session.tenantId);
+    const stalePolicies = previous
+      ? staleTermsAcceptancePolicies(previous)
+      : (['terms', 'privacy', 'prohibited', 'subscription'] as const);
+    const evidence = buildTermsAcceptanceEvidence({
+      accepted: input.acceptedTerms,
+      userId: user.id,
+      tenantId: tenant.id,
+      countryCode: tenant.countryCode,
+      locale: getCountry(tenant.countryCode)?.locale ?? 'en-KE',
+      appSurface: 'WEB',
+      acceptanceSource: previous ? 'REACCEPTANCE' : 'SIGNUP',
+      acceptedAt: new Date().toISOString(),
+    });
+    if (!evidence) {
+      throw new UnprocessableEntityException('Current terms acceptance is required.');
+    }
+
+    if (previous && isCurrentTermsAcceptance(previous)) {
+      return {
+        termsAcceptance: presentTermsAcceptanceLookup(previous),
+        termsGate: describeTermsAcceptanceGate(previous),
+        alreadyCurrent: true,
+      };
+    }
+
+    await this.repository.createTermsAcceptance(evidence);
+    await this.recordAudit({
+      tenantId: tenant.id,
+      actorUserId: user.id,
+      action: 'TERMS_REACCEPTED',
+      entityType: 'TERMS_ACCEPTANCE',
+      entityId: tenant.id,
+      metadata: {
+        termsVersion: evidence.termsVersion,
+        stalePolicyCount: stalePolicies.length,
+        stalePolicies: stalePolicies.join(','),
+        previouslyAccepted: Boolean(previous),
+      },
+    });
+
+    return {
+      termsAcceptance: presentTermsAcceptanceLookup(evidence),
+      termsGate: describeTermsAcceptanceGate(evidence),
+      alreadyCurrent: false,
+    };
   }
 
   async lookupTermsAcceptance(

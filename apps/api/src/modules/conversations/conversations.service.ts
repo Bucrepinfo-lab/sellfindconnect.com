@@ -95,7 +95,7 @@ export class ConversationsService {
   }
 
   async createConversation(tenantId: string, input: CreateConversationDto, actorUserId?: string) {
-    this.requireTerms(input.acceptedTerms);
+    await this.requireCurrentTerms(tenantId, input.acceptedTerms, actorUserId);
     this.assertSafe(input, 'Conversation contains blocked content.');
     await this.requireUnblockedSource(tenantId, input.sourceRecordId);
 
@@ -194,7 +194,7 @@ export class ConversationsService {
     input: SendConversationMessageDto,
     actorUserId?: string,
   ) {
-    this.requireTerms(input.acceptedTerms);
+    await this.requireCurrentTerms(tenantId, input.acceptedTerms, actorUserId);
     this.assertSafe(input, 'Message contains blocked content.');
 
     const conversation = await this.requireConversation(tenantId, conversationId);
@@ -956,6 +956,22 @@ export class ConversationsService {
         'Current terms acceptance is required before messaging.',
       );
     }
+  }
+
+  private async requireCurrentTerms(
+    tenantId: string,
+    acceptedTerms: boolean,
+    actorUserId?: string,
+  ): Promise<void> {
+    this.requireTerms(acceptedTerms);
+    if (!this.auth || !actorUserId) {
+      return;
+    }
+    await this.auth.requireCurrentStoredTerms(
+      actorUserId,
+      tenantId,
+      'Current stored terms acceptance is required before messaging.',
+    );
   }
 
   private assertSafe(input: object, message: string): void {

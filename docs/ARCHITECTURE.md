@@ -84,6 +84,9 @@ without validating it against the authenticated user's assignments.
   tenant session. Platform legal/support lookup is
   `GET /v1/platform/legal/terms-acceptances` behind MFA `VIEW_TENANT`;
   presented records omit emails and hashes and flag stale policy versions.
+  Session payloads include `termsGate`. Material version mismatch forces
+  re-acceptance via `POST /v1/auth/terms/accept` (`REACCEPTANCE` evidence)
+  before publish, chat, inquiry, UGC, relationship claims, or checkout.
 - Profiles: draft, preview, publish, profile completeness, enriched contacts,
   service-area coverage, profile media display metadata, live version
   preservation, and publish audit evidence. Profile write/preview/publish/media

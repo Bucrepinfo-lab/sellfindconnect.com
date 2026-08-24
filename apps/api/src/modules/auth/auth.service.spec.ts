@@ -697,6 +697,77 @@ describe('AuthService', () => {
     ).rejects.toThrow();
   });
 
+  it('forces re-acceptance after stored policy versions go stale', async () => {
+    const repository = new InMemoryAuthRepository();
+    const service = new AuthService(repository);
+    const registered = await service.registerTenantOwner({
+      email: 'owner@example.com',
+      password: strongPassword,
+      displayName: 'Mary Owner',
+      tenantDisplayName: 'Nairobi Fresh Produce Cooperative',
+      countryCode: 'KE',
+      industryCode: 'AGRICULTURE',
+      primaryRole: 'SUPPLIER',
+      userType: 'ADVERTISER',
+      acceptedTerms: true,
+    });
+
+    await expect(
+      service.acceptCurrentTerms({
+        sessionToken: registered.session.token,
+        acceptedTerms: true,
+      }),
+    ).rejects.toThrow('MFA verification is required');
+
+    await service.verifyMfa({
+      sessionToken: registered.session.token,
+      code: registered.session.mfaChallenge?.developmentCode ?? '',
+    });
+    const live = await service.getSession(registered.session.token);
+    expect(live.termsGate.current).toBe(true);
+    expect(live.termsGate.requiresReacceptance).toBe(false);
+
+    const current = await repository.findTermsAcceptance(registered.user.id, registered.tenant.id);
+    expect(current).toBeDefined();
+    repository.createTermsAcceptance({
+      ...current!,
+      termsVersion: 'terms-2026-06-18',
+      acceptedAt: new Date().toISOString(),
+    });
+    expect(await service.hasCurrentTermsAcceptance(registered.user.id, registered.tenant.id)).toBe(
+      false,
+    );
+    const stale = await service.getSession(registered.session.token);
+    expect(stale.termsGate.requiresReacceptance).toBe(true);
+    expect(stale.termsGate.stalePolicies).toEqual(['terms']);
+
+    await expect(
+      service.requireCurrentStoredTerms(registered.user.id, registered.tenant.id),
+    ).rejects.toThrow('Current stored terms acceptance is required');
+
+    const accepted = await service.acceptCurrentTerms({
+      sessionToken: registered.session.token,
+      acceptedTerms: true,
+    });
+    expect(accepted.alreadyCurrent).toBe(false);
+    expect(accepted.termsGate.current).toBe(true);
+    expect(accepted.termsAcceptance.acceptanceSource).toBe('REACCEPTANCE');
+    expect(JSON.stringify(accepted)).not.toContain('owner@example.com');
+    expect(await service.hasCurrentTermsAcceptance(registered.user.id, registered.tenant.id)).toBe(
+      true,
+    );
+
+    const replay = await service.acceptCurrentTerms({
+      sessionToken: registered.session.token,
+      acceptedTerms: true,
+    });
+    expect(replay.alreadyCurrent).toBe(true);
+
+    const audit = await service.listAuditLogsForTenant(registered.tenant.id);
+    expect(audit.auditLogs.map((record) => record.action)).toContain('TERMS_REACCEPTED');
+    expect(JSON.stringify(audit.auditLogs)).not.toContain('owner@example.com');
+  });
+
   it('keeps development tokens when no live auth email sender is configured', async () => {
     const service = new AuthService();
     const result = await service.registerTenantOwner({

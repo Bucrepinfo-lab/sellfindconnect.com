@@ -17,7 +17,7 @@ import type { CheckoutDto, PayoutDto } from './dto/payments.dto';
 
 export type CheckoutResult =
   | { ok: true; txnId: string; providerTxnId: string | null }
-  | { ok: false; reason: 'no_phone' | 'invalid_amount' | 'provider_error' | 'tax_profile'; txnId?: string };
+  | { ok: false; reason: 'no_phone' | 'invalid_amount' | 'provider_error' | 'tax_profile' | 'terms'; txnId?: string };
 
 export type PayoutResult =
   | { ok: true; txnId: string }
@@ -84,6 +84,25 @@ export class PaymentsService {
         },
       });
       return { ok: false, reason: 'tax_profile' };
+    }
+
+    if (!(await this.auth.hasCurrentTermsAcceptance(context.session.userId, context.session.tenantId))) {
+      await this.auth.recordTenantAudit({
+        tenantId: context.session.tenantId,
+        actorUserId: context.session.userId,
+        action: 'PAYMENT_CHECKOUT_BLOCKED',
+        entityType: 'PAYMENT',
+        entityId: context.session.tenantId,
+        metadata: {
+          kind: 'CHECKOUT',
+          amount: input.amount,
+          currency: 'KES',
+          ok: false,
+          status: 'BLOCKED',
+          reason: 'terms',
+        },
+      });
+      return { ok: false, reason: 'terms' };
     }
 
     const txn = this.newTxn({

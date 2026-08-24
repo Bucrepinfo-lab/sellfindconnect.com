@@ -38,6 +38,7 @@ export const productAuditActions = [
   'USER_UNBLOCKED',
   'USER_CONTENT_REPORT_RESOLVED',
   'TERMS_ACCEPTANCE_LOOKED_UP',
+  'TERMS_REACCEPTED',
 ] as const;
 
 export type ProductAuditAction = (typeof productAuditActions)[number];
@@ -185,6 +186,8 @@ export function describeProductAuditAction(action: string): string {
       return 'User content report resolved';
     case 'TERMS_ACCEPTANCE_LOOKED_UP':
       return 'Terms acceptance looked up';
+    case 'TERMS_REACCEPTED':
+      return 'Terms re-accepted';
     default:
       return action.replaceAll('_', ' ').toLowerCase();
   }

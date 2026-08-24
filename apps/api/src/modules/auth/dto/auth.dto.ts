@@ -243,6 +243,18 @@ export class CheckTenantSessionDto {
   declare tenantId: string;
 }
 
+export class AcceptCurrentTermsDto {
+  @ApiProperty({ example: 'session-token' })
+  @IsString()
+  @Length(16, 256)
+  declare sessionToken: string;
+
+  @ApiProperty({ example: true })
+  @IsBoolean()
+  @Equals(true)
+  declare acceptedTerms: true;
+}
+
 export class ExchangeHostedIdentityDto {
   @ApiProperty({
     example: 'eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3Qta2V5In0.eyJzdWIiOiJvaWRjfHVzZXIifQ.signature',

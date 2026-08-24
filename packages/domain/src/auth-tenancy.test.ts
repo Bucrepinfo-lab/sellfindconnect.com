@@ -5,10 +5,12 @@ import {
   buildTermsAcceptanceEvidence,
   buildTermsAcceptanceLookup,
   calculateTrialSubscription,
+  describeTermsAcceptanceGate,
   evaluatePasswordPolicy,
   isCurrentTermsAcceptance,
   presentTermsAcceptanceLookup,
   publicPolicyDocuments,
+  termsAcceptancePolicyKeys,
 } from './auth-tenancy';
 
 describe('auth and tenancy policy helpers', () => {
@@ -103,5 +105,19 @@ describe('auth and tenancy policy helpers', () => {
     expect(lookup.staleCount).toBe(1);
     expect(lookup.records[0]?.acceptedAt).toBe(current!.acceptedAt);
     expect(lookup.activePolicyVersions).toEqual(activePolicyVersions);
+
+    const missing = describeTermsAcceptanceGate(undefined);
+    expect(missing.requiresReacceptance).toBe(true);
+    expect(missing.stalePolicies).toEqual([...termsAcceptancePolicyKeys]);
+    expect(describeTermsAcceptanceGate(stale)).toMatchObject({
+      current: false,
+      requiresReacceptance: true,
+      stalePolicies: ['terms'],
+    });
+    expect(describeTermsAcceptanceGate(current)).toMatchObject({
+      current: true,
+      requiresReacceptance: false,
+      stalePolicies: [],
+    });
   });
 });

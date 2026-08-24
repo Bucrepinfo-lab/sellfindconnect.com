@@ -1153,6 +1153,11 @@ Implementation progress on 2026-06-17:
   policy versions. `GET /v1/platform/legal/terms-acceptances` is scoped by
   MFA `VIEW_TENANT` assignment and tenant country, returns current vs stale
   versions, and records `TERMS_ACCEPTANCE_LOOKED_UP` without emails or hashes.
+- Continued implementation on 2026-08-24 with forced re-acceptance after
+  material policy version changes. Session payloads include `termsGate`.
+  Stale stored versions lock publish, chat, inquiry, UGC, relationship claims,
+  and STK checkout (`reason: terms`). `POST /v1/auth/terms/accept` writes a
+  new `REACCEPTANCE` evidence row after MFA. Home can re-accept from Terms Gate.
 - Remaining hardening: app-store billing rails are out of scope while native
   mobile is not in delivery. A future Google Play listing must use Play Billing
   for the digital SaaS subscription. Web/PWA STK Push stays on the login phone.
@@ -1182,6 +1187,9 @@ Implementation progress on 2026-08-24:
 - Authorized support, legal, trust, and finance roles with `VIEW_TENANT` can look
   up accepted policy versions at `GET /v1/platform/legal/terms-acceptances`.
   Responses flag current vs stale policies and omit emails and hashes.
+- Forced re-acceptance after material policy version changes. Session
+  `termsGate` plus `POST /v1/auth/terms/accept` keep stored versions current
+  before publish, chat, inquiry, UGC, relationship claims, and checkout.
 
 ### 7.12 Reviews and Reputation
 

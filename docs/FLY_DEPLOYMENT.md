@@ -142,6 +142,9 @@ Do not onboard paying subscribers until:
   `MODERATE_CONTENT` session (401 without it)
 - Home Policy Lookup can load `GET /v1/platform/legal/terms-acceptances` with
   an MFA `VIEW_TENANT` session (401 without it; lookup omits emails)
+- Home Terms Gate can re-accept current policy versions at
+  `POST /v1/auth/terms/accept` (MFA session; stale stored versions lock
+  publish/chat/checkout)
 - A manual **Scheduled jobs** workflow_dispatch succeeds
 - STK Push uses the login phone only (`PAYMENT_PROVIDER` live credentials
   reviewed)

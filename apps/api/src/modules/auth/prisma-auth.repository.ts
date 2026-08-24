@@ -111,6 +111,12 @@ export class PrismaAuthRepository implements AuthRepository {
     return records.map((record) => this.mapTermsEvidence(record));
   }
 
+  async createTermsAcceptance(evidence: TermsAcceptanceEvidence): Promise<void> {
+    await this.prisma.termsAcceptanceEvidence.create({
+      data: this.termsCreateData(evidence),
+    });
+  }
+
   async findSessionByTokenHash(tokenHash: string): Promise<AuthSessionRecord | undefined> {
     const session = await this.prisma.authSession.findUnique({ where: { tokenHash } });
     return session ? this.mapSession(session) : undefined;
@@ -695,6 +701,22 @@ export class PrismaAuthRepository implements AuthRepository {
       appSurface: evidence.appSurface as TermsAcceptanceEvidence['appSurface'],
       acceptanceSource: evidence.acceptanceSource as TermsAcceptanceEvidence['acceptanceSource'],
       acceptedAt: evidence.acceptedAt.toISOString(),
+    };
+  }
+
+  private termsCreateData(evidence: TermsAcceptanceEvidence) {
+    return {
+      userId: evidence.userId,
+      tenantId: evidence.tenantId,
+      countryCode: evidence.countryCode,
+      locale: evidence.locale,
+      termsVersion: evidence.termsVersion,
+      privacyVersion: evidence.privacyVersion,
+      prohibitedContentVersion: evidence.prohibitedContentVersion,
+      subscriptionTermsVersion: evidence.subscriptionTermsVersion,
+      appSurface: evidence.appSurface,
+      acceptanceSource: evidence.acceptanceSource,
+      acceptedAt: new Date(evidence.acceptedAt),
     };
   }
 

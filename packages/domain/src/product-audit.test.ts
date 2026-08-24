@@ -103,6 +103,7 @@ describe('product audit helpers', () => {
     expect(describeProductAuditAction('TERMS_ACCEPTANCE_LOOKED_UP')).toBe(
       'Terms acceptance looked up',
     );
+    expect(describeProductAuditAction('TERMS_REACCEPTED')).toBe('Terms re-accepted');
   });
 
   it('filters tenant audit lookups by action and entity type', () => {

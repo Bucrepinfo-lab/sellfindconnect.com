@@ -239,3 +239,32 @@ export function buildTermsAcceptanceLookup(
     records: presented,
   };
 }
+
+export type TermsAcceptanceGate = {
+  current: boolean;
+  requiresReacceptance: boolean;
+  stalePolicies: TermsAcceptancePolicyKey[];
+  activePolicyVersions: ActivePolicyVersions;
+};
+
+export function describeTermsAcceptanceGate(
+  evidence: TermsAcceptanceEvidence | undefined,
+): TermsAcceptanceGate {
+  if (!evidence) {
+    return {
+      current: false,
+      requiresReacceptance: true,
+      stalePolicies: [...termsAcceptancePolicyKeys],
+      activePolicyVersions,
+    };
+  }
+
+  const stalePolicies = staleTermsAcceptancePolicies(evidence);
+  const current = isCurrentTermsAcceptance(evidence);
+  return {
+    current,
+    requiresReacceptance: !current,
+    stalePolicies,
+    activePolicyVersions,
+  };
+}

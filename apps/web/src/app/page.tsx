@@ -134,6 +134,7 @@ import {
   resolveUserContentReport,
   ugcReportReasons,
   ugcReportResolutions,
+  type TermsAcceptanceGate,
   type TermsAcceptanceLookup,
   type UgcModeratorQueue,
   type UgcReportReason,
@@ -247,6 +248,7 @@ type AuthSessionPayload = {
     id: string;
     displayName: string;
   };
+  termsGate?: TermsAcceptanceGate;
 };
 
 function formatNumber(value: number) {
@@ -471,6 +473,9 @@ export default function Home() {
     'We supply fresh vegetables to hotels, restaurants and retailers in Nairobi.',
   );
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [liveTermsGate, setLiveTermsGate] = useState<TermsAcceptanceGate | null>(null);
+  const [termsReacceptStatus, setTermsReacceptStatus] = useState<'IDLE' | 'SAVING' | 'ERROR'>('IDLE');
+  const [termsReacceptError, setTermsReacceptError] = useState('');
   const [relationshipKind, setRelationshipKind] = useState<RelationshipKind>('SHIPS');
   const [relationshipVisibility, setRelationshipVisibility] =
     useState<RelationshipVisibility>('PUBLIC');
@@ -577,12 +582,15 @@ export default function Home() {
   const safetyDecision = evaluateSafetyText(profileDescription);
   const querySafetyDecision = evaluateSafetyText(query);
   const queryExpansion = expandDiscoveryQuery(query);
-  const canPublish = safetyDecision.allowed && termsAccepted;
+  const canPublish =
+    safetyDecision.allowed && termsAccepted && !liveTermsGate?.requiresReacceptance;
   const publishBlockReason = !safetyDecision.allowed
     ? 'Publishing is disabled because the draft contains prohibited content'
-    : !termsAccepted
-      ? 'Publishing is disabled until the advertiser accepts the terms'
-      : 'Publish draft';
+    : liveTermsGate?.requiresReacceptance
+      ? 'Publishing is disabled until current policy versions are re-accepted'
+      : !termsAccepted
+        ? 'Publishing is disabled until the advertiser accepts the terms'
+        : 'Publish draft';
 
   const graphRecords = attachApprovedRelationshipClaims(
     pilotSourceFinderRecords,
@@ -926,6 +934,14 @@ export default function Home() {
       createdAt: conversationDemoNow,
       metadata: { resultCount: 1, currentCount: 1, staleCount: 0, filteredUser: false },
     }),
+    buildProductAuditRecord({
+      action: 'TERMS_REACCEPTED',
+      entityType: 'TERMS_ACCEPTANCE',
+      tenantId,
+      entityId: tenantId,
+      createdAt: conversationDemoNow,
+      metadata: { termsVersion: 'terms-2026-08-22', stalePolicyCount: 1, previouslyAccepted: true },
+    }),
   ];
   const accessDecision = evaluateAccess({
     subject: {
@@ -1087,6 +1103,11 @@ export default function Home() {
 
     if (payload.session.mfaChallenge?.developmentCode) {
       setPlatformMfaCode(payload.session.mfaChallenge.developmentCode);
+    }
+    if (payload.termsGate) {
+      setLiveTermsGate(payload.termsGate);
+      setTermsAccepted(payload.termsGate.current);
+      setTermsReacceptError('');
     }
   };
   const signInPlatformSession = async () => {
@@ -1410,6 +1431,40 @@ export default function Home() {
     } catch (error) {
       setTermsLookupStatus('ERROR');
       setTermsLookupError(error instanceof Error ? error.message : 'Policy lookup failed');
+    }
+  };
+
+  const reacceptCurrentTerms = async () => {
+    const sessionToken = platformSessionToken.trim() || readTenantSession().sessionToken;
+    if (!sessionToken || termsReacceptStatus === 'SAVING') {
+      return;
+    }
+    setTermsReacceptStatus('SAVING');
+    setTermsReacceptError('');
+    try {
+      const response = await fetch(`${publicApiBaseUrl.replace(/\/$/, '')}/auth/terms/accept`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionToken, acceptedTerms: true }),
+      });
+      if (!response.ok) {
+        setTermsReacceptStatus('ERROR');
+        setTermsReacceptError(await readApiError(response, 'Could not re-accept terms'));
+        return;
+      }
+      const payload = (await response.json()) as {
+        termsGate?: TermsAcceptanceGate;
+      };
+      if (payload.termsGate) {
+        setLiveTermsGate(payload.termsGate);
+        setTermsAccepted(payload.termsGate.current);
+      } else {
+        setTermsAccepted(true);
+      }
+      setTermsReacceptStatus('IDLE');
+    } catch (error) {
+      setTermsReacceptStatus('ERROR');
+      setTermsReacceptError(error instanceof Error ? error.message : 'Could not re-accept terms');
     }
   };
 
@@ -1852,8 +1907,20 @@ export default function Home() {
             <section className="side-panel">
               <div className="panel-heading tight">
                 <h2>Terms Gate</h2>
-                <span className={termsAccepted ? 'terms-status accepted' : 'terms-status required'}>
-                  {termsAccepted ? 'Accepted' : 'Required'}
+                <span
+                  className={
+                    (liveTermsGate ? liveTermsGate.current : termsAccepted)
+                      ? 'terms-status accepted'
+                      : 'terms-status required'
+                  }
+                >
+                  {liveTermsGate
+                    ? liveTermsGate.current
+                      ? 'Current'
+                      : 'Re-accept'
+                    : termsAccepted
+                      ? 'Accepted'
+                      : 'Required'}
                 </span>
               </div>
               <div className="terms-list">
@@ -1867,6 +1934,19 @@ export default function Home() {
                   </div>
                 ))}
               </div>
+              <FinanceRow
+                label="Live gate"
+                value={
+                  liveTermsGate
+                    ? liveTermsGate.current
+                      ? 'Current policy versions'
+                      : `Stale ${liveTermsGate.stalePolicies.join(', ') || 'policies'}`
+                    : 'Local demo'
+                }
+              />
+              {termsReacceptError ? (
+                <FinanceRow label="Re-accept error" value={termsReacceptError} />
+              ) : null}
               <div className="terms-actions">
                 <button
                   className="primary-button"
@@ -1876,6 +1956,20 @@ export default function Home() {
                 >
                   <FileCheck2 size={16} />
                   Accept Terms
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={
+                    !(platformSessionToken.trim() || readTenantSession().sessionToken) ||
+                    termsReacceptStatus === 'SAVING'
+                  }
+                  onClick={() => {
+                    void reacceptCurrentTerms();
+                  }}
+                >
+                  <FileCheck2 size={16} />
+                  {termsReacceptStatus === 'SAVING' ? 'Saving' : 'Re-accept'}
                 </button>
                 <button
                   className="secondary-button"
@@ -1890,11 +1984,19 @@ export default function Home() {
               <div className={canPublish ? 'policy-box ok compact' : 'policy-box block compact'}>
                 {canPublish ? <ShieldCheck size={18} /> : <CircleAlert size={18} />}
                 <div>
-                  <strong>{canPublish ? 'Publishing unlocked' : 'Publishing locked'}</strong>
+                  <strong>
+                    {liveTermsGate?.requiresReacceptance
+                      ? 'Re-acceptance required'
+                      : canPublish
+                        ? 'Publishing unlocked'
+                        : 'Publishing locked'}
+                  </strong>
                   <span>
-                    {canPublish
-                      ? 'Draft can move to preview and publishing.'
-                      : 'Accepting terms is required and prohibited content remains blocked.'}
+                    {liveTermsGate?.requiresReacceptance
+                      ? 'Material policy versions changed. Re-accept the current terms before publish, chat, report, or checkout.'
+                      : canPublish
+                        ? 'Draft can move to preview and publishing.'
+                        : 'Accepting terms is required and prohibited content remains blocked.'}
                   </span>
                 </div>
               </div>
@@ -3254,6 +3356,9 @@ export default function Home() {
                     setTermsAcceptanceLookup(null);
                     setTermsLookupStatus('PREVIEW');
                     setTermsLookupError('');
+                    setLiveTermsGate(null);
+                    setTermsReacceptError('');
+                    setTermsReacceptStatus('IDLE');
                   }}
                 />
               </label>

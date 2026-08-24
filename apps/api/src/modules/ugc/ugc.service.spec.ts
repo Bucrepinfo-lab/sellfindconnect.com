@@ -73,6 +73,7 @@ describe('UgcService', () => {
       }) => {
         auditLogs.push(input);
       },
+      requireCurrentStoredTerms: async () => undefined,
     };
     const service = new UgcService(undefined, auth as never);
     const report = await service.createReport(tenantId, 'owner-1', {
@@ -100,5 +101,22 @@ describe('UgcService', () => {
       status: 'RESOLVED',
       open: false,
     });
+  });
+
+  it('refuses reports when stored terms acceptance is stale', async () => {
+    const service = new UgcService(undefined, {
+      requireCurrentStoredTerms: async () => {
+        throw new Error('Current stored terms acceptance is required before reporting.');
+      },
+    } as never);
+
+    await expect(
+      service.createReport(tenantId, 'owner-1', {
+        targetType: 'USER',
+        targetId: 'r2',
+        reason: 'HARASSMENT',
+        acceptedTerms: true,
+      }),
+    ).rejects.toThrow('Current stored terms acceptance is required before reporting.');
   });
 });
