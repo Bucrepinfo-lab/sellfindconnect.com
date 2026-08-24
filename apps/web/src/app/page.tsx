@@ -127,8 +127,13 @@ import {
   createUserContentReport,
   filterBlockedSourceFinderResults,
   isTargetBlocked,
+  buildUgcModeratorQueue,
+  resolveUserContentReport,
   ugcReportReasons,
+  ugcReportResolutions,
+  type UgcModeratorQueue,
   type UgcReportReason,
+  type UgcReportResolution,
   type UserBlock,
   type UserContentReport,
 } from '@telpen/domain';
@@ -154,6 +159,7 @@ type SavedSearchAlertPreview = {
 type AnalyticsExportFormat = 'CSV' | 'JSON' | 'PDF';
 type AnalyticsReportDataSource = 'AUTO' | 'RAW' | 'ROLLUP';
 type HierarchyReportStatus = 'PREVIEW' | 'LOADING' | 'LIVE' | 'BLOCKED' | 'ERROR';
+type ModeratorQueueStatus = 'PREVIEW' | 'LOADING' | 'LIVE' | 'ERROR';
 type PlatformAuthStatus =
   | 'SIGNED_OUT'
   | 'LOGIN_PENDING'
@@ -471,6 +477,9 @@ export default function Home() {
   const [userBlocks, setUserBlocks] = useState<UserBlock[]>([]);
   const [userReports, setUserReports] = useState<UserContentReport[]>([]);
   const [reportReason, setReportReason] = useState<UgcReportReason>('HARASSMENT');
+  const [moderatorQueue, setModeratorQueue] = useState<UgcModeratorQueue | null>(null);
+  const [moderatorQueueStatus, setModeratorQueueStatus] = useState<ModeratorQueueStatus>('PREVIEW');
+  const [moderatorQueueError, setModeratorQueueError] = useState('');
   const [workspaceViewDraft, setWorkspaceView] = useState<HomeWorkspaceView | undefined>();
   const workspaceView = workspaceViewDraft ?? landing.view;
   const onboardingLanding = landing.onboarding;
@@ -1302,6 +1311,80 @@ export default function Home() {
     });
   };
 
+  const previewModeratorQueue = buildUgcModeratorQueue(userReports);
+  const displayModeratorQueue =
+    moderatorQueue && (moderatorQueueStatus === 'LIVE' || moderatorQueueStatus === 'LOADING')
+      ? moderatorQueue
+      : previewModeratorQueue;
+
+  const loadModeratorQueue = async () => {
+    const sessionToken = platformSessionToken.trim();
+    if (!sessionToken || moderatorQueueStatus === 'LOADING') {
+      return;
+    }
+    setModeratorQueueStatus('LOADING');
+    setModeratorQueueError('');
+    try {
+      const response = await fetch(`${publicApiBaseUrl.replace(/\/$/, '')}/platform/ugc/reports`, {
+        headers: { 'x-session-token': sessionToken },
+      });
+      if (!response.ok) {
+        setModeratorQueueStatus('ERROR');
+        setModeratorQueueError(await readApiError(response, 'Moderator queue load failed'));
+        return;
+      }
+      const queue = (await response.json()) as UgcModeratorQueue;
+      setModeratorQueue(queue);
+      setModeratorQueueStatus('LIVE');
+    } catch (error) {
+      setModeratorQueueStatus('ERROR');
+      setModeratorQueueError(error instanceof Error ? error.message : 'Moderator queue load failed');
+    }
+  };
+
+  const resolveModeratorReport = async (reportId: string, resolution: UgcReportResolution) => {
+    if (moderatorQueueStatus === 'LIVE') {
+      const sessionToken = platformSessionToken.trim();
+      if (!sessionToken) {
+        return;
+      }
+      try {
+        const response = await fetch(
+          `${publicApiBaseUrl.replace(/\/$/, '')}/platform/ugc/reports/${reportId}/resolve`,
+          {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              'x-session-token': sessionToken,
+            },
+            body: JSON.stringify({ resolution }),
+          },
+        );
+        if (!response.ok) {
+          setModeratorQueueError(await readApiError(response, 'Could not close report'));
+          return;
+        }
+        await loadModeratorQueue();
+      } catch (error) {
+        setModeratorQueueError(error instanceof Error ? error.message : 'Could not close report');
+      }
+      return;
+    }
+
+    setUserReports((current) =>
+      current.map((report) => {
+        if (report.id !== reportId) {
+          return report;
+        }
+        try {
+          return resolveUserContentReport(report, resolution);
+        } catch {
+          return report;
+        }
+      }),
+    );
+  };
+
   return (
     <main className="app-shell">
       <aside className="sidebar" aria-label="Workspace navigation">
@@ -1858,8 +1941,88 @@ export default function Home() {
                   <strong>{termsAccepted ? 'Report and block unlocked' : 'Accept terms first'}</strong>
                   <span>
                     {termsAccepted
-                      ? 'Use Report or Block on a Source Finder card. Blocked sources leave this tenant’s results. Moderators review POST /v1/platform/ugc/reports.'
+                      ? 'Use Report or Block on a Source Finder card. Blocked sources leave this tenant’s results and cannot be messaged.'
                       : 'Community standards require current terms before reporting or blocking.'}
+                  </span>
+                </div>
+              </div>
+              <FinanceRow
+                label="Queue"
+                value={`${displayModeratorQueue.openCount} open · ${displayModeratorQueue.overdueCount} overdue`}
+              />
+              <FinanceRow label="Source" value={statusLabel(moderatorQueueStatus)} />
+              {moderatorQueueError ? (
+                <FinanceRow label="Queue error" value={moderatorQueueError} />
+              ) : null}
+              <div className="terms-actions">
+                <button
+                  className="primary-button"
+                  type="button"
+                  disabled={!platformSessionToken.trim() || moderatorQueueStatus === 'LOADING'}
+                  onClick={() => {
+                    void loadModeratorQueue();
+                  }}
+                >
+                  <ClipboardList size={16} />
+                  {moderatorQueueStatus === 'LOADING' ? 'Loading' : 'Load Queue'}
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={moderatorQueueStatus === 'PREVIEW'}
+                  onClick={() => {
+                    setModeratorQueue(null);
+                    setModeratorQueueStatus('PREVIEW');
+                    setModeratorQueueError('');
+                  }}
+                >
+                  Preview
+                </button>
+              </div>
+              <div className="moderator-queue-list" aria-label="UGC moderator queue">
+                {displayModeratorQueue.reports.length === 0 ? (
+                  <p className="moderator-queue-empty">No reports in this queue yet.</p>
+                ) : (
+                  displayModeratorQueue.reports.slice(0, 6).map((item) => (
+                    <div className="moderator-row" key={item.id}>
+                      <Flag size={15} />
+                      <div>
+                        <strong>
+                          {codeLabel(item.reason)} · {item.targetType.toLowerCase()} {item.targetId}
+                        </strong>
+                        <span>
+                          {codeLabel(item.severity)} · {item.slaHours}h SLA · {item.countryCode}
+                          {item.overdue ? ' · overdue' : ''} · {codeLabel(item.status)}
+                        </span>
+                      </div>
+                      {item.open ? (
+                        <div className="moderator-row-actions">
+                          {ugcReportResolutions.map((resolution) => (
+                            <button
+                              key={resolution}
+                              className="secondary-button"
+                              type="button"
+                              onClick={() => {
+                                void resolveModeratorReport(item.id, resolution);
+                              }}
+                            >
+                              {codeLabel(resolution)}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="policy-box ok compact">
+                <ClipboardList size={16} />
+                <div>
+                  <strong>Moderator queue</strong>
+                  <span>
+                    MFA-verified MODERATE_CONTENT sessions load GET /v1/platform/ugc/reports.
+                    Preview uses this tenant’s local reports. Closing a report does not store
+                    details in product audit.
                   </span>
                 </div>
               </div>
@@ -2933,6 +3096,9 @@ export default function Home() {
                     );
                     setPlatformAuthError('');
                     setPlatformAuthStatus('SIGNED_OUT');
+                    setModeratorQueue(null);
+                    setModeratorQueueStatus('PREVIEW');
+                    setModeratorQueueError('');
                   }}
                 />
               </label>

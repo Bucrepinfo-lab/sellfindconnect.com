@@ -1,7 +1,7 @@
 # Product Requirements Document: Multi-Tenant Advertising SaaS
 
 Date: 2026-06-15
-Last updated: 2026-08-22
+Last updated: 2026-08-24
 Owner: Telpen Adverts
 Working name: Telpen Adverts Platform
 Status: Draft for validation
@@ -1145,6 +1145,10 @@ Implementation progress on 2026-06-17:
   conversation create/send/media/typing, lead inquiry, Source Finder search
   and opportunity alerts, not only the home result list. Unblock restores
   messaging; SLA checks skip blocked targets.
+- Continued implementation on 2026-08-24 with a UGC moderator queue: reports
+  get severity and SLA from reason, `GET /v1/platform/ugc/reports` returns
+  open/overdue counts, and home can load/resolve with an MFA
+  `MODERATE_CONTENT` session. Product audit still omits report details.
 - Remaining hardening: app-store billing rails are out of scope while native
   mobile is not in delivery. A future Google Play listing must use Play Billing
   for the digital SaaS subscription. Web/PWA STK Push stays on the login phone.

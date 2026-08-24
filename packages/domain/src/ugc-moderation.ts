@@ -30,6 +30,26 @@ export const ugcReportResolutions = ['RESOLVED', 'DISMISSED'] as const;
 
 export type UgcReportResolution = (typeof ugcReportResolutions)[number];
 
+export const ugcReportSeverities = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as const;
+
+export type UgcReportSeverity = (typeof ugcReportSeverities)[number];
+
+export const ugcReportSeverityByReason: Record<UgcReportReason, UgcReportSeverity> = {
+  PROHIBITED_CONTENT: 'CRITICAL',
+  HARASSMENT: 'HIGH',
+  IMPERSONATION: 'HIGH',
+  SPAM_SCAMS: 'MEDIUM',
+  INTELLECTUAL_PROPERTY: 'MEDIUM',
+  OTHER: 'LOW',
+};
+
+export const ugcReportSlaHoursBySeverity: Record<UgcReportSeverity, number> = {
+  CRITICAL: 24,
+  HIGH: 72,
+  MEDIUM: 168,
+  LOW: 336,
+};
+
 export type UserContentReportInput = {
   targetType: UgcReportTargetType;
   targetId: string;
@@ -53,6 +73,78 @@ export type UserContentReport = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type UgcModeratorQueueItem = UserContentReport & {
+  severity: UgcReportSeverity;
+  slaHours: number;
+  dueAt: string;
+  overdue: boolean;
+  open: boolean;
+};
+
+export type UgcModeratorQueue = {
+  checkedAt: string;
+  openCount: number;
+  overdueCount: number;
+  reports: UgcModeratorQueueItem[];
+};
+
+const ugcSeverityRank: Record<UgcReportSeverity, number> = {
+  CRITICAL: 0,
+  HIGH: 1,
+  MEDIUM: 2,
+  LOW: 3,
+};
+
+export function ugcReportSeverityForReason(reason: UgcReportReason): UgcReportSeverity {
+  return ugcReportSeverityByReason[reason];
+}
+
+export function presentUgcModeratorQueueItem(
+  report: UserContentReport,
+  now = new Date().toISOString(),
+): UgcModeratorQueueItem {
+  const severity = ugcReportSeverityForReason(report.reason);
+  const slaHours = ugcReportSlaHoursBySeverity[severity];
+  const dueAt = new Date(Date.parse(report.createdAt) + slaHours * 3_600_000).toISOString();
+  const open = report.status === 'OPEN' || report.status === 'REVIEWING';
+
+  return {
+    ...report,
+    severity,
+    slaHours,
+    dueAt,
+    overdue: open && now > dueAt,
+    open,
+  };
+}
+
+export function buildUgcModeratorQueue(
+  reports: UserContentReport[],
+  now = new Date().toISOString(),
+): UgcModeratorQueue {
+  const items = reports
+    .map((report) => presentUgcModeratorQueueItem(report, now))
+    .sort((left, right) => {
+      if (left.open !== right.open) {
+        return left.open ? -1 : 1;
+      }
+      if (left.overdue !== right.overdue) {
+        return left.overdue ? -1 : 1;
+      }
+      if (left.severity !== right.severity) {
+        return ugcSeverityRank[left.severity] - ugcSeverityRank[right.severity];
+      }
+      return left.createdAt.localeCompare(right.createdAt);
+    });
+
+  return {
+    checkedAt: now,
+    openCount: items.filter((item) => item.open).length,
+    overdueCount: items.filter((item) => item.overdue).length,
+    reports: items,
+  };
+}
 
 export type UserBlockInput = {
   blockedTargetId: string;

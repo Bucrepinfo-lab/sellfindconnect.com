@@ -805,6 +805,71 @@ textarea {
   line-height: 1.35;
 }
 
+.moderator-queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0 4px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.moderator-queue-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.moderator-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.moderator-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.moderator-row svg {
+  margin-top: 2px;
+  color: var(--red);
+}
+
+.moderator-row strong,
+.moderator-row span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.moderator-row strong {
+  font-size: 13px;
+}
+
+.moderator-row span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.moderator-row-actions {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.moderator-row-actions .secondary-button {
+  min-height: 32px;
+  padding: 4px 9px;
+  font-size: 12px;
+}
+
 .terms-status {
   min-height: 24px;
   border-radius: 999px;

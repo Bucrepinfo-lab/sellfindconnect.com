@@ -3,10 +3,12 @@ import { describe, expect, it } from 'vitest';
 import {
   assertTargetNotBlocked,
   blockedTargetContinueMessage,
+  buildUgcModeratorQueue,
   createUserBlock,
   createUserContentReport,
   filterBlockedSourceFinderResults,
   isTargetBlocked,
+  presentUgcModeratorQueueItem,
   resolveUserContentReport,
   UgcModerationError,
 } from './ugc-moderation';
@@ -124,5 +126,61 @@ describe('UGC report and block', () => {
 
     expect(closed.status).toBe('RESOLVED');
     expect(() => resolveUserContentReport(closed, 'DISMISSED')).toThrow(/already closed/);
+  });
+
+  it('ranks the moderator queue by open overdue critical reports first', () => {
+    const harassment = createUserContentReport(
+      {
+        targetType: 'USER',
+        targetId: 'r2',
+        reason: 'HARASSMENT',
+        acceptedTerms: true,
+      },
+      actor,
+      'report-harass',
+      '2026-08-22T10:00:00.000Z',
+    );
+    const prohibited = createUserContentReport(
+      {
+        targetType: 'ADVERT',
+        targetId: 'ad-1',
+        reason: 'PROHIBITED_CONTENT',
+        acceptedTerms: true,
+      },
+      actor,
+      'report-prohibited',
+      '2026-08-20T10:00:00.000Z',
+    );
+    const spam = createUserContentReport(
+      {
+        targetType: 'USER',
+        targetId: 'r3',
+        reason: 'SPAM_SCAMS',
+        acceptedTerms: true,
+      },
+      actor,
+      'report-spam',
+      '2026-08-22T12:00:00.000Z',
+    );
+    const closed = resolveUserContentReport(harassment, 'RESOLVED', '2026-08-22T16:00:00.000Z');
+    const queue = buildUgcModeratorQueue(
+      [closed, spam, prohibited],
+      '2026-08-22T18:00:00.000Z',
+    );
+
+    expect(presentUgcModeratorQueueItem(prohibited, '2026-08-22T18:00:00.000Z')).toMatchObject({
+      severity: 'CRITICAL',
+      slaHours: 24,
+      overdue: true,
+      open: true,
+    });
+    expect(queue.openCount).toBe(2);
+    expect(queue.overdueCount).toBe(1);
+    expect(queue.reports.map((item) => item.id)).toEqual([
+      'report-prohibited',
+      'report-spam',
+      'report-harass',
+    ]);
+    expect(queue.reports[2]).toMatchObject({ open: false, overdue: false, status: 'RESOLVED' });
   });
 });

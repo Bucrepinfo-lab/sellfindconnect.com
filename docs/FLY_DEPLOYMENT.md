@@ -138,6 +138,8 @@ Do not onboard paying subscribers until:
   UGC migration)
 - Blocked tenants cannot create or send conversations, inquiries, or Source
   Finder outcomes for that target (`userBlocked` on conversation GET)
+- Home moderator queue can load `GET /v1/platform/ugc/reports` with an MFA
+  `MODERATE_CONTENT` session (401 without it)
 - A manual **Scheduled jobs** workflow_dispatch succeeds
 - STK Push uses the login phone only (`PAYMENT_PROVIDER` live credentials
   reviewed)
