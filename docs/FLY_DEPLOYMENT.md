@@ -140,6 +140,8 @@ Do not onboard paying subscribers until:
   Finder outcomes for that target (`userBlocked` on conversation GET)
 - Home moderator queue can load `GET /v1/platform/ugc/reports` with an MFA
   `MODERATE_CONTENT` session (401 without it)
+- Home Policy Lookup can load `GET /v1/platform/legal/terms-acceptances` with
+  an MFA `VIEW_TENANT` session (401 without it; lookup omits emails)
 - A manual **Scheduled jobs** workflow_dispatch succeeds
 - STK Push uses the login phone only (`PAYMENT_PROVIDER` live credentials
   reviewed)

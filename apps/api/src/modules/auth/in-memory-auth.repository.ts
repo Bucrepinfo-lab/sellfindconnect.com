@@ -66,6 +66,16 @@ export class InMemoryAuthRepository implements AuthRepository {
     return this.termsEvidence.get(this.termsEvidenceKey(userId, tenantId));
   }
 
+  listTermsAcceptance(input: { tenantId: string; userId?: string }): TermsAcceptanceEvidence[] {
+    return Array.from(this.termsEvidence.values())
+      .filter(
+        (evidence) =>
+          evidence.tenantId === input.tenantId &&
+          (!input.userId || evidence.userId === input.userId),
+      )
+      .sort((left, right) => right.acceptedAt.localeCompare(left.acceptedAt));
+  }
+
   findSessionByTokenHash(tokenHash: string): AuthSessionRecord | undefined {
     return this.sessionsByTokenHash.get(tokenHash);
   }

@@ -96,6 +96,21 @@ export class PrismaAuthRepository implements AuthRepository {
     return evidence ? this.mapTermsEvidence(evidence) : undefined;
   }
 
+  async listTermsAcceptance(input: {
+    tenantId: string;
+    userId?: string;
+  }): Promise<TermsAcceptanceEvidence[]> {
+    const records = await this.prisma.termsAcceptanceEvidence.findMany({
+      where: {
+        tenantId: input.tenantId,
+        ...(input.userId ? { userId: input.userId } : {}),
+      },
+      orderBy: { acceptedAt: 'desc' },
+      take: 100,
+    });
+    return records.map((record) => this.mapTermsEvidence(record));
+  }
+
   async findSessionByTokenHash(tokenHash: string): Promise<AuthSessionRecord | undefined> {
     const session = await this.prisma.authSession.findUnique({ where: { tokenHash } });
     return session ? this.mapSession(session) : undefined;

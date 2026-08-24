@@ -1149,6 +1149,10 @@ Implementation progress on 2026-06-17:
   get severity and SLA from reason, `GET /v1/platform/ugc/reports` returns
   open/overdue counts, and home can load/resolve with an MFA
   `MODERATE_CONTENT` session. Product audit still omits report details.
+- Continued implementation on 2026-08-24 with legal/support lookup of accepted
+  policy versions. `GET /v1/platform/legal/terms-acceptances` is scoped by
+  MFA `VIEW_TENANT` assignment and tenant country, returns current vs stale
+  versions, and records `TERMS_ACCEPTANCE_LOOKED_UP` without emails or hashes.
 - Remaining hardening: app-store billing rails are out of scope while native
   mobile is not in delivery. A future Google Play listing must use Play Billing
   for the digital SaaS subscription. Web/PWA STK Push stays on the login phone.
@@ -1172,6 +1176,12 @@ Requirements:
 - Moderator tooling to distinguish regulated-but-allowed industries from fully blocked categories.
 - Terms acceptance evidence must be visible to authorized support, legal, trust, and finance users when investigating user content, disputes, payments, reports, or enforcement.
 - Terms acceptance must not reduce Telpen's own obligations to run reporting, moderation, privacy, tax, consumer-protection, app-store, and regulated-marketplace controls.
+
+Implementation progress on 2026-08-24:
+
+- Authorized support, legal, trust, and finance roles with `VIEW_TENANT` can look
+  up accepted policy versions at `GET /v1/platform/legal/terms-acceptances`.
+  Responses flag current vs stale policies and omit emails and hashes.
 
 ### 7.12 Reviews and Reputation
 

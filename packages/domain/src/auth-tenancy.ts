@@ -147,3 +147,95 @@ export function buildTermsAcceptanceEvidence(input: {
     acceptedAt: input.acceptedAt,
   };
 }
+
+export const termsAcceptancePolicyKeys = [
+  'terms',
+  'privacy',
+  'prohibited',
+  'subscription',
+] as const;
+
+export type TermsAcceptancePolicyKey = (typeof termsAcceptancePolicyKeys)[number];
+
+export type TermsAcceptanceLookupRecord = Omit<TermsAcceptanceEvidence, 'accepted'> & {
+  current: boolean;
+  stalePolicies: TermsAcceptancePolicyKey[];
+};
+
+export type TermsAcceptanceLookup = {
+  activePolicyVersions: ActivePolicyVersions;
+  currentCount: number;
+  staleCount: number;
+  records: TermsAcceptanceLookupRecord[];
+};
+
+export function staleTermsAcceptancePolicies(
+  evidence: Pick<
+    TermsAcceptanceEvidence,
+    'termsVersion' | 'privacyVersion' | 'prohibitedContentVersion' | 'subscriptionTermsVersion'
+  >,
+): TermsAcceptancePolicyKey[] {
+  const stale: TermsAcceptancePolicyKey[] = [];
+  if (evidence.termsVersion !== activePolicyVersions.termsVersion) {
+    stale.push('terms');
+  }
+  if (evidence.privacyVersion !== activePolicyVersions.privacyVersion) {
+    stale.push('privacy');
+  }
+  if (evidence.prohibitedContentVersion !== activePolicyVersions.prohibitedContentVersion) {
+    stale.push('prohibited');
+  }
+  if (evidence.subscriptionTermsVersion !== activePolicyVersions.subscriptionTermsVersion) {
+    stale.push('subscription');
+  }
+  return stale;
+}
+
+export function isCurrentTermsAcceptance(
+  evidence: Pick<
+    TermsAcceptanceEvidence,
+    | 'accepted'
+    | 'termsVersion'
+    | 'privacyVersion'
+    | 'prohibitedContentVersion'
+    | 'subscriptionTermsVersion'
+  >,
+): boolean {
+  return evidence.accepted === true && staleTermsAcceptancePolicies(evidence).length === 0;
+}
+
+export function presentTermsAcceptanceLookup(
+  evidence: TermsAcceptanceEvidence,
+): TermsAcceptanceLookupRecord {
+  const stalePolicies = staleTermsAcceptancePolicies(evidence);
+  return {
+    userId: evidence.userId,
+    tenantId: evidence.tenantId,
+    countryCode: evidence.countryCode,
+    locale: evidence.locale,
+    termsVersion: evidence.termsVersion,
+    privacyVersion: evidence.privacyVersion,
+    prohibitedContentVersion: evidence.prohibitedContentVersion,
+    subscriptionTermsVersion: evidence.subscriptionTermsVersion,
+    appSurface: evidence.appSurface,
+    acceptanceSource: evidence.acceptanceSource,
+    acceptedAt: evidence.acceptedAt,
+    current: isCurrentTermsAcceptance(evidence),
+    stalePolicies,
+  };
+}
+
+export function buildTermsAcceptanceLookup(
+  records: TermsAcceptanceEvidence[],
+): TermsAcceptanceLookup {
+  const presented = records
+    .map((record) => presentTermsAcceptanceLookup(record))
+    .sort((left, right) => right.acceptedAt.localeCompare(left.acceptedAt));
+
+  return {
+    activePolicyVersions,
+    currentCount: presented.filter((item) => item.current).length,
+    staleCount: presented.filter((item) => !item.current).length,
+    records: presented,
+  };
+}

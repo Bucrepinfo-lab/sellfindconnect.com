@@ -619,6 +619,11 @@ Progress:
 - Added a UGC moderator queue: severity and SLA from report reason,
   `GET /v1/platform/ugc/reports` returns open/overdue counts, and home can
   load/resolve with an MFA `MODERATE_CONTENT` session.
+- Added legal/support lookup of accepted policy versions.
+  `GET /v1/platform/legal/terms-acceptances?tenantId=&userId=` requires an MFA
+  `VIEW_TENANT` platform assignment, returns current vs stale policy versions,
+  and records `TERMS_ACCEPTANCE_LOOKED_UP` without emails or hashes. Home can
+  load the lookup with the same platform session token.
 
 ## Immediate Sprint
 
@@ -644,3 +649,4 @@ Progress:
 13. UGC moderator queue — after merge, API then web:
     `fly deploy --config fly.api.toml --remote-only` then
     `fly deploy --config fly.web.toml --remote-only`.
+14. Legal/support policy-acceptance lookup — after merge, API then web.
