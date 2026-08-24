@@ -16,6 +16,7 @@ import {
   UgcModerationError,
   type UserBlock,
   type UserContentReport,
+  type UgcModeratorQueueItem,
 } from '@telpen/domain';
 import { randomUUID } from 'node:crypto';
 
@@ -75,7 +76,7 @@ export class UgcService {
     id: string,
     userId: string,
     input: ResolveUgcReportDto,
-  ): Promise<UserContentReport> {
+  ): Promise<UgcModeratorQueueItem> {
     const existing = await this.repository.findReport(id);
     if (!existing) {
       throw new NotFoundException('Report not found.');
