@@ -33,7 +33,7 @@ export class InMemoryAuthRepository implements AuthRepository {
   private readonly tenantInvitesByTokenHash = new Map<string, AuthTenantInviteRecord>();
   private readonly accessAssignments = new Map<string, AccessAssignmentRecord>();
   private readonly accessDecisionAudits = new Map<string, AccessDecisionAuditRecord>();
-  private readonly termsEvidence = new Map<string, TermsAcceptanceEvidence>();
+  private readonly termsEvidence: TermsAcceptanceEvidence[] = [];
   private readonly auditLogs = new Map<string, AuthAuditRecord>();
 
   findUserByEmail(email: string): AuthUserRecord | undefined {
@@ -63,17 +63,21 @@ export class InMemoryAuthRepository implements AuthRepository {
   }
 
   findTermsAcceptance(userId: string, tenantId: string): TermsAcceptanceEvidence | undefined {
-    return this.termsEvidence.get(this.termsEvidenceKey(userId, tenantId));
+    return this.listTermsAcceptance({ tenantId, userId })[0];
   }
 
   listTermsAcceptance(input: { tenantId: string; userId?: string }): TermsAcceptanceEvidence[] {
-    return Array.from(this.termsEvidence.values())
+    return this.termsEvidence
       .filter(
         (evidence) =>
           evidence.tenantId === input.tenantId &&
           (!input.userId || evidence.userId === input.userId),
       )
       .sort((left, right) => right.acceptedAt.localeCompare(left.acceptedAt));
+  }
+
+  createTermsAcceptance(evidence: TermsAcceptanceEvidence): void {
+    this.termsEvidence.push(evidence);
   }
 
   findSessionByTokenHash(tokenHash: string): AuthSessionRecord | undefined {
@@ -104,27 +108,18 @@ export class InMemoryAuthRepository implements AuthRepository {
     this.saveUser(records.user);
     this.tenants.set(records.tenant.id, records.tenant);
     this.memberships.set(records.membership.id, records.membership);
-    this.termsEvidence.set(
-      this.termsEvidenceKey(records.user.id, records.tenant.id),
-      records.termsAcceptance,
-    );
+    this.createTermsAcceptance(records.termsAcceptance);
   }
 
   createInvitedTenantUser(records: InvitedTenantUserRecords): void {
     this.saveUser(records.user);
     this.memberships.set(records.membership.id, records.membership);
-    this.termsEvidence.set(
-      this.termsEvidenceKey(records.user.id, records.membership.tenantId),
-      records.termsAcceptance,
-    );
+    this.createTermsAcceptance(records.termsAcceptance);
   }
 
   createTenantMembershipWithTerms(records: TenantMembershipWithTermsRecords): void {
     this.memberships.set(records.membership.id, records.membership);
-    this.termsEvidence.set(
-      this.termsEvidenceKey(records.membership.userId, records.membership.tenantId),
-      records.termsAcceptance,
-    );
+    this.createTermsAcceptance(records.termsAcceptance);
   }
 
   createAccessAssignment(record: AccessAssignmentRecord): void {
@@ -257,9 +252,5 @@ export class InMemoryAuthRepository implements AuthRepository {
     if (user.phone) {
       this.usersByPhone.set(user.phone, user);
     }
-  }
-
-  private termsEvidenceKey(userId: string, tenantId: string): string {
-    return `${userId}:${tenantId}`;
   }
 }

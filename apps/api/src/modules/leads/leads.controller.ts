@@ -1,8 +1,8 @@
 import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 
-import { TenantId } from '../tenant/tenant-context.decorator';
-import { TenantSessionGuard } from '../tenant/tenant-session.guard';
+import { TenantAuthSession, TenantId } from '../tenant/tenant-context.decorator';
+import { TenantSessionGuard, type TenantSessionDecision } from '../tenant/tenant-session.guard';
 import { CreateInquiryDto, CreateMatchFeedbackDto, UpdateLeadStatusDto } from './dto/leads.dto';
 import { LeadsService } from './leads.service';
 
@@ -31,8 +31,12 @@ export class LeadsController {
   }
 
   @Post('inquiries')
-  createInquiry(@TenantId() tenantId: string, @Body() body: CreateInquiryDto) {
-    return this.leads.createInquiry(tenantId, body);
+  createInquiry(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Body() body: CreateInquiryDto,
+  ) {
+    return this.leads.createInquiry(tenantId, body, session.userId);
   }
 
   @Get()

@@ -309,3 +309,9 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   `VIEW_TENANT` platform assignment, marks current vs stale policies, and
   records `TERMS_ACCEPTANCE_LOOKED_UP` without emails or hashes. Home loads
   it from the Policy Lookup panel. API then web deploy.
+- 2026-08-24: Forced re-acceptance after material policy version changes.
+  `GET /v1/auth/session` returns `termsGate`. Stale stored versions lock
+  publish, chat, inquiry, UGC report/block, relationship claims, and checkout
+  (`reason: terms`). `POST /v1/auth/terms/accept` writes `REACCEPTANCE`
+  evidence after MFA and records `TERMS_REACCEPTED` without emails. Home Terms
+  Gate can re-accept with the session token. API then web deploy.

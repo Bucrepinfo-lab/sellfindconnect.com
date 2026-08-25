@@ -105,4 +105,26 @@ describe('LeadsService', () => {
       }),
     ).rejects.toThrow(/blocked/);
   });
+
+  it('refuses inquiry when stored terms acceptance is stale', async () => {
+    const service = new LeadsService(undefined, {
+      requireCurrentStoredTerms: async () => {
+        throw new Error('Current stored terms acceptance is required before inquiry.');
+      },
+    } as never);
+
+    await expect(
+      service.createInquiry(
+        tenantId,
+        {
+          sourceRecordId: 'r1',
+          query: 'fresh produce',
+          inquiryType: 'RFQ',
+          message: 'Please quote weekly supply for tomatoes and kale in Nairobi.',
+          acceptedTerms: true,
+        },
+        'owner-1',
+      ),
+    ).rejects.toThrow('Current stored terms acceptance is required before inquiry.');
+  });
 });

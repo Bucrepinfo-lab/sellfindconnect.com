@@ -624,6 +624,11 @@ Progress:
   `VIEW_TENANT` platform assignment, returns current vs stale policy versions,
   and records `TERMS_ACCEPTANCE_LOOKED_UP` without emails or hashes. Home can
   load the lookup with the same platform session token.
+- Forced re-acceptance after material policy version changes.
+  `GET /v1/auth/session` includes `termsGate`. Stale stored versions lock
+  publish, chat, inquiry, UGC report/block, relationship claims, and checkout.
+  `POST /v1/auth/terms/accept` writes a new `REACCEPTANCE` evidence row after
+  MFA. Home Terms Gate can re-accept with the session token.
 
 ## Immediate Sprint
 
@@ -646,7 +651,7 @@ Progress:
 11. UGC report/block — **live** (API + web).
 12. Enforce tenant blocks on conversation, inquiry, and Source Finder APIs —
     **live** (API + web).
-13. UGC moderator queue — after merge, API then web:
-    `fly deploy --config fly.api.toml --remote-only` then
-    `fly deploy --config fly.web.toml --remote-only`.
-14. Legal/support policy-acceptance lookup — after merge, API then web.
+13. UGC moderator queue — **live** (API + web).
+14. Legal/support policy-acceptance lookup — **live** (API + web).
+15. Forced re-acceptance after material policy version changes — after merge,
+    API then web.

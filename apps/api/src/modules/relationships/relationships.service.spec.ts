@@ -84,4 +84,16 @@ describe('RelationshipsService', () => {
     expect(removed.status).toBe('REMOVED');
     expect(await service.listGraph()).toHaveLength(0);
   });
+
+  it('refuses claims when stored terms acceptance is stale', async () => {
+    const service = new RelationshipsService(undefined, {
+      requireCurrentStoredTerms: async () => {
+        throw new Error('Current stored terms acceptance is required before relationship claims.');
+      },
+    } as never);
+
+    await expect(service.createClaim(ownerTenant, 'owner-1', claimInput())).rejects.toThrow(
+      'Current stored terms acceptance is required before relationship claims.',
+    );
+  });
 });

@@ -44,6 +44,11 @@ export class RelationshipsService {
     const claim = this.runDomain(() =>
       createRelationshipClaim(input, { tenantId, userId }, randomUUID()),
     );
+    await this.auth?.requireCurrentStoredTerms(
+      userId,
+      tenantId,
+      'Current stored terms acceptance is required before relationship claims.',
+    );
     await this.repository.create(claim);
     await this.auth?.recordTenantAudit({
       tenantId,

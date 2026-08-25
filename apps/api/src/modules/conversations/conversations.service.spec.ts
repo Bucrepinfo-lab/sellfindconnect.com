@@ -303,7 +303,8 @@ describe('ConversationsService', () => {
       recordTenantAudit: async (record) => {
         auditLogs.push(record);
       },
-    } as Pick<AuthService, 'recordTenantAudit'> as AuthService);
+      requireCurrentStoredTerms: async () => undefined,
+    } as Pick<AuthService, 'recordTenantAudit' | 'requireCurrentStoredTerms'> as AuthService);
     const conversation = await service.createConversation(tenantId, opener, 'actor-1');
     await service.sendMessage(
       tenantId,
@@ -320,6 +321,18 @@ describe('ConversationsService', () => {
     expect(auditLogs.some((record) => record.action === 'CONVERSATION_MESSAGE_SENT')).toBe(true);
     expect(JSON.stringify(auditLogs)).not.toContain(opener.message);
     expect(JSON.stringify(auditLogs)).not.toContain('Please share delivery coverage');
+  });
+
+  it('refuses messaging when stored terms acceptance is stale', async () => {
+    const service = new ConversationsService(undefined, undefined, undefined, undefined, {
+      requireCurrentStoredTerms: async () => {
+        throw new Error('Current stored terms acceptance is required before messaging.');
+      },
+    } as Pick<AuthService, 'requireCurrentStoredTerms'> as AuthService);
+
+    await expect(service.createConversation(tenantId, opener, 'actor-1')).rejects.toThrow(
+      'Current stored terms acceptance is required before messaging.',
+    );
   });
 
   it('refuses create, send, and SLA for a blocked Source Finder target', async () => {

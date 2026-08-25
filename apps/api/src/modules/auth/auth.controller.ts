@@ -19,6 +19,7 @@ import {
   EnrollTotpDto,
   ConfirmTotpDto,
   RegenerateRecoveryCodesDto,
+  AcceptCurrentTermsDto,
 } from './dto/auth.dto';
 
 @ApiTags('auth')
@@ -115,6 +116,11 @@ export class AuthController {
   @ApiHeader({ name: 'x-session-token', required: true })
   getSession(@Headers('x-session-token') sessionToken: string) {
     return this.auth.getSession(sessionToken);
+  }
+
+  @Post('terms/accept')
+  acceptCurrentTerms(@Body() body: AcceptCurrentTermsDto) {
+    return this.auth.acceptCurrentTerms(body);
   }
 
   @Get('tenants')

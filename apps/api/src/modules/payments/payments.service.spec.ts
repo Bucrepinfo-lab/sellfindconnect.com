@@ -28,6 +28,7 @@ describe('PaymentsService product audit', () => {
           session: { userId: 'user-1', tenantId, role: 'OWNER' },
           user: { phone: '+254700000001' },
         }),
+        hasCurrentTermsAcceptance: async () => true,
         recordTenantAudit: async (record: { action: string; metadata?: Record<string, unknown> }) => {
           audits.push(record);
         },
@@ -109,6 +110,38 @@ describe('PaymentsService product audit', () => {
       expect.objectContaining({
         action: 'PAYMENT_CHECKOUT_BLOCKED',
         metadata: expect.objectContaining({ reason: 'tax_profile', ok: false }),
+      }),
+    ]);
+    expect(JSON.stringify(audits)).not.toContain('+254700000001');
+  });
+
+  it('refuses checkout when stored terms acceptance is stale', async () => {
+    const audits: Array<{ action: string; metadata?: Record<string, unknown> }> = [];
+    const service = new PaymentsService(
+      {
+        getSession: async () => ({
+          session: { userId: 'user-1', tenantId, role: 'OWNER' },
+          user: { phone: '+254700000001' },
+        }),
+        hasCurrentTermsAcceptance: async () => false,
+        recordTenantAudit: async (record: { action: string; metadata?: Record<string, unknown> }) => {
+          audits.push(record);
+        },
+      } as unknown as AuthService,
+      new InMemoryPaymentsRepository(),
+      undefined,
+      undefined,
+      approvedFinance(),
+    );
+
+    await expect(service.requestCheckout('session-token', { amount: 1500 })).resolves.toEqual({
+      ok: false,
+      reason: 'terms',
+    });
+    expect(audits).toEqual([
+      expect.objectContaining({
+        action: 'PAYMENT_CHECKOUT_BLOCKED',
+        metadata: expect.objectContaining({ reason: 'terms', ok: false }),
       }),
     ]);
     expect(JSON.stringify(audits)).not.toContain('+254700000001');

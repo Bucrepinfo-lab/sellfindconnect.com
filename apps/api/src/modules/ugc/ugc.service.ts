@@ -42,6 +42,11 @@ export class UgcService {
     const report = this.runDomain(() =>
       createUserContentReport(input, { tenantId, userId, countryCode: 'KE' }, randomUUID()),
     );
+    await this.auth?.requireCurrentStoredTerms(
+      userId,
+      tenantId,
+      'Current stored terms acceptance is required before reporting.',
+    );
     await this.repository.createReport(report);
     await this.auth?.recordTenantAudit({
       tenantId,
@@ -100,6 +105,11 @@ export class UgcService {
   async createBlock(tenantId: string, userId: string, input: CreateUgcBlockDto): Promise<UserBlock> {
     const block = this.runDomain(() =>
       createUserBlock(input, { tenantId, userId, countryCode: 'KE' }, randomUUID()),
+    );
+    await this.auth?.requireCurrentStoredTerms(
+      userId,
+      tenantId,
+      'Current stored terms acceptance is required before blocking.',
     );
     const existing = await this.repository.findBlock(tenantId, block.blockedTargetId);
     if (existing) {

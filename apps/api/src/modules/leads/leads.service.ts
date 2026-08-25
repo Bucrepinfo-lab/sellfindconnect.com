@@ -12,6 +12,7 @@ import {
 import { randomUUID } from 'node:crypto';
 
 import { UgcService } from '../ugc/ugc.service';
+import type { AuthService } from '../auth/auth.service';
 import type {
   CreateInquiryDto,
   CreateMatchFeedbackDto,
@@ -32,7 +33,10 @@ export class LeadsService {
   private readonly feedback = new Map<string, MatchFeedbackRecord>();
   private readonly leads = new Map<string, LeadRecord>();
 
-  constructor(@Optional() private readonly ugc?: UgcService) {}
+  constructor(
+    @Optional() private readonly ugc?: UgcService,
+    @Optional() private readonly auth?: AuthService,
+  ) {}
 
   async recordMatchFeedback(tenantId: string, input: CreateMatchFeedbackDto): Promise<MatchFeedbackRecord> {
     this.assertSafe(input, 'Match feedback contains blocked content.');
@@ -59,9 +63,20 @@ export class LeadsService {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
-  async createInquiry(tenantId: string, input: CreateInquiryDto): Promise<LeadRecord> {
+  async createInquiry(
+    tenantId: string,
+    input: CreateInquiryDto,
+    actorUserId?: string,
+  ): Promise<LeadRecord> {
     if (!input.acceptedTerms) {
       throw new UnprocessableEntityException('Current terms acceptance is required before inquiry.');
+    }
+    if (this.auth && actorUserId) {
+      await this.auth.requireCurrentStoredTerms(
+        actorUserId,
+        tenantId,
+        'Current stored terms acceptance is required before inquiry.',
+      );
     }
 
     this.assertSafe(input, 'Inquiry contains blocked content.');

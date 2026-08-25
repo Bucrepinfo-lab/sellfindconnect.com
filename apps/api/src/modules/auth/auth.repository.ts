@@ -37,6 +37,7 @@ export interface AuthRepository {
     tenantId: string;
     userId?: string;
   }): RepositoryResult<TermsAcceptanceEvidence[]>;
+  createTermsAcceptance(evidence: TermsAcceptanceEvidence): RepositoryResult<void>;
   findSessionByTokenHash(tokenHash: string): RepositoryResult<AuthSessionRecord | undefined>;
   findMfaChallengeBySessionId(sessionId: string): RepositoryResult<AuthMfaChallengeRecord | undefined>;
   findAccountChallengeByTokenHash(tokenHash: string): RepositoryResult<AuthAccountChallengeRecord | undefined>;
