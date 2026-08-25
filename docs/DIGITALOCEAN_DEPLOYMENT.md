@@ -1,103 +1,122 @@
-# Sell Find Connect DigitalOcean Deployment Runbook
+# DigitalOcean App Platform — candidate only
 
-Status: Candidate only — Fly.io Frankfurt is the live production host
-Date: 2026-06-18
-Last updated: 2026-08-21
+Status: **Not live.** Do not point `sellfindconnect.com` DNS here.
+Date: 2026-08-22
+Live host: Fly.io Frankfurt — `docs/FLY_DEPLOYMENT.md`
 
-## Current Decision
+This file is the checked-in **candidate plan** if the owner later wants managed
+Postgres and App Platform (for example a closer African region). It is not a
+recovery path and it is not what production serves today.
 
-Fly.io (`fra`) is the live production host. See `docs/FLY_DEPLOYMENT.md`.
+| Surface | Live today | This candidate spec |
+| --- | --- | --- |
+| Web | `https://sellfindconnect.com` on Fly (`sellfindconnect-web`) | Same hostname, App Platform `web` service |
+| API | `https://api.sellfindconnect.com/v1` on Fly (`sellfindconnect-api`) | Path-routed `https://sellfindconnect.com/api/v1` **or** a second app on `api.sellfindconnect.com` |
+| Postgres | Hosted `DATABASE_URL` on Fly (Prisma live) | App Platform managed `sfc-postgres` |
+| Jobs | GitHub Actions cron + `INTERNAL_JOB_KEY` | Same workflow; change `API_BASE_URL` if the API host changes |
 
-DigitalOcean App Platform remains a checked-in **candidate** if the owner later
-wants managed Postgres + App Platform in a closer African region. The spec at
-`deploy/digitalocean/app.yaml` builds from `deploy/web.Dockerfile` and
-`deploy/api.Dockerfile`, but it is **not** what `sellfindconnect.com` currently
-serves.
+Railway is **not** a fallback. Those URLs 404. See `docs/GIT_RAILWAY_RUNBOOK.md`.
 
-The canonical domain is **`sellfindconnect.com`**, owned through **GoDaddy**.
-Live DNS points the apex/www at Fly web and `api.sellfindconnect.com` at Fly API.
+## When to use this spec
 
-If DigitalOcean is selected later, pick the closest available App Platform
-region (e.g. `fra1`) until a South Africa point of presence exists. Keep
-latency-critical web/API close to users and durable services in the nearest
-stable region.
+Use `deploy/digitalocean/app.yaml` only after a written decision to leave Fly.
+Until then:
 
-## Verification Gate
+- Keep GoDaddy DNS on Fly.
+- Do not run `doctl apps create` against the live domain.
+- Do not onboard paying subscribers on a second host.
 
-Before committing production infrastructure to DigitalOcean, verify the exact
-availability of these products in the Cape Town/South Africa location:
+If DigitalOcean is selected, pick the closest App Platform region (`fra1` until
+a South Africa PoP exists). Keep web/API close to users; put Postgres in the
+nearest stable region if Cape Town cannot host every managed service.
 
-- App Platform or deployable container hosting for the Next.js web app and
-  NestJS API.
-- Managed PostgreSQL.
-- Managed Redis or Redis-compatible cache/queue service.
-- Load balancer, TLS certificates, custom domains, and health checks.
-- Container registry or GitHub-connected deploy flow.
-- Kubernetes/Droplets fallback if App Platform is not available in the target
-  region.
-- Backups, point-in-time restore, monitoring, logs, alerts, and rollback tools.
-- Object storage/CDN path for future media.
-
-If any required managed service is not available in Cape Town, prefer a
-DigitalOcean architecture that keeps latency-critical web/API services closest
-to users while placing durable services in the nearest stable supported region,
-or reconsider another provider with complete Cape Town coverage.
-
-## Target Architecture After Coding Completion
+## Architecture (candidate)
 
 ```mermaid
 flowchart LR
-  User["Web, PWA, and Mobile Users"] --> Edge["DNS, WAF, CDN"]
-  Edge --> Web["Next.js Web/PWA"]
-  Web --> API["NestJS API"]
+  User["Browser / PWA"] --> DNS["GoDaddy DNS"]
+  DNS --> Web["App Platform web"]
+  DNS --> API["App Platform api"]
+  Web --> API
   API --> DB["Managed PostgreSQL"]
-  API --> Redis["Redis/Queue/Realtime Fan-out"]
-  Worker["Background Worker"] --> DB
-  Worker --> Redis
-  Scheduler["Scheduled Jobs"] --> API
-  API --> Media["Object Storage/CDN"]
-  API --> Providers["Payments, Tax, Search, Notifications"]
+  Jobs["GitHub Actions scheduled-jobs.yml"] --> API
+  Release["PRE_DEPLOY api-release.sh"] --> DB
 ```
 
-## Required Services
+The checked-in spec is **one App Platform app**, path-routed:
 
-- Web app service for `sellfindconnect.com` and `www.sellfindconnect.com`.
-- API service path-routed at `sellfindconnect.com/api` (or `api.sellfindconnect.com`
-  if you choose the two-app subdomain layout).
-- Managed PostgreSQL for tenant, auth, finance, analytics, moderation, and
-  relationship graph data.
-- Redis-compatible service for queues, rate limits, chat fan-out, notification
-  state, and multi-instance presence.
-- Worker process for notifications, media moderation, analytics rollups, tax
-  reminders, matching jobs, and search indexing.
-- Scheduler for advert lifecycle, day-35/day-39 renewal alerts, day-40
-  auto-deletion, conversation SLA sweeps, analytics retention pruning, and
-  finance/tax alert checks.
-- Object storage/CDN for images and clips.
-- Monitoring, logs, uptime alerts, error tracking, and backup verification.
+- web → `https://sellfindconnect.com/`
+- api → `https://sellfindconnect.com/api` (prefix stripped; Nest sees `/v1/...`)
+- public API base → `https://sellfindconnect.com/api/v1`
 
-## Cutover Policy
+That is **not** the live Fly layout (`api.sellfindconnect.com`). If you want
+the same hostnames as Fly, deploy API as a **second** app and set
+`NEXT_PUBLIC_API_URL=https://api.sellfindconnect.com/v1` (rebuild web).
 
-No paying subscriber should be onboarded until:
+## Spec file
 
-- The production provider decision is final.
-- DNS, TLS, health checks, backups, rollbacks, logs, and alerts are verified.
-- Web and API smoke tests pass.
-- Owner onboarding, login, MFA, tenant-session checks, terms gate, safety
-  blocking, Source Finder, lead conversion, notifications, analytics, advert
-  lifecycle, and finance/tax readiness pass.
-- Scheduled jobs run successfully.
-- Database migrations and seed data are repeatable.
-- Railway remains available as fallback until the new platform is stable.
+`deploy/digitalocean/app.yaml` builds the same Dockerfiles Fly uses
+(`deploy/web.Dockerfile`, `deploy/api.Dockerfile`) and the same release script
+(`sh /app/deploy/api-release.sh`: migrate, then idempotent seed).
 
-## Database Readiness Commands
+It sets `PERSISTENCE_DRIVER=prisma` and injects `DATABASE_URL` from
+`sfc-postgres`. Per-repository `memory` overrides still win. Named
+`PERSISTENCE_DRIVER=live` fail-closes without `DATABASE_URL`.
 
-Run these from the repository root after the target PostgreSQL `DATABASE_URL`
-is configured in the environment. Fly and DigitalOcean both run
-`sh /app/deploy/api-release.sh` before the new API image receives traffic
-(migrate, then idempotent seed). Do not set `PERSISTENCE_DRIVER=prisma` on a
-running memory image; let the release command finish first. For a manual
-console run against hosted PostgreSQL:
+`INTERNAL_JOB_KEY` must be set as a **dashboard secret**, never committed.
+The placeholder in `app.yaml` is invalid on purpose.
+
+## First create (only after the host decision)
+
+Prerequisites: DigitalOcean account, `doctl auth init`, GitHub connected for
+`Bucrepinfo-lab/sellfindconnect.com`.
+
+1. Set `region:` in `deploy/digitalocean/app.yaml` (example: `fra1`).
+2. `doctl apps create --spec deploy/digitalocean/app.yaml`
+3. In App → Settings, set API secret `INTERNAL_JOB_KEY` to a long random value.
+   Set the **same** value in GitHub Actions if jobs should hit this API.
+4. First deploy runs `deploy/api-release.sh` as the `db-migrate` PRE_DEPLOY job.
+   Set `SKIP_DB_SEED=true` on that job only to skip continents/countries/industries.
+5. Add domains only **after** Fly DNS is intentionally removed. DO shows the
+   exact target and issues Let's Encrypt once DNS resolves.
+
+### DNS (candidate — do not apply while Fly is live)
+
+**Option A — DigitalOcean nameservers:** `ns1.digitalocean.com`,
+`ns2.digitalocean.com`, `ns3.digitalocean.com`. DO manages the apex ALIAS.
+
+**Option B — keep GoDaddy:** A record `@` to the DO apex IP; CNAME `www` to
+`<app>.ondigitalocean.app`. GoDaddy cannot CNAME the apex.
+
+Path-routed health check after a real cutover:
+`https://sellfindconnect.com/api/v1/health` → `persistence.mode: prisma`.
+
+Subdomain alternative: second app for `api.sellfindconnect.com` (CNAME `api` →
+that app's `*.ondigitalocean.app`).
+
+## Jobs
+
+App Platform has no app-level cron. Keep
+`.github/workflows/scheduled-jobs.yml`.
+
+If the API stays on Fly, leave GitHub `API_BASE_URL` =
+`https://api.sellfindconnect.com/v1`.
+
+If the API moves to DigitalOcean path routing, set
+`API_BASE_URL=https://sellfindconnect.com/api/v1` and keep
+`INTERNAL_JOB_KEY` matched to the API secret.
+
+Endpoints (header `x-internal-job-key`):
+
+- every 15 min: conversations SLA, notification dispatch, media processing,
+  Source Finder alerts
+- daily 02:00 UTC: advert lifecycle, account-deletion grace sweep, analytics
+  rollups, finance remittance alerts
+- weekly Sunday 03:00 UTC: analytics retention
+
+## Manual database commands
+
+From the repo root against the **target** `DATABASE_URL` only:
 
 - `npm run db:validate`
 - `npm run db:generate`
@@ -105,113 +124,13 @@ console run against hosted PostgreSQL:
 - `npm run db:migrate:deploy`
 - `npm run db:seed`
 
-The seed command builds the shared domain package first, then loads baseline
-continents, country configuration, and industry categories from the same data
-used by the web and API.
+Do not point these at the live Fly database from a DigitalOcean experiment.
 
-## Step-by-step: first deployment (App Platform)
+## Paying subscribers
 
-Prerequisites: a DigitalOcean account, `doctl` installed and authenticated
-(`doctl auth init`), and GitHub connected to DigitalOcean for
-`Bucrepinfo-lab/sellfindconnect.com`.
+Infra on Fly is already cut over (Prisma + jobs + privacy URLs). A DigitalOcean
+move does **not** unlock paid onboarding. Still required:
 
-1. **Pick the region.** Edit `region:` in `deploy/digitalocean/app.yaml` to the
-   closest available App Platform region (e.g. `fra1`).
-2. **Create the app from the spec:**
-   ```
-   doctl apps create --spec deploy/digitalocean/app.yaml
-   ```
-   This provisions the `web` and `api` services, the managed `sfc-postgres`
-   database, and the `db-migrate` pre-deploy job.
-3. **Set secrets** in the DO dashboard (App → Settings → each component → Env):
-   - `api` → `INTERNAL_JOB_KEY` = a long random secret (used by scheduled jobs).
-   - Any live `PAYMENT_PROVIDER` / media-storage secrets only after approval.
-   `DATABASE_URL` is auto-injected from the managed DB (`${sfc-postgres.DATABASE_URL}`).
-4. **First deploy runs migrations** automatically via the `db-migrate`
-   PRE_DEPLOY job (`sh /app/deploy/api-release.sh`: migrate, then seed). Set
-   `SKIP_DB_SEED=true` on that job only if you must skip seed.
-5. **Add the custom domains** (App → Settings → Domains): `sellfindconnect.com`
-   (primary) and `www.sellfindconnect.com`. The API is path-routed on the same
-   domain (`/api`), so no API subdomain is needed in this layout. DO displays the
-   exact DNS target for each domain and auto-provisions Let's Encrypt TLS once
-   DNS resolves.
-
-## GoDaddy DNS records
-
-The spec uses a single app with path-based routing, so only the apex and `www`
-point at DigitalOcean. Two clean options:
-
-**Option A (recommended) — delegate DNS to DigitalOcean.** In GoDaddy, set the
-domain's nameservers to `ns1.digitalocean.com`, `ns2.digitalocean.com`,
-`ns3.digitalocean.com`. Then DO manages the apex `ALIAS` automatically (this is
-what `app.yaml`'s `type: ALIAS`/`PRIMARY` assumes). Nothing else to add in
-GoDaddy.
-
-**Option B — keep DNS at GoDaddy.** Point records at the targets DO shows
-(App → Settings → Domains gives a `*.ondigitalocean.app` hostname):
-
-| Type  | Name | Value                              | Notes                       |
-| ----- | ---- | ---------------------------------- | --------------------------- |
-| A     | @    | (DO-provided apex IP)              | Apex `sellfindconnect.com`  |
-| CNAME | www  | `<app>.ondigitalocean.app`         | `www.sellfindconnect.com`   |
-
-Notes:
-- GoDaddy does not support a true apex `CNAME`; for the apex use the **A record**
-  DO provides (Option B) or delegate nameservers (Option A).
-- Remove GoDaddy parking/forwarding records for `@` and `www` first.
-- After records propagate, DO issues TLS automatically and forces HTTPS. Verify
-  `https://sellfindconnect.com`, `https://www...` (redirects to apex), and the
-  API at `https://sellfindconnect.com/api/v1/health`.
-
-> Subdomain alternative: if you prefer `api.sellfindconnect.com`, deploy the API
-> as a **second** App Platform app, add that subdomain to it (CNAME `api` →
-> its `*.ondigitalocean.app`), and set the web app's
-> `NEXT_PUBLIC_API_URL=https://api.sellfindconnect.com/v1`.
-
-## Scheduled jobs
-
-DigitalOcean App Platform has no native recurring cron (only PRE/POST-deploy
-jobs), so production scheduling runs from the checked-in GitHub Actions workflow
-**`.github/workflows/scheduled-jobs.yml`**, which POSTs to the protected internal
-endpoints with header `x-internal-job-key: $INTERNAL_JOB_KEY`:
-
-- `POST /v1/operations/conversations/sla/run` — every 15 min.
-- `POST /v1/operations/notifications/dispatch/run` — every 15 min.
-- `POST /v1/operations/source-finder/alerts/run` — daily.
-- `POST /v1/operations/media/processing/run` — every 15 min (scan/transform tick).
-- `POST /v1/operations/adverts/lifecycle/run` — daily (day-35/39 alerts, day-40 delete).
-- `POST /v1/operations/analytics/rollups/run` — daily warehouse rebuild.
-- `POST /v1/operations/finance/alerts/run` — daily all-tenant remittance alerts
-  (T-30/14/7/3/1, due, overdue, reconciliation variance).
-- `POST /v1/operations/analytics/retention/run` — weekly retention sweep.
-
-Set two **GitHub repository secrets** (Settings → Secrets and variables →
-Actions): `API_BASE_URL` (e.g. `https://sellfindconnect.com/api/v1`) and
-`INTERNAL_JOB_KEY` (the same value set on the API service). You can trigger any
-group manually via the workflow's "Run workflow" button.
-
-Alternatively, run the same calls from a DigitalOcean Function with a scheduled
-trigger or a small worker service if you prefer to keep scheduling on DO.
-
-## Cutover smoke checklist
-
-Before onboarding any paying subscriber, verify on the live domains:
-- `GET https://sellfindconnect.com/api/v1/health` returns healthy.
-- Web loads at `https://sellfindconnect.com`; `www` redirects to apex.
-- Owner registration, login, MFA, tenant-session checks.
-- Terms gate + zero-tolerance blocking on publish/upload/chat/pay.
-- Source Finder, lead conversion, notifications, analytics dashboards.
-- Advert lifecycle + finance/tax readiness; invoice → payment → receipt →
-  reconciliation round-trips with `PAYMENT_PROVIDER=manual`.
-- Scheduled jobs run and migrations/seed are repeatable.
-
-## Current Deployment Posture
-
-- Fly.io Frankfurt is the live production host (`docs/FLY_DEPLOYMENT.md`).
-- DigitalOcean App Platform remains a candidate; spec checked in at
-  `deploy/digitalocean/app.yaml`.
-- `sellfindconnect.com` (GoDaddy) is the canonical domain; live API is
-  `api.sellfindconnect.com`, not path-routed `/api`.
-- Railway URLs and `adverts.telpen.net` are historical and no longer serve traffic.
-- Go live for paying subscribers only after the Fly cutover smoke checklist
-  in `docs/FLY_DEPLOYMENT.md` passes.
+- approved country tax profile
+- live `PAYMENT_PROVIDER` / STK review (login phone only)
+- finance gates in `docs/FLY_DEPLOYMENT.md`
