@@ -729,10 +729,11 @@ describe('AuthService', () => {
 
     const current = await repository.findTermsAcceptance(registered.user.id, registered.tenant.id);
     expect(current).toBeDefined();
+    current!.acceptedAt = new Date(Date.now() - 2000).toISOString();
     repository.createTermsAcceptance({
       ...current!,
       termsVersion: 'terms-2026-06-18',
-      acceptedAt: new Date().toISOString(),
+      acceptedAt: new Date(Date.now() - 1000).toISOString(),
     });
     expect(await service.hasCurrentTermsAcceptance(registered.user.id, registered.tenant.id)).toBe(
       false,
