@@ -3,8 +3,8 @@
 import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 
-import "../../../styles/privacy.css";
 import { publicApiBaseUrl, readTenantSession, tenantSessionHeaders } from "../../../lib/public-api";
+import "../../../styles/privacy.css";
 
 type Step = "CONFIRM" | "REASON" | "SCHEDULED" | "CANCELLED";
 
@@ -16,8 +16,12 @@ const REASONS = [
   "Other",
 ];
 
-function subscribeSession() {
-  return () => undefined;
+function subscribeSession(onStoreChange: () => void) {
+  if (typeof window === "undefined") {
+    return () => undefined;
+  }
+  window.addEventListener("storage", onStoreChange);
+  return () => window.removeEventListener("storage", onStoreChange);
 }
 
 function hasTenantSession() {
@@ -133,6 +137,12 @@ export default function AccountDeletionPage() {
             <div className="sfc-delete__actions">
               <button className="sfc-delete__btn sfc-delete__btn--ghost" onClick={() => router.back()}>
                 Keep my account
+              </button>
+              <button
+                className="sfc-delete__btn sfc-delete__btn--ghost"
+                onClick={() => router.push("/account/privacy-settings")}
+              >
+                Data and privacy
               </button>
               <button className="sfc-delete__btn sfc-delete__btn--danger" onClick={() => setStep("REASON")}>
                 Continue

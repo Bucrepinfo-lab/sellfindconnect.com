@@ -11,6 +11,9 @@ messaging, analytics, subscription, and country tax-remittance platform.
 - `packages/database`: Prisma/PostgreSQL schema
 - `docs`: technical architecture and implementation backlog
 
+**Production:** Fly.io Frankfurt — see [`docs/FLY_DEPLOYMENT.md`](docs/FLY_DEPLOYMENT.md).
+Hosted Prisma and scheduled jobs are live. Native mobile remains out of scope.
+
 ## Brand And Growth
 
 - Primary brand domain: `SellFindConnect.com`

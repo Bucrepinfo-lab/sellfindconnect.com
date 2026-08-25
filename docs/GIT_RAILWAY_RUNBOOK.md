@@ -1,155 +1,77 @@
-# Git And Railway Deployment Runbook
+# Railway — archived (do not deploy)
 
-Date: 2026-06-16
-Repository: `https://github.com/Bucrepinfo-lab/sellfindconnect.com.git`
-Railway project: `84794ef4-c31c-41cd-8048-089f59040f1f`
+Status: **Archived.** Fly.io is the live production host.
+Date archived: 2026-08-21
+Do not use this file to deploy, reconnect GitHub, or add DNS.
 
-Status: Archived. Fly.io is the live production host (`docs/FLY_DEPLOYMENT.md`).
-Do not use this runbook to deploy.
+Live runbook: `docs/FLY_DEPLOYMENT.md`  
+Candidate host (if leaving Fly): `docs/DIGITALOCEAN_DEPLOYMENT.md`
 
-On 2026-06-18, the root Railway deployment scripts and local `@railway/cli`
-dev dependency were removed to keep normal installs focused on coding and to
-avoid deploy-only transitive vulnerabilities. If Railway deployment resumes,
-install or run the Railway CLI as a transient/separate deployment tool after a
-fresh security review.
+Railway CLI scripts and the `@railway/cli` package were removed from this
+repository on 2026-06-18. Do not add them back.
 
-## Current Root Causes
+## Why this file exists
 
-Two separate issues made push/deployment difficult:
+Railway hosted early 2026 staging. Those apps are gone. The URLs below return
+**HTTP 404 Application not found** (probed 2026-08-21 and 2026-08-22).
+`adverts.telpen.net` and `api.adverts.telpen.net` do not resolve.
 
-1. GitHub network/auth from this desktop environment is not always available to
-   sandboxed commands. Approved `git push` works, but non-approved GitHub
-   network checks can fail quickly with `Could not connect to server`.
-2. Railway's GitHub source connection still returns
-   `User does not have access to the repo`. This means Railway's connected
-   GitHub identity/app installation does not have access to
-   `Bucrepinfo-lab/sellfindconnect.com`, even though the local Git remote can
-   push to that repository.
+Keep the IDs only for account archaeology (billing, old dashboards). They are
+not production.
 
-## Stable Operating Mode
+## Dead surfaces
 
-Deployment is currently paused while product coding continues. If Railway is
-temporarily reselected later and GitHub source access is still not fixed,
-deploy directly from the local workspace using a transient Railway CLI. This
-bypasses the GitHub App source connection while still deploying the exact
-checked-out code.
+| What | Value | Status |
+| --- | --- | --- |
+| Temporary web | `https://web-production-32b7d.up.railway.app` | 404 |
+| Temporary API | `https://api-production-ae5f.up.railway.app` | 404 |
+| Temporary docs | `https://api-production-ae5f.up.railway.app/docs` | 404 |
+| Custom web | `https://adverts.telpen.net` | DNS missing |
+| Custom API | `https://api.adverts.telpen.net` | DNS missing |
 
-Use this order:
+## Historical project IDs
 
-1. Validate:
+First Railway project (2026-06-15):
 
-   ```powershell
-   npm.cmd run test
-   npm.cmd run typecheck
-   npm.cmd run lint
-   npm.cmd run build
-   ```
+- Name: `telpen-adverts`
+- ID: `84794ef4-c31c-41cd-8048-089f59040f1f`
 
-2. Commit locally:
+Later GitHub-connected project visible to `bucrepinfo@gmail.com`:
 
-   ```powershell
-   git status --short
-   git add .
-   git commit -m "Describe change"
-   ```
+- Name: `resplendent-fulfillment`
+- ID: `42716fff-95b0-4755-b0b2-59faf081eb86`
+- Environment: `production` (`bc3f4b4e-0101-4f70-b346-3df2b8e5405b`)
+- API service `@telpen/api`: `99fb3c7e-487c-4a77-ba08-369a83ac7e0d`
+- Web service `@telpen/web`: `9b5a1466-f105-44e1-a16e-0b5c45f04ace`
 
-3. Push to GitHub:
+Old GoDaddy records Railway generated for `telpen.net` (no longer in use):
 
-   ```powershell
-   git push
-   ```
+| Type | Name | Historical value |
+| --- | --- | --- |
+| CNAME | `adverts` | `iuqqjuwo.up.railway.app` |
+| TXT | `_railway-verify.adverts` | `railway-verify=31d6e8c7c1206a194fb272ecc9699572b9d49353af88ecc4fa5ebb249dcfd5eb` |
+| CNAME | `api.adverts` | `gguqa2z8.up.railway.app` |
+| TXT | `_railway-verify.api.adverts` | `railway-verify=b15f6d0009ed7c462c4461d22bdb2d6eabea807ee96397a7b676b0cb0bf9a320` |
 
-4. Deploy to Railway from the local workspace only after deployment resumes:
+Remove those records from GoDaddy if they are still present. Live DNS for
+`sellfindconnect.com` / `www` / `api` points at Fly.
 
-   ```powershell
-   npx.cmd @railway/cli deployment up --service web --environment production --detach --yes --message "Deploy web from local workspace"
-   npx.cmd @railway/cli deployment up --service api --environment production --detach --yes --message "Deploy API from local workspace"
-   ```
+## What failed (do not retry)
 
-5. Check Railway service state:
+- Railway GitHub App could not read `Bucrepinfo-lab/sellfindconnect.com`
+  (`User does not have access to the repo`).
+- Trial-plan custom-domain limit blocked adding `sellfindconnect.com` while
+  `adverts.telpen.net` occupied the slot.
+- Serverless sleep had no cron; jobs now run on GitHub Actions against Fly.
 
-   ```powershell
-   npx.cmd @railway/cli service list --json
-   ```
+## If someone asks “redeploy Railway”
 
-`SLEEPING` is a successful state because Serverless/App Sleeping is enabled.
+Do not. Deploy Fly:
 
-## Railway Build Commands
-
-If Railway is building from GitHub/Nixpacks instead of the checked-in
-Dockerfiles, set the web service build command to:
-
-```powershell
-npm.cmd run build -w @telpen/domain && npm.cmd run build -w @telpen/web
 ```
-
-The equivalent repository script is:
-
-```powershell
-npm.cmd run build:web
+cd C:\Users\user\Desktop\Adverts\Telpen Adverts
+git fetch origin
+git reset --hard origin/main
+fly deploy --config fly.web.toml --remote-only
+fly deploy --config fly.api.toml --remote-only
 ```
-
-Do not set the web service to build only `@telpen/web`. The web app imports
-compiled exports from `@telpen/domain`, and Next.js cannot resolve those imports
-until the domain package has produced its `dist` output.
-
-Set the web service watch patterns to include:
-
-```text
-/packages/domain/**
-```
-
-This ensures shared domain changes trigger web rebuilds.
-
-As an additional guard, the `@telpen/web` workspace build script also builds
-`@telpen/domain` first. This means Railway's auto-detected command
-`npm run build --workspace=@telpen/web` is safe too.
-
-For the API service, use:
-
-```powershell
-npm.cmd run build:api
-```
-
-The `@telpen/api` workspace build script builds `@telpen/domain` and generates
-the database client before compiling the API, so Railway's auto-detected API
-workspace build remains safe as well.
-
-## Service-Specific Deploys
-
-Deploy only web:
-
-```powershell
-npx.cmd @railway/cli deployment up --service web --environment production --detach --yes --message "Deploy web from local workspace"
-```
-
-Deploy only API:
-
-```powershell
-npx.cmd @railway/cli deployment up --service api --environment production --detach --yes --message "Deploy API from local workspace"
-```
-
-## When To Re-enable GitHub Autodeploys
-
-Only switch Railway services to GitHub source after this command succeeds:
-
-```powershell
-npx.cmd railway service source connect --repo Bucrepinfo-lab/sellfindconnect.com --branch main --service web --environment production --project 84794ef4-c31c-41cd-8048-089f59040f1f --json
-```
-
-If it returns `User does not have access to the repo`, fix GitHub/Railway
-authorization first:
-
-1. Open `https://github.com/organizations/Bucrepinfo-lab/settings/installations`.
-2. Confirm `Railway App` is installed for `Bucrepinfo-lab`.
-3. Configure repository access to include `sellfindconnect.com`.
-4. In Railway, reconnect GitHub from the source selector so Railway refreshes
-   the GitHub installation.
-5. Retry the source connection command above.
-
-## Why This Fixes Day-To-Day Deployment
-
-The local CLI deployment path does not depend on Railway's GitHub App being able
-to read the repository. It uses the authenticated Railway CLI and uploads the
-current workspace directly, which has already produced successful web and API
-deployments.
