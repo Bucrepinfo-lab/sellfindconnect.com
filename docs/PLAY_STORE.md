@@ -104,3 +104,44 @@ A Play listing still needs:
 - It does not create a React Native / Play app.
 - It does not add Play Billing.
 - It does not request SMS or call-log permissions.
+- It does not submit a Play Console listing, Data Safety form, or tax approval.
+
+## Listing exercise (2026-09-24)
+
+This is a readiness pass for **Sell Find Connect** (`sellfindconnect.com`). It is
+not a submission. `app.telpen.net` and package `com.telpen.edu` are a different
+product and are not this repository.
+
+Public policy URLs for the Play Console form, once this web build is deployed:
+
+| Play field | URL |
+| --- | --- |
+| Privacy policy | `https://sellfindconnect.com/privacy` |
+| Terms | `https://sellfindconnect.com/terms` |
+| Subscription terms | `https://sellfindconnect.com/subscription` |
+| Prohibited content | `https://sellfindconnect.com/prohibited` |
+| UGC user policy | `https://sellfindconnect.com/community` |
+| Account deletion | `https://sellfindconnect.com/account/delete` |
+
+There is no `/community-standards` route. The user policy is `/community`.
+
+Data Safety answers supported by the current product:
+
+- Account data: name, email, and phone. Phone is the login identity and the only STK destination.
+- User content: profiles, adverts, media, and messages. Report and block exist on the web app.
+- Financial info: billing references and mobile-money transaction ids. Card numbers are rejected.
+- App activity: views, clicks, and searches, consent-gated.
+- Not directed at children. Sexual content is prohibited, not incidental.
+- Account deletion is in the web app, with a 30-day grace period, then erasure of profile, adverts, conversations, and media. Billing, analytics, and auth-audit rows are retained.
+
+PWA manifest name is `Sell Find Connect` (`short_name` `SellFind`). Privacy, terms, community standards, and account deletion link to each other.
+
+Still required before anyone presses Submit in Play Console:
+
+1. An Android package. This repository is web and PWA only.
+2. Play Billing for the digital SaaS subscription inside that package. STK stays on web and PWA. Do not put STK for the platform subscription inside a Play APK.
+3. `/.well-known/assetlinks.json` only after a real package name and signing certificates exist. Do not invent fingerprints.
+4. A demo reviewer account with current terms accepted.
+5. Counsel review of the public policies. The pages are product copy, not a sign-off.
+6. A human approval of the Kenya tax profile before any paid checkout. Do not sign that profile here.
+7. Deploy this branch to the live web host so the policy URLs above stop serving an older build.

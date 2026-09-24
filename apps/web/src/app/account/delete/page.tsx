@@ -101,6 +101,12 @@ export default function AccountDeletionPage() {
             <button className="sfc-delete__btn sfc-delete__btn--ghost" onClick={() => router.push("/privacy")}>
               Privacy policy
             </button>
+            <button className="sfc-delete__btn sfc-delete__btn--ghost" onClick={() => router.push("/terms")}>
+              Terms
+            </button>
+            <button className="sfc-delete__btn sfc-delete__btn--ghost" onClick={() => router.push("/community")}>
+              Community standards
+            </button>
             <button className="sfc-delete__btn sfc-delete__btn--primary" onClick={() => router.push("/")}>
               Go to sign in
             </button>
@@ -235,6 +241,17 @@ export default function AccountDeletionPage() {
             </div>
           </>
         )}
+        <p className="sfc-delete__body">
+          <button className="sfc-delete__btn sfc-delete__btn--ghost" onClick={() => router.push("/terms")}>
+            Terms
+          </button>
+          <button className="sfc-delete__btn sfc-delete__btn--ghost" onClick={() => router.push("/community")}>
+            Community standards
+          </button>
+          <button className="sfc-delete__btn sfc-delete__btn--ghost" onClick={() => router.push("/privacy")}>
+            Privacy
+          </button>
+        </p>
       </div>
     </div>
   );

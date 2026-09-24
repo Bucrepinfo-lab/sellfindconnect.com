@@ -315,6 +315,11 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   (`reason: terms`). `POST /v1/auth/terms/accept` writes `REACCEPTANCE`
   evidence after MFA and records `TERMS_REACCEPTED` without emails. Home Terms
   Gate can re-accept with the session token. API then web deploy.
+- 2026-09-24: Play listing exercise for Sell Find Connect only. Policy pages
+  cross-link, and the PWA manifest name is Sell Find Connect. Submission is
+  blocked on an Android package, Play Billing, counsel review, a reviewer
+  account, Kenya tax approval, and a production deploy. No Play Console
+  submission was made.
 - 2026-09-24: Missing or blank `x-session-token` on session lookup returns 401.
   Checkout still rejects a body `phone` with 400 from validation. Invoice pay
   rejects an E.164 `customerReference` with 422 before invoice lookup. Play
