@@ -498,6 +498,18 @@ describe('FinanceService', () => {
     expect(await service.listPaymentReceipts(tenantId)).toHaveLength(1);
   });
 
+  it('rejects a payer phone before looking up the invoice', async () => {
+    const service = new FinanceService();
+
+    await expect(
+      service.payInvoice(tenantId, {
+        invoiceId: 'missing-invoice',
+        method: 'MOBILE_MONEY',
+        customerReference: '+254712345678',
+      }),
+    ).rejects.toThrow('Do not send a phone number');
+  });
+
   it('keeps pending provider captures unpaid until settlement', async () => {
     const adapter: PaymentAdapter = {
       provider: 'africastalking',
