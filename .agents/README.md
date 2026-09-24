@@ -58,6 +58,9 @@ and write the shared context layer.
   (`name`, `description`) so it can be loaded as a skill.
 - Agents reference product truth in `../Advertising_SaaS_PRD.md`,
   `../Product_Memory.md`, `../docs/IMPLEMENTATION_BACKLOG.md`, and `../docs/`.
+- This environment mounts only `github.com/Bucrepinfo-lab/sellfindconnect.com`.
+  Telpen Edu stays in its previous separate Cloud Agent session. Do not add
+  it as a repository dependency or continue that conversation here.
 - Agents respect the platform's non-negotiables: zero-tolerance content policy,
   hosting acceptable-use, tenant isolation, terms gating, and finance/tax
   controls. These are acceptance criteria, never optional hardening.
