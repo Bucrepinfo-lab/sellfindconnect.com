@@ -9,14 +9,6 @@ import { generateTotpCode } from '@telpen/domain';
 const strongPassword = 'Strong-owner#2026';
 
 describe('AuthService', () => {
-  it('returns 401 instead of throwing when the session token is missing', async () => {
-    const service = new AuthService();
-
-    await expect(service.getSession(undefined)).rejects.toBeInstanceOf(UnauthorizedException);
-    await expect(service.getSession('')).rejects.toBeInstanceOf(UnauthorizedException);
-    await expect(service.getSession('   ')).rejects.toBeInstanceOf(UnauthorizedException);
-  });
-
   it('registers an owner, creates a tenant trial, and stores terms evidence', async () => {
     const service = new AuthService();
     const result = await service.registerTenantOwner({
@@ -145,6 +137,18 @@ describe('AuthService', () => {
     expect(requested.developmentCode).toBeUndefined();
 
     await expect(service.verifyPhoneOtp({ phone: '0700000000', code: '000000' })).rejects.toThrow();
+  });
+
+  it('rejects a missing or empty session token with 401 instead of crashing', async () => {
+    const service = new AuthService();
+
+    await expect(service.getSession(undefined as unknown as string)).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+    await expect(service.getSession('')).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(service.getSession('no-such-session')).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
   });
 
   it('stores sessions by token hash and never presents the hash to callers', async () => {
