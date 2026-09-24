@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import '../styles/privacy.css';
+import { PolicyNav } from './PolicyNav';
 
 export function LegalSection({
   id,
@@ -43,24 +44,7 @@ export function LegalDocument({
       </div>
       <div className="sfc-privacy__body">
         {children}
-        <nav className="sfc-privacy__section">
-          <h2>Other policies</h2>
-          <div className="sfc-privacy__content">
-            <p>
-              <a href="/terms">Terms of Service</a>
-              {' · '}
-              <a href="/subscription">Subscription terms</a>
-              {' · '}
-              <a href="/privacy">Privacy Policy</a>
-              {' · '}
-              <a href="/prohibited">Prohibited content</a>
-              {' · '}
-              <a href="/community">Community standards</a>
-              {' · '}
-              <a href="/account/delete">Delete account</a>
-            </p>
-          </div>
-        </nav>
+        <PolicyNav />
       </div>
     </main>
   );
