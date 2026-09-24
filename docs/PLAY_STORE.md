@@ -134,7 +134,7 @@ Data Safety answers supported by the current product:
 - Not directed at children. Sexual content is prohibited, not incidental.
 - Account deletion is in the web app, with a 30-day grace period, then erasure of profile, adverts, conversations, and media. Billing, analytics, and auth-audit rows are retained.
 
-PWA manifest name is `Sell Find Connect` (`short_name` `SellFind`). Privacy, terms, community standards, and account deletion link to each other.
+PWA manifest name is `Sell Find Connect` (`short_name` `SellFind`). Those six pages share one `PolicyNav` footer, so each links to the others.
 
 Still required before anyone presses Submit in Play Console:
 

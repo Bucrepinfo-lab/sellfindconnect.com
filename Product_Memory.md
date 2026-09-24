@@ -320,10 +320,13 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   blocked on an Android package, Play Billing, counsel review, a reviewer
   account, Kenya tax approval, and a production deploy. No Play Console
   submission was made.
-- 2026-09-24: Missing or blank `x-session-token` on session lookup returns 401.
-  Checkout still rejects a body `phone` with 400 from validation. Invoice pay
-  rejects an E.164 `customerReference` with 422 before invoice lookup. Play
-  Billing stays out of this repository.
+- 2026-09-24: A missing or empty `x-session-token` returns 401 before the
+  session token is hashed. Checkout still rejects a body `phone` with 400
+  from validation. Invoice pay rejects an E.164 `customerReference` with 422
+  before invoice lookup. Play Billing stays out of this repository.
+- 2026-09-24: Privacy, terms, subscription, prohibited content, community
+  standards, and account deletion share one `PolicyNav` footer so each page
+  links to the others.
 - 2026-09-24: Audit of this repository resumed on Sell Find Connect only.
   Community standards are now a required acceptance version. Invoice
   mobile-money pay rejects a caller-supplied phone and uses the verified
