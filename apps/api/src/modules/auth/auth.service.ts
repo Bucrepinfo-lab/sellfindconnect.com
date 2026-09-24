@@ -1272,7 +1272,7 @@ export class AuthService {
   }
 
   private async requireSession(sessionToken: string | undefined): Promise<AuthSessionRecord> {
-    if (!sessionToken?.trim()) {
+    if (typeof sessionToken !== 'string' || sessionToken.length === 0) {
       throw new UnauthorizedException('A valid active session is required.');
     }
     const session = await this.repository.findSessionByTokenHash(this.hashSessionToken(sessionToken));
