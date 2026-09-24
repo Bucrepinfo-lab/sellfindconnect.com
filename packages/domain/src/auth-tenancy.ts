@@ -22,6 +22,7 @@ export type ActivePolicyVersions = {
   privacyVersion: string;
   prohibitedContentVersion: string;
   subscriptionTermsVersion: string;
+  communityStandardsVersion: string;
 };
 
 export type TermsAcceptanceEvidence = ActivePolicyVersions & {
@@ -60,6 +61,7 @@ export const activePolicyVersions: ActivePolicyVersions = {
   privacyVersion: 'privacy-2026-06-18',
   prohibitedContentVersion: 'zero-tolerance-2026-06-18',
   subscriptionTermsVersion: 'subscription-2026-08-22',
+  communityStandardsVersion,
 };
 
 export const publicPolicyDocuments = [
@@ -153,6 +155,7 @@ export const termsAcceptancePolicyKeys = [
   'privacy',
   'prohibited',
   'subscription',
+  'community',
 ] as const;
 
 export type TermsAcceptancePolicyKey = (typeof termsAcceptancePolicyKeys)[number];
@@ -172,7 +175,11 @@ export type TermsAcceptanceLookup = {
 export function staleTermsAcceptancePolicies(
   evidence: Pick<
     TermsAcceptanceEvidence,
-    'termsVersion' | 'privacyVersion' | 'prohibitedContentVersion' | 'subscriptionTermsVersion'
+    | 'termsVersion'
+    | 'privacyVersion'
+    | 'prohibitedContentVersion'
+    | 'subscriptionTermsVersion'
+    | 'communityStandardsVersion'
   >,
 ): TermsAcceptancePolicyKey[] {
   const stale: TermsAcceptancePolicyKey[] = [];
@@ -188,6 +195,9 @@ export function staleTermsAcceptancePolicies(
   if (evidence.subscriptionTermsVersion !== activePolicyVersions.subscriptionTermsVersion) {
     stale.push('subscription');
   }
+  if (evidence.communityStandardsVersion !== activePolicyVersions.communityStandardsVersion) {
+    stale.push('community');
+  }
   return stale;
 }
 
@@ -199,6 +209,7 @@ export function isCurrentTermsAcceptance(
     | 'privacyVersion'
     | 'prohibitedContentVersion'
     | 'subscriptionTermsVersion'
+    | 'communityStandardsVersion'
   >,
 ): boolean {
   return evidence.accepted === true && staleTermsAcceptancePolicies(evidence).length === 0;
@@ -217,6 +228,7 @@ export function presentTermsAcceptanceLookup(
     privacyVersion: evidence.privacyVersion,
     prohibitedContentVersion: evidence.prohibitedContentVersion,
     subscriptionTermsVersion: evidence.subscriptionTermsVersion,
+    communityStandardsVersion: evidence.communityStandardsVersion,
     appSurface: evidence.appSurface,
     acceptanceSource: evidence.acceptanceSource,
     acceptedAt: evidence.acceptedAt,

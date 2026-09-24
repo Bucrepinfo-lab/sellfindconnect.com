@@ -50,6 +50,7 @@ describe('auth and tenancy policy helpers', () => {
     expect(evidence?.prohibitedContentVersion).toBe(activePolicyVersions.prohibitedContentVersion);
     expect(activePolicyVersions.termsVersion).toBe('terms-2026-08-22');
     expect(activePolicyVersions.subscriptionTermsVersion).toBe('subscription-2026-08-22');
+    expect(activePolicyVersions.communityStandardsVersion).toBe('community-2026-08-22');
     expect(publicPolicyDocuments.map((document) => document.path)).toEqual([
       '/terms',
       '/privacy',
@@ -119,5 +120,11 @@ describe('auth and tenancy policy helpers', () => {
       requiresReacceptance: false,
       stalePolicies: [],
     });
+    expect(
+      describeTermsAcceptanceGate({
+        ...current!,
+        communityStandardsVersion: 'community-2026-06-18',
+      }).stalePolicies,
+    ).toEqual(['community']);
   });
 });

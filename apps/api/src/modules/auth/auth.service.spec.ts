@@ -1,4 +1,4 @@
-import { UnprocessableEntityException } from '@nestjs/common';
+import { UnauthorizedException, UnprocessableEntityException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 
 import { InMemoryAuthRepository } from './in-memory-auth.repository';
@@ -137,6 +137,18 @@ describe('AuthService', () => {
     expect(requested.developmentCode).toBeUndefined();
 
     await expect(service.verifyPhoneOtp({ phone: '0700000000', code: '000000' })).rejects.toThrow();
+  });
+
+  it('rejects a missing or empty session token with 401 instead of crashing', async () => {
+    const service = new AuthService();
+
+    await expect(service.getSession(undefined as unknown as string)).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+    await expect(service.getSession('')).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(service.getSession('no-such-session')).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
   });
 
   it('stores sessions by token hash and never presents the hash to callers', async () => {

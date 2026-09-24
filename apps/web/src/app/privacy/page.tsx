@@ -2,6 +2,7 @@
 import Link from "next/link";
 
 import "../../styles/privacy.css";
+import { PolicyNav } from "../../components/PolicyNav";
 
 export const metadata: Metadata = { title: "Privacy Policy | SellFindConnect" };
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
@@ -24,6 +25,7 @@ export default function PrivacyPolicyPage() {
         <Section id="rights" title="Your Rights">Under the Kenya Data Protection Act and GDPR you have the right to access, correct, export, erase, restrict, and object to processing of your data. Exercise these rights from <Link href="/account/privacy-settings">Data and Privacy</Link>, <Link href="/account/delete">account deletion</Link>, or email privacy@sellfindconnect.com.</Section>
         <Section id="security" title="Security">Data is encrypted in transit (TLS 1.3) and at rest. Passwords are hashed and never stored in plain text. MFA is required for all sensitive account actions.</Section>
         <Section id="contact" title="Contact">Telpen Systems Ltd · privacy@sellfindconnect.com · Ruiru, Kiambu County, Kenya. Complaints: <a href="https://www.odpc.go.ke" target="_blank" rel="noopener noreferrer">odpc.go.ke</a></Section>
+        <PolicyNav current="/privacy" />
       </div>
     </main>
   );

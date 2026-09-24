@@ -24,6 +24,7 @@ import {
   getDunningNoticeDecision,
   getCountry,
   looksLikeCardPan,
+  toE164,
   getRemittanceAlertDecision,
   reconcileSettlement,
   roundMoney,
@@ -972,8 +973,18 @@ export class FinanceService {
       .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt));
   }
 
-  async payInvoice(tenantId: string, input: PayInvoiceDto) {
+  async payInvoice(tenantId: string, input: PayInvoiceDto, actor?: { userId?: string }) {
     this.assertSafe(input, 'Payment contains blocked content.');
+    if (input.customerReference && looksLikeCardPan(input.customerReference)) {
+      throw new UnprocessableEntityException(
+        'Card numbers must not be submitted. Use a provider payment-method token.',
+      );
+    }
+    if (input.customerReference && toE164(input.customerReference)) {
+      throw new UnprocessableEntityException(
+        'Do not send a phone number. Mobile money uses the verified login phone.',
+      );
+    }
 
     const invoice = await this.requireTenantPaymentInvoice(tenantId, input.invoiceId);
 
@@ -1007,10 +1018,15 @@ export class FinanceService {
     if (pendingCapture) {
       throw new UnprocessableEntityException('Invoice already has a pending provider capture.');
     }
-    if (input.customerReference && looksLikeCardPan(input.customerReference)) {
-      throw new UnprocessableEntityException(
-        'Card numbers must not be submitted. Use a provider payment-method token or mobile-money phone.',
-      );
+    let customerReference = input.customerReference;
+    if (input.method === 'MOBILE_MONEY') {
+      const phone = actor?.userId ? await this.auth?.getVerifiedLoginPhone(actor.userId) : undefined;
+      if (!phone) {
+        throw new UnprocessableEntityException(
+          'A verified login phone is required for mobile-money checkout.',
+        );
+      }
+      customerReference = phone;
     }
 
     const outstanding = roundMoney(invoice.total - invoice.amountPaid);
@@ -1021,7 +1037,7 @@ export class FinanceService {
       currencyCode: invoice.currencyCode,
       method: input.method,
       idempotencyKey,
-      customerReference: input.customerReference,
+      customerReference,
     });
     const now = new Date().toISOString();
     const payment: PaymentRecord = {
@@ -1035,7 +1051,7 @@ export class FinanceService {
       amount: result.status === 'CAPTURED' ? result.capturedAmount : outstanding,
       currencyCode: invoice.currencyCode,
       idempotencyKey,
-      customerReference: input.customerReference,
+      customerReference,
       failureReason: result.failureReason,
       capturedAt: result.status === 'CAPTURED' ? now : undefined,
       createdAt: now,

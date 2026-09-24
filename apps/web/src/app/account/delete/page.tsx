@@ -4,6 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 
 import { publicApiBaseUrl, readTenantSession, tenantSessionHeaders } from "../../../lib/public-api";
+import { PolicyNav } from "../../../components/PolicyNav";
 import "../../../styles/privacy.css";
 
 type Step = "CONFIRM" | "REASON" | "SCHEDULED" | "CANCELLED";
@@ -105,6 +106,7 @@ export default function AccountDeletionPage() {
               Go to sign in
             </button>
           </div>
+          <PolicyNav current="/account/delete" />
         </div>
       </div>
     );
@@ -235,6 +237,7 @@ export default function AccountDeletionPage() {
             </div>
           </>
         )}
+        <PolicyNav current="/account/delete" />
       </div>
     </div>
   );

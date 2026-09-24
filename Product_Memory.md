@@ -1,7 +1,7 @@
 # Telpen Adverts Product Memory
 
 Date started: 2026-06-15
-Last updated: 2026-08-24
+Last updated: 2026-09-24
 Purpose: Persistent decision log and strategic memory for the Telpen Adverts multi-tenant advertising SaaS.
 
 This file must be updated whenever product strategy, pricing, compliance, architecture, market positioning, or execution decisions change.
@@ -315,3 +315,26 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   (`reason: terms`). `POST /v1/auth/terms/accept` writes `REACCEPTANCE`
   evidence after MFA and records `TERMS_REACCEPTED` without emails. Home Terms
   Gate can re-accept with the session token. API then web deploy.
+- 2026-09-24: Play listing exercise for Sell Find Connect only. Policy pages
+  cross-link. The PWA manifest name is SellFindConnect, with placeholder
+  icons. `docs/PLAY_LISTING_PACK.md` is the paste-ready Console copy.
+  `deploy/twa/` is the Bubblewrap input and an assetlinks template with no
+  real fingerprint. Submission is blocked on a signed AAB, Play Billing,
+  counsel review, a reviewer account, Kenya tax approval, and a production
+  deploy. No Play Console submission was made.
+- 2026-09-24: `PAYMENT_PROVIDER=play` selects `GooglePlayBillingPaymentAdapter`.
+  It verifies a client purchase token against the Play Developer API and
+  fails closed without package name and access token. Refunds stay on the
+  Play refund flow. No Android client, keystore, or Play Console submission.
+- 2026-09-24: A missing or empty `x-session-token` returns 401 before the
+  session token is hashed. Checkout still rejects a body `phone` with 400
+  from validation. Invoice pay rejects an E.164 `customerReference` with 422
+  before invoice lookup. Play Billing stays out of this repository.
+- 2026-09-24: Privacy, terms, subscription, prohibited content, community
+  standards, and account deletion share one `PolicyNav` footer so each page
+  links to the others.
+- 2026-09-24: Audit of this repository resumed on Sell Find Connect only.
+  Community standards are now a required acceptance version. Invoice
+  mobile-money pay rejects a caller-supplied phone and uses the verified
+  login phone. Owner payouts fail closed unless the recipient belongs to
+  the same tenant. Native Play Billing is still not in this repo.

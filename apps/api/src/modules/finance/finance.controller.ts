@@ -286,8 +286,12 @@ export class FinanceController {
   }
 
   @Post('payment-invoices/pay')
-  payInvoice(@TenantId() tenantId: string, @Body() body: PayInvoiceDto) {
-    return this.finance.payInvoice(tenantId, body);
+  payInvoice(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Body() body: PayInvoiceDto,
+  ) {
+    return this.finance.payInvoice(tenantId, body, { userId: session.userId });
   }
 
   @Post('payments/settle')

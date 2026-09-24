@@ -499,7 +499,11 @@ export class PayInvoiceDto {
   @Length(4, 160)
   declare idempotencyKey?: string;
 
-  @ApiPropertyOptional({ example: 'customer-ref-123' })
+  @ApiPropertyOptional({
+    example: 'pm_card_visa',
+    description:
+      'Provider payment-method token. Do not send a phone number. Mobile money uses the verified login phone.',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(160)
