@@ -1,4 +1,4 @@
-import { UnprocessableEntityException } from '@nestjs/common';
+import { UnauthorizedException, UnprocessableEntityException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 
 import { InMemoryAuthRepository } from './in-memory-auth.repository';
@@ -9,6 +9,14 @@ import { generateTotpCode } from '@telpen/domain';
 const strongPassword = 'Strong-owner#2026';
 
 describe('AuthService', () => {
+  it('returns 401 instead of throwing when the session token is missing', async () => {
+    const service = new AuthService();
+
+    await expect(service.getSession(undefined)).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(service.getSession('')).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(service.getSession('   ')).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
   it('registers an owner, creates a tenant trial, and stores terms evidence', async () => {
     const service = new AuthService();
     const result = await service.registerTenantOwner({

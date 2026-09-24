@@ -315,6 +315,10 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   (`reason: terms`). `POST /v1/auth/terms/accept` writes `REACCEPTANCE`
   evidence after MFA and records `TERMS_REACCEPTED` without emails. Home Terms
   Gate can re-accept with the session token. API then web deploy.
+- 2026-09-24: Missing or blank `x-session-token` on session lookup returns 401.
+  Checkout still rejects a body `phone` with 400 from validation. Invoice pay
+  rejects an E.164 `customerReference` with 422 before invoice lookup. Play
+  Billing stays out of this repository.
 - 2026-09-24: Audit of this repository resumed on Sell Find Connect only.
   Community standards are now a required acceptance version. Invoice
   mobile-money pay rejects a caller-supplied phone and uses the verified

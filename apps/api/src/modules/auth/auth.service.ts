@@ -996,7 +996,7 @@ export class AuthService {
     };
   }
 
-  async getSession(sessionToken: string) {
+  async getSession(sessionToken: string | undefined) {
     const session = await this.requireSession(sessionToken);
     const user = await this.repository.findUserById(session.userId);
     const termsAcceptance = await this.repository.findTermsAcceptance(
@@ -1271,7 +1271,10 @@ export class AuthService {
     return this.presentSession(session, token, await this.createMfaChallenge(session));
   }
 
-  private async requireSession(sessionToken: string): Promise<AuthSessionRecord> {
+  private async requireSession(sessionToken: string | undefined): Promise<AuthSessionRecord> {
+    if (!sessionToken?.trim()) {
+      throw new UnauthorizedException('A valid active session is required.');
+    }
     const session = await this.repository.findSessionByTokenHash(this.hashSessionToken(sessionToken));
     if (!session || session.revokedAt || Date.parse(session.expiresAt) <= Date.now()) {
       throw new UnauthorizedException('A valid active session is required.');
