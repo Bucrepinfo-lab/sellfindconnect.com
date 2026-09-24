@@ -322,6 +322,10 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   real fingerprint. Submission is blocked on a signed AAB, Play Billing,
   counsel review, a reviewer account, Kenya tax approval, and a production
   deploy. No Play Console submission was made.
+- 2026-09-24: `PAYMENT_PROVIDER=play` selects `GooglePlayBillingPaymentAdapter`.
+  It verifies a client purchase token against the Play Developer API and
+  fails closed without package name and access token. Refunds stay on the
+  Play refund flow. No Android client, keystore, or Play Console submission.
 - 2026-09-24: A missing or empty `x-session-token` returns 401 before the
   session token is hashed. Checkout still rejects a body `phone` with 400
   from validation. Invoice pay rejects an E.164 `customerReference` with 422

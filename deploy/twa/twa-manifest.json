@@ -14,7 +14,7 @@
   "enableNotifications": false,
   "startUrl": "/",
   "iconUrl": "https://sellfindconnect.com/icons/icon-512.png",
-  "maskableIconUrl": "https://sellfindconnect.com/icons/icon-maskable-512.png",
+  "maskableIconUrl": "https://sellfindconnect.com/icons/maskable-512.png",
   "splashScreenFadeOutDuration": 300,
   "signingKey": {
     "path": "./android.keystore",

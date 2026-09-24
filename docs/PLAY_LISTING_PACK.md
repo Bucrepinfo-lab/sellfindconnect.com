@@ -80,8 +80,9 @@ this repository. No reviewer account exists in this change.
 2. Build and sign the AAB with your own keystore (`deploy/twa/README.md`).
 3. Publish `assetlinks.json` only after the real SHA-256 fingerprint replaces
    the placeholder.
-4. Add a Play Billing adapter for the SaaS fee inside the Play package. Do not
-   ship STK for that fee inside the AAB.
+4. The server verifies a Play `purchaseToken` when `PAYMENT_PROVIDER=play`.
+   The Android client that obtains that token, and Play Console product ids,
+   are still required. Do not ship STK for the SaaS fee inside the AAB.
 5. Capture phone screenshots. This pack does not include them.
 6. Counsel reviews the public policies.
 7. A person approves the Kenya tax profile. Do not set `approvedBy` here.
