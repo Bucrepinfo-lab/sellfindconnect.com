@@ -564,8 +564,9 @@ Progress:
   the digital SaaS subscription, STK only to the login phone, no `READ_SMS` /
   `READ_CALL_LOG`, public `/privacy` plus signed-in `/account/delete`.
 - Privacy API is mounted at `/v1/privacy` behind the tenant session guard.
-  The grace-period worker erases due accounts. Native Play Billing is still
-  required before any Play listing.
+  The grace-period worker erases due accounts. The server Play Billing
+  adapter verifies a purchase token (`PAYMENT_PROVIDER=play`). The Android
+  client that starts the purchase is still required before any Play listing.
 
 ## Epic 10: Legal Terms and Policy Operations
 
