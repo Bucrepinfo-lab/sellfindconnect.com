@@ -1,7 +1,7 @@
 # Telpen Adverts Product Memory
 
 Date started: 2026-06-15
-Last updated: 2026-08-24
+Last updated: 2026-09-24
 Purpose: Persistent decision log and strategic memory for the Telpen Adverts multi-tenant advertising SaaS.
 
 This file must be updated whenever product strategy, pricing, compliance, architecture, market positioning, or execution decisions change.
@@ -76,9 +76,13 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - Recommended market domain portfolio: buy `SellFindConnect.com` first; also buy `SellFindConnect.app`, `FindSellConnect.com`, and `FindSellConnect.app` as defensive/app companions if budget allows. Campaign line: "Sell it. Find it. Connect."
 - SEO/growth direction: position Sell Find Connect around supplier finder, buyer-seller connection, business advertising app, source finder, local business directory, B2B marketplace, and country/industry business matching. Growth should combine organic SEO, country/industry landing pages, app-store optimization, social video demos, partnerships, referrals, opportunity digests, and safety/trust positioning.
 - GitHub repository: use `https://github.com/Bucrepinfo-lab/sellfindconnect.com.git` as the source repository for the Sell Find Connect codebase and future production deployments after the final platform decision.
-- Owner portfolio (five products, five Desktop folders). This cloud agent
-  only mounts `sellfindconnect.com`. The owner's Windows Desktop is not
-  visible here. Folder names as given on 2026-08-21:
+- Owner portfolio (five products, five Desktop folders). This Cloud Agent
+  environment mounts only `github.com/Bucrepinfo-lab/sellfindconnect.com`.
+  `.cursor/environment.json` sets `repositoryDependencies` to an empty list.
+  Telpen Edu and its Play Store conversation stay in their previous separate
+  session and environment. Do not clone that project or continue that session
+  from here. The owner's Windows Desktop is not visible here. Folder names as
+  given on 2026-08-21:
 
   | Product | Desktop folder | GitHub today |
   | --- | --- | --- |
@@ -315,3 +319,7 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   (`reason: terms`). `POST /v1/auth/terms/accept` writes `REACCEPTANCE`
   evidence after MFA and records `TERMS_REACCEPTED` without emails. Home Terms
   Gate can re-accept with the session token. API then web deploy.
+- 2026-09-24: Locked this Cloud Agent environment to
+  `github.com/Bucrepinfo-lab/sellfindconnect.com` only. Empty
+  `repositoryDependencies` in `.cursor/environment.json`. Telpen Edu remains
+  in its previous separate session and environment.
