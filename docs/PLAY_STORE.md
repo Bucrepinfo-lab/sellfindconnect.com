@@ -18,7 +18,12 @@ M-Pesa / Africa's Talking STK Push destination.
   `AuthService.verifyPhoneOtp`, `PaymentsService.requestCheckout`).
 - Checkout does **not** accept a payer phone in the request body. The signed-in
   user's stored phone is used. If that phone is missing, checkout returns
-  `no_phone`.
+  `no_phone`. Invoice pay (`POST /v1/finance/payment-invoices/pay`) rejects an
+  E.164 `customerReference` and, for `MOBILE_MONEY`, sends STK only to
+  `AuthService.getVerifiedLoginPhone`.
+- Owner payouts (`POST /v1/payments/payout`) require current terms and a
+  recipient who is a member of the same tenant. A user id from another tenant
+  returns `forbidden` and does not call the provider.
 - Product audit stores `phoneHash` / amount / status only — never the raw
   number, never the STK reason text.
 
