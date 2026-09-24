@@ -23,6 +23,7 @@ import {
   isCurrentTermsAcceptance,
   presentTermsAcceptanceLookup,
   staleTermsAcceptancePolicies,
+  termsAcceptancePolicyKeys,
   normalizeResourceScope,
   requiresMfa,
   roleHasPermission,
@@ -1123,6 +1124,12 @@ export class AuthService {
     await this.repository.revokeSessionsForUser(userId, new Date().toISOString());
   }
 
+  async getVerifiedLoginPhone(userId: string): Promise<string | undefined> {
+    const user = await this.repository.findUserById(userId);
+    const phone = user?.phone?.trim();
+    return phone || undefined;
+  }
+
   async hasCurrentTermsAcceptance(userId: string, tenantId: string): Promise<boolean> {
     const evidence = await this.repository.findTermsAcceptance(userId, tenantId);
     return Boolean(evidence && isCurrentTermsAcceptance(evidence));
@@ -1153,7 +1160,7 @@ export class AuthService {
     const previous = await this.repository.findTermsAcceptance(session.userId, session.tenantId);
     const stalePolicies = previous
       ? staleTermsAcceptancePolicies(previous)
-      : (['terms', 'privacy', 'prohibited', 'subscription'] as const);
+      : [...termsAcceptancePolicyKeys];
     const evidence = buildTermsAcceptanceEvidence({
       accepted: input.acceptedTerms,
       userId: user.id,

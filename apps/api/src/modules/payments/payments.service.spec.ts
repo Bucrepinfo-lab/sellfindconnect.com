@@ -146,4 +146,44 @@ describe('PaymentsService product audit', () => {
     ]);
     expect(JSON.stringify(audits)).not.toContain('+254700000001');
   });
+
+  it('pays out only to a member of the same tenant', async () => {
+    const calls: string[] = [];
+    const service = new PaymentsService(
+      {
+        getSession: async () => ({
+          session: { userId: 'owner-1', tenantId, role: 'OWNER' },
+          user: { phone: '+254700000001' },
+        }),
+        hasCurrentTermsAcceptance: async () => true,
+        recordTenantAudit: async () => undefined,
+      } as unknown as AuthService,
+      new InMemoryPaymentsRepository(),
+      {
+        mobileCheckout: async () => ({ ok: true, transactionId: null, raw: {} }),
+        mobileB2C: async () => {
+          calls.push('b2c');
+          return { ok: true, raw: {} };
+        },
+      },
+      {
+        findMembershipForUserAndTenant: async (userId: string, scopeTenantId: string) =>
+          userId === 'member-1' && scopeTenantId === tenantId
+            ? { userId, tenantId: scopeTenantId }
+            : undefined,
+        findUserById: async (userId: string) =>
+          userId === 'member-1' ? { id: userId, phone: '+254700000002' } : { id: userId, phone: '+254799999999' },
+      } as never,
+    );
+
+    await expect(
+      service.requestPayout('session-token', { toUserId: 'outsider', amount: 500 }),
+    ).resolves.toEqual({ ok: false, reason: 'forbidden' });
+    expect(calls).toEqual([]);
+
+    await expect(
+      service.requestPayout('session-token', { toUserId: 'member-1', amount: 500 }),
+    ).resolves.toMatchObject({ ok: true });
+    expect(calls).toEqual(['b2c']);
+  });
 });

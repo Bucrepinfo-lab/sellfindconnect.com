@@ -23,7 +23,7 @@ export type PayoutResult =
   | { ok: true; txnId: string }
   | {
       ok: false;
-      reason: 'forbidden' | 'invalid_amount' | 'no_phone' | 'provider_error';
+      reason: 'forbidden' | 'invalid_amount' | 'no_phone' | 'provider_error' | 'terms';
       txnId?: string;
     };
 
@@ -158,8 +158,21 @@ export class PaymentsService {
     if (!isValidPaymentAmount(input.amount)) {
       return { ok: false, reason: 'invalid_amount' };
     }
+    if (!(await this.auth.hasCurrentTermsAcceptance(context.session.userId, context.session.tenantId))) {
+      return { ok: false, reason: 'terms' };
+    }
+    if (!this.authRepository) {
+      return { ok: false, reason: 'forbidden' };
+    }
+    const membership = await this.authRepository.findMembershipForUserAndTenant(
+      input.toUserId,
+      context.session.tenantId,
+    );
+    if (!membership) {
+      return { ok: false, reason: 'forbidden' };
+    }
 
-    const recipient = await this.authRepository?.findUserById(input.toUserId);
+    const recipient = await this.authRepository.findUserById(input.toUserId);
     if (!recipient?.phone) {
       return { ok: false, reason: 'no_phone' };
     }
