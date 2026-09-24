@@ -8,6 +8,7 @@ import {
   roundMoney,
   toE164,
   toPaymentProviderMinorUnits,
+  type FinancePaymentStatus,
   type PaymentCaptureRequest,
   type PaymentCaptureResult,
   type PaymentMethod,
@@ -379,6 +380,135 @@ export class AfricasTalkingPaymentAdapter implements PaymentAdapter {
 }
 
 /**
+ * Google Play Billing verification adapter for the SaaS subscription sold inside
+ * the Android (TWA) package. Google's payments policy requires Play Billing for
+ * the digital subscription in a Play-distributed build; STK / Africa's Talking
+ * must NOT be used for that fee inside the AAB (see docs/PLAY_STORE.md). STK
+ * stays on web/PWA and for real-world counterparty payments only.
+ *
+ * Split of responsibilities:
+ *  - CLIENT (Android/TWA, not this repo): launches the purchase via the Digital
+ *    Goods API + PaymentRequest and obtains a Play `purchaseToken`.
+ *  - SERVER (this adapter): verifies that token against the Google Play Developer
+ *    API and acknowledges it. `customerReference` carries the purchaseToken.
+ *
+ * Config (fails closed when missing, like the other live adapters):
+ *  - GOOGLE_PLAY_PACKAGE_NAME       e.g. com.sellfindconnect.app
+ *  - GOOGLE_PLAY_ACCESS_TOKEN       a valid OAuth2 access token for the
+ *                                   androidpublisher scope. A service-account
+ *                                   token provider must mint/refresh this; wiring
+ *                                   that refresh is a deployment concern and is
+ *                                   intentionally left to config here.
+ *
+ * Refunds are fail-closed by design: Play subscription refunds/voids are issued
+ * through the Play refund flow (Play Console or the Voided Purchases / orders
+ * refund API under an operator's authority), never silently from this path.
+ */
+export class GooglePlayBillingPaymentAdapter implements PaymentAdapter {
+  readonly provider = 'google-play-billing';
+
+  constructor(
+    private readonly config: PaymentAdapterConfigReader,
+    private readonly fetchImpl: PaymentAdapterFetch = fetch as PaymentAdapterFetch,
+  ) {
+    requiredConfig(config, 'GOOGLE_PLAY_PACKAGE_NAME', 'PAYMENT_PROVIDER=play');
+    requiredConfig(config, 'GOOGLE_PLAY_ACCESS_TOKEN', 'PAYMENT_PROVIDER=play');
+  }
+
+  async capture(request: PaymentCaptureRequest): Promise<PaymentCaptureResult> {
+    const validated = validateMoney(request.amount, request.currencyCode, this.provider, 'fail', 'capture');
+    if ('status' in validated) {
+      return validated;
+    }
+
+    const purchaseToken = request.customerReference?.trim();
+    if (!purchaseToken) {
+      return failedCapture(
+        this.provider,
+        validated.currencyCode,
+        'Play Billing capture requires the client purchaseToken in customerReference.',
+      );
+    }
+
+    const pkg = requiredConfig(this.config, 'GOOGLE_PLAY_PACKAGE_NAME', 'PAYMENT_PROVIDER=play');
+    const base =
+      optionalConfig(this.config, 'GOOGLE_PLAY_API_BASE') ?? 'https://androidpublisher.googleapis.com';
+    const verifyUrl =
+      `${base.replace(/\/$/, '')}/androidpublisher/v3/applications/` +
+      `${encodeURIComponent(pkg)}/purchases/subscriptionsv2/tokens/${encodeURIComponent(purchaseToken)}`;
+
+    const response = await this.fetchImpl(verifyUrl, {
+      method: 'GET',
+      headers: {
+        authorization: `Bearer ${requiredConfig(this.config, 'GOOGLE_PLAY_ACCESS_TOKEN', 'PAYMENT_PROVIDER=play')}`,
+        accept: 'application/json',
+      },
+    });
+    const body: unknown = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return failedCapture(
+        this.provider,
+        validated.currencyCode,
+        googlePlayError(body) ?? `Play verification failed (HTTP ${response.status}).`,
+      );
+    }
+
+    const subscription = body as {
+      subscriptionState?: string;
+      acknowledgementState?: string;
+      latestOrderId?: string;
+    };
+    const status = mapPlaySubscriptionState(subscription.subscriptionState ?? '');
+    if (status === 'FAILED') {
+      return failedCapture(
+        this.provider,
+        validated.currencyCode,
+        `Play subscription is not active (state: ${subscription.subscriptionState ?? 'UNKNOWN'}).`,
+      );
+    }
+
+    if (
+      status === 'CAPTURED' &&
+      subscription.acknowledgementState === 'ACKNOWLEDGEMENT_STATE_PENDING'
+    ) {
+      await this.acknowledge(base, pkg, purchaseToken).catch(() => undefined);
+    }
+
+    return {
+      provider: this.provider,
+      providerPaymentId:
+        subscription.latestOrderId ?? deterministicId(this.provider, 'play', purchaseToken),
+      status,
+      capturedAmount: status === 'CAPTURED' ? validated.amount : 0,
+      currencyCode: validated.currencyCode,
+    };
+  }
+
+  refund(request: PaymentRefundRequest): PaymentRefundResult {
+    return failedRefund(
+      this.provider,
+      request.currencyCode.trim().toUpperCase(),
+      'Play Billing refunds are issued through the Play Console / Voided Purchases flow, not this adapter.',
+    );
+  }
+
+  private async acknowledge(base: string, pkg: string, purchaseToken: string): Promise<void> {
+    const url =
+      `${base.replace(/\/$/, '')}/androidpublisher/v3/applications/` +
+      `${encodeURIComponent(pkg)}/purchases/subscriptionsv2/tokens/${encodeURIComponent(purchaseToken)}:acknowledge`;
+    await this.fetchImpl(url, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${requiredConfig(this.config, 'GOOGLE_PLAY_ACCESS_TOKEN', 'PAYMENT_PROVIDER=play')}`,
+        'content-type': 'application/json',
+        accept: 'application/json',
+      },
+      body: '{}',
+    });
+  }
+}
+
+/**
  * Method-routed live adapter: CARD/WALLET → Stripe, MOBILE_MONEY → Africa's
  * Talking. Missing rails fail closed per capture instead of falling back to the
  * manual development adapter.
@@ -488,6 +618,14 @@ export function createConfiguredPaymentAdapter(
     case 'mpesa':
       return new AfricasTalkingPaymentAdapter(
         requireReader(config, 'PAYMENT_PROVIDER=africastalking'),
+        fetchImpl,
+      );
+    case 'play':
+    case 'playbilling':
+    case 'google_play':
+    case 'googleplay':
+      return new GooglePlayBillingPaymentAdapter(
+        requireReader(config, 'PAYMENT_PROVIDER=play'),
         fetchImpl,
       );
     case 'live': {
@@ -655,4 +793,27 @@ function africasTalkingError(body: unknown): string | undefined {
   }
   const record = body as { errorMessage?: string; description?: string; status?: string };
   return record.errorMessage ?? record.description ?? record.status;
+}
+
+function mapPlaySubscriptionState(
+  state: string,
+): Extract<FinancePaymentStatus, 'CAPTURED' | 'REQUIRES_CAPTURE' | 'FAILED'> {
+  switch (state.trim().toUpperCase()) {
+    case 'SUBSCRIPTION_STATE_ACTIVE':
+    case 'SUBSCRIPTION_STATE_IN_GRACE_PERIOD':
+      return 'CAPTURED';
+    case 'SUBSCRIPTION_STATE_PENDING':
+    case 'SUBSCRIPTION_STATE_ON_HOLD':
+      return 'REQUIRES_CAPTURE';
+    default:
+      return 'FAILED';
+  }
+}
+
+function googlePlayError(body: unknown): string | undefined {
+  if (!body || typeof body !== 'object') {
+    return undefined;
+  }
+  const error = (body as { error?: { message?: string; status?: string } }).error;
+  return error?.message ?? error?.status;
 }
