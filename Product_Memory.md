@@ -316,10 +316,12 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   evidence after MFA and records `TERMS_REACCEPTED` without emails. Home Terms
   Gate can re-accept with the session token. API then web deploy.
 - 2026-09-24: Play listing exercise for Sell Find Connect only. Policy pages
-  cross-link, and the PWA manifest name is Sell Find Connect. Submission is
-  blocked on an Android package, Play Billing, counsel review, a reviewer
-  account, Kenya tax approval, and a production deploy. No Play Console
-  submission was made.
+  cross-link. The PWA manifest name is SellFindConnect, with placeholder
+  icons. `docs/PLAY_LISTING_PACK.md` is the paste-ready Console copy.
+  `deploy/twa/` is the Bubblewrap input and an assetlinks template with no
+  real fingerprint. Submission is blocked on a signed AAB, Play Billing,
+  counsel review, a reviewer account, Kenya tax approval, and a production
+  deploy. No Play Console submission was made.
 - 2026-09-24: A missing or empty `x-session-token` returns 401 before the
   session token is hashed. Checkout still rejects a body `phone` with 400
   from validation. Invoice pay rejects an E.164 `customerReference` with 422
