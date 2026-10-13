@@ -109,6 +109,7 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 
 ## Decision Log
 
+- 2026-10-13: Added a manual `Deploy API (Fly.io)` GitHub workflow (workflow_dispatch only) running the runbook command `fly deploy --config fly.api.toml --remote-only` with a FLY_API_TOKEN deploy token and a post-deploy /v1/health check. Production deploys stay a deliberate human action; this replaces running flyctl from a laptop.
 - 2026-10-13: Added opt-in AI match explanations to Source Finder (`POST source-finder/explain`). Provider-neutral like the embeddings/payment/tax adapters: the default build returns the deterministic template built from the matcher's own reason codes (zero cost, no key); the Anthropic overlay (`MATCH_EXPLANATION_PROVIDER=anthropic`, cheapest tier `claude-haiku-5-5`) is opt-in, fails closed without a key, re-screens every model output through the zero-tolerance safety core, and falls back to the template on any failure. Cost is incurred only when a searcher asks for an explanation.
 - 2026-06-15: Created PRD for multi-tenant advertising SaaS with web and downloadable mobile app requirements.
 - 2026-06-15: Locked local pricing rule: first month free, then 10 units of each subscriber country's local currency per month.
