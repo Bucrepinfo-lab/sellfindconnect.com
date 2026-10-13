@@ -55,6 +55,7 @@ export * from './relationships';
 export * from './sanitization';
 export * from './safety';
 export * from './source-finder';
+export * from './match-explanation';
 export * from './phone';
 export * from './payments';
 export * from './product-audit';

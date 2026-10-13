@@ -5,6 +5,7 @@ import { TenantAuthSession, TenantId } from '../tenant/tenant-context.decorator'
 import { TenantSessionGuard, type TenantSessionDecision } from '../tenant/tenant-session.guard';
 import {
   CreateSavedSourceFinderSearchDto,
+  ExplainSourceFinderMatchDto,
   RecordSourceFinderOutcomeDto,
   RebuildSourceFinderIndexDto,
   RunSourceFinderOpportunityAlertsDto,
@@ -31,6 +32,11 @@ export class SourceFinderController {
   @Post('search')
   search(@TenantId() tenantId: string, @Body() body: SearchSourceFinderDto) {
     return this.sourceFinder.search(body, tenantId);
+  }
+
+  @Post('explain')
+  explain(@Body() body: ExplainSourceFinderMatchDto) {
+    return this.sourceFinder.explainMatch(body);
   }
 
   @Post('index/reindex')

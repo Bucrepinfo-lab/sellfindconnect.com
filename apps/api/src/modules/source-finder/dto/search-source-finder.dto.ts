@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   opportunityAlertFrequencies,
   sourceFinderOutcomeActions,
+  sourceFinderReasonCodes,
   sourceFinderSortOptions,
   supplyChainRoles,
   type OpportunityAlertFrequency,
@@ -11,6 +12,8 @@ import {
 } from '@telpen/domain';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsIn,
   IsInt,
@@ -179,4 +182,57 @@ export class RecordSourceFinderOutcomeDto {
   @IsOptional()
   @IsBoolean()
   declare behavioralMatchingConsent?: boolean;
+}
+
+const roleValues = [...supplyChainRoles] as const;
+
+/**
+ * Request a plain-English "why this match" explanation for one match. The client
+ * passes the match facts it already received from a search result, so no extra
+ * lookup is needed. The server screens the content, then uses the AI overlay
+ * (when configured) or the deterministic template.
+ */
+export class ExplainSourceFinderMatchDto {
+  @ApiProperty({ example: 'who packages avocados for export in Kenya' })
+  @IsString()
+  @MaxLength(200)
+  declare query: string;
+
+  @ApiProperty({ example: 'Rift Valley Pack House' })
+  @IsString()
+  @MaxLength(160)
+  declare name: string;
+
+  @ApiProperty({ enum: roleValues, example: 'PROCESSOR' })
+  @IsIn(roleValues)
+  declare role: SupplyChainRole;
+
+  @ApiProperty({ example: 'Nakuru, Kenya' })
+  @IsString()
+  @MaxLength(160)
+  declare location: string;
+
+  @ApiProperty({ type: [String], example: ['Avocado packing', 'Cold storage'] })
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  @MaxLength(120, { each: true })
+  declare offers: string[];
+
+  @ApiProperty({ example: true })
+  @IsBoolean()
+  declare verified: boolean;
+
+  @ApiProperty({ enum: sourceFinderReasonCodes, isArray: true })
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsIn(sourceFinderReasonCodes, { each: true })
+  declare reasonCodes: (typeof sourceFinderReasonCodes)[number][];
+
+  @ApiProperty({ type: [String] })
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  @MaxLength(240, { each: true })
+  declare reasons: string[];
 }

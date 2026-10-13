@@ -11,6 +11,10 @@ import {
   SOURCE_FINDER_EMBEDDER,
   createConfiguredSourceFinderEmbedder,
 } from './openai-embeddings';
+import {
+  SOURCE_FINDER_EXPLAINER,
+  createConfiguredSourceFinderExplainer,
+} from './anthropic-explainer';
 import { SOURCE_FINDER_REPOSITORY } from './source-finder.repository';
 import { SourceFinderController } from './source-finder.controller';
 import { SourceFinderService } from './source-finder.service';
@@ -46,6 +50,11 @@ import { SourceFinderService } from './source-finder.service';
       provide: SOURCE_FINDER_EMBEDDER,
       inject: [ConfigService],
       useFactory: (config: ConfigService) => createConfiguredSourceFinderEmbedder(config),
+    },
+    {
+      provide: SOURCE_FINDER_EXPLAINER,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => createConfiguredSourceFinderExplainer(config),
     },
     SourceFinderService,
   ],
