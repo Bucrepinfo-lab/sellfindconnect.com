@@ -28,7 +28,9 @@ import {
   resolveSourceFinderSearchMode,
   searchSourceFinderRecords,
   selectOpportunityMatches,
+  templateMatchExplanation,
   toSourceFinderRecord,
+  type MatchExplanationInput,
   type SavedSourceFinderSearch,
   type SourceFinderIndexDocument,
   type SourceFinderOpportunityAlert,
@@ -55,11 +57,17 @@ import {
   SOURCE_FINDER_EMBEDDER,
   type SourceFinderEmbedder,
 } from './openai-embeddings';
+import {
+  SOURCE_FINDER_EXPLAINER,
+  type SourceFinderExplainer,
+} from './anthropic-explainer';
+import type { ExplainSourceFinderMatchDto } from './dto/search-source-finder.dto';
 
 @Injectable()
 export class SourceFinderService {
   private readonly repository: SourceFinderRepository;
   private readonly embedder?: SourceFinderEmbedder;
+  private readonly explainer?: SourceFinderExplainer;
 
   constructor(
     @Optional()
@@ -72,9 +80,43 @@ export class SourceFinderService {
     @Inject(SOURCE_FINDER_EMBEDDER)
     embedder?: SourceFinderEmbedder | null,
     @Optional() private readonly ugc?: UgcService,
+    @Optional()
+    @Inject(SOURCE_FINDER_EXPLAINER)
+    explainer?: SourceFinderExplainer | null,
   ) {
     this.repository = repository ?? new InMemorySourceFinderRepository();
     this.embedder = embedder ?? undefined;
+    this.explainer = explainer ?? undefined;
+  }
+
+  /**
+   * Explain, in one plain-English line, why a match surfaced for a search.
+   * Opt-in (its own endpoint) so cost is incurred only when a searcher asks.
+   * Provider-neutral: uses the AI overlay when configured, else the
+   * deterministic template built from the matcher's own reasons. The request is
+   * safety-screened, and the adapter re-screens any model output.
+   */
+  async explainMatch(
+    input: ExplainSourceFinderMatchDto,
+  ): Promise<{ explanation: string; usedModel: boolean }> {
+    this.assertSafe(input, 'This explanation request contains blocked content.');
+
+    const facts: MatchExplanationInput = {
+      query: input.query,
+      name: input.name,
+      role: input.role,
+      location: input.location,
+      offers: input.offers ?? [],
+      verified: Boolean(input.verified),
+      reasonCodes: input.reasonCodes ?? [],
+      reasons: input.reasons ?? [],
+    };
+
+    const ai = this.explainer ? await this.explainer.explain(facts) : undefined;
+    return {
+      explanation: ai ?? templateMatchExplanation(facts),
+      usedModel: Boolean(ai),
+    };
   }
 
   async search(input: SearchSourceFinderDto, tenantId?: string) {

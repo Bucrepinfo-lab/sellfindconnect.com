@@ -109,6 +109,7 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 
 ## Decision Log
 
+- 2026-10-13: Added opt-in AI match explanations to Source Finder (`POST source-finder/explain`). Provider-neutral like the embeddings/payment/tax adapters: the default build returns the deterministic template built from the matcher's own reason codes (zero cost, no key); the Anthropic overlay (`MATCH_EXPLANATION_PROVIDER=anthropic`, cheapest tier `claude-haiku-5-5`) is opt-in, fails closed without a key, re-screens every model output through the zero-tolerance safety core, and falls back to the template on any failure. Cost is incurred only when a searcher asks for an explanation.
 - 2026-06-15: Created PRD for multi-tenant advertising SaaS with web and downloadable mobile app requirements.
 - 2026-06-15: Locked local pricing rule: first month free, then 10 units of each subscriber country's local currency per month.
 - 2026-06-15: Added zero-tolerance blocked categories covering weapons, pornography, human trafficking/human trade, child exploitation, illegal drugs, violent extremism, hate/threats, graphic violence/self-harm encouragement, criminal services, counterfeit/stolen goods, and illegal wildlife trafficking.
