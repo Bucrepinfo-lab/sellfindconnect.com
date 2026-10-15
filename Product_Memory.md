@@ -317,3 +317,10 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   (`reason: terms`). `POST /v1/auth/terms/accept` writes `REACCEPTANCE`
   evidence after MFA and records `TERMS_REACCEPTED` without emails. Home Terms
   Gate can re-accept with the session token. API then web deploy.
+- 2026-10-15: Recorded signed SFC-02 (Kenya tax profile approval) in
+  `docs/SIGN_OFF_RECORDS.md`: director signed 05/10/26, tax agent 07/10/26,
+  production approval ticked. Kenya profile stays DRAFT and `approvedBy`
+  unset until the agent resolves the resident-vs-non-resident contradiction
+  (eTIMS and SEP rows) and the blank KRA PIN and `approvedBy` fields. The
+  legal policy sign-off PDF arrived in the same email but is not yet
+  recorded, so the policy pages remain "not counsel sign-off".
