@@ -19,7 +19,7 @@ export default function CommunityStandardsPage() {
           These community standards are the public user policy for Sell Find Connect profiles,
           listings, media, search, matching, and chat. You must accept the current terms, privacy,
           subscription, prohibited-content, and community standards policies before you create or
-          upload user-generated content. This page is not a counsel sign-off.
+          upload user-generated content.
         </p>
       </LegalSection>
       <LegalSection id="standards" title="Required conduct">

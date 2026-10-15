@@ -597,7 +597,8 @@ Progress:
   approved.
 - Published public `/terms` and `/subscription` pages at the active policy
   versions (`terms-2026-08-22`, `subscription-2026-08-22`). Privacy CSS is
-  imported on those legal pages. This is not a counsel sign-off.
+  imported on those legal pages. Counsel signed off all five policies on
+  09/10/26 (SFC-01, see `docs/SIGN_OFF_RECORDS.md`).
 - Published public `/prohibited` from `prohibitedCategorySummaries` and
   redirected `/dashboard`, `/dashboard/adverts/new`, and `/dashboard/discover`
   into the home workspace so onboarding no longer 404s.

@@ -275,7 +275,7 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - 2026-08-22: Published public Terms of Service and subscription terms at
   `/terms` and `/subscription`, versions `terms-2026-08-22` and
   `subscription-2026-08-22`. Existing tenants must re-accept before gated
-  actions. This is not counsel sign-off. A web deploy is required before the
+  actions. Counsel signed off on 09/10/26 (SFC-01). A web deploy is required before the
   live URLs leave 404.
 - 2026-08-22: Published public prohibited-content policy at `/prohibited`
   from the shared zero-tolerance summaries, and redirected `/dashboard`
@@ -289,8 +289,8 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - 2026-08-22: Published public community standards at `/community`
   (`community-2026-08-22`) from shared domain summaries. The page is the
   Play UGC user policy: report/block, harassment, not-for-children, and
-  sexual content fully prohibited (not incidental). This is not a counsel
-  sign-off. Live `/community` is HTTP 200.
+  sexual content fully prohibited (not incidental). Counsel signed off on
+  09/10/26 (SFC-01). Live `/community` is HTTP 200.
 - 2026-08-22: Added UGC report and block. Tenants can report or block a
   Source Finder target after terms acceptance. Blocked ids leave that
   tenant’s results. `POST /v1/ugc/reports` and `POST /v1/ugc/blocks` persist
@@ -324,3 +324,9 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   (eTIMS and SEP rows) and the blank KRA PIN and `approvedBy` fields. The
   legal policy sign-off PDF arrived in the same email but is not yet
   recorded, so the policy pages remain "not counsel sign-off".
+- 2026-10-15: Recorded signed SFC-01 (legal policy review) in
+  `docs/SIGN_OFF_RECORDS.md`. Counsel (Advocate of the High Court of Kenya)
+  signed 09/10/26 and the director 05/10/26: all five policies approved as
+  published at their current versions, no changes requested. They are now
+  the production contract; no version bump or re-acceptance needed. Removed
+  the "not a counsel sign-off" line from `/community` (web deploy).
