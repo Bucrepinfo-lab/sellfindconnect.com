@@ -92,17 +92,34 @@ export default function AccountDeletionPage() {
     return (
       <div className="sfc-delete">
         <div className="sfc-delete__card">
-          <h1 className="sfc-delete__title">Sign in to delete your account</h1>
+          <h1 className="sfc-delete__title">Delete your SellFindConnect account</h1>
           <p className="sfc-delete__body">
-            Account deletion requires a signed-in session. Sign in on the web app, then return to
-            this page. The public privacy policy stays available without signing in.
+            SellFindConnect is run by Telpen Systems Ltd. You can delete your account and its data
+            yourself, in the Android app or on the web.
+          </p>
+          <ol className="sfc-delete__list">
+            <li>Sign in to your business account.</li>
+            <li>Open this page again (sellfindconnect.com/account/delete).</li>
+            <li>Choose a reason and confirm. Deletion starts a 30-day grace period, and you can cancel it during that time.</li>
+          </ol>
+          <p className="sfc-delete__body">
+            <strong>Deleted after 30 days:</strong> your account, business profile, adverts, photos and
+            videos, conversations, saved searches and sign-in sessions.
+            <br />
+            <strong>Kept:</strong> billing records for 7 years, as Kenya&apos;s tax authority (KRA)
+            requires, and security and audit logs that do not include your messages or your reason for
+            leaving.
+          </p>
+          <p className="sfc-delete__body">
+            Can&apos;t sign in? Email privacy@sellfindconnect.com from the address on your account and
+            we will delete it for you.
           </p>
           <div className="sfc-delete__actions">
             <button className="sfc-delete__btn sfc-delete__btn--ghost" onClick={() => router.push("/privacy")}>
               Privacy policy
             </button>
-            <button className="sfc-delete__btn sfc-delete__btn--primary" onClick={() => router.push("/")}>
-              Go to sign in
+            <button className="sfc-delete__btn sfc-delete__btn--primary" onClick={() => router.push("/dashboard")}>
+              Sign in
             </button>
           </div>
         </div>

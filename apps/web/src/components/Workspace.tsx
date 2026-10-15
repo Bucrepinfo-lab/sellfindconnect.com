@@ -146,6 +146,7 @@ import {
 } from '@telpen/domain';
 import { publicApiBaseUrl, readTenantSession, tenantSessionHeaders } from '../lib/public-api';
 import { clearSession, isStaffRole, saveSession, useStoredSession } from '../lib/use-session';
+import { SignUpForm } from './SignUpForm';
 import { useHomeWorkspaceLanding } from '../lib/use-home-workspace-landing';
 
 const tenantId = '11111111-1111-4111-8111-111111111111';
@@ -395,6 +396,7 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
   const showAdmin = area === 'admin' && signedIn && isStaff;
   const needsSignIn = area !== 'public' && !signedIn;
   const landing = useHomeWorkspaceLanding();
+  const [authMode, setAuthMode] = useState<'sign-in' | 'sign-up'>('sign-in');
   const [queryDraft, setQuery] = useState<string | undefined>();
   const query = queryDraft ?? landing.query ?? 'fresh produce';
   // "Why this match?" — one explanation per click, never per page view.
@@ -2054,6 +2056,18 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
           <aside className="right-rail">
             {needsSignIn ? (
               <section className="side-panel sign-in-panel" id="sign-in">
+                {authMode === 'sign-up' && area === 'member' ? (
+                  <SignUpForm
+                    apiBaseUrl={analyticsApiBaseUrl}
+                    onCancel={() => setAuthMode('sign-in')}
+                    onRegistered={(payload) => {
+                      setAuthMode('sign-in');
+                      setPlatformEmail(payload.user?.email ?? platformEmail);
+                      applyPlatformSession(payload as unknown as AuthSessionPayload);
+                    }}
+                  />
+                ) : (
+                <>
                 <div className="panel-heading tight">
                   <h2>Sign in</h2>
                 </div>
@@ -2116,9 +2130,15 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
                   </>
                 ) : null}
                 {platformAuthError ? <p className="form-error" role="alert">{platformAuthError}</p> : null}
-                {area === 'member' ? (
+                </>
+                )}
+                {area === 'member' && authMode === 'sign-in' ? (
                   <p className="form-note">
-                    New here? <Link href="/onboarding">List your business</Link> — the first month is free.
+                    New here?{' '}
+                    <button className="text-link" type="button" onClick={() => setAuthMode('sign-up')}>
+                      Create a business account
+                    </button>{' '}
+                    — the first month is free.
                   </p>
                 ) : null}
               </section>

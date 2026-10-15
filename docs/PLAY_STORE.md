@@ -1,13 +1,14 @@
 # Google Play Store compliance for Sell Find Connect
 
-Status: Native Android / Play listing is **out of current delivery**. This note
-locks the policy constraints so a later mobile slice cannot ship a Play-violating
-checkout or SMS-permission design.
-Date: 2026-08-21
-
-Sell Find Connect currently launches as **web + PWA**. Do not submit an Android
-package to Google Play until the checklist below is implemented and legal has
-signed off.
+Status (15/10/26): **in progress — preparing the first Play listing.** The
+Android app is a Trusted Web Activity of https://sellfindconnect.com, package
+`com.sellfindconnect.app`, built with PWABuilder. Legal sign-off (SFC-01) is
+recorded in `docs/SIGN_OFF_RECORDS.md`. Paste packs:
+`docs/PLAY-STORE-LISTING.md` (listing, build, assetlinks, testing track) and
+`docs/PLAY-APP-CONTENT-REVIEW.md` (App content cards, Data safety, reviewer
+access). The first Android release has **no purchase screen**; Play Billing is
+needed before the app charges for the subscription.
+First written: 2026-08-21
 
 ## Locked identity: login phone = STK Push phone
 

@@ -245,6 +245,44 @@ describe('AuthService', () => {
     expect(result.session.mfaVerified).toBe(true);
   });
 
+  it('accepts the Play review code only for the designated non-staff account', async () => {
+    const previous = { email: process.env.PLAY_REVIEW_EMAIL, code: process.env.PLAY_REVIEW_MFA_CODE };
+    process.env.PLAY_REVIEW_EMAIL = 'play-review@example.com';
+    process.env.PLAY_REVIEW_MFA_CODE = '482913';
+    try {
+      const service = new AuthService(new InMemoryAuthRepository());
+      const register = (email: string) =>
+        service.registerTenantOwner({
+          email,
+          password: strongPassword,
+          displayName: 'Play Reviewer',
+          tenantDisplayName: 'Review Traders',
+          countryCode: 'KE',
+          industryCode: 'AGRICULTURE',
+          primaryRole: 'SUPPLIER',
+          userType: 'ADVERTISER',
+          acceptedTerms: true,
+        });
+
+      const reviewer = await register('Play-Review@example.com');
+      const verified = await service.verifyMfa({
+        sessionToken: reviewer.session.token,
+        code: '482913',
+      });
+      expect(verified.session.mfaVerified).toBe(true);
+
+      const other = await register('owner2@example.com');
+      await expect(
+        service.verifyMfa({ sessionToken: other.session.token, code: '482913' }),
+      ).rejects.toThrow('Invalid MFA code.');
+    } finally {
+      process.env.PLAY_REVIEW_EMAIL = previous.email;
+      process.env.PLAY_REVIEW_MFA_CODE = previous.code;
+      if (previous.email === undefined) delete process.env.PLAY_REVIEW_EMAIL;
+      if (previous.code === undefined) delete process.env.PLAY_REVIEW_MFA_CODE;
+    }
+  });
+
   it('records owner auth events in tenant audit logs', async () => {
     const repository = new InMemoryAuthRepository();
     const service = new AuthService(repository);
