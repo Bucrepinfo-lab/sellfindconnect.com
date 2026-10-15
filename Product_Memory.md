@@ -340,3 +340,10 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   `onboarding.css` were 404). Live sign-in still needs `RESEND_API_KEY` and
   `EMAIL_FROM` on the API: without them no MFA code is delivered. Paste packs:
   `docs/PLAY-STORE-LISTING.md`, `docs/PLAY-APP-CONTENT-REVIEW.md`.
+- 2026-10-15: Built the Android package with PWABuilder
+  (`com.sellfindconnect.app`, notifications/location/Play Billing off; the
+  owner holds the signing key) and created the app in Play Console (id
+  4974683027202673741). Most App content cards and the store listing are
+  saved; Data safety is a draft imported from `docs/data_safety_export.csv`.
+  Remaining: reviewer account and App access, Target audience, phone
+  screenshots, `.aab` upload, assetlinks fingerprints, closed test.
