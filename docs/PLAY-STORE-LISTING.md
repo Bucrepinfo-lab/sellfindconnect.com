@@ -70,7 +70,7 @@ which is not built yet (see `docs/PLAY_STORE.md`).
 | --- | --- |
 | App icon 512×512 | `docs/store-assets/app-icon-512.png` |
 | Feature graphic 1024×500 | `docs/store-assets/feature-graphic-1024x500.png` |
-| Phone screenshots 1080×1920 (9:16), at least 2 | `docs/store-assets/screenshot-*.png` |
+| Phone screenshots 1080×1920 (9:16) — uploaded 15/10/26 | `docs/store-assets/screenshot-1-home.png`, `screenshot-2-results.png`, `screenshot-3-signup.png` |
 
 Play rejects screenshots that are not 16:9 or 9:16.
 
