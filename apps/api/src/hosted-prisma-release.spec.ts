@@ -102,7 +102,9 @@ describe('hosted Prisma release path', () => {
     const modelNames = new Set(models.map((match) => match[1]));
     const missing: string[] = [];
 
-    for (const [, name, body] of models) {
+    for (const match of models) {
+      const name = match[1] ?? '';
+      const body = match[2] ?? '';
       const table = body.match(/@@map\("([^"]+)"\)/)?.[1] ?? name;
       const tableSql = new RegExp(`(CREATE TABLE (IF NOT EXISTS )?"${table}"[\\s\\S]*?\\n\\);|ALTER TABLE "${table}"[^;]*;)`, 'g');
       const tableText = [...sql.matchAll(tableSql)].map((match) => match[0]).join('\n');
