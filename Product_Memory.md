@@ -330,3 +330,13 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   published at their current versions, no changes requested. They are now
   the production contract; no version bump or re-acceptance needed. Removed
   the "not a counsel sign-off" line from `/community` (web deploy).
+- 2026-10-15: Started the Google Play listing (Android TWA,
+  `com.sellfindconnect.app`, built with PWABuilder). Added public sign-up
+  (Create a business account), PWA icons and manifest, an offline service
+  worker, env-driven `/.well-known/assetlinks.json`
+  (`ANDROID_CERT_FINGERPRINTS`), a Play reviewer MFA code for one non-staff
+  account (`PLAY_REVIEW_EMAIL` / `PLAY_REVIEW_MFA_CODE`), and a fuller public
+  deletion page. The web image now ships `apps/web/public` (icons and
+  `onboarding.css` were 404). Live sign-in still needs `RESEND_API_KEY` and
+  `EMAIL_FROM` on the API: without them no MFA code is delivered. Paste packs:
+  `docs/PLAY-STORE-LISTING.md`, `docs/PLAY-APP-CONTENT-REVIEW.md`.

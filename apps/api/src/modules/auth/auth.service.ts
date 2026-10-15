@@ -845,7 +845,10 @@ export class AuthService {
       throw new UnauthorizedException('MFA challenge locked after too many attempts.');
     }
 
-    if (!this.verifyMfaCode(session.id, input.code, challenge.codeHash)) {
+    const codeMatches =
+      this.verifyMfaCode(session.id, input.code, challenge.codeHash) ||
+      (await this.isPlayReviewCode(user, input.code));
+    if (!codeMatches) {
       await this.repository.updateMfaChallenge({
         ...challenge,
         failedAttempts: challenge.failedAttempts + 1,
@@ -1449,6 +1452,22 @@ export class AuthService {
     const actual = Buffer.from(left);
     const expected = Buffer.from(right);
     return actual.length === expected.length && timingSafeEqual(actual, expected);
+  }
+
+  /**
+   * Google Play review sign-in. One designated, non-staff account
+   * (PLAY_REVIEW_EMAIL) may pass email MFA with a fixed six-digit code
+   * (PLAY_REVIEW_MFA_CODE) because the reviewer cannot read that inbox.
+   * Off unless both are set; never for accounts with platform access.
+   */
+  private async isPlayReviewCode(user: AuthUserRecord | undefined | null, code: string): Promise<boolean> {
+    const reviewEmail = process.env.PLAY_REVIEW_EMAIL?.trim().toLowerCase();
+    const reviewCode = process.env.PLAY_REVIEW_MFA_CODE?.trim();
+    if (!user || !reviewEmail || !reviewCode || !/^\d{6}$/.test(reviewCode)) return false;
+    if (user.email.trim().toLowerCase() !== reviewEmail) return false;
+    const assignments = await this.repository.listAccessAssignmentsForUser(user.id);
+    if (assignments.length > 0) return false;
+    return this.equalSecret(code.trim(), reviewCode);
   }
 
   private verifyMfaCode(sessionId: string, code: string, expectedHash: string): boolean {

@@ -2,13 +2,22 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Telpen Adverts',
-    short_name: 'Telpen',
-    description: 'Source Finder and advertising workspace.',
+    id: '/',
+    name: 'SellFindConnect',
+    short_name: 'SellFindConnect',
+    description: 'Find the supplier, buyer or transporter your business needs.',
     start_url: '/',
+    scope: '/',
     display: 'standalone',
-    background_color: '#f7f8f5',
+    orientation: 'portrait',
+    background_color: '#1d4f45',
     theme_color: '#1d4f45',
-    icons: [],
+    categories: ['business', 'productivity'],
+    lang: 'en-KE',
+    icons: [
+      { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+    ],
   };
 }
