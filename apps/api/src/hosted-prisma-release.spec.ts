@@ -87,6 +87,44 @@ describe('hosted Prisma release path', () => {
     expect(bomFiles).toEqual([]);
   });
 
+  it('has a migration for every Prisma model table and column', () => {
+    const prismaDir = path.join(repoRoot, 'packages', 'database', 'prisma');
+    const schema = readFileSync(path.join(prismaDir, 'schema.prisma'), 'utf8');
+    const migrationsDir = path.join(prismaDir, 'migrations');
+    const sql = readdirSync(migrationsDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => path.join(migrationsDir, entry.name, 'migration.sql'))
+      .filter((file) => existsSync(file))
+      .map((file) => readFileSync(file, 'utf8'))
+      .join('\n');
+
+    const models = [...schema.matchAll(/^model (\w+) \{([\s\S]*?)^\}/gm)];
+    const modelNames = new Set(models.map((match) => match[1]));
+    const missing: string[] = [];
+
+    for (const [, name, body] of models) {
+      const table = body.match(/@@map\("([^"]+)"\)/)?.[1] ?? name;
+      const tableSql = new RegExp(`(CREATE TABLE (IF NOT EXISTS )?"${table}"[\\s\\S]*?\\n\\);|ALTER TABLE "${table}"[^;]*;)`, 'g');
+      const tableText = [...sql.matchAll(tableSql)].map((match) => match[0]).join('\n');
+      if (!tableText) {
+        missing.push(`table ${table}`);
+        continue;
+      }
+      for (const raw of body.split('\n')) {
+        const line = raw.trim();
+        if (!line || line.startsWith('//') || line.startsWith('@@')) continue;
+        const [field, type] = line.split(/\s+/);
+        if (!field || !type) continue;
+        const baseType = type.replace(/[?\[\]]/g, '');
+        if (modelNames.has(baseType) || line.includes('@relation')) continue;
+        const column = line.match(/@map\("([^"]+)"\)/)?.[1] ?? field;
+        if (!tableText.includes(`"${column}"`)) missing.push(`${table}.${column}`);
+      }
+    }
+
+    expect(missing).toEqual([]);
+  });
+
   it('schedules production maintenance jobs on the default branch', () => {
     const workflow = readFileSync(path.join(repoRoot, '.github', 'workflows', 'scheduled-jobs.yml'), 'utf8');
     expect(workflow).toMatch(/cron:\s+'\*\/15 \* \* \* \*'/);

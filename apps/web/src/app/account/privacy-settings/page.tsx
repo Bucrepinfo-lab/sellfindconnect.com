@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 
-import { publicApiBaseUrl, tenantSessionHeaders } from "../../../lib/public-api";
+import { publicApiBaseUrl, readTenantSession, tenantSessionHeaders } from "../../../lib/public-api";
 import "../../../styles/privacy.css";
 
 type DeletedWith = "ACCOUNT" | "MANUAL" | "RETENTION_POLICY";
@@ -24,22 +24,43 @@ const BADGE: Record<DeletedWith, { label: string; cls: string }> = {
   RETENTION_POLICY: { label: "Retention policy", cls: "badge--retention" },
 };
 
+function subscribeSession(onStoreChange: () => void) {
+  if (typeof window === "undefined") return () => undefined;
+  window.addEventListener("storage", onStoreChange);
+  return () => window.removeEventListener("storage", onStoreChange);
+}
+
+function hasTenantSession() {
+  const session = readTenantSession();
+  return Boolean(session.sessionToken && session.tenantId);
+}
+
 export default function PrivacySettingsPage() {
+  const hasSession = useSyncExternalStore(subscribeSession, hasTenantSession, () => true);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [exportState, setExportState] = useState<"idle" | "loading" | "queued">("idle");
   const [error, setError] = useState("");
+  const [rejected, setRejected] = useState(false);
+  const signedOut = !hasSession || rejected;
 
   useEffect(() => {
+    if (!hasSession) return;
     fetch(`${publicApiBaseUrl}/privacy/data-summary`, { headers: tenantSessionHeaders() })
       .then((response) => {
+        if (response.status === 401 || response.status === 403) {
+          setRejected(true);
+          return Promise.reject(new Error("signed-out"));
+        }
         if (!response.ok) {
           throw new Error("Failed to load.");
         }
         return response.json() as Promise<Summary>;
       })
       .then(setSummary)
-      .catch(() => setError("Failed to load."));
-  }, []);
+      .catch((caught: Error) => {
+        if (caught.message !== "signed-out") setError("Could not load your data summary. Try again in a moment.");
+      });
+  }, [hasSession]);
 
   const doExport = async () => {
     setExportState("loading");
@@ -57,6 +78,31 @@ export default function PrivacySettingsPage() {
       setExportState("idle");
     }
   };
+
+  if (signedOut) {
+    return (
+      <div className="sfc-ps">
+        <header className="sfc-ps__header">
+          <h1>Data &amp; Privacy</h1>
+          <p className="sfc-ps__subtitle">
+            Sign in to see the data we hold, export it, or delete your account.
+          </p>
+        </header>
+        <div className="sfc-ps__signed-out">
+          <Link href="/dashboard" className="sfc-ps__btn sfc-ps__btn--primary">
+            Sign in
+          </Link>
+          <Link href="/dashboard?signup=1" className="sfc-ps__btn sfc-ps__btn--secondary">
+            Create a business account
+          </Link>
+        </div>
+        <p className="sfc-ps__subtitle">
+          Read the <Link href="/privacy">Privacy Policy</Link> or see{" "}
+          <Link href="/account/delete">how to delete an account</Link> without signing in.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="sfc-ps">

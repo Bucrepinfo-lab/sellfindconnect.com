@@ -64,3 +64,5 @@
 .sfc-ps__btn--danger{background:rgba(255,107,94,.1);border:1px solid rgba(255,107,94,.3);color:var(--danger);}
 @media(prefers-reduced-motion:reduce){.sfc-ps__skeleton{animation:none;opacity:.5}}
 @media(max-width:600px){.sfc-delete__card{padding:32px 20px;}.sfc-delete__actions{flex-direction:column;}.sfc-delete__btn{width:100%;text-align:center;}.sfc-ps__inventory-item{flex-direction:column;align-items:flex-start;}}
+.sfc-ps__signed-out{display:flex;flex-wrap:wrap;gap:12px;margin:8px 0 24px;}
+.sfc-ps__btn--primary{background:var(--signal);color:#111;}

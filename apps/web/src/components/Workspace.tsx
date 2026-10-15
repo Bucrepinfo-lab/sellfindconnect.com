@@ -28,7 +28,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 
 import {
   accessPermissions,
@@ -306,6 +306,11 @@ function sessionSummary(payload: AuthSessionPayload) {
   return `${identity} / ${tenant} / ${mfa}`;
 }
 
+function subscribeToLocation(onStoreChange: () => void) {
+  window.addEventListener('popstate', onStoreChange);
+  return () => window.removeEventListener('popstate', onStoreChange);
+}
+
 async function readApiError(response: Response, fallback: string) {
   const body = await response.text();
   if (!body) return response.statusText || fallback;
@@ -396,7 +401,13 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
   const showAdmin = area === 'admin' && signedIn && isStaff;
   const needsSignIn = area !== 'public' && !signedIn;
   const landing = useHomeWorkspaceLanding();
-  const [authMode, setAuthMode] = useState<'sign-in' | 'sign-up'>('sign-in');
+  const [authModeChoice, setAuthMode] = useState<'sign-in' | 'sign-up' | null>(null);
+  const signupRequested = useSyncExternalStore(
+    subscribeToLocation,
+    () => new URLSearchParams(window.location.search).get('signup') === '1',
+    () => false,
+  );
+  const authMode = authModeChoice ?? (signupRequested ? 'sign-up' : 'sign-in');
   const [queryDraft, setQuery] = useState<string | undefined>();
   const query = queryDraft ?? landing.query ?? 'fresh produce';
   // "Why this match?" — one explanation per click, never per page view.
@@ -1689,7 +1700,7 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
               <a className="primary-button" href="#source-finder">
                 <Search size={16} /> Search businesses
               </a>
-              <Link className="secondary-button" href="/onboarding">
+              <Link className="secondary-button" href="/dashboard?signup=1">
                 List your business
               </Link>
             </div>
