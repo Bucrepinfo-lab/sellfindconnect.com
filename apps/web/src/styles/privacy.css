@@ -66,4 +66,4 @@
 @media(max-width:600px){.sfc-delete__card{padding:32px 20px;}.sfc-delete__actions{flex-direction:column;}.sfc-delete__btn{width:100%;text-align:center;}.sfc-ps__inventory-item{flex-direction:column;align-items:flex-start;}}
 .sfc-ps__signed-out{display:flex;flex-wrap:wrap;gap:12px;margin:8px 0 24px;}
 .sfc-ps__btn--primary{background:var(--signal);color:#111;}
-body:has(.sfc-ps){background:var(--bg);}.sfc-ps{min-height:100vh;}.sfc-ps a{color:var(--signal);}
+body:has(.sfc-ps){background:var(--bg);}.sfc-ps{min-height:100vh;}.sfc-ps a:not(.sfc-ps__btn){color:var(--signal);}.sfc-ps a.sfc-ps__btn--primary{color:#111;}
