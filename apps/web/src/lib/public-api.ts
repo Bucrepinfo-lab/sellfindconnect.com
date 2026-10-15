@@ -22,3 +22,5 @@ export function tenantSessionHeaders(): HeadersInit {
     ...(tenantId ? { 'x-tenant-id': tenantId } : {}),
   };
 }
+
+export const ROLE_STORAGE_KEY = 'sfc.role';

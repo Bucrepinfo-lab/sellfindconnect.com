@@ -14,5 +14,5 @@ export default async function NewAdvertPage({
     }
   }
   params.set('view', 'adverts');
-  redirect(`/?${params.toString()}`);
+  redirect(`/dashboard?${params.toString()}`);
 }
