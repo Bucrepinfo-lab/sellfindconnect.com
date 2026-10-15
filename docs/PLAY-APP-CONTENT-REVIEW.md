@@ -14,7 +14,7 @@ draft. Play only accepts the submit after Target audience, which needs App
 access (Sign in details) first.
 
 Still to do: reviewer account + `PLAY_REVIEW_*` secrets → App access →
-Target audience (18+) → submit Data safety; phone screenshots (2–8, 9:16);
+Target audience (18+) → submit Data safety; (phone screenshots uploaded 15/10/26);
 upload the `.aab` to closed testing; add both signing fingerprints to
 `ANDROID_CERT_FINGERPRINTS`; 12 testers × 14 days.
 
