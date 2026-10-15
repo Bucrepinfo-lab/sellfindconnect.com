@@ -1,5 +1,23 @@
 # Play Console — App content answers (SellFindConnect, com.sellfindconnect.app)
 
+## Status (15/10/26)
+
+App created in Play Console (app id 4974683027202673741, developer account
+"Telpen Edu", personal). Saved: Privacy policy, Ads (Yes), Content rating
+(IARC, All other app types — UGC, block, report, moderated chat, online
+content), Advertising ID (No), Government apps (No), Financial features
+(none), Health (none), store listing text + icon + feature graphic, category
+Business, contact bucrepinfo@gmail.com, website.
+
+Data safety is imported from `docs/data_safety_export.csv` and saved as a
+draft. Play only accepts the submit after Target audience, which needs App
+access (Sign in details) first.
+
+Still to do: reviewer account + `PLAY_REVIEW_*` secrets → App access →
+Target audience (18+) → submit Data safety; phone screenshots (2–8, 9:16);
+upload the `.aab` to closed testing; add both signing fingerprints to
+`ANDROID_CERT_FINGERPRINTS`; 12 testers × 14 days.
+
 Goal: every App content card saved, so the only remaining gate is the closed
 test (12 testers × 14 days). **Claude in Chrome fills each card; the owner says
 yes before each Save or Submit.** Answers were checked against the code
