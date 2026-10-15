@@ -27,6 +27,7 @@ import {
   UserCheck,
   Sparkles,
 } from 'lucide-react';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import {
@@ -1580,10 +1581,10 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
   return (
     <main className="app-shell">
       <aside className="sidebar" aria-label={area === 'admin' ? 'Staff navigation' : area === 'member' ? 'Business navigation' : 'Site navigation'}>
-        <a className="brand-mark" href="/">
+        <Link className="brand-mark" href="/">
           <Building2 size={24} />
           <span>SellFindConnect</span>
-        </a>
+        </Link>
         <nav className="nav-stack">
           {area === 'public' ? (
             <>
@@ -1595,10 +1596,10 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
                 <ShieldCheck size={18} />
                 <span>What we never allow</span>
               </a>
-              <a className="nav-item" href="/terms">
+              <Link className="nav-item" href="/terms">
                 <FileCheck2 size={18} />
                 <span>Terms</span>
-              </a>
+              </Link>
             </>
           ) : null}
           {area === 'member' ? (
@@ -1623,10 +1624,10 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
                 <Link2 size={18} />
                 <span>Connections</span>
               </a>
-              <a className="nav-item" href="/account/privacy-settings">
+              <Link className="nav-item" href="/account/privacy-settings">
                 <UserCheck size={18} />
                 <span>Account</span>
-              </a>
+              </Link>
             </>
           ) : null}
           {area === 'admin' ? (
@@ -1653,14 +1654,14 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
         <div className="sidebar-foot">
           {signedIn ? (
             <>
-              {area !== 'member' ? <a href="/dashboard">My business</a> : null}
-              {isStaff && area !== 'admin' ? <a href="/admin">Staff console</a> : null}
+              {area !== 'member' ? <Link href="/dashboard">My business</Link> : null}
+              {isStaff && area !== 'admin' ? <Link href="/admin">Staff console</Link> : null}
               <button type="button" className="sidebar-signout" onClick={clearSession}>
                 Sign out
               </button>
             </>
           ) : (
-            <a href="/dashboard">Sign in</a>
+            <Link href="/dashboard">Sign in</Link>
           )}
         </div>
       </aside>
@@ -1686,9 +1687,9 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
               <a className="primary-button" href="#source-finder">
                 <Search size={16} /> Search businesses
               </a>
-              <a className="secondary-button" href="/onboarding">
+              <Link className="secondary-button" href="/onboarding">
                 List your business
-              </a>
+              </Link>
             </div>
           </header>
         ) : null}
@@ -1708,7 +1709,7 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
           <header className="area-intro">
             <h1>Staff console</h1>
             <p>
-              Your account doesn&apos;t have staff access. <a href="/dashboard">Go to your business</a>.
+              Your account doesn&apos;t have staff access. <Link href="/dashboard">Go to your business</Link>.
             </p>
           </header>
         ) : null}
@@ -2117,7 +2118,7 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
                 {platformAuthError ? <p className="form-error" role="alert">{platformAuthError}</p> : null}
                 {area === 'member' ? (
                   <p className="form-note">
-                    New here? <a href="/onboarding">List your business</a> — the first month is free.
+                    New here? <Link href="/onboarding">List your business</Link> — the first month is free.
                   </p>
                 ) : null}
               </section>
