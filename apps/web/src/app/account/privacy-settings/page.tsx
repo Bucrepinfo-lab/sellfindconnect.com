@@ -30,18 +30,19 @@ function subscribeSession(onStoreChange: () => void) {
   return () => window.removeEventListener("storage", onStoreChange);
 }
 
-function hasTenantSession() {
+function sessionState(): "in" | "out" {
   const session = readTenantSession();
-  return Boolean(session.sessionToken && session.tenantId);
+  return session.sessionToken && session.tenantId ? "in" : "out";
 }
 
 export default function PrivacySettingsPage() {
-  const hasSession = useSyncExternalStore(subscribeSession, hasTenantSession, () => true);
+  const session = useSyncExternalStore(subscribeSession, sessionState, () => "unknown" as const);
+  const hasSession = session === "in";
   const [summary, setSummary] = useState<Summary | null>(null);
   const [exportState, setExportState] = useState<"idle" | "loading" | "queued">("idle");
   const [error, setError] = useState("");
   const [rejected, setRejected] = useState(false);
-  const signedOut = !hasSession || rejected;
+  const signedOut = session === "out" || rejected;
 
   useEffect(() => {
     if (!hasSession) return;
@@ -78,6 +79,16 @@ export default function PrivacySettingsPage() {
       setExportState("idle");
     }
   };
+
+  if (session === "unknown") {
+    return (
+      <div className="sfc-ps">
+        <header className="sfc-ps__header">
+          <h1>Data &amp; Privacy</h1>
+        </header>
+      </div>
+    );
+  }
 
   if (signedOut) {
     return (
