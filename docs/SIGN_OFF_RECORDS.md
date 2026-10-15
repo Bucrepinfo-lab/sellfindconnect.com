@@ -53,10 +53,36 @@ blank.
 Until points 1–3 are resolved, the seeded Kenya profile stays DRAFT and STK
 checkout keeps returning `tax_profile` / `PAYMENT_CHECKOUT_BLOCKED`.
 
-## Legal policy review and sign-off
+## SFC-01 — Legal policy review and sign-off
 
-Received in the same email (09/10/26) as "Legal Policy Review and
-Sign-off.pdf". Not yet reviewed or recorded here: the file was not available
-in the shared Acrobat or Drive locations. Until it is recorded, the public
-Terms, Subscription, Privacy, Prohibited-content and Community pages remain
-"not counsel sign-off".
+| Field | Value |
+| --- | --- |
+| Document ref | SFC-01, prepared 26/09/26 |
+| Received | Email "SELLFINDCONNECT Documents", 09/10/26 |
+| Signed by counsel | Wanjiku Kinyanjui, Advocate of the High Court of Kenya and Commissioner for Oaths (stamped), 09/10/26 |
+| Signed by director | Fredrick Mwangi, 05/10/26 |
+| Decision | "All five policies approved as published" — ticked |
+
+| Policy | Version | Result |
+| --- | --- | --- |
+| Terms of Service | `terms-2026-08-22` | Approve |
+| Subscription terms | `subscription-2026-08-22` | Approve |
+| Privacy Policy | `privacy-2026-06-18` | Approve |
+| Prohibited content | `zero-tolerance-2026-06-18` | Approve |
+| Community standards (Play UGC policy) | `community-2026-08-22` | Approve |
+
+No notes or changes were written against any policy. These versions are now
+the production contract, so no version bump or forced re-acceptance is
+needed. The live pages no longer need the "not counsel sign-off" caveat.
+
+The form listed points for counsel to check (Kenya Data Protection Act and
+ODPC registration, cross-border transfer to Fly.io Frankfurt, Terms §6
+indemnity and §9 disclaimer, Consumer Protection Act refunds, 30-day
+deletion and 7-year billing retention, zero-tolerance reporting). Counsel
+approved without comment. Two remain worth doing as operator housekeeping,
+not as blockers:
+
+- ODPC registration as data controller/processor, if not already done.
+- The Privacy Policy is dated 25/06/26 and does not mention Stripe, Stripe
+  Tax or UGC report/block data. Any future update needs a new version and
+  re-acceptance, and should go back to counsel.
