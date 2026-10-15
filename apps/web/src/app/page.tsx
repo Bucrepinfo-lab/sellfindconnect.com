@@ -75,6 +75,7 @@ import {
   operationalRegions,
   attachApprovedRelationshipClaims,
   applySourceFinderOutcomes,
+  templateMatchExplanation,
   buildOpportunityAlert,
   buildSourceFinderHierarchyReport,
   buildProductAuditRecord,
@@ -384,6 +385,10 @@ export default function Home() {
   const landing = useHomeWorkspaceLanding();
   const [queryDraft, setQuery] = useState<string | undefined>();
   const query = queryDraft ?? landing.query ?? 'fresh produce';
+  // "Why this match?" — one explanation per click, never per page view.
+  const [matchExplanations, setMatchExplanations] = useState<
+    Record<string, { text: string; usedModel: boolean; loading: boolean }>
+  >({});
   const [savedSearchName, setSavedSearchName] = useState('Fresh produce buyers');
   const [savedSearchFrequency, setSavedSearchFrequency] =
     useState<OpportunityAlertFrequency>('DAILY');
@@ -1306,6 +1311,47 @@ export default function Home() {
     });
   };
 
+  const explainMatch = async (result: SourceFinderSearchResult) => {
+    const facts = {
+      query: query.slice(0, 200),
+      name: result.name.slice(0, 160),
+      role: result.role,
+      location: result.location.slice(0, 160),
+      offers: result.offers.slice(0, 20).map((offer) => offer.slice(0, 120)),
+      verified: Boolean(result.verified),
+      reasonCodes: result.reasonCodes.slice(0, 20),
+      reasons: result.reasons.slice(0, 20).map((reason) => reason.slice(0, 240)),
+    };
+    const fallback = { text: templateMatchExplanation(facts), usedModel: false, loading: false };
+    const session = readTenantSession();
+    // Signed out: the free deterministic explanation, no API call.
+    if (!session.sessionToken || !session.tenantId) {
+      setMatchExplanations((prev) => ({ ...prev, [result.id]: fallback }));
+      return;
+    }
+    setMatchExplanations((prev) => ({
+      ...prev,
+      [result.id]: { text: prev[result.id]?.text ?? '', usedModel: false, loading: true },
+    }));
+    try {
+      const response = await fetch(`${publicApiBaseUrl.replace(/\/$/, '')}/source-finder/explain`, {
+        method: 'POST',
+        headers: tenantSessionHeaders(),
+        body: JSON.stringify(facts),
+      });
+      if (!response.ok) throw new Error(String(response.status));
+      const body = (await response.json()) as { explanation?: string; usedModel?: boolean };
+      setMatchExplanations((prev) => ({
+        ...prev,
+        [result.id]: body.explanation
+          ? { text: body.explanation, usedModel: Boolean(body.usedModel), loading: false }
+          : fallback,
+      }));
+    } catch {
+      setMatchExplanations((prev) => ({ ...prev, [result.id]: fallback }));
+    }
+  };
+
   const reportSource = (targetId: string) => {
     if (!termsAccepted) {
       return;
@@ -1858,10 +1904,24 @@ export default function Home() {
                         >
                           <Ban size={14} /> Block
                         </button>
+                        <button
+                          className="link-button"
+                          type="button"
+                          disabled={matchExplanations[result.id]?.loading}
+                          onClick={() => void explainMatch(result)}
+                        >
+                          {matchExplanations[result.id]?.loading ? 'Explaining…' : 'Why this match?'}
+                        </button>
                         <button className="link-button">
                           Open <ChevronRight size={14} />
                         </button>
                       </div>
+                      {matchExplanations[result.id]?.text ? (
+                        <p className="match-explanation" aria-live="polite">
+                          {matchExplanations[result.id]?.text}
+                          {matchExplanations[result.id]?.usedModel ? ' (AI-assisted)' : ''}
+                        </p>
+                      ) : null}
                     </article>
                   );
                 })}
