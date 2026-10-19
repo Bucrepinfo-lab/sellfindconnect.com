@@ -1,5 +1,6 @@
 {
-  "name": "Telpen Adverts (Sell Find Connect)",
+  "name": "Sell Find Connect only (Bucrepinfo-lab/sellfindconnect.com)",
+  "repositoryDependencies": [],
   "install": "npm ci && npm run db:generate && npm run build:domain",
   "terminals": [
     {
