@@ -355,3 +355,13 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   saved; Data safety is a draft imported from `docs/data_safety_export.csv`.
   Remaining: reviewer account and App access, Target audience, phone
   screenshots, `.aab` upload, assetlinks fingerprints, closed test.
+- 2026-10-19: Rebased PR #55 (policy audit fixes from 2026-09-24) onto main.
+  Community standards (`community-2026-08-22`) join the terms gate (migration
+  `20261019120000_add_community_standards_acceptance`, additive, backfills
+  rows on `terms-2026-08-22`). Invoice mobile-money pay rejects a
+  caller-supplied phone and sends STK only to the verified login phone. Owner
+  payouts require current terms and a same-tenant recipient. A missing
+  `x-session-token` returns 401. Legal pages share one `PolicyNav` footer.
+  Server-side Play purchase-token verification (`PAYMENT_PROVIDER=play`) is
+  opt-in and off by default. The PR's placeholder icons, `deploy/twa` and
+  Play listing pack were dropped as superseded by #64/#65.

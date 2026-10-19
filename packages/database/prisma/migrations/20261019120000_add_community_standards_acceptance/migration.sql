@@ -1,4 +1,4 @@
-ALTER TABLE "TermsAcceptanceEvidence" ADD COLUMN "communityStandardsVersion" VARCHAR(80);
+ALTER TABLE "TermsAcceptanceEvidence" ADD COLUMN IF NOT EXISTS "communityStandardsVersion" VARCHAR(80);
 
 UPDATE "TermsAcceptanceEvidence"
 SET "communityStandardsVersion" = 'community-2026-08-22'

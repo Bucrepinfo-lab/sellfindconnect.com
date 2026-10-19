@@ -661,4 +661,5 @@ Progress:
 13. UGC moderator queue — **live** (API + web).
 14. Legal/support policy-acceptance lookup — **live** (API + web).
 15. Forced re-acceptance after material policy version changes — **live**
-    (API + web), including community standards.
+    (API + web). Community standards join the same gate after PR #55 is
+    merged and deployed (API then web).
