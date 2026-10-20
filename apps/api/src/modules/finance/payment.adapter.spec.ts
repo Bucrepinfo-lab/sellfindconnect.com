@@ -89,7 +89,9 @@ describe('payment adapter factory', () => {
       adapter.capture({ ...captureRequest, method: 'WALLET', customerReference: 'play-token-1' }),
     ).resolves.toMatchObject({ provider: 'google-play-billing', status: 'CAPTURED' });
     await expect(
-      adapter.capture({ ...captureRequest, method: 'MOBILE_MONEY', customerReference: '+254700000001' }),
+      Promise.resolve(
+        adapter.capture({ ...captureRequest, method: 'MOBILE_MONEY', customerReference: '+254700000001' }),
+      ),
     ).resolves.toMatchObject({ provider: 'africastalking', status: 'FAILED' });
     expect(urls.every((url) => !url.includes('254700000001'))).toBe(true);
   });
