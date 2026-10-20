@@ -1023,7 +1023,7 @@ export class FinanceService {
       const phone = actor?.userId ? await this.auth?.getVerifiedLoginPhone(actor.userId) : undefined;
       if (!phone) {
         throw new UnprocessableEntityException(
-          'A verified login phone is required for mobile-money checkout.',
+          'Verify your phone number in your profile (sign in once with a phone code) before paying by mobile money.',
         );
       }
       customerReference = phone;

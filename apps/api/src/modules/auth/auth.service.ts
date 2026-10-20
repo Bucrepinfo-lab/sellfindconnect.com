@@ -1127,7 +1127,8 @@ export class AuthService {
   async getVerifiedLoginPhone(userId: string): Promise<string | undefined> {
     const user = await this.repository.findUserById(userId);
     const phone = user?.phone?.trim();
-    return phone || undefined;
+    // Only a phone proven by an OTP login counts; an unverified profile phone never receives STK.
+    return phone && user?.phoneVerifiedAt ? phone : undefined;
   }
 
   async hasCurrentTermsAcceptance(userId: string, tenantId: string): Promise<boolean> {

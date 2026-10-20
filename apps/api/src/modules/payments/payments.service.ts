@@ -58,7 +58,8 @@ export class PaymentsService {
    */
   async requestCheckout(sessionToken: string, input: CheckoutDto): Promise<CheckoutResult> {
     const context = await this.auth.getSession(sessionToken); // throws 401 if invalid
-    const phone = context.user?.phone;
+    // Only an OTP-verified login phone is a payer; an unverified profile phone never gets STK.
+    const phone = context.user?.phoneVerifiedAt ? context.user.phone?.trim() : undefined;
     if (!phone) {
       return { ok: false, reason: 'no_phone' };
     }

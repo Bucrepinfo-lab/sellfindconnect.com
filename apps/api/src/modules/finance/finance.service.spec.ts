@@ -557,7 +557,7 @@ describe('FinanceService', () => {
       };
     };
     const authed = new FinanceService(adapter, {
-      getVerifiedLoginPhone: async () => loginPhone,
+      getVerifiedLoginPhone: async (userId: string) => (userId === 'user-1' ? loginPhone : undefined),
       recordTenantAudit: async () => undefined,
     } as never);
     await authed.configureCountryTaxProfile({
@@ -582,6 +582,16 @@ describe('FinanceService', () => {
       currencyCode: 'KES',
       lines: [{ description: 'Monthly subscription', quantity: 1, unitAmount: 10 }],
     });
+    // No verified login phone: a clear "verify your phone" message, and no provider call.
+    await expect(
+      authed.payInvoice(
+        tenantId,
+        { invoiceId: rebound.id, method: 'MOBILE_MONEY' },
+        { userId: 'user-without-verified-phone' },
+      ),
+    ).rejects.toThrow('Verify your phone number in your profile');
+    expect(captured).toEqual([]);
+
     const pending = await authed.payInvoice(
       tenantId,
       { invoiceId: rebound.id, method: 'MOBILE_MONEY' },

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { AuthService } from '../auth/auth.service';
 import type { FinanceService } from '../finance/finance.service';
@@ -26,7 +26,7 @@ describe('PaymentsService product audit', () => {
       {
         getSession: async () => ({
           session: { userId: 'user-1', tenantId, role: 'OWNER' },
-          user: { phone: '+254700000001' },
+          user: { phone: '+254700000001', phoneVerifiedAt: '2026-10-01T00:00:00.000Z' },
         }),
         hasCurrentTermsAcceptance: async () => true,
         recordTenantAudit: async (record: { action: string; metadata?: Record<string, unknown> }) => {
@@ -87,13 +87,34 @@ describe('PaymentsService product audit', () => {
     });
   });
 
+  it('refuses checkout when the login phone was never verified', async () => {
+    const mobileCheckout = vi.fn();
+    const service = new PaymentsService(
+      {
+        getSession: async () => ({
+          session: { userId: 'user-1', tenantId, role: 'OWNER' },
+          user: { phone: '+254700000001' },
+        }),
+        recordTenantAudit: async () => undefined,
+      } as unknown as AuthService,
+      new InMemoryPaymentsRepository(),
+      { mobileCheckout } as never,
+    );
+
+    await expect(service.requestCheckout('session-token', { amount: 1500 })).resolves.toEqual({
+      ok: false,
+      reason: 'no_phone',
+    });
+    expect(mobileCheckout).not.toHaveBeenCalled();
+  });
+
   it('refuses checkout when the Kenya tax profile is not approved', async () => {
     const audits: Array<{ action: string; metadata?: Record<string, unknown> }> = [];
     const service = new PaymentsService(
       {
         getSession: async () => ({
           session: { userId: 'user-1', tenantId, role: 'OWNER' },
-          user: { phone: '+254700000001' },
+          user: { phone: '+254700000001', phoneVerifiedAt: '2026-10-01T00:00:00.000Z' },
         }),
         recordTenantAudit: async (record: { action: string; metadata?: Record<string, unknown> }) => {
           audits.push(record);
@@ -121,7 +142,7 @@ describe('PaymentsService product audit', () => {
       {
         getSession: async () => ({
           session: { userId: 'user-1', tenantId, role: 'OWNER' },
-          user: { phone: '+254700000001' },
+          user: { phone: '+254700000001', phoneVerifiedAt: '2026-10-01T00:00:00.000Z' },
         }),
         hasCurrentTermsAcceptance: async () => false,
         recordTenantAudit: async (record: { action: string; metadata?: Record<string, unknown> }) => {
@@ -153,7 +174,7 @@ describe('PaymentsService product audit', () => {
       {
         getSession: async () => ({
           session: { userId: 'owner-1', tenantId, role: 'OWNER' },
-          user: { phone: '+254700000001' },
+          user: { phone: '+254700000001', phoneVerifiedAt: '2026-10-01T00:00:00.000Z' },
         }),
         hasCurrentTermsAcceptance: async () => true,
         recordTenantAudit: async () => undefined,

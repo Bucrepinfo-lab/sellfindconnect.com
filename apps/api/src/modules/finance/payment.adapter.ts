@@ -421,6 +421,15 @@ export class GooglePlayBillingPaymentAdapter implements PaymentAdapter {
       return validated;
     }
 
+    if (request.method !== 'WALLET') {
+      // Play only verifies Play purchase tokens. M-Pesa / card never reach Google.
+      return failedCapture(
+        this.provider,
+        validated.currencyCode,
+        `Play Billing verifies WALLET purchase tokens only, not ${request.method}.`,
+      );
+    }
+
     const purchaseToken = request.customerReference?.trim();
     if (!purchaseToken) {
       return failedCapture(
@@ -510,8 +519,10 @@ export class GooglePlayBillingPaymentAdapter implements PaymentAdapter {
 
 /**
  * Method-routed live adapter: CARD/WALLET → Stripe, MOBILE_MONEY → Africa's
- * Talking. Missing rails fail closed per capture instead of falling back to the
- * manual development adapter.
+ * Talking. With `PAYMENT_PROVIDER=play` only, WALLET goes to Play Billing
+ * instead; CARD and MOBILE_MONEY keep their Stripe / Africa's Talking rails.
+ * Missing rails fail closed per capture instead of falling back to the manual
+ * development adapter.
  */
 export class RoutedPaymentAdapter implements PaymentAdapter {
   readonly provider = 'live';
@@ -520,6 +531,7 @@ export class RoutedPaymentAdapter implements PaymentAdapter {
     private readonly rails: {
       card?: PaymentAdapter;
       mobileMoney?: PaymentAdapter;
+      play?: PaymentAdapter;
     },
   ) {}
 
@@ -532,6 +544,9 @@ export class RoutedPaymentAdapter implements PaymentAdapter {
   }
 
   private route(method: PaymentMethod, currencyCode: string): PaymentAdapter {
+    if (method === 'WALLET' && this.rails.play) {
+      return this.rails.play;
+    }
     if (method === 'CARD' || method === 'WALLET') {
       return (
         this.rails.card ??
@@ -561,6 +576,12 @@ export class RoutedPaymentAdapter implements PaymentAdapter {
 
   private adapterForProvider(provider: string, currencyCode: string): PaymentAdapter {
     const normalized = provider.trim().toLowerCase();
+    if (normalized === 'google-play-billing') {
+      return (
+        this.rails.play ??
+        unavailableAdapter('google-play-billing', currencyCode, 'Play Billing rail is not configured.')
+      );
+    }
     if (normalized === 'stripe' || normalized.startsWith('stripe')) {
       return (
         this.rails.card ??
@@ -623,18 +644,24 @@ export function createConfiguredPaymentAdapter(
     case 'play':
     case 'playbilling':
     case 'google_play':
-    case 'googleplay':
-      return new GooglePlayBillingPaymentAdapter(
-        requireReader(config, 'PAYMENT_PROVIDER=play'),
-        fetchImpl,
-      );
+    case 'googleplay': {
+      // Explicit opt-in only. Play verifies WALLET purchase tokens; card and
+      // M-Pesa keep their own rails so enabling Play never blocks them.
+      const reader = requireReader(config, 'PAYMENT_PROVIDER=play');
+      return new RoutedPaymentAdapter({
+        card: optionalConfig(reader, 'STRIPE_SECRET_KEY')
+          ? new StripePaymentAdapter(reader, fetchImpl)
+          : undefined,
+        mobileMoney: africasTalkingPaymentsReady(reader)
+          ? new AfricasTalkingPaymentAdapter(reader, fetchImpl)
+          : undefined,
+        play: new GooglePlayBillingPaymentAdapter(reader, fetchImpl),
+      });
+    }
     case 'live': {
       const reader = requireReader(config, 'PAYMENT_PROVIDER=live');
       const stripeKey = optionalConfig(reader, 'STRIPE_SECRET_KEY');
-      const atReady =
-        Boolean(optionalConfig(reader, 'AT_API_KEY')) &&
-        Boolean(optionalConfig(reader, 'AT_USERNAME')) &&
-        Boolean(optionalConfig(reader, 'AT_PAYMENTS_PRODUCT_NAME'));
+      const atReady = africasTalkingPaymentsReady(reader);
       if (!stripeKey && !atReady) {
         throw new Error(
           'PAYMENT_PROVIDER=live requires STRIPE_SECRET_KEY and/or Africa\'s Talking payment credentials.',
@@ -793,6 +820,14 @@ function africasTalkingError(body: unknown): string | undefined {
   }
   const record = body as { errorMessage?: string; description?: string; status?: string };
   return record.errorMessage ?? record.description ?? record.status;
+}
+
+function africasTalkingPaymentsReady(reader: PaymentAdapterConfigReader): boolean {
+  return (
+    Boolean(optionalConfig(reader, 'AT_API_KEY')) &&
+    Boolean(optionalConfig(reader, 'AT_USERNAME')) &&
+    Boolean(optionalConfig(reader, 'AT_PAYMENTS_PRODUCT_NAME'))
+  );
 }
 
 function mapPlaySubscriptionState(
