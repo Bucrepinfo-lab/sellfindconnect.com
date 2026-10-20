@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   AfricasTalkingPaymentAdapter,
+  GooglePlayBillingPaymentAdapter,
   ManualPaymentAdapter,
   StripePaymentAdapter,
   createConfiguredPaymentAdapter,
@@ -65,6 +66,61 @@ describe('payment adapter factory', () => {
     expect(() =>
       createConfiguredPaymentAdapter(configReader({ PAYMENT_PROVIDER: 'lemon-squeezy' })),
     ).toThrow(/seller of record/);
+    expect(() =>
+      createConfiguredPaymentAdapter(configReader({ PAYMENT_PROVIDER: 'play' })),
+    ).toThrow(/GOOGLE_PLAY_PACKAGE_NAME/);
+  });
+
+  it('routes only WALLET to Play when PAYMENT_PROVIDER=play; M-Pesa keeps its own rail', async () => {
+    const urls: string[] = [];
+    const adapter = createConfiguredPaymentAdapter(
+      configReader({
+        PAYMENT_PROVIDER: 'play',
+        GOOGLE_PLAY_PACKAGE_NAME: 'com.sellfindconnect.app',
+        GOOGLE_PLAY_ACCESS_TOKEN: 'ya29.token',
+      }),
+      jsonFetch((url) => {
+        urls.push(url);
+        return { status: 200, body: { subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE' } };
+      }),
+    );
+
+    await expect(
+      adapter.capture({ ...captureRequest, method: 'WALLET', customerReference: 'play-token-1' }),
+    ).resolves.toMatchObject({ provider: 'google-play-billing', status: 'CAPTURED' });
+    await expect(
+      Promise.resolve(
+        adapter.capture({ ...captureRequest, method: 'MOBILE_MONEY', customerReference: '+254700000001' }),
+      ),
+    ).resolves.toMatchObject({ provider: 'africastalking', status: 'FAILED' });
+    expect(urls.every((url) => !url.includes('254700000001'))).toBe(true);
+  });
+
+  it('keeps Play Billing inert unless PAYMENT_PROVIDER=play', async () => {
+    const urls: string[] = [];
+    const playEnv = {
+      GOOGLE_PLAY_PACKAGE_NAME: 'com.sellfindconnect.app',
+      GOOGLE_PLAY_ACCESS_TOKEN: 'ya29.token',
+    };
+    const fetchSpy = jsonFetch((url) => {
+      urls.push(url);
+      return { status: 200, body: { status: 'PendingConfirmation', transactionId: 'ATPid_1' } };
+    });
+
+    expect(createConfiguredPaymentAdapter(configReader(playEnv), fetchSpy).provider).toBe('manual-development');
+    const live = createConfiguredPaymentAdapter(
+      configReader({
+        ...playEnv,
+        PAYMENT_PROVIDER: 'live',
+        AT_API_KEY: 'at-key',
+        AT_USERNAME: 'sandbox',
+        AT_PAYMENTS_PRODUCT_NAME: 'SFC',
+      }),
+      fetchSpy,
+    );
+    await live.capture({ ...captureRequest, method: 'MOBILE_MONEY', customerReference: '+254700000001' });
+    await live.capture({ ...captureRequest, method: 'WALLET', customerReference: 'play-token-1' });
+    expect(urls.some((url) => url.includes('androidpublisher'))).toBe(false);
   });
 
   it('selects Stripe, Africa\'s Talking, and method-routed live adapters', () => {
@@ -237,5 +293,97 @@ describe('AfricasTalkingPaymentAdapter', () => {
       status: 'REQUIRES_CAPTURE',
       capturedAmount: 0,
     });
+  });
+});
+
+describe('GooglePlayBillingPaymentAdapter', () => {
+  const playConfig = {
+    GOOGLE_PLAY_PACKAGE_NAME: 'com.sellfindconnect.app',
+    GOOGLE_PLAY_ACCESS_TOKEN: 'ya29.token',
+  };
+
+  it('verifies an active subscription token as CAPTURED and acknowledges it', async () => {
+    const calls: Array<{ url: string; method?: string }> = [];
+    const adapter = new GooglePlayBillingPaymentAdapter(
+      configReader(playConfig),
+      jsonFetch((url, init) => {
+        calls.push({ url, method: init?.method });
+        expect(init?.headers).toMatchObject({ authorization: 'Bearer ya29.token' });
+        if (url.endsWith(':acknowledge')) {
+          return { status: 200, body: {} };
+        }
+        expect(url).toContain('/purchases/subscriptionsv2/tokens/play-token-123');
+        return {
+          status: 200,
+          body: {
+            subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE',
+            acknowledgementState: 'ACKNOWLEDGEMENT_STATE_PENDING',
+            latestOrderId: 'GPA.1234',
+          },
+        };
+      }),
+    );
+
+    await expect(
+      adapter.capture({
+        ...captureRequest,
+        method: 'WALLET',
+        customerReference: 'play-token-123',
+      }),
+    ).resolves.toMatchObject({
+      provider: 'google-play-billing',
+      providerPaymentId: 'GPA.1234',
+      status: 'CAPTURED',
+      capturedAmount: 11.3793,
+      currencyCode: 'KES',
+    });
+    expect(calls.some((c) => c.method === 'POST' && c.url.endsWith(':acknowledge'))).toBe(true);
+  });
+
+  it('fails closed on an inactive subscription state', async () => {
+    const adapter = new GooglePlayBillingPaymentAdapter(
+      configReader(playConfig),
+      jsonFetch(() => ({
+        status: 200,
+        body: { subscriptionState: 'SUBSCRIPTION_STATE_EXPIRED' },
+      })),
+    );
+
+    await expect(
+      adapter.capture({ ...captureRequest, method: 'WALLET', customerReference: 'expired-token' }),
+    ).resolves.toMatchObject({ status: 'FAILED', capturedAmount: 0 });
+  });
+
+  it('requires a purchaseToken in customerReference', async () => {
+    const adapter = new GooglePlayBillingPaymentAdapter(
+      configReader(playConfig),
+      jsonFetch(() => ({ status: 200, body: {} })),
+    );
+
+    await expect(
+      adapter.capture({ ...captureRequest, method: 'WALLET', customerReference: '' }),
+    ).resolves.toMatchObject({ status: 'FAILED', failureReason: /purchaseToken/ });
+  });
+
+  it('never sends a non-WALLET capture to Google', async () => {
+    const fetchImpl = vi.fn();
+    const adapter = new GooglePlayBillingPaymentAdapter(configReader(playConfig), fetchImpl as never);
+
+    await expect(
+      adapter.capture({ ...captureRequest, method: 'MOBILE_MONEY', customerReference: '+254700000001' }),
+    ).resolves.toMatchObject({ status: 'FAILED', capturedAmount: 0 });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('fails closed on refunds (Play refunds go through the Play flow)', () => {
+    const adapter = new GooglePlayBillingPaymentAdapter(configReader(playConfig));
+    expect(
+      adapter.refund({
+        provider: 'google-play-billing',
+        providerPaymentId: 'GPA.1234',
+        amount: 10,
+        currencyCode: 'KES',
+      }),
+    ).toMatchObject({ status: 'FAILED', refundedAmount: 0 });
   });
 });

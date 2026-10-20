@@ -1548,6 +1548,31 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
     }
   };
 
+  // A returning member (session restored from storage) must see the live terms gate, so stale
+  // acceptances get the Re-accept prompt here instead of a bare 422 on publish/chat/checkout.
+  const storedSessionToken = showMember ? (storedSession?.token ?? '') : '';
+  useEffect(() => {
+    if (!storedSessionToken) {
+      return;
+    }
+    let cancelled = false;
+    fetch(`${publicApiBaseUrl.replace(/\/$/, '')}/auth/session`, {
+      headers: { 'x-session-token': storedSessionToken },
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: { termsGate?: TermsAcceptanceGate } | null) => {
+        if (cancelled || !payload?.termsGate) {
+          return;
+        }
+        setLiveTermsGate(payload.termsGate);
+        setTermsAccepted(payload.termsGate.current);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [storedSessionToken]);
+
   const resolveModeratorReport = async (reportId: string, resolution: UgcReportResolution) => {
     if (moderatorQueueStatus === 'LIVE') {
       const sessionToken = platformSessionToken.trim();
