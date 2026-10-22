@@ -564,7 +564,9 @@ Progress:
   the digital SaaS subscription, STK only to the login phone, no `READ_SMS` /
   `READ_CALL_LOG`, public `/privacy` plus signed-in `/account/delete`.
 - Privacy API is mounted at `/v1/privacy` behind the tenant session guard.
-  Durable erase-after-grace-period remains before a Play listing.
+  The grace-period worker erases due accounts. The server Play Billing
+  adapter verifies a purchase token (`PAYMENT_PROVIDER=play`). The Android
+  client that starts the purchase is still required before any Play listing.
 
 ## Epic 10: Legal Terms and Policy Operations
 
@@ -597,7 +599,8 @@ Progress:
   approved.
 - Published public `/terms` and `/subscription` pages at the active policy
   versions (`terms-2026-08-22`, `subscription-2026-08-22`). Privacy CSS is
-  imported on those legal pages. This is not a counsel sign-off.
+  imported on those legal pages. Counsel signed off all five policies on
+  09/10/26 (SFC-01, see `docs/SIGN_OFF_RECORDS.md`).
 - Published public `/prohibited` from `prohibitedCategorySummaries` and
   redirected `/dashboard`, `/dashboard/adverts/new`, and `/dashboard/discover`
   into the home workspace so onboarding no longer 404s.
@@ -629,6 +632,10 @@ Progress:
   publish, chat, inquiry, UGC report/block, relationship claims, and checkout.
   `POST /v1/auth/terms/accept` writes a new `REACCEPTANCE` evidence row after
   MFA. Home Terms Gate can re-accept with the session token.
+- Community standards (`community-2026-08-22`) are part of the same gate.
+  A stale or missing `communityStandardsVersion` locks the same actions.
+  Rows that already accepted `terms-2026-08-22` are backfilled to that
+  community version because those terms incorporate the standards.
 
 ## Immediate Sprint
 
@@ -653,5 +660,6 @@ Progress:
     **live** (API + web).
 13. UGC moderator queue — **live** (API + web).
 14. Legal/support policy-acceptance lookup — **live** (API + web).
-15. Forced re-acceptance after material policy version changes — after merge,
-    API then web.
+15. Forced re-acceptance after material policy version changes — **live**
+    (API + web). Community standards join the same gate after PR #55 is
+    merged and deployed (API then web).

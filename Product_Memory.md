@@ -1,7 +1,7 @@
 # Telpen Adverts Product Memory
 
 Date started: 2026-06-15
-Last updated: 2026-08-24
+Last updated: 2026-10-15
 Purpose: Persistent decision log and strategic memory for the Telpen Adverts multi-tenant advertising SaaS.
 
 This file must be updated whenever product strategy, pricing, compliance, architecture, market positioning, or execution decisions change.
@@ -76,9 +76,13 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - Recommended market domain portfolio: buy `SellFindConnect.com` first; also buy `SellFindConnect.app`, `FindSellConnect.com`, and `FindSellConnect.app` as defensive/app companions if budget allows. Campaign line: "Sell it. Find it. Connect."
 - SEO/growth direction: position Sell Find Connect around supplier finder, buyer-seller connection, business advertising app, source finder, local business directory, B2B marketplace, and country/industry business matching. Growth should combine organic SEO, country/industry landing pages, app-store optimization, social video demos, partnerships, referrals, opportunity digests, and safety/trust positioning.
 - GitHub repository: use `https://github.com/Bucrepinfo-lab/sellfindconnect.com.git` as the source repository for the Sell Find Connect codebase and future production deployments after the final platform decision.
-- Owner portfolio (five products, five Desktop folders). This cloud agent
-  only mounts `sellfindconnect.com`. The owner's Windows Desktop is not
-  visible here. Folder names as given on 2026-08-21:
+- Owner portfolio (five products, five Desktop folders). This Cloud Agent
+  environment mounts only `github.com/Bucrepinfo-lab/sellfindconnect.com`.
+  `.cursor/environment.json` sets `repositoryDependencies` to an empty list.
+  Telpen Edu and its Play Store conversation stay in their previous separate
+  session and environment. Do not clone that project or continue that session
+  from here. The owner's Windows Desktop is not visible here. Folder names as
+  given on 2026-08-21:
 
   | Product | Desktop folder | GitHub today |
   | --- | --- | --- |
@@ -109,6 +113,8 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 
 ## Decision Log
 
+- 2026-10-13: Added a manual `Deploy API (Fly.io)` GitHub workflow (workflow_dispatch only) running the runbook command `fly deploy --config fly.api.toml --remote-only` with a FLY_API_TOKEN deploy token and a post-deploy /v1/health check. Production deploys stay a deliberate human action; this replaces running flyctl from a laptop.
+- 2026-10-13: Added opt-in AI match explanations to Source Finder (`POST source-finder/explain`). Provider-neutral like the embeddings/payment/tax adapters: the default build returns the deterministic template built from the matcher's own reason codes (zero cost, no key); the Anthropic overlay (`MATCH_EXPLANATION_PROVIDER=anthropic`, cheapest tier `claude-haiku-5-5`) is opt-in, fails closed without a key, re-screens every model output through the zero-tolerance safety core, and falls back to the template on any failure. Cost is incurred only when a searcher asks for an explanation.
 - 2026-06-15: Created PRD for multi-tenant advertising SaaS with web and downloadable mobile app requirements.
 - 2026-06-15: Locked local pricing rule: first month free, then 10 units of each subscriber country's local currency per month.
 - 2026-06-15: Added zero-tolerance blocked categories covering weapons, pornography, human trafficking/human trade, child exploitation, illegal drugs, violent extremism, hate/threats, graphic violence/self-harm encouragement, criminal services, counterfeit/stolen goods, and illegal wildlife trafficking.
@@ -273,7 +279,7 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - 2026-08-22: Published public Terms of Service and subscription terms at
   `/terms` and `/subscription`, versions `terms-2026-08-22` and
   `subscription-2026-08-22`. Existing tenants must re-accept before gated
-  actions. This is not counsel sign-off. A web deploy is required before the
+  actions. Counsel signed off on 09/10/26 (SFC-01). A web deploy is required before the
   live URLs leave 404.
 - 2026-08-22: Published public prohibited-content policy at `/prohibited`
   from the shared zero-tolerance summaries, and redirected `/dashboard`
@@ -287,8 +293,8 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - 2026-08-22: Published public community standards at `/community`
   (`community-2026-08-22`) from shared domain summaries. The page is the
   Play UGC user policy: report/block, harassment, not-for-children, and
-  sexual content fully prohibited (not incidental). This is not a counsel
-  sign-off. Live `/community` is HTTP 200.
+  sexual content fully prohibited (not incidental). Counsel signed off on
+  09/10/26 (SFC-01). Live `/community` is HTTP 200.
 - 2026-08-22: Added UGC report and block. Tenants can report or block a
   Source Finder target after terms acceptance. Blocked ids leave that
   tenant’s results. `POST /v1/ugc/reports` and `POST /v1/ugc/blocks` persist
@@ -315,3 +321,47 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   (`reason: terms`). `POST /v1/auth/terms/accept` writes `REACCEPTANCE`
   evidence after MFA and records `TERMS_REACCEPTED` without emails. Home Terms
   Gate can re-accept with the session token. API then web deploy.
+- 2026-09-24: Locked this Cloud Agent environment to
+  `github.com/Bucrepinfo-lab/sellfindconnect.com` only. Empty
+  `repositoryDependencies` in `.cursor/environment.json`. Telpen Edu remains
+  in its previous separate session and environment.
+- 2026-10-15: Recorded signed SFC-02 (Kenya tax profile approval) in
+  `docs/SIGN_OFF_RECORDS.md`: director signed 05/10/26, tax agent 07/10/26,
+  production approval ticked. Kenya profile stays DRAFT and `approvedBy`
+  unset until the agent resolves the resident-vs-non-resident contradiction
+  (eTIMS and SEP rows) and the blank KRA PIN and `approvedBy` fields. The
+  legal policy sign-off PDF arrived in the same email but is not yet
+  recorded, so the policy pages remain "not counsel sign-off".
+- 2026-10-15: Recorded signed SFC-01 (legal policy review) in
+  `docs/SIGN_OFF_RECORDS.md`. Counsel (Advocate of the High Court of Kenya)
+  signed 09/10/26 and the director 05/10/26: all five policies approved as
+  published at their current versions, no changes requested. They are now
+  the production contract; no version bump or re-acceptance needed. Removed
+  the "not a counsel sign-off" line from `/community` (web deploy).
+- 2026-10-15: Started the Google Play listing (Android TWA,
+  `com.sellfindconnect.app`, built with PWABuilder). Added public sign-up
+  (Create a business account), PWA icons and manifest, an offline service
+  worker, env-driven `/.well-known/assetlinks.json`
+  (`ANDROID_CERT_FINGERPRINTS`), a Play reviewer MFA code for one non-staff
+  account (`PLAY_REVIEW_EMAIL` / `PLAY_REVIEW_MFA_CODE`), and a fuller public
+  deletion page. The web image now ships `apps/web/public` (icons and
+  `onboarding.css` were 404). Live sign-in still needs `RESEND_API_KEY` and
+  `EMAIL_FROM` on the API: without them no MFA code is delivered. Paste packs:
+  `docs/PLAY-STORE-LISTING.md`, `docs/PLAY-APP-CONTENT-REVIEW.md`.
+- 2026-10-15: Built the Android package with PWABuilder
+  (`com.sellfindconnect.app`, notifications/location/Play Billing off; the
+  owner holds the signing key) and created the app in Play Console (id
+  4974683027202673741). Most App content cards and the store listing are
+  saved; Data safety is a draft imported from `docs/data_safety_export.csv`.
+  Remaining: reviewer account and App access, Target audience, phone
+  screenshots, `.aab` upload, assetlinks fingerprints, closed test.
+- 2026-10-19: Rebased PR #55 (policy audit fixes from 2026-09-24) onto main.
+  Community standards (`community-2026-08-22`) join the terms gate (migration
+  `20261019120000_add_community_standards_acceptance`, additive, backfills
+  rows on `terms-2026-08-22`). Invoice mobile-money pay rejects a
+  caller-supplied phone and sends STK only to the verified login phone. Owner
+  payouts require current terms and a same-tenant recipient. A missing
+  `x-session-token` returns 401. Legal pages share one `PolicyNav` footer.
+  Server-side Play purchase-token verification (`PAYMENT_PROVIDER=play`) is
+  opt-in and off by default. The PR's placeholder icons, `deploy/twa` and
+  Play listing pack were dropped as superseded by #64/#65.

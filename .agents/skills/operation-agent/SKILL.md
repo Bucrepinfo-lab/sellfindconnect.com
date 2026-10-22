@@ -14,6 +14,14 @@ it shipped. Steps 3–5 of the delivery loop (build → harness subagents → de
 - Refactoring, dependency upgrades, or platform hardening.
 - Preparing and executing a commit + push, or a deployment.
 
+## Environment scope
+This Cloud Agent environment mounts only
+`github.com/Bucrepinfo-lab/sellfindconnect.com`.
+`.cursor/environment.json` keeps `repositoryDependencies` empty so no other
+repository is added to the GitHub token. Telpen Edu, including its Play Store
+listing conversation, stays in its previous separate session and environment.
+Do not clone it, add it here, or continue that session from this environment.
+
 ## Repository map (npm workspaces monorepo)
 - `apps/web` — Next.js 16 / React 19 web + PWA.
 - `apps/api` — NestJS API (modules: auth, profiles, adverts, source-finder,

@@ -1,4 +1,4 @@
-import { UnprocessableEntityException } from '@nestjs/common';
+import { UnauthorizedException, UnprocessableEntityException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 
 import { InMemoryAuthRepository } from './in-memory-auth.repository';
@@ -113,6 +113,11 @@ describe('AuthService', () => {
     });
 
     // Normalises to E.164 and issues a code for the existing account.
+    const userId = (await service.login({ email: 'owner@example.com', password: strongPassword }))
+      .user.id;
+    // A profile phone that was never proven by an OTP is not a mobile-money payer.
+    await expect(service.getVerifiedLoginPhone(userId)).resolves.toBeUndefined();
+
     const requested = await service.requestPhoneOtp({ phone: '+254 712 345 678' });
     expect(requested.requested).toBe(true);
     expect(requested.developmentCode).toMatch(/^\d{6}$/);
@@ -123,6 +128,7 @@ describe('AuthService', () => {
     });
     expect(verified.session.token).toEqual(expect.any(String));
     expect(verified.user.phoneVerifiedAt).toBeTruthy();
+    await expect(service.getVerifiedLoginPhone(userId)).resolves.toBe('+254712345678');
 
     // The code is single-use.
     await expect(
@@ -137,6 +143,18 @@ describe('AuthService', () => {
     expect(requested.developmentCode).toBeUndefined();
 
     await expect(service.verifyPhoneOtp({ phone: '0700000000', code: '000000' })).rejects.toThrow();
+  });
+
+  it('rejects a missing or empty session token with 401 instead of crashing', async () => {
+    const service = new AuthService();
+
+    await expect(service.getSession(undefined as unknown as string)).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+    await expect(service.getSession('')).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(service.getSession('no-such-session')).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
   });
 
   it('stores sessions by token hash and never presents the hash to callers', async () => {
@@ -243,6 +261,44 @@ describe('AuthService', () => {
     });
 
     expect(result.session.mfaVerified).toBe(true);
+  });
+
+  it('accepts the Play review code only for the designated non-staff account', async () => {
+    const previous = { email: process.env.PLAY_REVIEW_EMAIL, code: process.env.PLAY_REVIEW_MFA_CODE };
+    process.env.PLAY_REVIEW_EMAIL = 'play-review@example.com';
+    process.env.PLAY_REVIEW_MFA_CODE = '482913';
+    try {
+      const service = new AuthService(new InMemoryAuthRepository());
+      const register = (email: string) =>
+        service.registerTenantOwner({
+          email,
+          password: strongPassword,
+          displayName: 'Play Reviewer',
+          tenantDisplayName: 'Review Traders',
+          countryCode: 'KE',
+          industryCode: 'AGRICULTURE',
+          primaryRole: 'SUPPLIER',
+          userType: 'ADVERTISER',
+          acceptedTerms: true,
+        });
+
+      const reviewer = await register('Play-Review@example.com');
+      const verified = await service.verifyMfa({
+        sessionToken: reviewer.session.token,
+        code: '482913',
+      });
+      expect(verified.session.mfaVerified).toBe(true);
+
+      const other = await register('owner2@example.com');
+      await expect(
+        service.verifyMfa({ sessionToken: other.session.token, code: '482913' }),
+      ).rejects.toThrow('Invalid MFA code.');
+    } finally {
+      process.env.PLAY_REVIEW_EMAIL = previous.email;
+      process.env.PLAY_REVIEW_MFA_CODE = previous.code;
+      if (previous.email === undefined) delete process.env.PLAY_REVIEW_EMAIL;
+      if (previous.code === undefined) delete process.env.PLAY_REVIEW_MFA_CODE;
+    }
   });
 
   it('records owner auth events in tenant audit logs', async () => {
@@ -767,6 +823,50 @@ describe('AuthService', () => {
     const audit = await service.listAuditLogsForTenant(registered.tenant.id);
     expect(audit.auditLogs.map((record) => record.action)).toContain('TERMS_REACCEPTED');
     expect(JSON.stringify(audit.auditLogs)).not.toContain('owner@example.com');
+  });
+
+  it('prompts (not 401) for re-acceptance when a pre-community acceptance is loaded', async () => {
+    const repository = new InMemoryAuthRepository();
+    const service = new AuthService(repository);
+    const registered = await service.registerTenantOwner({
+      email: 'owner@example.com',
+      password: strongPassword,
+      displayName: 'Mary Owner',
+      tenantDisplayName: 'Nairobi Fresh Produce Cooperative',
+      countryCode: 'KE',
+      industryCode: 'AGRICULTURE',
+      primaryRole: 'SUPPLIER',
+      userType: 'ADVERTISER',
+      acceptedTerms: true,
+    });
+    await service.verifyMfa({
+      sessionToken: registered.session.token,
+      code: registered.session.mfaChallenge?.developmentCode ?? '',
+    });
+
+    // A row accepted before community standards existed (the migration backfill skips it).
+    const current = await repository.findTermsAcceptance(registered.user.id, registered.tenant.id);
+    current!.acceptedAt = new Date(Date.now() - 2000).toISOString();
+    repository.createTermsAcceptance({
+      ...current!,
+      termsVersion: 'terms-2026-06-18',
+      communityStandardsVersion: undefined as unknown as string,
+      acceptedAt: new Date(Date.now() - 1000).toISOString(),
+    });
+
+    const stale = await service.getSession(registered.session.token);
+    expect(stale.termsGate.requiresReacceptance).toBe(true);
+    expect(stale.termsGate.stalePolicies).toEqual(['terms', 'community']);
+
+    const accepted = await service.acceptCurrentTerms({
+      sessionToken: registered.session.token,
+      acceptedTerms: true,
+    });
+    expect(accepted.termsGate.current).toBe(true);
+    expect(accepted.termsAcceptance.communityStandardsVersion).toBe('community-2026-08-22');
+    expect(await service.hasCurrentTermsAcceptance(registered.user.id, registered.tenant.id)).toBe(
+      true,
+    );
   });
 
   it('keeps development tokens when no live auth email sender is configured', async () => {

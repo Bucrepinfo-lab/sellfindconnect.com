@@ -379,6 +379,7 @@ model TermsAcceptanceEvidence {
   privacyVersion           String   @db.VarChar(80)
   prohibitedContentVersion String   @db.VarChar(80)
   subscriptionTermsVersion String   @db.VarChar(80)
+  communityStandardsVersion String? @db.VarChar(80)
   appSurface               String   @db.VarChar(40)
   acceptanceSource         String   @db.VarChar(80)
   acceptedAt               DateTime

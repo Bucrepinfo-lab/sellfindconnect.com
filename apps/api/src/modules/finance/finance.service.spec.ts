@@ -498,6 +498,18 @@ describe('FinanceService', () => {
     expect(await service.listPaymentReceipts(tenantId)).toHaveLength(1);
   });
 
+  it('rejects a payer phone before looking up the invoice', async () => {
+    const service = new FinanceService();
+
+    await expect(
+      service.payInvoice(tenantId, {
+        invoiceId: 'missing-invoice',
+        method: 'MOBILE_MONEY',
+        customerReference: '+254712345678',
+      }),
+    ).rejects.toThrow('Do not send a phone number');
+  });
+
   it('keeps pending provider captures unpaid until settlement', async () => {
     const adapter: PaymentAdapter = {
       provider: 'africastalking',
@@ -524,26 +536,82 @@ describe('FinanceService', () => {
       lines: [{ description: 'Monthly subscription', quantity: 1, unitAmount: 10 }],
     });
 
-    const pending = await service.payInvoice(tenantId, {
-      invoiceId: invoice.id,
-      method: 'MOBILE_MONEY',
-      customerReference: '+254712345678',
+    await expect(
+      service.payInvoice(tenantId, {
+        invoiceId: invoice.id,
+        method: 'MOBILE_MONEY',
+        customerReference: '+254712345678',
+      }),
+    ).rejects.toThrow('Do not send a phone number');
+
+    const loginPhone = '+254700000001';
+    const captured: string[] = [];
+    adapter.capture = async (request) => {
+      captured.push(request.customerReference ?? '');
+      return {
+        provider: 'africastalking',
+        providerPaymentId: 'ATX123',
+        status: 'REQUIRES_CAPTURE',
+        capturedAmount: 0,
+        currencyCode: 'KES',
+      };
+    };
+    const authed = new FinanceService(adapter, {
+      getVerifiedLoginPhone: async (userId: string) => (userId === 'user-1' ? loginPhone : undefined),
+      recordTenantAudit: async () => undefined,
+    } as never);
+    await authed.configureCountryTaxProfile({
+      countryCode: 'KE',
+      taxAuthorityName: 'Pilot Tax Authority',
+      taxRegistrationStatus: 'REGISTERED',
+      localFinanceOwner: 'Country Finance Admin',
+      filingFrequency: 'MONTHLY',
+      recordRetentionYears: 7,
+      taxInclusivePricing: true,
+      approvedBy: 'global-finance-admin',
     });
+    await authed.createTaxRule({
+      countryCode: 'KE',
+      taxType: 'VAT',
+      taxRate: 0.16,
+      productTaxCode: 'SFC_SUBSCRIPTION',
+      effectiveFrom: '2026-01-01T00:00:00.000Z',
+    });
+    const rebound = await authed.issueInvoice(tenantId, {
+      countryCode: 'KE',
+      currencyCode: 'KES',
+      lines: [{ description: 'Monthly subscription', quantity: 1, unitAmount: 10 }],
+    });
+    // No verified login phone: a clear "verify your phone" message, and no provider call.
+    await expect(
+      authed.payInvoice(
+        tenantId,
+        { invoiceId: rebound.id, method: 'MOBILE_MONEY' },
+        { userId: 'user-without-verified-phone' },
+      ),
+    ).rejects.toThrow('Verify your phone number in your profile');
+    expect(captured).toEqual([]);
+
+    const pending = await authed.payInvoice(
+      tenantId,
+      { invoiceId: rebound.id, method: 'MOBILE_MONEY' },
+      { userId: 'user-1' },
+    );
+    expect(captured).toEqual([loginPhone]);
 
     expect(pending.payment.status).toBe('REQUIRES_CAPTURE');
     expect(pending.invoice.status).toBe('ISSUED');
     expect(pending.receipt).toBeNull();
 
     await expect(
-      service.payInvoice(tenantId, {
-        invoiceId: invoice.id,
-        method: 'MOBILE_MONEY',
-        customerReference: '+254712345678',
-        idempotencyKey: 'second-attempt',
-      }),
+      authed.payInvoice(
+        tenantId,
+        { invoiceId: rebound.id, method: 'MOBILE_MONEY', idempotencyKey: 'second-attempt' },
+        { userId: 'user-1' },
+      ),
     ).rejects.toThrow('Invoice already has a pending provider capture.');
 
-    const settled = await service.settleProviderCapture(tenantId, {
+    const settled = await authed.settleProviderCapture(tenantId, {
       providerPaymentId: 'ATX123',
       status: 'CAPTURED',
     });
@@ -551,14 +619,14 @@ describe('FinanceService', () => {
     expect(settled.idempotentReplay).toBe(false);
     expect(settled.payment.status).toBe('CAPTURED');
     expect(settled.invoice.status).toBe('PAID');
-    expect(settled.receipt?.amount).toBe(invoice.total);
+    expect(settled.receipt?.amount).toBe(rebound.total);
 
-    const replay = await service.settleProviderCapture(tenantId, {
+    const replay = await authed.settleProviderCapture(tenantId, {
       providerPaymentId: 'ATX123',
       status: 'CAPTURED',
     });
     expect(replay.idempotentReplay).toBe(true);
-    expect(await service.listPaymentReceipts(tenantId)).toHaveLength(1);
+    expect(await authed.listPaymentReceipts(tenantId)).toHaveLength(1);
   });
 
   it('is idempotent when paying with the same idempotency key', async () => {
@@ -571,12 +639,12 @@ describe('FinanceService', () => {
 
     const first = await service.payInvoice(tenantId, {
       invoiceId: invoice.id,
-      method: 'MOBILE_MONEY',
+      method: 'CARD',
       idempotencyKey: 'idem-001',
     });
     const replay = await service.payInvoice(tenantId, {
       invoiceId: invoice.id,
-      method: 'MOBILE_MONEY',
+      method: 'CARD',
       idempotencyKey: 'idem-001',
     });
 

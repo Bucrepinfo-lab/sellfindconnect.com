@@ -23,7 +23,7 @@ export type PayoutResult =
   | { ok: true; txnId: string }
   | {
       ok: false;
-      reason: 'forbidden' | 'invalid_amount' | 'no_phone' | 'provider_error';
+      reason: 'forbidden' | 'invalid_amount' | 'no_phone' | 'provider_error' | 'terms';
       txnId?: string;
     };
 
@@ -58,7 +58,8 @@ export class PaymentsService {
    */
   async requestCheckout(sessionToken: string, input: CheckoutDto): Promise<CheckoutResult> {
     const context = await this.auth.getSession(sessionToken); // throws 401 if invalid
-    const phone = context.user?.phone;
+    // Only an OTP-verified login phone is a payer; an unverified profile phone never gets STK.
+    const phone = context.user?.phoneVerifiedAt ? context.user.phone?.trim() : undefined;
     if (!phone) {
       return { ok: false, reason: 'no_phone' };
     }
@@ -158,8 +159,21 @@ export class PaymentsService {
     if (!isValidPaymentAmount(input.amount)) {
       return { ok: false, reason: 'invalid_amount' };
     }
+    if (!(await this.auth.hasCurrentTermsAcceptance(context.session.userId, context.session.tenantId))) {
+      return { ok: false, reason: 'terms' };
+    }
+    if (!this.authRepository) {
+      return { ok: false, reason: 'forbidden' };
+    }
+    const membership = await this.authRepository.findMembershipForUserAndTenant(
+      input.toUserId,
+      context.session.tenantId,
+    );
+    if (!membership) {
+      return { ok: false, reason: 'forbidden' };
+    }
 
-    const recipient = await this.authRepository?.findUserById(input.toUserId);
+    const recipient = await this.authRepository.findUserById(input.toUserId);
     if (!recipient?.phone) {
       return { ok: false, reason: 'no_phone' };
     }

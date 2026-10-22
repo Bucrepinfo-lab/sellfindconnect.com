@@ -1096,3 +1096,272 @@ textarea {
     display: grid;
   }
 }
+
+.match-explanation {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.04);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+/* ── Role areas: public home, business dashboard, staff console ───────────── */
+:root {
+  --maize: #c99a2e;
+  --font-display: ui-sans-serif;
+}
+
+h1,
+h2 {
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+}
+
+a.nav-item,
+a.brand-mark {
+  color: inherit;
+  text-decoration: none;
+}
+
+a.nav-item {
+  color: #cbd8d3;
+}
+
+a.nav-item:focus-visible,
+.sidebar-foot a:focus-visible,
+.sidebar-signout:focus-visible,
+.hero-actions a:focus-visible {
+  outline: 2px solid var(--maize);
+  outline-offset: 2px;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-foot {
+  margin-top: auto;
+  padding: 16px 10px 4px;
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid #263431;
+  font-size: 14px;
+}
+
+.sidebar-foot a {
+  color: #f4f8f5;
+  text-decoration: none;
+}
+
+.sidebar-signout {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #9fb3ad;
+  text-decoration: underline;
+}
+
+/* Public hero — the supply chain is the one memorable element. */
+.public-hero {
+  max-width: 760px;
+  padding: 28px 0 30px;
+}
+
+.hero-kicker {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.public-hero h1 {
+  margin: 0;
+  font-size: clamp(30px, 4.4vw, 48px);
+  line-height: 1.08;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+
+.hero-lede {
+  max-width: 62ch;
+  margin: 16px 0 0;
+  font-size: 17px;
+  line-height: 1.6;
+  color: #3b4546;
+}
+
+.chain {
+  list-style: none;
+  margin: 26px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: 10px;
+}
+
+.chain li {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--green);
+}
+
+.chain li::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  margin-right: 8px;
+  border-radius: 50%;
+  border: 2px solid var(--maize);
+  background: var(--canvas);
+}
+
+.chain li:not(:last-child)::after {
+  content: '';
+  width: 28px;
+  height: 2px;
+  margin: 0 8px;
+  background: var(--maize);
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 28px;
+}
+
+.hero-actions a {
+  text-decoration: none;
+}
+
+/* Signed-out and staff headers for /dashboard and /admin */
+.area-intro {
+  max-width: 680px;
+  padding: 22px 0 18px;
+}
+
+.area-intro h1 {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.15;
+}
+
+.area-intro p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.sign-in-panel {
+  border-color: var(--green);
+}
+
+.form-error {
+  margin: 10px 0 0;
+  color: var(--red);
+  font-size: 14px;
+}
+
+.form-note {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* Staff console: no finder, panels tile across the full width. */
+.work-grid.area-admin {
+  grid-template-columns: 1fr;
+}
+
+.work-grid.area-admin .right-rail {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  align-items: start;
+}
+
+@media (max-width: 760px) {
+  .public-hero {
+    padding: 18px 0 22px;
+  }
+
+  .hero-lede {
+    font-size: 16px;
+  }
+
+  .work-grid.area-admin .right-rail {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    flex-direction: row;
+  }
+
+  .sidebar-foot {
+    margin-top: 0;
+    margin-left: auto;
+    border-top: 0;
+    padding: 0 4px;
+    display: flex;
+    white-space: nowrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* Sign-up form in the member sign-in panel. */
+.text-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--green);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.sign-up-form .field select {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+  color: var(--ink);
+  padding: 0 8px;
+}
+
+.check-field {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: start;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.check-field input {
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  accent-color: var(--green);
+}
+
+.check-field a {
+  color: var(--green);
+}
+
+.sign-up-form .terms-actions {
+  flex-wrap: wrap;
+}
