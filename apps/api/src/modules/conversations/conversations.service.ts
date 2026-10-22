@@ -1,0 +1,1002 @@
+import {
+  Inject,
+  Injectable,
+  NotFoundException,
+  Optional,
+  UnprocessableEntityException,
+} from '@nestjs/common';
+import {
+  ConversationReceiptError,
+  assertConversationAttachmentsSendable,
+  buildLeadConversionIntelligence,
+  buildSavedReplySuggestions,
+  calculateConversationSlaDecision,
+  countUnreadMessagesForRole,
+  evaluateMediaAssetInput,
+  evaluateMediaUploadPreparationInput,
+  evaluateSafetyFields,
+  evaluateSafetyText,
+  isConversationTypingActive,
+  isSameConversationSide,
+  markMessageDelivered,
+  markMessageRead,
+  mediaPolicy,
+  presentTenantMediaAsset,
+  presentTenantMediaAssets,
+  ConversationRealtimeError,
+  pilotSourceFinderRecords,
+  recordConversationTyping,
+  searchSourceFinderRecords,
+  shouldCountAsTenantResponse,
+  shouldCreateInboundResponseSla,
+  toConversationAttachment,
+  type ConversationMessage,
+  type ConversationMessageAttachment,
+  type ConversationNotification,
+  type ConversationParticipantRole,
+  type ConversationRecord,
+  type MediaAsset,
+  type ProductAuditAction,
+  type SourceFinderSearchResult,
+} from '@telpen/domain';
+import { randomUUID } from 'node:crypto';
+
+import type {
+  AssignConversationDto,
+  CreateConversationDto,
+  CreateConversationMediaDto,
+  PrepareConversationMediaUploadDto,
+  RunConversationSlaDto,
+  SendConversationMessageDto,
+  UpdateConversationStatusDto,
+} from './dto/conversations.dto';
+import { AuthService } from '../auth/auth.service';
+import { CONVERSATIONS_REPOSITORY, type ConversationsRepository } from './conversations.repository';
+import { ConversationsRealtimeService } from './conversations.realtime.service';
+import { InMemoryConversationsRepository } from './in-memory-conversations.repository';
+import {
+  MEDIA_ADAPTERS,
+  createDefaultMediaAdapters,
+  enqueueMediaProcessingJobs,
+  type MediaAdapters,
+} from '../media/media.adapters';
+import { NotificationsService } from '../notifications/notifications.service';
+import { UgcService } from '../ugc/ugc.service';
+
+@Injectable()
+export class ConversationsService {
+  private readonly repository: ConversationsRepository;
+  private readonly mediaAdapters: MediaAdapters;
+  private readonly realtime: ConversationsRealtimeService;
+  private readonly notifications?: NotificationsService;
+  private readonly auth?: AuthService;
+
+  constructor(
+    @Optional()
+    @Inject(CONVERSATIONS_REPOSITORY)
+    repository?: ConversationsRepository,
+    @Optional()
+    @Inject(MEDIA_ADAPTERS)
+    mediaAdapters?: MediaAdapters,
+    @Optional()
+    realtime?: ConversationsRealtimeService,
+    @Optional()
+    notifications?: NotificationsService,
+    @Optional()
+    auth?: AuthService,
+    @Optional()
+    private readonly ugc?: UgcService,
+  ) {
+    this.repository = repository ?? new InMemoryConversationsRepository();
+    this.mediaAdapters = mediaAdapters ?? createDefaultMediaAdapters();
+    this.realtime = realtime ?? new ConversationsRealtimeService();
+    this.notifications = notifications;
+    this.auth = auth;
+  }
+
+  async createConversation(tenantId: string, input: CreateConversationDto, actorUserId?: string) {
+    await this.requireCurrentTerms(tenantId, input.acceptedTerms, actorUserId);
+    this.assertSafe(input, 'Conversation contains blocked content.');
+    await this.requireUnblockedSource(tenantId, input.sourceRecordId);
+
+    const source = this.getSourceResult(input.sourceRecordId, input.query);
+    const intelligence = buildLeadConversionIntelligence(source);
+    const now = new Date().toISOString();
+    const firstResponseDueAt = new Date(
+      Date.parse(now) + intelligence.responseSlaHours * 60 * 60 * 1000,
+    ).toISOString();
+    const conversation: ConversationRecord = {
+      id: randomUUID(),
+      tenantId,
+      sourceRecordId: source.id,
+      sourceName: source.name,
+      sourceRole: source.role,
+      inquiryType: input.inquiryType,
+      status: input.assigneeUserId ? 'ASSIGNED' : 'OPEN',
+      priority: intelligence.priority,
+      matchConfidence: intelligence.confidence,
+      responseSlaHours: intelligence.responseSlaHours,
+      assigneeUserId: input.assigneeUserId,
+      assigneeDisplayName: input.assigneeDisplayName,
+      openedAt: now,
+      firstResponseDueAt,
+      lastInboundMessageAt: now,
+      lastMessageAt: now,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const opener: ConversationMessage = {
+      id: randomUUID(),
+      conversationId: conversation.id,
+      tenantId,
+      senderRole: 'REQUESTER',
+      body: input.message,
+      deliveryStatus: 'SENT',
+      createdAt: now,
+    };
+
+    await this.repository.createConversation(conversation);
+    await this.repository.createMessage(opener);
+    await this.createNotification(tenantId, conversation, 'NEW_CONVERSATION', now);
+
+    if (input.assigneeUserId) {
+      await this.createNotification(tenantId, conversation, 'ASSIGNMENT', now);
+    }
+
+    await this.auditProduct({
+      tenantId,
+      actorUserId,
+      action: 'CONVERSATION_CREATED',
+      entityId: conversation.id,
+      metadata: {
+        inquiryType: input.inquiryType,
+        sourceRecordId: conversation.sourceRecordId,
+        messageLength: input.message.length,
+      },
+    });
+
+    return this.presentConversation(conversation, [opener]);
+  }
+
+  async listConversations(tenantId: string) {
+    const [conversations, blockedIds] = await Promise.all([
+      this.repository.listConversations(tenantId),
+      this.blockedSourceIds(tenantId),
+    ]);
+    return Promise.all(
+      conversations.map(async (conversation) =>
+        this.presentConversation(
+          conversation,
+          await this.repository.listMessages(tenantId, conversation.id),
+          blockedIds.has(conversation.sourceRecordId),
+        ),
+      ),
+    );
+  }
+
+  async getConversation(tenantId: string, conversationId: string) {
+    const conversation = await this.requireConversation(tenantId, conversationId);
+    return this.presentConversation(
+      conversation,
+      await this.repository.listMessages(tenantId, conversationId),
+      await this.isSourceBlocked(tenantId, conversation.sourceRecordId),
+    );
+  }
+
+  async listMessages(tenantId: string, conversationId: string): Promise<ConversationMessage[]> {
+    await this.requireConversation(tenantId, conversationId);
+    return this.repository.listMessages(tenantId, conversationId);
+  }
+
+  async sendMessage(
+    tenantId: string,
+    conversationId: string,
+    input: SendConversationMessageDto,
+    actorUserId?: string,
+  ) {
+    await this.requireCurrentTerms(tenantId, input.acceptedTerms, actorUserId);
+    this.assertSafe(input, 'Message contains blocked content.');
+
+    const conversation = await this.requireConversation(tenantId, conversationId);
+    if (conversation.status === 'BLOCKED' || conversation.status === 'RESOLVED') {
+      throw new UnprocessableEntityException('Conversation is closed for new messages.');
+    }
+    await this.requireUnblockedSource(tenantId, conversation.sourceRecordId);
+
+    const now = new Date().toISOString();
+    const attachments = await this.requireSendableAttachments(
+      tenantId,
+      conversationId,
+      input.mediaAssetIds,
+    );
+    const message: ConversationMessage = {
+      id: randomUUID(),
+      conversationId,
+      tenantId,
+      senderRole: input.senderRole,
+      body: input.body,
+      deliveryStatus: 'SENT',
+      attachments: attachments.length > 0 ? attachments : undefined,
+      createdAt: now,
+    };
+
+    let updated: ConversationRecord = {
+      ...conversation,
+      lastMessageAt: now,
+      typingAt: undefined,
+      typingRole: undefined,
+      updatedAt: now,
+    };
+
+    if (shouldCreateInboundResponseSla(input.senderRole)) {
+      updated = {
+        ...updated,
+        status: 'WAITING_ON_ADVERTISER',
+        lastInboundMessageAt: now,
+      };
+    }
+
+    if (shouldCountAsTenantResponse(input.senderRole)) {
+      updated = {
+        ...updated,
+        status: 'WAITING_ON_REQUESTER',
+        firstResponseAt: updated.firstResponseAt ?? now,
+      };
+    }
+
+    await this.repository.createMessage(message);
+    await this.repository.updateConversation(updated);
+    await this.createNotification(tenantId, updated, 'NEW_MESSAGE', now);
+    this.realtime.publishEvent({
+      type: 'conversation.message',
+      tenantId,
+      conversationId,
+      occurredAt: now,
+      payload: { message },
+    });
+    await this.auditProduct({
+      tenantId,
+      actorUserId,
+      action: 'CONVERSATION_MESSAGE_SENT',
+      entityId: conversationId,
+      metadata: {
+        senderRole: input.senderRole,
+        messageLength: input.body.length,
+        attachmentCount: attachments.length,
+      },
+    });
+
+    return {
+      conversation: this.presentConversation(updated, [
+        ...(await this.repository.listMessages(tenantId, conversationId)),
+      ]),
+      message,
+    };
+  }
+
+  async markDelivered(
+    tenantId: string,
+    conversationId: string,
+    messageId: string,
+    actorUserId?: string,
+  ) {
+    await this.requireConversation(tenantId, conversationId);
+    const message = await this.requireMessage(tenantId, conversationId, messageId);
+    const updated = this.runReceipt(() => markMessageDelivered(message));
+    await this.repository.updateMessage(updated);
+    this.realtime.publishEvent({
+      type: 'conversation.receipt',
+      tenantId,
+      conversationId,
+      payload: { messages: [updated] },
+    });
+    await this.auditProduct({
+      tenantId,
+      actorUserId,
+      action: 'CONVERSATION_RECEIPT_RECORDED',
+      entityId: conversationId,
+      metadata: { receipt: 'DELIVERED', messageId },
+    });
+    return updated;
+  }
+
+  async markRead(
+    tenantId: string,
+    conversationId: string,
+    messageId: string,
+    readerRole: ConversationParticipantRole,
+    actorUserId?: string,
+  ) {
+    await this.requireConversation(tenantId, conversationId);
+    const message = await this.requireMessage(tenantId, conversationId, messageId);
+    const updated = this.runReceipt(() => markMessageRead(message, readerRole));
+    await this.repository.updateMessage(updated);
+    this.realtime.publishEvent({
+      type: 'conversation.receipt',
+      tenantId,
+      conversationId,
+      payload: { readerRole, messages: [updated] },
+    });
+    await this.auditProduct({
+      tenantId,
+      actorUserId,
+      action: 'CONVERSATION_RECEIPT_RECORDED',
+      entityId: conversationId,
+      metadata: { receipt: 'READ', messageId, readerRole },
+    });
+    return updated;
+  }
+
+  async recordTyping(
+    tenantId: string,
+    conversationId: string,
+    typingRole: ConversationParticipantRole,
+  ) {
+    const conversation = await this.requireConversation(tenantId, conversationId);
+    await this.requireUnblockedSource(tenantId, conversation.sourceRecordId);
+    const updated = this.runReceipt(() => recordConversationTyping(conversation, typingRole));
+    await this.repository.updateConversation(updated);
+    this.realtime.publishEvent({
+      type: 'conversation.typing',
+      tenantId,
+      conversationId,
+      payload: {
+        typingRole,
+        typingAt: updated.typingAt ?? conversation.updatedAt,
+        typingActive: isConversationTypingActive(updated.typingAt),
+      },
+    });
+    return this.presentConversation(
+      updated,
+      await this.repository.listMessages(tenantId, conversationId),
+    );
+  }
+
+  async getPresence(tenantId: string, conversationId: string, nowIso?: string) {
+    await this.requireConversation(tenantId, conversationId);
+    return this.realtime.snapshot(tenantId, conversationId, nowIso);
+  }
+
+  async recordPresence(
+    tenantId: string,
+    conversationId: string,
+    input: {
+      userId: string;
+      participantRole?: ConversationParticipantRole;
+      now?: string;
+    },
+  ) {
+    await this.requireConversation(tenantId, conversationId);
+    const participantRole = input.participantRole ?? 'TENANT_AGENT';
+    const connectionId = this.realtime.httpConnectionId(input.userId, conversationId);
+
+    try {
+      this.realtime.heartbeat(connectionId, input.now);
+    } catch (error) {
+      if (!(error instanceof ConversationRealtimeError)) {
+        throw error;
+      }
+
+      this.realtime.connect({
+        connectionId,
+        userId: input.userId,
+        tenantId,
+        conversationId,
+        participantRole,
+        nowIso: input.now,
+      });
+    }
+
+    return {
+      connectionId,
+      presence: this.realtime.snapshot(tenantId, conversationId, input.now),
+    };
+  }
+
+  async prepareMediaUpload(
+    tenantId: string,
+    conversationId: string,
+    input: PrepareConversationMediaUploadDto,
+  ) {
+    const conversation = await this.requireConversation(tenantId, conversationId);
+    await this.requireUnblockedSource(tenantId, conversation.sourceRecordId);
+    const existingMedia = await this.repository.listMediaAssets(tenantId, conversationId);
+    if (existingMedia.length >= mediaPolicy.maxItemsPerOwner) {
+      throw new UnprocessableEntityException(
+        `A conversation can hold a maximum of ${mediaPolicy.maxItemsPerOwner} media items.`,
+      );
+    }
+
+    const uploadInput = {
+      tenantId,
+      ownerType: 'CONVERSATION' as const,
+      ownerId: conversationId,
+      fileName: input.fileName.trim(),
+      mimeType: input.mimeType.trim().toLowerCase(),
+      fileSizeBytes: input.fileSizeBytes,
+    };
+    const mediaDecision = evaluateMediaUploadPreparationInput(uploadInput);
+    if (!mediaDecision.allowed) {
+      throw new UnprocessableEntityException({
+        message: 'Conversation media upload violates media policy.',
+        mediaPolicy: mediaDecision,
+      });
+    }
+
+    this.assertSafe(uploadInput, 'Conversation media upload metadata contains blocked content.');
+    const upload = await this.mediaAdapters.storage.prepareUpload(uploadInput);
+    return {
+      upload,
+      mediaSlots: {
+        used: existingMedia.length,
+        max: mediaPolicy.maxItemsPerOwner,
+        remaining: mediaPolicy.maxItemsPerOwner - existingMedia.length,
+      },
+    };
+  }
+
+  async addMedia(tenantId: string, conversationId: string, input: CreateConversationMediaDto) {
+    const conversation = await this.requireConversation(tenantId, conversationId);
+    await this.requireUnblockedSource(tenantId, conversation.sourceRecordId);
+    const existingMedia = await this.repository.listMediaAssets(tenantId, conversationId);
+    if (existingMedia.length >= mediaPolicy.maxItemsPerOwner) {
+      throw new UnprocessableEntityException(
+        `A conversation can hold a maximum of ${mediaPolicy.maxItemsPerOwner} media items.`,
+      );
+    }
+
+    const mediaInput = {
+      sourceUrl: input.sourceUrl.trim(),
+      thumbnailUrl: input.thumbnailUrl?.trim(),
+      fileName: input.fileName.trim(),
+      mimeType: input.mimeType.trim().toLowerCase(),
+      fileSizeBytes: input.fileSizeBytes,
+      caption: input.caption?.trim(),
+      displayOrder: existingMedia.length,
+      visibility: 'TENANT_ONLY' as const,
+    };
+    const mediaDecision = evaluateMediaAssetInput(mediaInput);
+    if (!mediaDecision.allowed) {
+      throw new UnprocessableEntityException({
+        message: 'Conversation media metadata violates media policy.',
+        mediaPolicy: mediaDecision,
+      });
+    }
+
+    this.assertSafe(mediaInput, 'Conversation media metadata contains blocked content.');
+    const moderation = await this.mediaAdapters.moderation.review(mediaInput);
+    if (!moderation.allowed) {
+      throw new UnprocessableEntityException({
+        message: 'Conversation media failed moderation review.',
+        moderation,
+      });
+    }
+
+    const now = new Date().toISOString();
+    const baseMedia: MediaAsset = {
+      ...mediaInput,
+      id: randomUUID(),
+      tenantId,
+      ownerType: 'CONVERSATION',
+      ownerId: conversationId,
+      kind: mediaDecision.kind,
+      status: 'READY_FOR_PREVIEW',
+      moderationStatus: moderation.moderationStatus,
+      moderationReason: moderation.moderationReason,
+      storageProvider: input.storageProvider,
+      objectKey: input.objectKey,
+      uploadedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const transform = await this.mediaAdapters.transforms.plan(baseMedia);
+    const media: MediaAsset = {
+      ...baseMedia,
+      cdnUrl: transform.cdnUrl ?? baseMedia.cdnUrl,
+      thumbnailUrl: transform.thumbnailUrl ?? baseMedia.thumbnailUrl,
+      transformStatus: transform.transformStatus,
+      variants: transform.variants ?? baseMedia.variants,
+    };
+    await this.repository.createMediaAsset(media);
+    const processingJobs = await enqueueMediaProcessingJobs(this.mediaAdapters, media);
+    await this.auditProduct({
+      tenantId,
+      action: 'CONVERSATION_MEDIA_ATTACHED',
+      entityId: conversationId,
+      metadata: {
+        mediaId: media.id,
+        kind: media.kind,
+        moderationStatus: media.moderationStatus,
+      },
+    });
+
+    return {
+      media: presentTenantMediaAsset(media),
+      processingJobs,
+      sendable: media.moderationStatus === 'PASSED',
+    };
+  }
+
+  async listMedia(tenantId: string, conversationId: string) {
+    await this.requireConversation(tenantId, conversationId);
+    return presentTenantMediaAssets(await this.repository.listMediaAssets(tenantId, conversationId));
+  }
+
+  async markThreadDelivered(tenantId: string, conversationId: string) {
+    await this.requireConversation(tenantId, conversationId);
+    const messages = await this.repository.listMessages(tenantId, conversationId);
+    let updatedCount = 0;
+
+    for (const message of messages) {
+      if (message.deliveryStatus !== 'SENT') {
+        continue;
+      }
+
+      const updated = this.runReceipt(() => markMessageDelivered(message));
+      await this.repository.updateMessage(updated);
+      updatedCount += 1;
+    }
+
+    const deliveredMessages = await this.repository.listMessages(tenantId, conversationId);
+    this.realtime.publishEvent({
+      type: 'conversation.receipt',
+      tenantId,
+      conversationId,
+      payload: { messages: deliveredMessages },
+    });
+    await this.auditProduct({
+      tenantId,
+      action: 'CONVERSATION_RECEIPT_RECORDED',
+      entityId: conversationId,
+      metadata: { receipt: 'DELIVERED', updatedCount },
+    });
+
+    return {
+      updatedCount,
+      messages: deliveredMessages,
+    };
+  }
+
+  async markThreadRead(
+    tenantId: string,
+    conversationId: string,
+    readerRole: ConversationParticipantRole,
+  ) {
+    await this.requireConversation(tenantId, conversationId);
+    const messages = await this.repository.listMessages(tenantId, conversationId);
+    let updatedCount = 0;
+
+    for (const message of messages) {
+      if (
+        message.senderRole === 'SYSTEM' ||
+        isSameConversationSide(message.senderRole, readerRole)
+      ) {
+        continue;
+      }
+
+      const updated = this.runReceipt(() => markMessageRead(message, readerRole));
+      await this.repository.updateMessage(updated);
+      updatedCount += 1;
+    }
+
+    const readMessages = await this.repository.listMessages(tenantId, conversationId);
+    this.realtime.publishEvent({
+      type: 'conversation.receipt',
+      tenantId,
+      conversationId,
+      payload: { readerRole, messages: readMessages },
+    });
+    await this.auditProduct({
+      tenantId,
+      action: 'CONVERSATION_RECEIPT_RECORDED',
+      entityId: conversationId,
+      metadata: { receipt: 'READ', readerRole, updatedCount },
+    });
+
+    return {
+      updatedCount,
+      messages: readMessages,
+    };
+  }
+
+  async assignConversation(tenantId: string, conversationId: string, input: AssignConversationDto) {
+    this.assertSafe(input, 'Assignment contains blocked content.');
+
+    const conversation = await this.requireConversation(tenantId, conversationId);
+    await this.requireUnblockedSource(tenantId, conversation.sourceRecordId);
+    const now = new Date().toISOString();
+    const updated: ConversationRecord = {
+      ...conversation,
+      assigneeUserId: input.assigneeUserId,
+      assigneeDisplayName: input.assigneeDisplayName,
+      status: conversation.status === 'OPEN' ? 'ASSIGNED' : conversation.status,
+      updatedAt: now,
+    };
+
+    await this.repository.updateConversation(updated);
+    await this.createNotification(tenantId, updated, 'ASSIGNMENT', now);
+    await this.auditProduct({
+      tenantId,
+      action: 'CONVERSATION_ASSIGNED',
+      entityId: conversationId,
+      metadata: {
+        assigneeUserId: input.assigneeUserId,
+      },
+    });
+    return this.presentConversation(
+      updated,
+      await this.repository.listMessages(tenantId, conversationId),
+    );
+  }
+
+  async updateStatus(tenantId: string, conversationId: string, input: UpdateConversationStatusDto) {
+    const conversation = await this.requireConversation(tenantId, conversationId);
+    const now = new Date().toISOString();
+    const updated: ConversationRecord = {
+      ...conversation,
+      status: input.status,
+      resolvedAt: input.status === 'RESOLVED' ? now : conversation.resolvedAt,
+      blockedAt: input.status === 'BLOCKED' ? now : conversation.blockedAt,
+      updatedAt: now,
+    };
+
+    await this.repository.updateConversation(updated);
+    await this.auditProduct({
+      tenantId,
+      action: 'CONVERSATION_STATUS_CHANGED',
+      entityId: conversationId,
+      metadata: {
+        fromStatus: conversation.status,
+        toStatus: input.status,
+      },
+    });
+    return this.presentConversation(
+      updated,
+      await this.repository.listMessages(tenantId, conversationId),
+    );
+  }
+
+  async listNotifications(tenantId: string): Promise<ConversationNotification[]> {
+    return this.repository.listNotifications(tenantId);
+  }
+
+  async runSlaChecks(tenantId: string, input: RunConversationSlaDto = {}) {
+    const checkedAt = input.now ?? new Date().toISOString();
+    const notificationsCreated: ConversationNotification[] = [];
+    const conversations = await this.repository.listConversations(tenantId);
+    const blockedIds = await this.blockedSourceIds(tenantId);
+
+    for (const conversation of conversations) {
+      if (blockedIds.has(conversation.sourceRecordId)) {
+        continue;
+      }
+      const decision = calculateConversationSlaDecision(
+        {
+          openedAt: conversation.openedAt,
+          lastInboundMessageAt: conversation.lastInboundMessageAt,
+          firstResponseAt: conversation.firstResponseAt,
+          responseSlaHours: conversation.responseSlaHours,
+          priority: conversation.priority,
+          status: conversation.status,
+        },
+        checkedAt,
+      );
+
+      if (!decision.alertType) continue;
+
+      if (
+        await this.repository.hasSlaAlert(
+          tenantId,
+          conversation.id,
+          decision.alertType,
+          decision.dueAt,
+        )
+      ) {
+        continue;
+      }
+
+      await this.repository.rememberSlaAlert(
+        tenantId,
+        conversation.id,
+        decision.alertType,
+        decision.dueAt,
+      );
+      notificationsCreated.push(
+        await this.createNotification(
+          tenantId,
+          conversation,
+          decision.alertType,
+          decision.dueAt,
+          decision.message,
+        ),
+      );
+    }
+
+    return {
+      checkedAt,
+      notificationsCreated,
+      conversations: await this.listConversations(tenantId),
+    };
+  }
+
+  async runAllSlaChecks(input: RunConversationSlaDto = {}) {
+    const checkedAt = input.now ?? new Date().toISOString();
+    const conversations = await this.repository.listAllConversations();
+    const tenantIds = [...new Set(conversations.map((item) => item.tenantId))];
+
+    return {
+      checkedAt,
+      tenantsChecked: tenantIds.length,
+      results: await Promise.all(
+        tenantIds.map(async (tenantId) => ({
+          tenantId,
+          ...(await this.runSlaChecks(tenantId, { ...input, now: checkedAt })),
+        })),
+      ),
+    };
+  }
+
+  private presentConversation(
+    conversation: ConversationRecord,
+    messages: ConversationMessage[] = [],
+    userBlocked = false,
+  ) {
+    const sla = calculateConversationSlaDecision({
+      openedAt: conversation.openedAt,
+      lastInboundMessageAt: conversation.lastInboundMessageAt,
+      firstResponseAt: conversation.firstResponseAt,
+      responseSlaHours: conversation.responseSlaHours,
+      priority: conversation.priority,
+      status: userBlocked ? 'BLOCKED' : conversation.status,
+    });
+    const savedReplies = buildSavedReplySuggestions({
+      sourceName: conversation.sourceName,
+      inquiryType: conversation.inquiryType,
+    });
+    const unreadCount = countUnreadMessagesForRole(messages, 'TENANT_AGENT');
+
+    return {
+      ...conversation,
+      status: userBlocked && conversation.status !== 'RESOLVED' ? 'BLOCKED' : conversation.status,
+      sla,
+      savedReplies,
+      unreadCount,
+      userBlocked,
+      typingActive: isConversationTypingActive(conversation.typingAt),
+      presence: this.realtime.snapshot(conversation.tenantId, conversation.id),
+    };
+  }
+
+  private async createNotification(
+    tenantId: string,
+    conversation: ConversationRecord,
+    type: ConversationNotification['type'],
+    now: string,
+    overrideMessage?: string,
+  ): Promise<ConversationNotification> {
+    const titleByType: Record<ConversationNotification['type'], string> = {
+      NEW_CONVERSATION: `New conversation: ${conversation.sourceName}`,
+      NEW_MESSAGE: `New message: ${conversation.sourceName}`,
+      ASSIGNMENT: `Assigned conversation: ${conversation.sourceName}`,
+      SLA_DUE_SOON: `SLA due soon: ${conversation.sourceName}`,
+      SLA_BREACHED: `SLA breached: ${conversation.sourceName}`,
+    };
+    const messageByType: Record<ConversationNotification['type'], string> = {
+      NEW_CONVERSATION: 'A matched inquiry has entered the conversation workspace.',
+      NEW_MESSAGE: 'A new message was added to the conversation.',
+      ASSIGNMENT: conversation.assigneeDisplayName
+        ? `Conversation assigned to ${conversation.assigneeDisplayName}.`
+        : 'Conversation assignment changed.',
+      SLA_DUE_SOON: 'The conversation response SLA is due soon.',
+      SLA_BREACHED: 'The conversation response SLA has been breached.',
+    };
+    const notification: ConversationNotification = {
+      id: randomUUID(),
+      tenantId,
+      conversationId: conversation.id,
+      type,
+      title: titleByType[type],
+      message: overrideMessage ?? messageByType[type],
+      scheduledFor: now,
+      createdAt: now,
+    };
+
+    await this.repository.createNotification(notification);
+    await this.queueOutboundNotification(conversation, type, notification);
+    return notification;
+  }
+
+  private async queueOutboundNotification(
+    conversation: ConversationRecord,
+    type: ConversationNotification['type'],
+    notification: ConversationNotification,
+  ) {
+    if (!this.notifications) {
+      return;
+    }
+
+    const eventType =
+      type === 'SLA_BREACHED'
+        ? 'CONVERSATION_SLA_BREACHED'
+        : type === 'SLA_DUE_SOON'
+          ? 'CONVERSATION_SLA_DUE_SOON'
+          : type === 'NEW_CONVERSATION'
+            ? 'CONVERSATION_NEW'
+            : type === 'ASSIGNMENT'
+              ? 'CONVERSATION_ASSIGNMENT'
+              : 'CONVERSATION_MESSAGE';
+    const severity =
+      type === 'SLA_BREACHED' ? 'CRITICAL' : type === 'SLA_DUE_SOON' ? 'HIGH' : 'MEDIUM';
+
+    await this.notifications.planAndQueue(conversation.tenantId, {
+      eventType,
+      severity,
+      title: notification.title,
+      message: notification.message,
+      entityType: 'conversation',
+      entityId: conversation.id,
+    });
+  }
+
+  private getSourceResult(sourceRecordId: string, query?: string): SourceFinderSearchResult {
+    const source = this.requireSource(sourceRecordId);
+    const queryText = query?.trim() || source.offers[0] || source.name;
+    const result =
+      searchSourceFinderRecords({
+        query: queryText,
+        countryCode: source.countryCode,
+        sortBy: 'RELEVANCE',
+      }).find((item) => item.id === sourceRecordId) ??
+      searchSourceFinderRecords({
+        query: '',
+        countryCode: source.countryCode,
+        sortBy: 'RELEVANCE',
+      }).find((item) => item.id === sourceRecordId);
+
+    if (!result) {
+      throw new NotFoundException('Source Finder match not found.');
+    }
+
+    return result;
+  }
+
+  private requireSource(sourceRecordId: string) {
+    const source = pilotSourceFinderRecords.find((record) => record.id === sourceRecordId);
+    if (!source) {
+      throw new NotFoundException('Source Finder match not found.');
+    }
+
+    return source;
+  }
+
+  private async requireUnblockedSource(tenantId: string, sourceRecordId: string): Promise<void> {
+    await this.ugc?.requireUnblocked(tenantId, sourceRecordId);
+  }
+
+  private async isSourceBlocked(tenantId: string, sourceRecordId: string): Promise<boolean> {
+    return this.ugc ? this.ugc.isBlocked(tenantId, sourceRecordId) : false;
+  }
+
+  private async blockedSourceIds(tenantId: string): Promise<Set<string>> {
+    if (!this.ugc) {
+      return new Set();
+    }
+
+    return new Set(
+      (await this.ugc.listBlocks(tenantId)).map((block) => block.blockedTargetId),
+    );
+  }
+
+  private async requireConversation(
+    tenantId: string,
+    conversationId: string,
+  ): Promise<ConversationRecord> {
+    const conversation = await this.repository.findConversation(tenantId, conversationId);
+    if (!conversation) {
+      throw new NotFoundException('Conversation not found.');
+    }
+
+    return conversation;
+  }
+
+  private async requireMessage(
+    tenantId: string,
+    conversationId: string,
+    messageId: string,
+  ): Promise<ConversationMessage> {
+    const message = await this.repository.findMessage(tenantId, conversationId, messageId);
+    if (!message) {
+      throw new NotFoundException('Conversation message not found.');
+    }
+
+    return message;
+  }
+
+  private async requireSendableAttachments(
+    tenantId: string,
+    conversationId: string,
+    mediaAssetIds: string[] | undefined,
+  ) {
+    if (!mediaAssetIds?.length) {
+      return [];
+    }
+
+    const attachments: ConversationMessageAttachment[] = [];
+    for (const mediaId of mediaAssetIds) {
+      const asset = await this.repository.findMediaAsset(tenantId, conversationId, mediaId);
+      if (!asset) {
+        throw new NotFoundException('Conversation attachment not found.');
+      }
+      attachments.push(toConversationAttachment(asset));
+    }
+
+    return this.runReceipt(() => assertConversationAttachmentsSendable(attachments));
+  }
+
+  private async auditProduct(input: {
+    tenantId: string;
+    actorUserId?: string;
+    action: ProductAuditAction;
+    entityId: string;
+    metadata?: Record<string, string | number | boolean | null>;
+  }) {
+    await this.auth?.recordTenantAudit({
+      tenantId: input.tenantId,
+      actorUserId: input.actorUserId,
+      action: input.action,
+      entityType: 'CONVERSATION',
+      entityId: input.entityId,
+      metadata: input.metadata,
+    });
+  }
+
+  private requireTerms(acceptedTerms: boolean): void {
+    if (!acceptedTerms) {
+      throw new UnprocessableEntityException(
+        'Current terms acceptance is required before messaging.',
+      );
+    }
+  }
+
+  private async requireCurrentTerms(
+    tenantId: string,
+    acceptedTerms: boolean,
+    actorUserId?: string,
+  ): Promise<void> {
+    this.requireTerms(acceptedTerms);
+    if (!this.auth || !actorUserId) {
+      return;
+    }
+    await this.auth.requireCurrentStoredTerms(
+      actorUserId,
+      tenantId,
+      'Current stored terms acceptance is required before messaging.',
+    );
+  }
+
+  private assertSafe(input: object, message: string): void {
+    const fieldSafety = evaluateSafetyFields(input);
+    const textSafety = 'message' in input ? evaluateSafetyText(String(input.message)) : fieldSafety;
+    const bodySafety = 'body' in input ? evaluateSafetyText(String(input.body)) : textSafety;
+    const safety = fieldSafety.allowed ? bodySafety : fieldSafety;
+
+    if (!safety.allowed) {
+      throw new UnprocessableEntityException({ message, safety });
+    }
+  }
+
+  private runReceipt<T>(callback: () => T): T {
+    try {
+      return callback();
+    } catch (error) {
+      if (error instanceof ConversationReceiptError) {
+        throw new UnprocessableEntityException(error.message);
+      }
+      throw error;
+    }
+  }
+
+  async eraseTenantAccountHoldings(tenantId: string) {
+    return this.repository.eraseTenantHoldings(tenantId);
+  }
+}

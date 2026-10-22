@@ -1,0 +1,107 @@
+# Google Play Store compliance for Sell Find Connect
+
+Status (15/10/26): **in progress — preparing the first Play listing.** The
+Android app is a Trusted Web Activity of https://sellfindconnect.com, package
+`com.sellfindconnect.app`, built with PWABuilder. Legal sign-off (SFC-01) is
+recorded in `docs/SIGN_OFF_RECORDS.md`. Paste packs:
+`docs/PLAY-STORE-LISTING.md` (listing, build, assetlinks, testing track) and
+`docs/PLAY-APP-CONTENT-REVIEW.md` (App content cards, Data safety, reviewer
+access). The first Android release has **no purchase screen**; Play Billing is
+needed before the app charges for the subscription.
+First written: 2026-08-21
+
+## Locked identity: login phone = STK Push phone
+
+The verified E.164 phone number is the **login identity** and the **only**
+M-Pesa / Africa's Talking STK Push destination.
+
+- SMS OTP and STK Push both target the same number (`packages/domain/src/phone.ts`,
+  `AuthService.verifyPhoneOtp`, `PaymentsService.requestCheckout`).
+- Checkout does **not** accept a payer phone in the request body. The signed-in
+  user's stored phone is used. If that phone is missing, checkout returns
+  `no_phone`. Invoice pay (`POST /v1/finance/payment-invoices/pay`) rejects an
+  E.164 `customerReference` and, for `MOBILE_MONEY`, sends STK only to
+  `AuthService.getVerifiedLoginPhone`.
+- Owner payouts (`POST /v1/payments/payout`) require current terms and a
+  recipient who is a member of the same tenant. A user id from another tenant
+  returns `forbidden` and does not call the provider.
+- Product audit stores `phoneHash` / amount / status only — never the raw
+  number, never the STK reason text.
+
+This is a fraud and Play User Data control: a Play or web client must not let a
+user push an STK prompt to someone else's phone.
+
+## Payments policy (digital goods)
+
+The tenant SaaS fee (first month free, then 10 local-currency units / month) is a
+**digital subscription**.
+
+| Surface | Allowed rail for the SaaS subscription |
+| --- | --- |
+| Web and PWA | Stripe and/or Africa's Talking STK to the **login** phone |
+| Google Play Android app | **Google Play Billing** (Play's payments policy). Kenya is not in the India / South Korea / EEA alternative-billing programmes. Direct M-Pesa STK **inside a Play-distributed APK** for the platform subscription is not permitted. |
+| Physical goods / services between marketplace counterparties | STK / local rails may be used outside Play Billing, including from a Play app, when the payment is for a real-world good or service and not for the digital SaaS entitlement. |
+
+Do not enable in-app SaaS checkout via STK in a Play build. Keep STK on web/PWA
+and for counterparty marketplace payments. A future Play binary needs a Play
+Billing adapter behind the existing `PAYMENT_PROVIDER` boundary.
+
+## SMS, OTP, and sensitive permissions
+
+Phone login is allowed. The implementation must stay on:
+
+- User-typed OTP, or
+- SMS Retriever / user-consent SMS APIs that do **not** require `READ_SMS`.
+
+Do **not** request `READ_SMS` or `READ_CALL_LOG`. Google Play's SMS and Call Log
+policy (updated July 2026) no longer treats account verification via call log as
+a permitted use.
+
+## User Data, account deletion, and Data Safety
+
+Play User Data requires:
+
+- An accurate Data Safety form (account data, phone number used for login and
+  mobile-money, approximate location if collected, UGC, diagnostics).
+- A public privacy policy URL. In this repo: `/privacy`.
+- A public terms and subscription URL. In this repo: `/terms` and `/subscription`.
+- A public prohibited-content URL. In this repo: `/prohibited`.
+- A public community-standards / UGC user-policy URL. In this repo: `/community`.
+- In-product report and block for UGC (`POST /v1/ugc/reports`, `POST /v1/ugc/blocks`).
+  Tenant blocks also stop conversation, inquiry, and Source Finder outreach.
+  Moderators review the home queue (`GET /v1/platform/ugc/reports`) with MFA
+  `MODERATE_CONTENT` access.
+- **In-app and web-accessible account deletion** for any account the app creates.
+  In this repo: `/account/delete` plus `POST/DELETE/GET /v1/privacy/deletion`.
+
+Current gaps before a Play listing:
+
+- Durable deletion exists in code: 30-day grace, then
+  `POST /v1/operations/privacy/deletions/run` erases profile/adverts/media/
+  conversations, revokes sessions, retains billing/analytics/auth-audit, and
+  writes `ACCOUNT_DELETION_COMPLETED` without the user's reason text. Hosted
+  Prisma (`PERSISTENCE_DRIVER=prisma`) plus the daily scheduled-jobs sweep
+  make that durable in production after the Fly API image in this change is
+  deployed.
+- Production Fly web (verified 2026-08-22) serves `/privacy` and
+  `/account/delete` (HTTP 200). Keep those URLs live before a Play Console
+  listing.
+- Deletion UI must send `x-session-token` and `x-tenant-id`; it must not be a
+  dead form.
+
+## UGC, child safety, and subscriptions disclosure
+
+Zero-tolerance blocking, reporting, and terms gating already exist for web UGC.
+A Play listing still needs:
+
+- Demo reviewer account.
+- In-app report/block that works on the Android client.
+- Localized subscription price, trial length, and cancellation path (Play
+  Billing subscription center, not only a web portal).
+- No child-directed positioning. This is a B2B marketplace.
+
+## What this slice does **not** do
+
+- It does not create a React Native / Play app.
+- It does not add Play Billing.
+- It does not request SMS or call-log permissions.

@@ -1,0 +1,52 @@
+name: Deploy Web (Fly.io)
+
+# Manual deploy of the SellFindConnect website to Fly (sellfindconnect-web).
+# Same command as docs/FLY_DEPLOYMENT.md:
+#   fly deploy --config fly.web.toml --remote-only
+# NEXT_PUBLIC_API_URL is baked at build time from fly.web.toml [build.args].
+#
+# Required repo secret: FLY_WEB_API_TOKEN — a deploy token scoped to the web app:
+#   fly tokens create deploy -a sellfindconnect-web
+# (The API's FLY_API_TOKEN is scoped to sellfindconnect-api and cannot deploy this app.)
+#
+# Manual only (Actions → Deploy Web (Fly.io) → Run workflow); production
+# deploys stay a deliberate human action.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-web
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy sellfindconnect-web
+    runs-on: ubuntu-latest
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_WEB_API_TOKEN }}
+    steps:
+      - name: Require deploy token
+        if: env.FLY_API_TOKEN == ''
+        run: |
+          echo "::error title=Deploy blocked::FLY_WEB_API_TOKEN repo secret is not set (fly tokens create deploy -a sellfindconnect-web)."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy
+        run: flyctl deploy --config fly.web.toml --remote-only
+
+      - name: Confirm the site is up
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            if curl -fsS -o /dev/null https://sellfindconnect.com/; then
+              echo "::notice title=Deploy live::sellfindconnect.com returned 200."
+              exit 0
+            fi
+            echo "site not ready (attempt $attempt), retrying in 10s"; sleep 10
+          done
+          echo "::error title=Deploy unverified::sellfindconnect.com did not return 200."
+          exit 1

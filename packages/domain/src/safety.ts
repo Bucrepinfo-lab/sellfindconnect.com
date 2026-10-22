@@ -433,20 +433,30 @@ export function evaluateSafetyText(value: string): SafetyDecision {
 
 export function evaluateSafetyFields(fields: object): SafetyDecision {
   const values: string[] = [];
+  const seen = new WeakSet<object>();
 
-  function collect(value: unknown): void {
+  function collect(value: unknown, depth = 0): void {
     if (typeof value === 'string') {
       values.push(value);
       return;
     }
 
+    if (depth >= 8) {
+      return;
+    }
+
     if (Array.isArray(value)) {
-      value.forEach(collect);
+      value.slice(0, 100).forEach((item) => collect(item, depth + 1));
       return;
     }
 
     if (value && typeof value === 'object') {
-      Object.values(value as Record<string, unknown>).forEach(collect);
+      if (seen.has(value)) {
+        return;
+      }
+
+      seen.add(value);
+      Object.values(value as Record<string, unknown>).forEach((item) => collect(item, depth + 1));
     }
   }
 

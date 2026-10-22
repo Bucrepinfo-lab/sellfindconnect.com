@@ -1,7 +1,7 @@
 # Telpen Adverts Product Memory
 
 Date started: 2026-06-15
-Last updated: 2026-06-16
+Last updated: 2026-10-15
 Purpose: Persistent decision log and strategic memory for the Telpen Adverts multi-tenant advertising SaaS.
 
 This file must be updated whenever product strategy, pricing, compliance, architecture, market positioning, or execution decisions change.
@@ -21,6 +21,7 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - Zero-tolerance categories: weapons, pornography, human trafficking/human trade, child exploitation, illegal drugs, violent extremism, hate/threats, graphic violence/self-harm encouragement, criminal services, counterfeit/stolen goods, illegal wildlife trafficking, platform abuse, spam/scams, intellectual-property abuse, and prohibited infrastructure use are blocked entirely across taxonomy, profiles, listings, media, search, matching, relationship links, chat, payment, and analytics exports.
 - Terms gate: publishing, media upload, messaging, paid promotion, and payment enablement require current terms/privacy/subscription/prohibited-policy acceptance. Acceptance never overrides zero-tolerance or hosting-provider acceptable-use blocking. User responsibility and indemnity clauses are required, but Telpen cannot waive non-waivable platform, privacy, tax, consumer, app-store, hosting-provider, or safety duties.
 - Finance/tax: paid launch in any country requires an approved country tax profile, tax calculation snapshots for every paid transaction, finance ledger, reconciliation dashboard, remittance calendar, computed VAT/GST/sales tax/DST/withholding/levy alerts, approval workflow, filing/remittance evidence, and exportable tax reports.
+- Tax operating model (all five owner products' SaaS subscriptions): this platform stays merchant of record (not Paddle / Lemon Squeezy / Dodo). Kenya first via iTax simplified digital-marketplace VAT or one Kenyan tax representative. Keep STK (login phone) plus Stripe. Rates from the finance module and Stripe Tax. Add EU Non-Union OSS later. See `docs/GROUP_TAX_OPERATING_MODEL.md`.
 
 ## Competitive Advantage Strategy
 
@@ -42,7 +43,7 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - Legal policy engine: versioned terms, privacy, community standards, subscription terms, country addenda, acceptance records, re-acceptance workflows, and audit lookup for disputes or investigations.
 - Growth and retention engine: saved searches, alerts, opportunity digests, profile improvement tips, referrals, and notifications.
 - Analytics command engine: tenant, country, continent, regional, and global dashboards.
-- Finance and tax command engine: country tax profiles, VAT/GST/sales tax/DST/withholding/levy rules, tax snapshots, remittance calendar, finance alerts, return workbench, reconciliation, and audit evidence.
+- Finance and tax command engine: country tax profiles, VAT/GST/sales tax/DST/withholding/levy rules, invoices, receipts, tax snapshots, remittance calendar, finance alerts, return workbench, reconciliation, and audit evidence.
 
 ## Preferred Technology Direction
 
@@ -54,34 +55,66 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - Matching: rules first, then embeddings/vector search, then graph ranking and ML ranking as data grows.
 - Chat: custom WebSocket/Socket.IO for MVP or Twilio/Stream-style managed chat if speed and cross-channel support matter more.
 - Notifications: FCM, APNs, email, SMS, and WhatsApp where compliant.
-- Payments: Stripe where supported, app-store billing where required, and local mobile money/payment providers per launch country.
-- Tax automation: use an adapter layer. Stripe Tax is a preferred candidate where supported; TaxJar, Taxually, Avalara, Marosa, local country providers, or finance-approved manual rules may be needed for unsupported countries/tax types.
+- Payments: Stripe where supported, Africa's Talking STK / M-Pesa on the verified login phone, app-store billing where a native listing exists. Merchant-of-record checkouts (Paddle, Lemon Squeezy, Dodo) are forbidden.
+- Tax automation: finance-module country tax rules plus Stripe Tax for rates; Kenyan iTax or one tax representative files; EU Non-Union OSS later. Stripe Tax does not become the seller.
 - Analytics: event pipeline, warehouse, BI dashboard, product analytics, and exportable reports.
 - Safety: moderation queue, media scanning, malware scanning, keyword/synonym libraries, evidence preservation, audit logs, and escalation workflow.
 - Observability: Sentry/OpenTelemetry/Prometheus/Grafana or equivalent.
 - Local development environment: Docker Desktop with WSL 2 for PostgreSQL, Redis, Meilisearch, and Mailpit; Volta with Node.js 24 LTS to keep runtime versions consistent; DBeaver Community recommended for database inspection.
-- Production domains: `adverts.telpen.net` for the web app and `api.adverts.telpen.net` for the API. `telpen.net` DNS is managed through GoDaddy nameservers. Railway is the selected initial full-stack host.
-- Brand domain target: `SellFindConnect.com` was purchased through GoDaddy on 2026-06-16 and will be the main public brand domain after DNS connection, SSL issuance, and verification. Keep `adverts.telpen.net` as the internal/technical deployment domain if the Railway plan supports the extra custom domain; otherwise use the Railway-provided web URL as the fallback until the plan is upgraded.
+- Deployment posture: Fly.io Frankfurt (`fra`) is the live production host for
+  `sellfindconnect.com`, `www.sellfindconnect.com`, and `api.sellfindconnect.com`.
+  DigitalOcean App Platform remains a documented candidate. Historical Railway
+  URLs and `adverts.telpen.net` no longer serve this product. Do not onboard
+  paying subscribers until the live Fly image matches `main`, persistence health
+  is configured, and scheduled jobs run.
+- Login phone = STK Push phone: the verified E.164 number used for SMS OTP is
+  the only Africa's Talking / M-Pesa checkout destination. Checkout must not
+  accept a different payer phone. Google Play listings, if ever submitted, must
+  use Play Billing for the digital SaaS subscription (`docs/PLAY_STORE.md`).
+- Production domains: `SellFindConnect.com`, `www.SellFindConnect.com`, and
+  `api.SellFindConnect.com` are the live public surfaces.
 - Recommended market domain portfolio: buy `SellFindConnect.com` first; also buy `SellFindConnect.app`, `FindSellConnect.com`, and `FindSellConnect.app` as defensive/app companions if budget allows. Campaign line: "Sell it. Find it. Connect."
 - SEO/growth direction: position Sell Find Connect around supplier finder, buyer-seller connection, business advertising app, source finder, local business directory, B2B marketplace, and country/industry business matching. Growth should combine organic SEO, country/industry landing pages, app-store optimization, social video demos, partnerships, referrals, opportunity digests, and safety/trust positioning.
-- GitHub repository: use `https://github.com/Bucrepinfo-lab/sellfindconnect.com.git` as the source repository for the Sell Find Connect codebase and future Railway GitHub deployments.
+- GitHub repository: use `https://github.com/Bucrepinfo-lab/sellfindconnect.com.git` as the source repository for the Sell Find Connect codebase and future production deployments after the final platform decision.
+- Owner portfolio (five products, five Desktop folders). This Cloud Agent
+  environment mounts only `github.com/Bucrepinfo-lab/sellfindconnect.com`.
+  `.cursor/environment.json` sets `repositoryDependencies` to an empty list.
+  Telpen Edu and its Play Store conversation stay in their previous separate
+  session and environment. Do not clone that project or continue that session
+  from here. The owner's Windows Desktop is not visible here. Folder names as
+  given on 2026-08-21:
+
+  | Product | Desktop folder | GitHub today |
+  | --- | --- | --- |
+  | Sell Find Connect / Telpen Adverts | this repo | `Bucrepinfo-lab/sellfindconnect.com` (write works) |
+  | InsurOS | `insurance` | `Bucrepinfo-lab/InsurOS` exists but is a stub README only |
+  | Telpen Edu | `telpen-edu` | no GitHub repo under `Bucrepinfo-lab` |
+  | Stawi | `Mvendoh` | `Bucrepinfo-lab/Stawi` exists; Cursor push is 403. An older Desktop `Chamaa App` snapshot was already consolidated into that repo. |
+
+  Do not invent remotes for `telpen-edu` or `Mvendoh`. The locked SaaS
+  subscription tax model for all five is in `docs/GROUP_TAX_OPERATING_MODEL.md`.
+  Paste that file's copy blocks into InsurOS, Telpen Edu, and Stawi on Desktop.
 
 ## Open Decisions
 
-- First launch country or countries.
-- Exact payment providers and mobile money rails for launch countries.
 - Whether native apps are required on day one or whether web + PWA launches first.
+  Current delivery is web + PWA. A Play listing is blocked on Play Billing, durable
+  account deletion, and the SMS-permission rules in `docs/PLAY_STORE.md`.
 - Which countries need fallback pricing because provider/app-store minimums prevent exactly 10 local currency units.
 - Which launch countries require specific legal reporting channels for child safety, trafficking, weapons, drugs, or violent extremist content.
 - Whether to include public reviews in MVP or Phase 2.
 - Whether to use managed search/chat/analytics providers for speed or self-hosted/open-source components for control.
-- Which tax provider or provider combination will be used for each launch country.
 - Which accounting system the finance module must export to or integrate with.
-- Named Country Finance Admin and external tax advisor for each launch country.
-- Approved fallback process where external tax providers do not support a country or tax type.
+- Named Country Finance Admin and external Kenyan tax advisor (iTax contact).
+  This is a remote role (owner + local tax agent), not a requirement to travel
+  or incorporate in that country.
+- Approved fallback process where Stripe Tax does not support a country or tax type
+  (finance-module rules remain the fail-closed rate source).
 
 ## Decision Log
 
+- 2026-10-13: Added a manual `Deploy API (Fly.io)` GitHub workflow (workflow_dispatch only) running the runbook command `fly deploy --config fly.api.toml --remote-only` with a FLY_API_TOKEN deploy token and a post-deploy /v1/health check. Production deploys stay a deliberate human action; this replaces running flyctl from a laptop.
+- 2026-10-13: Added opt-in AI match explanations to Source Finder (`POST source-finder/explain`). Provider-neutral like the embeddings/payment/tax adapters: the default build returns the deterministic template built from the matcher's own reason codes (zero cost, no key); the Anthropic overlay (`MATCH_EXPLANATION_PROVIDER=anthropic`, cheapest tier `claude-haiku-5-5`) is opt-in, fails closed without a key, re-screens every model output through the zero-tolerance safety core, and falls back to the template on any failure. Cost is incurred only when a searcher asks for an explanation.
 - 2026-06-15: Created PRD for multi-tenant advertising SaaS with web and downloadable mobile app requirements.
 - 2026-06-15: Locked local pricing rule: first month free, then 10 units of each subscriber country's local currency per month.
 - 2026-06-15: Added zero-tolerance blocked categories covering weapons, pornography, human trafficking/human trade, child exploitation, illegal drugs, violent extremism, hate/threats, graphic violence/self-harm encouragement, criminal services, counterfeit/stolen goods, and illegal wildlife trafficking.
@@ -114,3 +147,221 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 - 2026-06-16: Deployed the self-sufficient web workspace build fix to Railway. Web deployment `76cf2156-dff3-4a87-8589-0034278ece27` completed with `SUCCESS`, confirming the deployment path no longer fails when the web build needs `@telpen/domain` compiled first.
 - 2026-06-16: Updated Railway web-service dashboard settings so the build command compiles `@telpen/domain` before `@telpen/web`, and added `/packages/domain/**` to watch patterns so shared domain-package changes trigger web rebuilds.
 - 2026-06-16: Started Epic 7 analytics implementation. Added shared analytics event/consent models, a Prisma `AnalyticsEvent` schema, tenant-scoped analytics API endpoints for event capture and summaries, safety blocking for analytics metadata, and a web Analytics Command panel showing most visited, sorted, click rate, enquiries, shares, downloads, and average age.
+- 2026-06-16: Railway GitHub deployment for the new web project compiled `@telpen/domain` correctly, then exposed a separate non-standard `NODE_ENV` issue during Next.js prerendering. Added `cross-env` and forced `NODE_ENV=production` for the web build script so Railway and Windows builds use the same production mode.
+- 2026-06-16: Railway CLI is now authenticated as `bucrepinfo@gmail.com` and linked locally to the GitHub-connected project `resplendent-fulfillment` (`42716fff-95b0-4755-b0b2-59faf081eb86`) in production (`bc3f4b4e-0101-4f70-b346-3df2b8e5405b`). Active services are `@telpen/api` (`99fb3c7e-487c-4a77-ba08-369a83ac7e0d`) and `@telpen/web` (`9b5a1466-f105-44e1-a16e-0b5c45f04ace`), both sourced from `Bucrepinfo-lab/sellfindconnect.com`.
+- 2026-06-16: Deployed the analytics vertical slice successfully through Railway GitHub autodeploy. API deployment `c3478884-b803-4d8a-be05-ceeb7e67c6e6` is `SUCCESS` on commit `b199a8f`; web deployment `6a837a7e-b421-408c-b804-520b26a3f0f9` is `SUCCESS` on commit `a32fb88`.
+- 2026-06-16: Added the advert/post lifecycle requirement and MVP implementation: every advert lives for 40 days unless renewed, renewal alerts are generated on days 35 and 39, and expired adverts are auto-deleted on day 40. Added shared lifecycle policy logic, tenant-scoped advert lifecycle API, notification schema fields, tests, and web lifecycle indicators. Durable scheduler/queue persistence remains the next hardening step.
+- 2026-06-16: Deployed the 40-day advert lifecycle feature through Railway GitHub autodeploy. API deployment `960bafd5-c445-4c6f-90b1-e68181e20162` and web deployment `e9b5d4ee-f2f3-4c76-a59b-f3b83065616f` both completed with `SUCCESS`.
+- 2026-06-16: Confirmed the intermittent Next.js prerender failure on generated error-boundary pages is mitigated by explicit `apps/web/src/app/global-error.tsx` and `apps/web/src/app/not-found.tsx` files, plus the forced `NODE_ENV=production` web build. Local web build and lint pass with these hardening files present.
+- 2026-06-16: Added a protected internal operations endpoint for advert lifecycle sweeps: `POST /v1/operations/adverts/lifecycle/run`, guarded by `x-internal-job-key` and `INTERNAL_JOB_KEY`. This prepares Railway Cron or an external scheduler to run day-35/day-39 renewal alerts and day-40 auto-deletion daily once the durable repository/scheduler is enabled.
+- 2026-06-16: Deployed the protected advert lifecycle sweep through Railway GitHub autodeploy. API deployment `e0301a63-e739-4eff-af26-c73781aa657c` completed with `SUCCESS` on commit `3453dd3`; the web deployment was unchanged because no watched web files changed.
+- 2026-06-17: Started Epic 8 finance/tax implementation. Added shared configured-rate tax calculation helpers, a tenant-scoped finance API for country tax profiles, effective-dated rules, immutable tax snapshots, ledger entries, draft tax returns, and timed remittance alerts, plus a web Finance Readiness panel. This does not hard-code live country tax rates; country finance admins must approve rule configuration before paid launch.
+- 2026-06-17: Deployed the Epic 8 finance/tax command slice through Railway GitHub autodeploy. API deployment `2187c01e-7204-4660-be68-742ef6ba22bc` and web deployment `e4947ac7-018c-4096-a00e-7abbe1bf1595` both completed with `SUCCESS` on commit `d848b2e`.
+- 2026-06-17: Started Epic 5 Source Finder implementation. Added shared rules-based ranking with explainable reason codes, sort modes, relationship links, and pilot graph records; exposed `POST /v1/source-finder/search`; and updated the web Source Finder to show match reasons and related supplier/buyer/service links. Prohibited searches remain blocked server-side and client-side.
+- 2026-06-17: Deployed the explainable Source Finder slice through Railway GitHub autodeploy. API deployment `c1ace549-e96d-4a97-b564-12cef6161997` and web deployment `3ca76bbf-78e2-45cd-8b34-dd0f865eb0ed` both completed with `SUCCESS` on commit `e6303f5`.
+- 2026-06-17: Started Epic 6 matching and lead conversion. Added shared lead intelligence for confidence, priority, response SLA, and next-best actions; exposed lead APIs for match feedback, terms-gated inquiries/RFQs, lead inbox, and lead status updates; and added a web Lead Conversion panel. Realtime chat, assignment, notifications, and durable lead persistence remain next.
+- 2026-06-17: Deployed the lead conversion workflow through Railway GitHub autodeploy. API deployment `e339094d-305f-4398-a517-9f021075ae9c` and web deployment `2783a9ef-e0a1-4aad-a4be-f4d05e50599d` both completed with `SUCCESS` on commit `e970d2a`.
+- 2026-06-17: Continued Epic 6 into the messaging/SLA phase. Added shared conversation states, saved replies, SLA decisions, tenant-scoped conversation APIs for safe terms-gated chat, assignment, notifications, SLA checks, Prisma conversation/message/notification models, and a web Conversation Workspace. Live websocket delivery, read receipts, typing/presence, attachments, provider-backed delivery, audit logs, and repository persistence remain next.
+- 2026-06-17: Deployed the conversation SLA workspace through Railway GitHub autodeploy. API deployment `95f24983-4c69-46a0-a610-f2983e467c99` and web deployment `d8140bfc-3140-4498-8515-9a1b483a4f37` both completed with `SUCCESS` on commit `761ba5d`. Latest deployment metadata reports `sleepApplication: false` for both services, so Railway Serverless/App Sleeping should be re-enabled in the service settings if the toggle was reset.
+- 2026-06-18: Started the notification orchestration phase. Added consent-aware notification delivery planning for in-app, email, SMS, push, and WhatsApp; tenant notification preferences; an API outbox; database models for preferences/outbox/delivery attempts; a protected all-tenant conversation SLA sweep endpoint; and a web Notification Delivery readiness panel. Actual provider adapters and durable repositories remain next.
+- 2026-06-18: Deployed notification orchestration through Railway GitHub autodeploy. API deployment `41529428-eb92-493d-9299-adbc44b504b4` and web deployment `07fb8e7e-d991-466f-bab5-7edfde26dece` both completed with `SUCCESS` on commit `ca20996`.
+- 2026-06-18: Started Epic 2 access foundation. Added shared hierarchy/RBAC rules for global, regional, continental, country, and tenant scopes; MFA-required role decisions; access evaluation/audit API; web Hierarchy Access controls; and database models for MFA state, access assignments, and access decision audit evidence. Production auth/session provider and database-backed guards remain next.
+- 2026-06-18: Deployed the access hierarchy foundation through Railway GitHub autodeploy. API deployment `440f6ac0-e7ca-4a26-a8ac-c4d62023df70` and web deployment `c03183fa-b11a-40bc-b407-586b3d042eeb` both completed with `SUCCESS` on commit `fc509ce`.
+- 2026-06-18: Started the owner onboarding/auth tenancy slice. Added shared password/trial/terms evidence helpers, an MVP auth API for tenant-owner registration, PBKDF2 password hashing, login sessions, MFA verification, tenant-session checks, database auth/session/terms evidence models, and a web Owner Onboarding readiness panel. Production identity provider, email verification, password reset, real OTP/authenticator MFA, invite flows, session-backed route guards, and database repositories remain next.
+- 2026-06-18: Deployed the owner onboarding/auth tenancy slice through Railway GitHub autodeploy. API deployment `19de73b0-2c4e-4e60-b78f-66035fca8857` and web deployment `f09e31bf-e14b-4acb-9293-48e90e4969c2` both completed with `SUCCESS` on commit `79d1f55`.
+- 2026-06-18: Continued Epic 2 persistence hardening. Added an auth repository interface plus in-memory adapter, refactored AuthService behind the repository boundary, and changed session lookup to use SHA-256 token hashes so raw bearer tokens are only returned at issuance. Prisma-backed repository wiring remains the next persistence step.
+- 2026-06-18: Deployed the auth persistence boundary hardening through Railway GitHub autodeploy. API deployment `39391f4d-9fa3-498f-9eb9-0f63974f1df4` completed with `SUCCESS` on commit `84b0a67`; the web deployment skipped because no watched web files changed.
+- 2026-06-18: Continued the Prisma/session guard phase. Added an opt-in Prisma auth repository selected by `AUTH_REPOSITORY=prisma`, added explicit API Prisma dependencies and Docker generated-client copy support, converted AuthService to async repository operations, and added a reusable tenant session guard that validates `x-session-token` against `x-tenant-id` and requires MFA. Controller-by-controller migration to the strict guard remains next.
+- 2026-06-18: Deployed the Prisma auth repository and session guard phase through Railway GitHub autodeploy. API deployment `aac5638a-5012-499f-a109-b46637411d81` completed with `SUCCESS` on commit `df71904`; the web deployment skipped because no watched web files changed.
+- 2026-06-18: Paused the new deployment migration process at the owner's direction so the team can finish core coding work first. DigitalOcean is now the leading candidate to evaluate before subscriber onboarding because a Cape Town/South Africa deployment location may provide better first-country launch latency. Removed the active Render blueprint direction from the current working head and added `docs/DIGITALOCEAN_DEPLOYMENT.md` as the deployment candidate runbook. Railway remains the current proven fallback/staging deployment.
+- 2026-06-18: Continued database readiness without deployment. Added a checked-in baseline Prisma migration, repeatable migration/status scripts, and a seed workflow that loads continents, pilot country configuration, and industry categories from the shared domain package. Hosted migration/seed execution remains paused until the final deployment platform is selected.
+- 2026-06-18: Continued sanitising and security hardening without deployment. Removed the local Railway CLI dependency and root deploy scripts while deployment is paused, added shared input sanitisation helpers, wired a global API sanitising pipe before validation, tightened URL validation to HTTP/HTTPS only, prevented validation errors from echoing submitted values, and hardened recursive safety checks against cyclic or deeply nested payloads. npm audit remains partially blocked by latest NestJS, Next.js, and Prisma transitive advisories until upstream packages publish patched release lines.
+- 2026-06-18: Continued tenant-route hardening without deployment. Migrated profile draft/preview routes and advert listing/lifecycle routes from temporary `x-tenant-id` header trust to the MFA-verified tenant session guard, and added OpenAPI documentation for the required `x-session-token` header. Remaining tenant modules still need the same strict-guard migration.
+- 2026-06-18: Continued tenant-route hardening without deployment. Migrated lead conversion and conversation/chat routes from temporary `x-tenant-id` header trust to the MFA-verified tenant session guard, covering match feedback, inquiry/RFQ, lead inbox, lead status, conversation, message, assignment, notification, and SLA endpoints.
+- 2026-06-18: Completed the current tenant-controller guard migration without deployment. Migrated Source Finder, notification, analytics, and finance routes to the MFA-verified tenant session guard, added required session-token API documentation, and removed the obsolete header-only tenant context guard. Production identity provider, real MFA provider, invite flows, and hosted Prisma enablement remain future hardening work.
+- 2026-06-18: Continued auth hardening without deployment. Replaced the fixed MFA verification code with generated six-digit challenge codes that are stored only as session-scoped hashes, expire after 10 minutes, lock after repeated failures, and can be persisted through the Prisma auth repository. Non-production can display the development code for local testing; production provider-backed email/SMS/authenticator delivery remains future work.
+- 2026-06-18: Continued account security hardening without deployment. Added hashed, expiring account challenges for email verification and password reset, exposed request/confirm auth endpoints, and made completed password resets revoke active user sessions. Non-production can display development tokens for local testing; production email delivery remains future work.
+- 2026-06-18: Continued tenant access hardening without deployment. Added MVP tenant invite tokens so MFA-verified owners can invite non-owner tenant roles, invite acceptance creates a verified invited user with terms evidence and role-aware membership, and invited users receive role-aware sessions. Existing-account invite linking and production email delivery remain future work.
+- 2026-06-19: Continued auth audit hardening without deployment. Added repository-backed audit logs for owner registration, login success/failure, email verification, password reset, MFA success/failure, tenant invite creation, and tenant invite acceptance, with an owner/MFA-protected tenant audit lookup endpoint. Audit metadata avoids raw secrets, tokens, MFA codes, invite links, and raw email addresses.
+- 2026-06-19: Continued tenant invite hardening without deployment. Existing accounts can now accept tenant invites only when they provide an active session for the same invited user, creating a role-aware membership and terms evidence without duplicating the user account.
+- 2026-06-19: Continued Epic 3 profile publishing without deployment. Added tenant-session protected profile publish/live/history routes, in-memory draft-to-live profile versioning, previous-live archiving, days-live tracking, and profile publish audit evidence. Durable Prisma profile repositories, edit/update endpoints, terms re-acceptance at publish, and moderation review gates remain next.
+- 2026-06-19: Continued Epic 3 profile persistence without deployment. Added a profile repository boundary with in-memory default storage and opt-in Prisma persistence through `PROFILE_REPOSITORY=prisma`, including persisted source-draft linkage for published profiles. Profile edit/update endpoints, terms re-acceptance at publish, moderation review gates, and media/contact enrichment remain next.
+- 2026-06-19: Continued Epic 3 profile edit and publish control without deployment. Added tenant-session protected draft editing, edit audit evidence, publish-time request and stored current-terms checks, and review-pending gates for high-risk industry, role, or country changes. Moderator approval workflow, richer review reason persistence, service-area fields, and media/contact enrichment remain next.
+- 2026-06-19: Continued Epic 3 profile review workflow without deployment. Added persisted profile review reasons, review-request timestamps, approve/reject decisions, review notes, reviewed-by metadata, an MVP owner/admin pending-review queue, and publish blocking for rejected drafts. Platform-level moderator access and richer review case management remain next.
+- 2026-06-19: Continued Epic 3 profile enrichment without deployment. Added optional WhatsApp, physical address, map URL, social/contact links, structured service-area coverage, preview exposure, safety checks for nested enrichment fields, Prisma persistence, and live publish carry-over. Platform-level moderator access, media upload/display, and richer review case management remain next.
+- 2026-06-19: Continued Epic 3 platform moderation without deployment. Added MFA-required `MODERATE_CONTENT` platform access sessions backed by access assignments, country/tenant-scoped pending profile review filtering, platform profile review endpoints, shared review decision persistence, and access-decision audit writes. Media upload/display and richer review case management remain next.
+- 2026-06-19: Continued media upload/display foundation without deployment. Added shared media policy, profile draft media metadata routes, current-terms enforcement for authenticated media upload, 10-item display cap, metadata safety checks, preview media slots, Prisma `MediaAsset` persistence, and publish-time media carry-over into live profiles. Provider upload URLs, malware scanning, CDN transforms, video transcoding, listing media, and richer review case management remain next.
+- 2026-06-19: Continued the profile media provider foundation without deployment. Added provider-neutral upload preparation, storage/moderation/CDN transform adapter hooks, and persisted provider object keys, CDN URLs, transform status, and variant metadata for profile media. Real object-storage credentials/signed URLs, provider malware/media scanning, background media workers, listing media, and richer review case management remain next.
+- 2026-06-19: Continued Listing and Media without deployment. Promoted media adapters into a shared API media foundation, then added advert media upload preparation, media attach/list routes, ten-item display slots, safety/moderation/transform handling, tenant audit hooks, and advert-media auto-archive when day-40 advert auto-deletion runs. Persisted advert repositories, draft/preview advert versions, provider-backed storage/scanning workers, and richer review case management remain next.
+- 2026-06-19: Continued media provider hardening without deployment. Added S3-compatible presigned PUT upload support using env-configured Signature V4 signing, plus shared media processing job contracts for malware scan, content moderation, image transform, and video transcode work. Added `docs/MEDIA_PIPELINE.md` with storage env vars and upload/worker contracts. Live object-storage credentials, durable queues, provider scanners, and media workers remain next.
+- 2026-06-19: Continued durable media worker readiness without deployment. Added a Prisma/PostgreSQL media processing job outbox selected with `MEDIA_JOB_QUEUE_DRIVER=prisma`, database migration/model support, and worker claim/complete/retry/fail lifecycle methods so scan/transform jobs survive API restarts. Provider-backed scanners, image/video worker entrypoints, CDN publication, and live storage credentials remain next.
+- 2026-06-19: Continued media worker execution without deployment. Added a shared `MediaModule`, development media job processors, a `MediaWorkerService`, and the protected `POST /v1/operations/media/processing/run` endpoint so internal workers can claim persisted scan/transform jobs and mark them succeeded, retryable, or failed. Real provider scanners/transcoders, media asset result publication, unsafe-media escalation, and live credentials remain next.
+- 2026-06-20: Continued provider-backed media processing without deployment. Added generic HTTP processor adapters for malware scan, content moderation, image transform, and video transcode endpoints, plus Prisma media asset result publication so completed/final worker jobs update moderation state, blocked fail-closed state, transform status, CDN URLs, thumbnails, and responsive variants. Approved live vendors, CDN publication verification, unsafe-media escalation, and live credentials remain next.
+- 2026-06-20: Continued unsafe-media escalation without deployment. Added durable Prisma `MediaReviewCase` records and migration, plus escalation drafting from media result publication so blocked/final-failed scan, moderation, image, or video jobs open severity-ranked review cases with source job, provider, reason, media reference, and evidence. Moderator assignment/resolution actions, country/legal escalation playbooks, and live provider credentials remain next.
+- 2026-06-20: Continued media moderation operations without deployment. Added a protected platform media review API with scoped case listing, confirmed-block/restored/escalated/dismissed resolution actions, unsafe moderator-note blocking, Prisma and in-memory review-case repositories, and tenant audit evidence for moderator decisions. Moderator assignment queues, country/legal escalation playbooks, live provider credentials, and user-facing review status remain next.
+- 2026-06-20: Continued advert persistence without deployment. Added in-memory and Prisma advert repositories, Prisma `AdvertDraft`, `PublishedAdvert`, and `AdvertLifecycleNotification` models/migration, tenant-session protected draft/preview/publish routes, publish-to-live versioning, persisted advert media carry-over, persisted lifecycle alerts, and pause/archive/renew controls. Remaining listing work includes duplicate/boost controls, public discovery ranking, approved live media vendors, and richer moderator assignment queues.
+- 2026-06-20: Continued listing growth and moderation queues without deployment. Added draft/live advert duplication, boost metadata and controls, public advert discovery ranking with blocked-search safety, live/renewal-due visibility, active boost/freshness/media scoring, plus media review assignment queues with assigned/unassigned filters, assignment notes, scoped platform access, and tenant audit evidence. Remaining work includes approved live media vendors, full-text/vector discovery indexing, saved searches, relationship graph ranking, and user-facing review status.
+- 2026-06-20: Continued discovery foundation without deployment. Added domain discovery helpers for full-text tokenization, sparse vector scoring, desired-role inference, and relationship graph signals; added persisted advert discovery index, saved advert searches, de-duplicated discovery alerts, index rebuild controls, and Prisma migration support. Remaining work includes typo tolerance/synonyms, Postgres full-text/pgvector or external search provider hardening, discovery analytics counters, relationship claim approval, and web/mobile saved-search UX.
+- 2026-06-20: Continued discovery conversion and analytics without deployment. Added typo-tolerant query correction, synonym expansion dictionaries, expanded buyer/supplier role inference, saved-search save/search/match analytics events, protected advert discovery interaction counters for view/click/inquiry/share/download, and web/PWA saved-search controls with cadence, blocked-search handling, search restore, and alert candidate previews. Remaining work includes production search provider or Postgres full-text/pgvector hardening, persisted analytics rollups, external notification delivery, relationship claim approval, native mobile saved-search screens, and privacy/consent refinements.
+- 2026-06-20: Continued analytics durability without deployment. Added an analytics repository boundary, in-memory analytics repository, Prisma/PostgreSQL analytics repository selected with `ANALYTICS_REPOSITORY=prisma`, async tenant summary reads from the configured repository, awaited saved-search/discovery event writes, and updated env/deployment docs. Remaining work includes analytics warehouse/rollups, exports, hierarchy dashboards, retention automation, and privacy request workflows.
+- 2026-06-20: Continued analytics reporting without deployment. Added tenant analytics report/export endpoints for aggregated CSV/JSON output without raw event metadata, an internal analytics retention sweep with dry-run support and a 395-day default raw-event window, repository pruning for in-memory and Prisma analytics stores, and a web analytics readiness signal. Remaining work includes full analytics warehouse/rollups, PDF exports, hierarchy dashboards, configurable country/legal retention policies, and privacy request automation.
+- 2026-06-20: Continued hierarchy analytics without deployment. Added a platform analytics guard for `VIEW_ANALYTICS`, scope-filtered analytics repository reads, a platform hierarchy report endpoint for global/regional/continent/country/tenant views, service-level scope authorization using platform access assignments, top-country/top-tenant/top-entity breakdowns, and web analytics hierarchy readiness copy. Remaining work includes full hierarchy dashboard screens, PDF exports, rollup tables/warehouse, configurable retention policy, and privacy request automation.
+- 2026-06-20: Continued hierarchy analytics UX without deployment. Added web/PWA Analytics Command controls for hierarchy scope selection, CSV/JSON export choice, `VIEW_ANALYTICS` grant/block state, hierarchy aggregate metrics, top country/industry/tenant previews, and export filename readiness. Remaining work includes API-backed dashboard screens, PDF exports, analytics warehouse/rollups, configurable retention policy, and privacy request automation.
+- 2026-06-22: Continued hierarchy analytics API backing without deployment. Added protected platform hierarchy CSV/JSON exports through `GET /v1/platform/analytics/hierarchy/export`, reused `VIEW_ANALYTICS` scope checks for export generation, excluded raw event metadata from hierarchy export payloads, and surfaced protected report/export API routes in the web/PWA Analytics Command panel. Remaining work includes live dashboard data loading with platform session tokens, PDF exports, analytics warehouse/rollups, configurable retention policy, and privacy request automation.
+- 2026-06-22: Continued hierarchy analytics live loading without deployment. Added web/PWA Analytics Command platform session token input, protected live report fetches against `GET /v1/platform/analytics/hierarchy`, preview fallback reset on scope/format/industry changes, live/blocked/error status handling, and live report metric projection for totals, top country, top industry, top tenant, and most-visited rows. Remaining work includes first-party platform auth/session UX, PDF exports, analytics warehouse/rollups, configurable retention policy, and privacy request automation.
+- 2026-06-22: Continued hierarchy analytics platform auth UX without deployment. Added Analytics Command platform email/password sign-in, session lookup for pasted or managed tokens, MFA verification, session summary/error state, automatic token reuse for protected report loading, and report reset when the auth session changes. Remaining work includes PDF exports, analytics warehouse/rollups, configurable retention policy, and privacy request automation.
+- 2026-06-22: Continued analytics retention policy without deployment. Added shared analytics retention policy resolution, Kenya/default policy metadata, country-scoped retention pruning for in-memory and Prisma analytics repositories, `countryCode` support on the protected retention job, policy legal-basis output, and explicit retention-day override reporting. Remaining work includes PDF exports, analytics warehouse/rollups, deeper country retention approvals, and privacy request automation.
+- 2026-06-22: Continued analytics export hardening without deployment. Added PDF as a tenant and platform hierarchy analytics export format, returned PDF payloads as base64 with explicit encoding metadata, kept CSV/JSON exports as UTF-8 payloads, surfaced PDF export readiness in the web/PWA Analytics Command panel, and verified exported content still excludes raw event metadata. Remaining work includes analytics warehouse/rollups, privacy request automation, and deeper country retention approvals.
+- 2026-06-22: Continued analytics warehouse hardening without deployment. Added shared daily analytics rollup aggregation, Prisma `AnalyticsDailyRollup` persistence and migration, in-memory repository parity, a protected `POST /v1/operations/analytics/rollups/run` rebuild job with dry-run and tenant/country scoping, and tests proving aggregate rows exclude raw metadata. Remaining work includes rollup-backed dashboard read optimization, privacy request automation, and deeper country retention approvals.
+- 2026-06-23: Continued analytics dashboard read optimization without deployment. Added `AUTO`/`RAW`/`ROLLUP` report data-source selection, rollup-backed tenant and platform hierarchy report construction, warehouse metadata in JSON/CSV/PDF exports, and web/PWA Analytics Command controls that show the resolved raw-event or daily-rollup source. Remaining work includes privacy request automation and deeper country retention approvals.
+- 2026-06-23: Continued analytics privacy automation without deployment. Added protected `POST /v1/operations/analytics/privacy-requests/run` support for tenant-scoped analytics access summaries and erasure workflows, dry-run-by-default deletion, optional country/date scoping, raw event deletion through in-memory and Prisma repositories, rollup cleanup/rebuild after erasure, and tests proving returned summaries exclude raw metadata. Remaining work includes deeper country retention approvals.
+- 2026-06-23: Continued analytics retention approval hardening without deployment. Added legal approval status and review metadata to analytics retention policies, surfaced legal-approval-required state in retention results, and required `approvalReference` for emergency retention-day overrides. Remaining work is operational: obtain external legal approvals before marking country schedules approved.
+- 2026-06-23: Continued Epic 8 finance without deployment. Added shared invoice numbering and payment-balance helpers, protected tenant finance endpoints for invoice creation and receipt issuance, in-memory invoice/receipt records, and tests proving a paid transaction creates an invoice, receipt, tax snapshot, and ledger entries. Remaining work includes durable finance persistence, payment-provider adapters/idempotency, refunds, chargebacks, dunning, reconciliation, filing/remittance evidence, period locks, and exports.
+- 2026-06-24: Continued Epic 8 finance without deployment. Added shared credit-note numbering, proportional refund/chargeback reversal helpers, dunning stage selection, protected refund and chargeback endpoints, adjustment listing, duplicate-safe invoice dunning runs, and tests proving refund credit notes, reversal ledger entries, disputed-balance reopening, and overdue dunning notices. Remaining work includes durable finance persistence, payment-provider adapters/idempotency, reconciliation, approval workflow, evidence attachments, period locks, and exports.
+- 2026-08-21: Closed the remaining PRD 7.7 relationship-claim gap and PRD 7.4 scheduled-publish gap. Relationship claims now use structured kinds, visibility, counterpart or moderator approval, zero-tolerance/terms gating, opt-in Prisma persistence, and Source Finder graph attachment. Future advert `publishedAt` values stay `SCHEDULED` and out of public discovery until the lifecycle sweep promotes them to `LIVE`. The owner's local Desktop `Advert` folder was not present in this cloud workspace; product truth remains `Advertising_SaaS_PRD.md`.
+- 2026-08-21: Continued Epic 6 / PRD 7.8 messaging. Added SENT/DELIVERED/READ/FAILED receipts, counterpart-only read rules, a 15-second typing window, tenant conversation receipt/typing APIs, unread counts, opt-in Prisma conversation persistence through `CONVERSATIONS_REPOSITORY=prisma`, and Conversation Workspace receipt/typing controls. Live websocket delivery, attachments, and provider-backed adapters remain next.
+- 2026-08-21: Continued Epic 5 / PRD 7.5 Source Finder saved searches. Named searches now persist with INSTANT/DAILY/WEEKLY cadence, blocked-query gating, de-duplicated opportunity alerts, consent-aware IN_APP/email delivery plans, opt-in Prisma persistence through `SOURCE_FINDER_REPOSITORY=prisma`, and a protected operations sweep. Native mobile screens and provider-backed push/SMS/WhatsApp remain next.
+- 2026-08-21: Continued PRD 7.8 live chat delivery. Added a session-authenticated Socket.IO namespace at `/v1/conversations`, in-process online presence, HTTP presence heartbeat/snapshot routes, and Conversation Workspace live-channel controls. Message, typing, and receipt HTTP writes now fan out to tenant conversation rooms. Provider-backed notification adapters and audit logs remain next.
+- 2026-08-21: Wired PRD 7.8 notification delivery. Outbox records now dispatch through memory adapters by default, with Resend, Africa's Talking, and FCM overlay when credentials are present. Conversation SLA and Source Finder alerts enqueue into the outbox, delivery attempts are recorded, and `POST /v1/operations/notifications/dispatch/run` retries queued or failed channels. Product audit logs remain next.
+- 2026-08-21: Closed the remaining PRD 7.8 product-audit gap. Conversation create/send/assign/status/receipt/media and notification plan/dispatch writes now append tenant audit records with chat copy, emails, and secrets stripped. Owner/admin lookup is `GET /v1/audit`.
+- 2026-08-21: Continued Epic 8 tax return workbench. Draft returns now submit for review, require a clear provider reconciliation before approval, require a second filing approver above 10,000 filing-currency units, attach filing/remittance/authority evidence, lock the period after remittance, and export CSV/JSON country tax reports. `COUNTRY_FINANCE_ADMIN` can operate the workbench; tenant billing managers cannot. Product audit records the actions without notes or receipt references. Durable finance persistence and post-lock corrections remain next.
+- 2026-08-21: Continued Epic 5 Source Finder outcome feedback. Tenants can accept, save, dismiss, hide, or report matches. Hide/report always suppress that tenant's results; accept/save ranking boosts apply only when behavioral matching consent is granted. Opt-in Prisma persistence reuses `SOURCE_FINDER_REPOSITORY=prisma`. Native mobile screens, persisted search index, and hierarchy dashboards remain next.
+- 2026-08-21: Continued PRD 7.8 notification durability. Preferences and outbox dispatch state now persist through an in-memory repository by default, with opt-in PostgreSQL via `NOTIFICATIONS_REPOSITORY=prisma`. Retry sweeps read queued or failed channels from that store. Live WhatsApp provider credentials remain next.
+- 2026-08-21: Continued Epic 8 finance durability. Tax profiles, snapshots, invoices, receipts, adjustments, tax returns, payments, and reconciliation runs now persist through an in-memory repository by default, with opt-in PostgreSQL via `FINANCE_REPOSITORY=prisma`. Live payment-provider adapters and post-lock corrections remain next.
+- 2026-08-21: Continued Epic 8 post-lock tax corrections. Locked periods stay locked. Finance admins can post signed correction entries with `PERIOD_CORRECTION` evidence, ledger impact, and dual-control above 10,000 filing-currency units. Product audit omits notes and authority references. Live payment-provider adapters remain next.
+- 2026-08-21: Continued Epic 8 live payment-provider adapters. Invoice capture stays on the manual development adapter by default. `PAYMENT_PROVIDER=stripe`, `africastalking`, or `live` selects Stripe PaymentIntents and/or Africa's Talking M-Pesa checkout, rejects raw card numbers, keeps pending STK/3DS captures as `REQUIRES_CAPTURE` until settlement, and fail-closes without credentials. App-store billing and a persisted Source Finder search index remain next.
+- 2026-08-21: Continued Epic 5 Source Finder search index. Catalog documents now persist search text and sparse token vectors through the Source Finder repository. `POST /v1/source-finder/index/reindex` rebuilds from the pilot catalog, search uses indexed documents when present, and opt-in Prisma persistence reuses `SOURCE_FINDER_REPOSITORY=prisma`. Hierarchy dashboards and Postgres full-text/pgvector remain next.
+- 2026-08-21: Continued Epic 5 Source Finder hierarchy dashboards. Catalog records now roll up by country, industry, role, and relationship link. `GET /v1/source-finder/hierarchy` returns the dashboard, and the Relationship Graph panel shows source, verified, and top-bucket counts. Postgres full-text/pgvector remains next.
+- 2026-08-21: Continued Epic 5 Source Finder full-text ranking. Indexed catalog documents now score with token overlap in memory and Postgres `tsvector` search when Prisma is enabled. Search reports `RULES`/`FTS`/`HYBRID` and adds `KEYWORD_MATCH` without requiring live OpenAI embeddings. Live object-storage/media scanners and a WhatsApp provider remain next.
+- 2026-08-21: Continued PRD 7.8 WhatsApp notification delivery. Memory remains the default WhatsApp adapter. WhatsApp Cloud overlays when `WHATSAPP_TOKEN` and `WHATSAPP_PHONE_NUMBER_ID` are present; `WHATSAPP_PROVIDER=africastalking` uses Africa's Talking with `AT_WHATSAPP_FROM`. Explicit provider selection fail-closes without credentials, and destinations that are not E.164 numbers are rejected. Live object-storage/media scanners remain next.
+- 2026-08-21: Continued Listing and Media live storage. DigitalOcean `SPACES_*` credentials now overlay the S3-compatible upload signer, ClamAV scans malware, and Sightengine moderates visuals. Named providers fail-close without credentials, and scanner results omit API secrets. CDN publication verification remains next.
+- 2026-08-21: Continued Epic 2 auth email delivery. Verification, password-reset, tenant-invite, and email MFA messages overlay through Resend when `RESEND_API_KEY` and `EMAIL_FROM` are set. `AUTH_EMAIL_PROVIDER=resend` fail-closes without credentials; development tokens stay in non-production when no live sender is configured. Authenticator/TOTP MFA remains next.
+- 2026-08-21: Continued Epic 2 authenticator MFA. RFC 6238 TOTP enrollment issues an otpauth URI once, confirmation stores the secret, later logins use `AUTHENTICATOR` delivery, and reused time-steps are rejected. Recovery codes and a hosted identity provider remain next.
+- 2026-08-21: Continued Epic 2 MFA recovery codes. TOTP confirmation now issues 10 hashed single-use codes, login MFA accepts a recovery code when an authenticator is enrolled, reuse is rejected, and regenerate replaces the prior set. Audit metadata omits the codes. A hosted identity provider remains next.
+- 2026-08-21: Continued Epic 2 hosted identity overlay. Auth0, Clerk, or generic OIDC ID tokens verify through JWKS and exchange at `POST /v1/auth/identity/session` for an existing tenant session. Named providers fail-close without issuer and audience. Unverified emails and unknown accounts are rejected. New tenants still accept terms through owner signup. Hosted Prisma enablement remains next.
+- 2026-08-21: Continued Epic 5 Source Finder embeddings. OpenAI `text-embedding-3-small` overlays when `OPENAI_API_KEY` is set, stores vectors on reindex, and adds `SEMANTIC_MATCH` at search time. `SOURCE_FINDER_EMBEDDING_PROVIDER=openai` fail-closes without the key; tests mock fetch and do not require live secrets. Hosted Prisma enablement remains next.
+- 2026-08-21: Continued Listing and Media CDN publication verification. `IMAGE_TRANSFORM` and `VIDEO_TRANSCODE` jobs now confirm public HTTPS URLs with a Range GET before succeeding. The overlay activates when `SPACES_CDN_ENDPOINT` or `MEDIA_S3_PUBLIC_BASE_URL` is set; `MEDIA_CDN_VERIFICATION_PROVIDER=live` fail-closes without a public origin. Unreachable objects fail closed; 5xx stays retryable. Legal/reporting escalation playbooks remain next.
+- 2026-08-21: Continued Listing and Media legal/reporting playbooks. Kenya is the first approved country profile: escalate and HIGH/CRITICAL confirmed-block decisions attach KE-CIRT, NCMEC CyberTipline, and hosting-abuse channels with evidence preservation. Other countries fail closed until a playbook is approved. Audit metadata stores codes and deadlines only. User-facing review status remains next.
+- 2026-08-21: Continued Listing and Media user-facing review status. Tenant profile, advert, and conversation media now return `review` (`UNDER_REVIEW` / `READY` / `BLOCKED` / `PROCESSING_FAILED`) and omit internal moderation reasons. Public discovery only includes ready files. Richer review-case management remains next.
+- 2026-08-21: Continued Listing and Media review-case management. Cases now present computed SLAs (CRITICAL 24h, HIGH 72h, MEDIUM 168h), support GET by id, job-type and overdue filters, and reopen of dismissed cases only. HIGH/CRITICAL restore or dismiss requires mistaken-classification confirmation plus a reviewer note. Audit metadata stores the flag and omits note bodies. Production identity remains next.
+- 2026-08-21: Continued hosted Prisma enablement. `PERSISTENCE_DRIVER=prisma` overlays PostgreSQL for repositories and media queues when `DATABASE_URL` is set, and fail-closes without it. Per-repository `memory` overrides still win. Unset driver keeps the in-memory default even if `DATABASE_URL` exists. `GET /v1/health` reports driver and `databaseConfigured` without the URL. Broader non-auth product audit coverage remains next.
+- 2026-08-21: Continued broader non-auth product audit coverage. Analytics exports, privacy/retention/rollup jobs, invoice create/receipt/capture/refund, provider capture settlement, and mobile checkout/payout now append tenant audit records. Metadata omits emails, phones, invoice numbers, payment references, and secrets. `GET /v1/audit` filters by action or entity type. Native mobile and app-store billing remain out of scope.
+- 2026-08-21: Reviewed live deployment and Google Play constraints. Fly.io Frankfurt serves `sellfindconnect.com` / `www` (HTTP 200) and `api.sellfindconnect.com/v1/health` (HTTP 200). The live API image still reports `telpen-api` without persistence health, and `/privacy` plus `/account/delete` 404 until web is redeployed. Railway URLs 404; `adverts.telpen.net` does not resolve. CORS now pairs apex and www. Privacy routes are mounted at `/v1/privacy` behind the tenant session guard. Locked rule: the verified login phone is the only STK Push destination; a Play Android listing would need Google Play Billing for the SaaS subscription and must not request `READ_SMS` or `READ_CALL_LOG`. See `docs/FLY_DEPLOYMENT.md` and `docs/PLAY_STORE.md`.
+- 2026-08-22: Added the durable account-deletion worker. After the 30-day grace period, `POST /v1/operations/privacy/deletions/run` (internal job key) completes due requests: erase tenant profile/adverts/conversations/media, revoke sessions, retain billing/analytics/auth-audit, and write `ACCOUNT_DELETION_COMPLETED` without the user's reason. Memory remains the default store; Prisma overlays the existing `AccountDeletionRequest` tables via `PRIVACY_REPOSITORY` or `PERSISTENCE_DRIVER`. The daily scheduled-jobs workflow now includes this sweep. Fly still needs a redeploy before `/privacy` and `/account/delete` are live.
+- 2026-08-22: Enabled hosted Prisma on Fly deploy. The API image now includes Prisma CLI, schema, and migrations. `fly.api.toml` `release_command` runs `deploy/api-release.sh` (migrate, then idempotent country/industry seed) before traffic shifts, then sets `PERSISTENCE_DRIVER=prisma`. GitHub Actions scheduled-job cron is on for `https://api.sellfindconnect.com/v1` once `INTERNAL_JOB_KEY` is set on Fly and in repository secrets. Live health still reports memory until that API image is deployed.
+- 2026-08-22: First hosted Prisma Fly release failed on `20260625000000_finance_durability` because three checked-in SQL files started with a UTF-8 BOM (`U+FEFF`). Postgres rejected the file at byte 0, so no statements ran. The BOM is stripped; the release command marks that failed Prisma row rolled back and retries migrate. Production stays on memory until that image deploys.
+- 2026-08-22: The BOM-fix image then failed with Prisma P3009 (failed `finance_durability` row still present; recovery only handled P3018). Release now runs `migrate resolve --rolled-back` for that migration before `migrate deploy`. Production still stays on memory until this image deploys.
+- 2026-08-22: After finance/privacy applied, `20260627000000_search_hardening` failed because `to_tsvector("english", coalesce(...,""))` and `" "` are identifiers in Postgres, not strings. SQL now uses `'english'` / `''` / `' '`. Release also rolls back that failed row before migrate. Production stays on memory until this image deploys.
+- 2026-08-22: Prepared the Kenya paid-launch tax gate. Seed writes a DRAFT
+  Kenya Revenue Authority profile (16% VAT, monthly iTax, digital-marketplace
+  threshold 0) into the finance workbench store and never overwrites an
+  APPROVED row. STK checkout fail-closes with `tax_profile` and
+  `PAYMENT_CHECKOUT_BLOCKED` until a human sets `approvedBy`.
+- 2026-08-22: Researched remote multi-country tax remittance. Digital-service
+  competitors (Google/Meta/Netflix-style and Stripe Tax SaaS) register on
+  non-resident portals and file online; they do not travel or open an office
+  per customer country. Kenya: iTax simplified DMS VAT or a tax representative;
+  eTIMS is not required for that path (KRA DMS FAQ). Jumia/Jiji local-entity
+  models are for on-the-ground marketplaces. Merchant-of-Record (Paddle)
+  remits Kenya 16% VAT but conflicts with login-phone STK as seller of record.
+- 2026-08-22: Locked the group tax operating model for all five owner-product
+  SaaS subscriptions: stay merchant of record, Kenya first on iTax (or one
+  Kenyan agent), keep STK, finance module + Stripe Tax for rates, EU OSS later.
+  Executable in this repo (`packages/domain/src/tax-operating-model.ts`);
+  `PAYMENT_PROVIDER=paddle|lemonsqueezy|dodo` fail-closes. Copy-paste blocks
+  for InsurOS, Telpen Edu, and Stawi are in `docs/GROUP_TAX_OPERATING_MODEL.md`.
+  This does not auto-approve the Kenya tax profile.
+- 2026-08-22: Wired Stripe Tax as an optional rate overlay.
+  `TAX_RATE_PROVIDER=stripe_tax` requires `STRIPE_SECRET_KEY`, quotes
+  `POST /v1/tax/calculations` for digital software (`txcd_10103000`), and
+  fail-closes on a zero or mismatched quote. Finance-module rules remain the
+  source of truth. Stripe Tax does not become the seller and does not file iTax.
+- 2026-08-22: Published public Terms of Service and subscription terms at
+  `/terms` and `/subscription`, versions `terms-2026-08-22` and
+  `subscription-2026-08-22`. Existing tenants must re-accept before gated
+  actions. Counsel signed off on 09/10/26 (SFC-01). A web deploy is required before the
+  live URLs leave 404.
+- 2026-08-22: Published public prohibited-content policy at `/prohibited`
+  from the shared zero-tolerance summaries, and redirected `/dashboard`
+  routes into the home workspace so onboarding sell/find launches no longer
+  404. Onboarding now links to terms, subscription, privacy, and prohibited
+  policies.
+- 2026-08-22: Home workspace now reads `view`, `q`, `industry`, and `role`
+  from those dashboard redirects. Find onboarding maps AGRI-style quick
+  codes onto catalog industries and focuses Source Finder; sell onboarding
+  focuses Advertiser Setup. This is a web deploy.
+- 2026-08-22: Published public community standards at `/community`
+  (`community-2026-08-22`) from shared domain summaries. The page is the
+  Play UGC user policy: report/block, harassment, not-for-children, and
+  sexual content fully prohibited (not incidental). Counsel signed off on
+  09/10/26 (SFC-01). Live `/community` is HTTP 200.
+- 2026-08-22: Added UGC report and block. Tenants can report or block a
+  Source Finder target after terms acceptance. Blocked ids leave that
+  tenant’s results. `POST /v1/ugc/reports` and `POST /v1/ugc/blocks` persist
+  in memory by default and Prisma when `PERSISTENCE_DRIVER=prisma`.
+  Moderators use `GET/POST /v1/platform/ugc/reports`. Audit stores reason
+  and target id, never report details. API then web deploy.
+- 2026-08-22: Tenant blocks now stop conversation create/send/media/typing,
+  lead inquiry, Source Finder search, opportunity alerts, and outcome
+  writes. Existing threads present as `BLOCKED` with paused SLA until the
+  tenant unblocks. No new Prisma migration. API then web deploy.
+- 2026-08-24: Added a UGC moderator queue. Report reasons map to severity and
+  SLA (prohibited 24h, harassment/impersonation 72h). `GET /v1/platform/ugc/reports`
+  returns `{ openCount, overdueCount, reports }` sorted open/overdue/critical
+  first. Home loads and resolves the queue with an MFA `MODERATE_CONTENT`
+  session token. Audit still omits report details. API then web deploy.
+- 2026-08-24: Added legal/support lookup of accepted policy versions.
+  `GET /v1/platform/legal/terms-acceptances?tenantId=&userId=` requires an MFA
+  `VIEW_TENANT` platform assignment, marks current vs stale policies, and
+  records `TERMS_ACCEPTANCE_LOOKED_UP` without emails or hashes. Home loads
+  it from the Policy Lookup panel. API then web deploy.
+- 2026-08-24: Forced re-acceptance after material policy version changes.
+  `GET /v1/auth/session` returns `termsGate`. Stale stored versions lock
+  publish, chat, inquiry, UGC report/block, relationship claims, and checkout
+  (`reason: terms`). `POST /v1/auth/terms/accept` writes `REACCEPTANCE`
+  evidence after MFA and records `TERMS_REACCEPTED` without emails. Home Terms
+  Gate can re-accept with the session token. API then web deploy.
+- 2026-09-24: Locked this Cloud Agent environment to
+  `github.com/Bucrepinfo-lab/sellfindconnect.com` only. Empty
+  `repositoryDependencies` in `.cursor/environment.json`. Telpen Edu remains
+  in its previous separate session and environment.
+- 2026-10-15: Recorded signed SFC-02 (Kenya tax profile approval) in
+  `docs/SIGN_OFF_RECORDS.md`: director signed 05/10/26, tax agent 07/10/26,
+  production approval ticked. Kenya profile stays DRAFT and `approvedBy`
+  unset until the agent resolves the resident-vs-non-resident contradiction
+  (eTIMS and SEP rows) and the blank KRA PIN and `approvedBy` fields. The
+  legal policy sign-off PDF arrived in the same email but is not yet
+  recorded, so the policy pages remain "not counsel sign-off".
+- 2026-10-15: Recorded signed SFC-01 (legal policy review) in
+  `docs/SIGN_OFF_RECORDS.md`. Counsel (Advocate of the High Court of Kenya)
+  signed 09/10/26 and the director 05/10/26: all five policies approved as
+  published at their current versions, no changes requested. They are now
+  the production contract; no version bump or re-acceptance needed. Removed
+  the "not a counsel sign-off" line from `/community` (web deploy).
+- 2026-10-15: Started the Google Play listing (Android TWA,
+  `com.sellfindconnect.app`, built with PWABuilder). Added public sign-up
+  (Create a business account), PWA icons and manifest, an offline service
+  worker, env-driven `/.well-known/assetlinks.json`
+  (`ANDROID_CERT_FINGERPRINTS`), a Play reviewer MFA code for one non-staff
+  account (`PLAY_REVIEW_EMAIL` / `PLAY_REVIEW_MFA_CODE`), and a fuller public
+  deletion page. The web image now ships `apps/web/public` (icons and
+  `onboarding.css` were 404). Live sign-in still needs `RESEND_API_KEY` and
+  `EMAIL_FROM` on the API: without them no MFA code is delivered. Paste packs:
+  `docs/PLAY-STORE-LISTING.md`, `docs/PLAY-APP-CONTENT-REVIEW.md`.
+- 2026-10-15: Built the Android package with PWABuilder
+  (`com.sellfindconnect.app`, notifications/location/Play Billing off; the
+  owner holds the signing key) and created the app in Play Console (id
+  4974683027202673741). Most App content cards and the store listing are
+  saved; Data safety is a draft imported from `docs/data_safety_export.csv`.
+  Remaining: reviewer account and App access, Target audience, phone
+  screenshots, `.aab` upload, assetlinks fingerprints, closed test.
+- 2026-10-19: Rebased PR #55 (policy audit fixes from 2026-09-24) onto main.
+  Community standards (`community-2026-08-22`) join the terms gate (migration
+  `20261019120000_add_community_standards_acceptance`, additive, backfills
+  rows on `terms-2026-08-22`). Invoice mobile-money pay rejects a
+  caller-supplied phone and sends STK only to the verified login phone. Owner
+  payouts require current terms and a same-tenant recipient. A missing
+  `x-session-token` returns 401. Legal pages share one `PolicyNav` footer.
+  Server-side Play purchase-token verification (`PAYMENT_PROVIDER=play`) is
+  opt-in and off by default. The PR's placeholder icons, `deploy/twa` and
+  Play listing pack were dropped as superseded by #64/#65.

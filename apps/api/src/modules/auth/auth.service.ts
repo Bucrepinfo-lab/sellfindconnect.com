@@ -1,0 +1,1902 @@
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  Optional,
+  UnauthorizedException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
+import {
+  activePolicyVersions,
+  buildTermsAcceptanceEvidence,
+  buildTermsAcceptanceLookup,
+  calculateTrialSubscription,
+  describeTermsAcceptanceGate,
+  evaluateAccess,
+  evaluatePasswordPolicy,
+  evaluateSafetyFields,
+  getCountry,
+  industryCategories,
+  isCurrentTermsAcceptance,
+  presentTermsAcceptanceLookup,
+  staleTermsAcceptancePolicies,
+  termsAcceptancePolicyKeys,
+  normalizeResourceScope,
+  requiresMfa,
+  roleHasPermission,
+  sanitizeProductAuditMetadata,
+  matchesProductAuditQuery,
+  toE164,
+  buildOtpauthUri,
+  generateRecoveryCodes,
+  generateTotpSecret,
+  isTotpMfaCode,
+  normalizeRecoveryCode,
+  totpDefaults,
+  verifyTotpCode,
+  type AccessDecision,
+  type AccessPermission,
+  type AccessResourceScope,
+  type ProductAuditQuery,
+  type TenantAccessRole,
+} from '@telpen/domain';
+import { createHash, pbkdf2Sync, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
+
+import type {
+  AccessAssignmentRecord,
+  AuthAuditRecord,
+  AuthAccountChallengePurpose,
+  AuthAccountChallengeRecord,
+  AuthMfaChallengeRecord,
+  AuthSessionRecord,
+  AuthTenantRecord,
+  AuthTenantInviteRecord,
+  AuthUserRecord,
+  IssuedAuthSession,
+  PresentedAccountChallenge,
+  PresentedMfaChallenge,
+  PresentedAuthSession,
+  PresentedTenantInvite,
+  PlatformAccessSession,
+  TenantMembershipRecord,
+} from './auth.records';
+import { AUTH_REPOSITORY, type AuthRepository } from './auth.repository';
+import { SMS_SENDER, type SmsSender } from './africastalking-sms';
+import {
+  EMAIL_SENDER,
+  buildAuthEmailMessage,
+  type AuthEmailMessage,
+  type AuthEmailPurpose,
+  type AuthEmailSender,
+} from './resend-email';
+import { tenantInviteRoles } from './dto/auth.dto';
+import type {
+  AcceptTenantInviteDto,
+  CheckTenantSessionDto,
+  ConfirmEmailVerificationDto,
+  ConfirmPasswordResetDto,
+  CreateTenantInviteDto,
+  LoginDto,
+  RegisterTenantOwnerDto,
+  RequestEmailVerificationDto,
+  RequestPasswordResetDto,
+  RequestPhoneOtpDto,
+  VerifyMfaDto,
+  VerifyPhoneOtpDto,
+  EnrollTotpDto,
+  ConfirmTotpDto,
+  ExchangeHostedIdentityDto,
+  RegenerateRecoveryCodesDto,
+} from './dto/auth.dto';
+import { InMemoryAuthRepository } from './in-memory-auth.repository';
+import {
+  HOSTED_IDENTITY_VERIFIER,
+  type HostedIdentityVerifier,
+} from './oidc-identity';
+
+const MFA_CHALLENGE_TTL_MS = 10 * 60 * 1000;
+const MFA_MAX_FAILED_ATTEMPTS = 5;
+const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
+const PASSWORD_RESET_TTL_MS = 30 * 60 * 1000;
+const PHONE_OTP_TTL_MS = 10 * 60 * 1000;
+const TENANT_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+@Injectable()
+export class AuthService {
+  private readonly emailSender?: AuthEmailSender;
+  private readonly identityVerifier?: HostedIdentityVerifier;
+
+  constructor(
+    @Optional()
+    @Inject(AUTH_REPOSITORY)
+    private readonly repository: AuthRepository = new InMemoryAuthRepository(),
+    @Optional()
+    @Inject(SMS_SENDER)
+    private readonly smsSender?: SmsSender,
+    @Optional()
+    @Inject(EMAIL_SENDER)
+    emailSender?: AuthEmailSender | null,
+    @Optional()
+    @Inject(HOSTED_IDENTITY_VERIFIER)
+    identityVerifier?: HostedIdentityVerifier | null,
+  ) {
+    this.emailSender = emailSender ?? undefined;
+    this.identityVerifier = identityVerifier ?? undefined;
+  }
+
+  async registerTenantOwner(input: RegisterTenantOwnerDto) {
+    this.assertSafe(input, 'Registration contains blocked content.');
+
+    const email = input.email.trim().toLowerCase();
+    if (await this.repository.findUserByEmail(email)) {
+      throw new ConflictException('An account with this email already exists.');
+    }
+
+    const country = getCountry(input.countryCode);
+    if (!country) {
+      throw new UnprocessableEntityException('Unsupported country.');
+    }
+    const phone = input.phone ? (toE164(input.phone) ?? undefined) : undefined;
+    if (input.phone && !phone) {
+      throw new UnprocessableEntityException('Enter a valid phone number.');
+    }
+
+    if (!industryCategories.some((industry) => industry.code === input.industryCode)) {
+      throw new UnprocessableEntityException('Unsupported industry.');
+    }
+
+    const passwordPolicy = evaluatePasswordPolicy(input.password);
+    if (!passwordPolicy.allowed) {
+      throw new UnprocessableEntityException({
+        message: 'Password does not meet the security policy.',
+        passwordPolicy,
+      });
+    }
+
+    const now = new Date().toISOString();
+    const userId = randomUUID();
+    const tenantId = randomUUID();
+    const password = this.hashPassword(input.password);
+    const subscription = calculateTrialSubscription({
+      startedAt: now,
+      monthlyAmount: country.monthlySubscriptionAmount,
+      currencyCode: country.currencyCode,
+    });
+    const user: AuthUserRecord = {
+      id: userId,
+      email,
+      displayName: input.displayName,
+      phone,
+      passwordHash: password.hash,
+      passwordSalt: password.salt,
+      passwordIterations: password.iterations,
+      mfaRequired: true,
+      createdAt: now,
+    };
+    const tenant: AuthTenantRecord = {
+      id: tenantId,
+      displayName: input.tenantDisplayName,
+      countryCode: country.code,
+      industryCode: input.industryCode,
+      primaryRole: input.primaryRole,
+      userType: input.userType,
+      status: subscription.status,
+      trialStartedAt: subscription.trialStartedAt,
+      trialEndsAt: subscription.trialEndsAt,
+      nextBillingAt: subscription.nextBillingAt,
+      monthlyAmount: subscription.monthlyAmount,
+      currencyCode: subscription.currencyCode,
+      createdAt: now,
+    };
+    const membership: TenantMembershipRecord = {
+      id: randomUUID(),
+      userId,
+      tenantId,
+      role: 'OWNER',
+      createdAt: now,
+    };
+    const termsAcceptance = buildTermsAcceptanceEvidence({
+      accepted: input.acceptedTerms,
+      userId,
+      tenantId,
+      countryCode: country.code,
+      locale: country.locale,
+      appSurface: 'WEB',
+      acceptanceSource: 'SIGNUP',
+      acceptedAt: now,
+    });
+
+    if (!termsAcceptance) {
+      throw new UnprocessableEntityException('Current terms acceptance is required.');
+    }
+
+    await this.repository.createOwnerRegistration({
+      user,
+      tenant,
+      membership,
+      termsAcceptance,
+    });
+
+    const session = await this.createSession(user, tenantId, 'OWNER');
+    const emailVerificationChallenge = await this.createAccountChallenge(
+      user,
+      'EMAIL_VERIFICATION',
+      EMAIL_VERIFICATION_TTL_MS,
+    );
+
+    await this.recordAudit({
+      tenantId,
+      actorUserId: user.id,
+      action: 'AUTH_TENANT_OWNER_REGISTERED',
+      entityType: 'TENANT',
+      entityId: tenantId,
+      metadata: {
+        countryCode: country.code,
+        industryCode: input.industryCode,
+        role: 'OWNER',
+        termsVersion: termsAcceptance.termsVersion,
+      },
+    });
+
+    return {
+      user: this.presentUser(user),
+      tenant,
+      membership,
+      session,
+      emailVerificationChallenge,
+      termsAcceptance,
+      passwordPolicy,
+    };
+  }
+
+  async login(input: LoginDto) {
+    const email = input.email.trim().toLowerCase();
+    const user = await this.repository.findUserByEmail(email);
+    if (!user || !this.verifyPassword(input.password, user)) {
+      await this.recordAudit({
+        action: 'AUTH_LOGIN_FAILED',
+        entityType: 'AUTH',
+        metadata: {
+          reason: 'INVALID_CREDENTIALS',
+          emailHash: this.hashAuditIdentifier(email),
+        },
+      });
+      throw new UnauthorizedException('Invalid email or password.');
+    }
+
+    const membership = await this.repository.findFirstMembershipForUser(user.id);
+    if (!membership) {
+      await this.recordAudit({
+        actorUserId: user.id,
+        action: 'AUTH_LOGIN_FAILED',
+        entityType: 'USER',
+        entityId: user.id,
+        metadata: { reason: 'NO_TENANT_MEMBERSHIP' },
+      });
+      throw new UnauthorizedException('No tenant membership is attached to this account.');
+    }
+
+    const session = await this.createSession(user, membership.tenantId, membership.role);
+    await this.recordAudit({
+      tenantId: membership.tenantId,
+      actorUserId: user.id,
+      action: 'AUTH_LOGIN_SUCCEEDED',
+      entityType: 'AUTH_SESSION',
+      entityId: session.id,
+      metadata: {
+        role: membership.role,
+        mfaRequired: session.mfaRequired,
+      },
+    });
+
+    return {
+      user: this.presentUser(user),
+      tenant: await this.repository.findTenantById(membership.tenantId),
+      session,
+    };
+  }
+
+  async exchangeHostedIdentity(input: ExchangeHostedIdentityDto) {
+    if (!this.identityVerifier) {
+      throw new UnprocessableEntityException('Hosted identity is not configured.');
+    }
+
+    let claims;
+    try {
+      claims = await this.identityVerifier.verifyIdToken(input.idToken);
+    } catch {
+      await this.recordAudit({
+        action: 'AUTH_HOSTED_IDENTITY_FAILED',
+        entityType: 'AUTH',
+        metadata: { reason: 'INVALID_TOKEN' },
+      });
+      throw new UnauthorizedException('Invalid identity token.');
+    }
+
+    const email = claims.email.trim().toLowerCase();
+    const user = await this.repository.findUserByEmail(email);
+    if (!user) {
+      await this.recordAudit({
+        action: 'AUTH_HOSTED_IDENTITY_FAILED',
+        entityType: 'AUTH',
+        metadata: {
+          reason: 'NO_ACCOUNT',
+          emailHash: this.hashAuditIdentifier(email),
+          issuer: claims.issuer,
+        },
+      });
+      throw new UnauthorizedException('No matching tenant account.');
+    }
+
+    const membership = await this.repository.findFirstMembershipForUser(user.id);
+    if (!membership) {
+      await this.recordAudit({
+        actorUserId: user.id,
+        action: 'AUTH_HOSTED_IDENTITY_FAILED',
+        entityType: 'USER',
+        entityId: user.id,
+        metadata: { reason: 'NO_TENANT_MEMBERSHIP' },
+      });
+      throw new UnauthorizedException('No tenant membership is attached to this account.');
+    }
+
+    const now = new Date().toISOString();
+    if (!user.emailVerifiedAt) {
+      await this.repository.markUserEmailVerified(user.id, now);
+    }
+
+    const session = await this.createSession(user, membership.tenantId, membership.role, {
+      mfaVerified: true,
+    });
+    await this.recordAudit({
+      tenantId: membership.tenantId,
+      actorUserId: user.id,
+      action: 'AUTH_HOSTED_IDENTITY_LOGIN_SUCCEEDED',
+      entityType: 'AUTH_SESSION',
+      entityId: session.id,
+      metadata: {
+        role: membership.role,
+        issuer: claims.issuer,
+        subjectHash: this.hashAuditIdentifier(claims.subject),
+        mfaVerified: true,
+      },
+    });
+
+    return {
+      user: this.presentUser({ ...user, emailVerifiedAt: user.emailVerifiedAt ?? now }),
+      tenant: await this.repository.findTenantById(membership.tenantId),
+      session,
+    };
+  }
+
+  /**
+   * Phone-OTP login — request. Normalises the phone to E.164 and, if it belongs to
+   * an existing account, mints a 6-digit code, stores it as a PHONE_LOGIN challenge
+   * and sends it via SMS (Africa's Talking). Always returns `{ requested: true }`
+   * so callers cannot probe which numbers exist. In non-production the code is
+   * returned inline for testing.
+   */
+  async requestPhoneOtp(input: RequestPhoneOtpDto) {
+    const phone = toE164(input.phone);
+    if (!phone) {
+      throw new UnprocessableEntityException('Enter a valid phone number.');
+    }
+
+    const user = await this.repository.findUserByPhone(phone);
+    let developmentCode: string | undefined;
+
+    if (user) {
+      const code = await this.createPhoneOtpChallenge(user, phone);
+      developmentCode = this.isProductionRuntime() ? undefined : code;
+
+      if (this.smsSender) {
+        await this.smsSender
+          .sendSms(
+            phone,
+            `${code} is your Telpen Adverts login code. It expires in 10 minutes. Do not share it.`,
+          )
+          .catch(() => undefined);
+      }
+
+      const membership = await this.repository.findFirstMembershipForUser(user.id);
+      await this.recordAudit({
+        tenantId: membership?.tenantId,
+        actorUserId: user.id,
+        action: 'AUTH_PHONE_OTP_REQUESTED',
+        entityType: 'USER',
+        entityId: user.id,
+        metadata: { phoneHash: this.hashAuditIdentifier(phone) },
+      });
+    }
+
+    return { requested: true, developmentCode };
+  }
+
+  /**
+   * Phone-OTP login — verify. Validates the code, marks the phone verified, and
+   * issues the SAME session the email/password login issues (tenant + role + MFA
+   * challenge if required). The phone the user logs in with is also their M-Pesa
+   * number for payments.
+   */
+  async verifyPhoneOtp(input: VerifyPhoneOtpDto) {
+    const phone = toE164(input.phone);
+    if (!phone) {
+      throw new UnauthorizedException('Invalid or expired login code.');
+    }
+
+    const challenge = await this.repository.findAccountChallengeByTokenHash(
+      this.hashPhoneOtp(phone, input.code),
+    );
+    if (
+      !challenge ||
+      challenge.purpose !== 'PHONE_LOGIN' ||
+      challenge.consumedAt ||
+      Date.parse(challenge.expiresAt) <= Date.now()
+    ) {
+      throw new UnauthorizedException('Invalid or expired login code.');
+    }
+
+    const user = await this.repository.findUserById(challenge.userId);
+    if (!user) {
+      throw new UnauthorizedException('Invalid or expired login code.');
+    }
+
+    const membership = await this.repository.findFirstMembershipForUser(user.id);
+    if (!membership) {
+      throw new UnauthorizedException('No tenant membership is attached to this account.');
+    }
+
+    const now = new Date().toISOString();
+    await this.repository.updateAccountChallenge({ ...challenge, consumedAt: now });
+    if (!user.phoneVerifiedAt) {
+      await this.repository.markUserPhoneVerified(user.id, now);
+    }
+
+    const session = await this.createSession(user, membership.tenantId, membership.role);
+    await this.recordAudit({
+      tenantId: membership.tenantId,
+      actorUserId: user.id,
+      action: 'AUTH_PHONE_OTP_LOGIN_SUCCEEDED',
+      entityType: 'AUTH_SESSION',
+      entityId: session.id,
+      metadata: { role: membership.role, mfaRequired: session.mfaRequired },
+    });
+
+    return {
+      user: this.presentUser({ ...user, phoneVerifiedAt: user.phoneVerifiedAt ?? now }),
+      tenant: await this.repository.findTenantById(membership.tenantId),
+      session,
+    };
+  }
+
+  async requestEmailVerification(input: RequestEmailVerificationDto) {
+    const user = await this.repository.findUserByEmail(input.email.trim().toLowerCase());
+    const emailVerificationChallenge =
+      user && !user.emailVerifiedAt
+        ? await this.createAccountChallenge(user, 'EMAIL_VERIFICATION', EMAIL_VERIFICATION_TTL_MS)
+        : undefined;
+
+    if (user && emailVerificationChallenge) {
+      const membership = await this.repository.findFirstMembershipForUser(user.id);
+      await this.recordAudit({
+        tenantId: membership?.tenantId,
+        actorUserId: user.id,
+        action: 'AUTH_EMAIL_VERIFICATION_REQUESTED',
+        entityType: 'USER',
+        entityId: user.id,
+        metadata: { emailHash: this.hashAuditIdentifier(user.email) },
+      });
+    }
+
+    return {
+      requested: true,
+      emailVerificationChallenge: this.isProductionRuntime() ? undefined : emailVerificationChallenge,
+    };
+  }
+
+  async confirmEmailVerification(input: ConfirmEmailVerificationDto) {
+    const challenge = await this.requireAccountChallenge(input.token, 'EMAIL_VERIFICATION');
+    const user = await this.repository.findUserById(challenge.userId);
+    if (!user) {
+      throw new UnauthorizedException('Invalid or expired account challenge.');
+    }
+
+    const now = new Date().toISOString();
+    await this.repository.updateAccountChallenge({ ...challenge, consumedAt: now });
+    await this.repository.markUserEmailVerified(challenge.userId, now);
+    const membership = await this.repository.findFirstMembershipForUser(challenge.userId);
+    await this.recordAudit({
+      tenantId: membership?.tenantId,
+      actorUserId: challenge.userId,
+      action: 'AUTH_EMAIL_VERIFIED',
+      entityType: 'USER',
+      entityId: challenge.userId,
+      metadata: { challengeId: challenge.id },
+    });
+
+    return {
+      verified: true,
+      emailVerifiedAt: now,
+    };
+  }
+
+  async requestPasswordReset(input: RequestPasswordResetDto) {
+    const user = await this.repository.findUserByEmail(input.email.trim().toLowerCase());
+    const passwordResetChallenge = user
+      ? await this.createAccountChallenge(user, 'PASSWORD_RESET', PASSWORD_RESET_TTL_MS)
+      : undefined;
+
+    if (user && passwordResetChallenge) {
+      const membership = await this.repository.findFirstMembershipForUser(user.id);
+      await this.recordAudit({
+        tenantId: membership?.tenantId,
+        actorUserId: user.id,
+        action: 'AUTH_PASSWORD_RESET_REQUESTED',
+        entityType: 'USER',
+        entityId: user.id,
+        metadata: { emailHash: this.hashAuditIdentifier(user.email) },
+      });
+    }
+
+    return {
+      requested: true,
+      passwordResetChallenge: this.isProductionRuntime() ? undefined : passwordResetChallenge,
+    };
+  }
+
+  async confirmPasswordReset(input: ConfirmPasswordResetDto) {
+    const passwordPolicy = evaluatePasswordPolicy(input.newPassword);
+    if (!passwordPolicy.allowed) {
+      throw new UnprocessableEntityException({
+        message: 'Password does not meet the security policy.',
+        passwordPolicy,
+      });
+    }
+
+    const challenge = await this.requireAccountChallenge(input.token, 'PASSWORD_RESET');
+    const user = await this.repository.findUserById(challenge.userId);
+    if (!user) {
+      throw new UnauthorizedException('Invalid or expired account challenge.');
+    }
+
+    const now = new Date().toISOString();
+    const password = this.hashPassword(input.newPassword);
+    await this.repository.updateAccountChallenge({ ...challenge, consumedAt: now });
+    await this.repository.updateUserPassword(user.id, {
+      passwordHash: password.hash,
+      passwordSalt: password.salt,
+      passwordIterations: password.iterations,
+    });
+    await this.repository.revokeSessionsForUser(user.id, now);
+    const membership = await this.repository.findFirstMembershipForUser(user.id);
+    await this.recordAudit({
+      tenantId: membership?.tenantId,
+      actorUserId: user.id,
+      action: 'AUTH_PASSWORD_RESET_COMPLETED',
+      entityType: 'USER',
+      entityId: user.id,
+      metadata: { challengeId: challenge.id, sessionsRevoked: true },
+    });
+
+    return {
+      reset: true,
+      sessionsRevokedAt: now,
+      passwordPolicy,
+    };
+  }
+
+  async createTenantInvite(input: CreateTenantInviteDto) {
+    const session = await this.requireSession(input.sessionToken);
+    if (session.tenantId !== input.tenantId || session.role !== 'OWNER') {
+      throw new UnauthorizedException('Only a tenant owner can create invites for this tenant.');
+    }
+
+    if (!session.mfaVerified) {
+      throw new UnauthorizedException('MFA verification is required before creating tenant invites.');
+    }
+
+    if (!tenantInviteRoles.includes(input.role)) {
+      throw new UnprocessableEntityException('Unsupported tenant invite role.');
+    }
+
+    const tenant = await this.repository.findTenantById(input.tenantId);
+    if (!tenant) {
+      throw new UnprocessableEntityException('Unsupported tenant.');
+    }
+
+    const email = input.email.trim().toLowerCase();
+    const existingInvitee = await this.repository.findUserByEmail(email);
+    if (
+      existingInvitee &&
+      (await this.repository.findMembershipForUserAndTenant(existingInvitee.id, tenant.id))
+    ) {
+      throw new ConflictException('This account already belongs to this tenant.');
+    }
+
+    const invite = await this.createTenantInviteRecord({
+      tenantId: tenant.id,
+      tenantDisplayName: tenant.displayName,
+      email,
+      role: input.role,
+      invitedByUserId: session.userId,
+    });
+    await this.recordAudit({
+      tenantId: tenant.id,
+      actorUserId: session.userId,
+      action: 'AUTH_TENANT_INVITE_CREATED',
+      entityType: 'TENANT_INVITE',
+      entityId: invite.id,
+      metadata: {
+        invitedEmailHash: this.hashAuditIdentifier(email),
+        invitedRole: input.role,
+        existingAccount: Boolean(existingInvitee),
+      },
+    });
+
+    return {
+      invite,
+    };
+  }
+
+  async acceptTenantInvite(input: AcceptTenantInviteDto) {
+    this.assertSafe(
+      {
+        displayName: input.displayName,
+        phone: input.phone,
+      },
+      'Invite acceptance contains blocked content.',
+    );
+
+    const invite = await this.requireTenantInvite(input.token);
+    const tenant = await this.repository.findTenantById(invite.tenantId);
+    const country = tenant ? getCountry(tenant.countryCode) : undefined;
+    if (!tenant || !country) {
+      throw new UnprocessableEntityException('Unsupported tenant.');
+    }
+
+    const existingUser = await this.repository.findUserByEmail(invite.email);
+    if (existingUser) {
+      if (!input.sessionToken) {
+        throw new UnauthorizedException('An active session is required to accept this invite.');
+      }
+
+      const inviteeSession = await this.requireSession(input.sessionToken);
+      if (inviteeSession.userId !== existingUser.id) {
+        throw new UnauthorizedException('Invite session does not belong to the invited account.');
+      }
+
+      if (await this.repository.findMembershipForUserAndTenant(existingUser.id, invite.tenantId)) {
+        throw new ConflictException('This account already belongs to this tenant.');
+      }
+
+      const now = new Date().toISOString();
+      const membership: TenantMembershipRecord = {
+        id: randomUUID(),
+        userId: existingUser.id,
+        tenantId: invite.tenantId,
+        role: invite.role,
+        createdAt: now,
+      };
+      const termsAcceptance = buildTermsAcceptanceEvidence({
+        accepted: input.acceptedTerms,
+        userId: existingUser.id,
+        tenantId: invite.tenantId,
+        countryCode: country.code,
+        locale: country.locale,
+        appSurface: 'WEB',
+        acceptanceSource: 'ADMIN_INVITE',
+        acceptedAt: now,
+      });
+
+      if (!termsAcceptance) {
+        throw new UnprocessableEntityException('Current terms acceptance is required.');
+      }
+
+      await this.repository.updateTenantInvite({ ...invite, acceptedAt: now });
+      await this.repository.createTenantMembershipWithTerms({
+        membership,
+        termsAcceptance,
+      });
+      await this.recordAudit({
+        tenantId: invite.tenantId,
+        actorUserId: existingUser.id,
+        action: 'AUTH_TENANT_INVITE_ACCEPTED',
+        entityType: 'TENANT_INVITE',
+        entityId: invite.id,
+        metadata: {
+          invitedByUserId: invite.invitedByUserId,
+          acceptedRole: invite.role,
+          termsVersion: termsAcceptance.termsVersion,
+          existingAccount: true,
+        },
+      });
+
+      return {
+        user: this.presentUser(existingUser),
+        tenant,
+        membership,
+        session: await this.createSession(existingUser, invite.tenantId, invite.role),
+        termsAcceptance,
+      };
+    }
+
+    const displayName = input.displayName?.trim();
+    if (!displayName || !input.password) {
+      throw new UnprocessableEntityException(
+        'Display name and password are required when accepting an invite for a new account.',
+      );
+    }
+
+    const passwordPolicy = evaluatePasswordPolicy(input.password);
+    if (!passwordPolicy.allowed) {
+      throw new UnprocessableEntityException({
+        message: 'Password does not meet the security policy.',
+        passwordPolicy,
+      });
+    }
+
+    const now = new Date().toISOString();
+    const userId = randomUUID();
+    const password = this.hashPassword(input.password);
+    const user: AuthUserRecord = {
+      id: userId,
+      email: invite.email,
+      displayName,
+      phone: input.phone,
+      passwordHash: password.hash,
+      passwordSalt: password.salt,
+      passwordIterations: password.iterations,
+      emailVerifiedAt: now,
+      mfaRequired: true,
+      createdAt: now,
+    };
+    const membership: TenantMembershipRecord = {
+      id: randomUUID(),
+      userId,
+      tenantId: invite.tenantId,
+      role: invite.role,
+      createdAt: now,
+    };
+    const termsAcceptance = buildTermsAcceptanceEvidence({
+      accepted: input.acceptedTerms,
+      userId,
+      tenantId: invite.tenantId,
+      countryCode: country.code,
+      locale: country.locale,
+      appSurface: 'WEB',
+      acceptanceSource: 'ADMIN_INVITE',
+      acceptedAt: now,
+    });
+
+    if (!termsAcceptance) {
+      throw new UnprocessableEntityException('Current terms acceptance is required.');
+    }
+
+    await this.repository.updateTenantInvite({ ...invite, acceptedAt: now });
+    await this.repository.createInvitedTenantUser({
+      user,
+      membership,
+      termsAcceptance,
+    });
+    await this.recordAudit({
+      tenantId: invite.tenantId,
+      actorUserId: user.id,
+      action: 'AUTH_TENANT_INVITE_ACCEPTED',
+      entityType: 'TENANT_INVITE',
+      entityId: invite.id,
+      metadata: {
+        invitedByUserId: invite.invitedByUserId,
+        acceptedRole: invite.role,
+        termsVersion: termsAcceptance.termsVersion,
+        existingAccount: false,
+      },
+    });
+
+    return {
+      user: this.presentUser(user),
+      tenant,
+      membership,
+      session: await this.createSession(user, invite.tenantId, invite.role),
+      termsAcceptance,
+      passwordPolicy,
+    };
+  }
+
+  async verifyMfa(input: VerifyMfaDto) {
+    const session = await this.requireSession(input.sessionToken);
+    if (!session.mfaRequired || session.mfaVerified) {
+      return {
+        session: this.presentSession(session),
+      };
+    }
+
+    const user = await this.repository.findUserById(session.userId);
+    const challenge = await this.repository.findMfaChallengeBySessionId(session.id);
+    if (user?.totpSecret) {
+      if (isTotpMfaCode(input.code)) {
+        return this.verifyAuthenticatorMfa(session, user, challenge, input.code);
+      }
+      return this.verifyRecoveryCodeMfa(session, user, challenge, input.code);
+    }
+
+    if (!challenge || challenge.consumedAt || Date.parse(challenge.expiresAt) <= Date.now()) {
+      await this.recordAudit({
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        action: 'AUTH_MFA_FAILED',
+        entityType: 'AUTH_SESSION',
+        entityId: session.id,
+        metadata: { reason: 'CHALLENGE_UNAVAILABLE' },
+      });
+      throw new UnauthorizedException('MFA challenge expired or unavailable.');
+    }
+
+    if (challenge.failedAttempts >= MFA_MAX_FAILED_ATTEMPTS) {
+      await this.recordAudit({
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        action: 'AUTH_MFA_FAILED',
+        entityType: 'AUTH_SESSION',
+        entityId: session.id,
+        metadata: { reason: 'CHALLENGE_LOCKED', challengeId: challenge.id },
+      });
+      throw new UnauthorizedException('MFA challenge locked after too many attempts.');
+    }
+
+    const codeMatches =
+      this.verifyMfaCode(session.id, input.code, challenge.codeHash) ||
+      (await this.isPlayReviewCode(user, input.code));
+    if (!codeMatches) {
+      await this.repository.updateMfaChallenge({
+        ...challenge,
+        failedAttempts: challenge.failedAttempts + 1,
+      });
+      await this.recordAudit({
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        action: 'AUTH_MFA_FAILED',
+        entityType: 'AUTH_SESSION',
+        entityId: session.id,
+        metadata: {
+          reason: 'INVALID_CODE',
+          challengeId: challenge.id,
+          failedAttempts: challenge.failedAttempts + 1,
+        },
+      });
+      throw new UnauthorizedException('Invalid MFA code.');
+    }
+
+    return this.completeMfaVerification(session, challenge);
+  }
+
+  async enrollTotp(input: EnrollTotpDto) {
+    const session = await this.requireSession(input.sessionToken);
+    if (!session.mfaVerified) {
+      throw new UnauthorizedException('MFA verification is required before authenticator enrollment.');
+    }
+
+    const user = await this.repository.findUserById(session.userId);
+    if (!user) {
+      throw new UnauthorizedException('A valid active session is required.');
+    }
+
+    const secret = generateTotpSecret();
+    const issuer = process.env.MFA_ISSUER?.trim() || 'SellFindConnect';
+    await this.repository.updateUserTotpEnrollment(user.id, {
+      totpPendingSecret: secret,
+    });
+    await this.recordAudit({
+      tenantId: session.tenantId,
+      actorUserId: user.id,
+      action: 'AUTH_TOTP_ENROLLMENT_STARTED',
+      entityType: 'USER',
+      entityId: user.id,
+      metadata: {
+        rotating: Boolean(user.totpSecret),
+        issuer,
+      },
+    });
+
+    return {
+      enrollment: {
+        issuer,
+        account: user.email,
+        secret,
+        otpauthUri: buildOtpauthUri({ issuer, account: user.email, secret }),
+        algorithm: totpDefaults.algorithm,
+        digits: totpDefaults.digits,
+        periodSeconds: totpDefaults.periodSeconds,
+      },
+    };
+  }
+
+  async confirmTotpEnrollment(input: ConfirmTotpDto) {
+    const session = await this.requireSession(input.sessionToken);
+    if (!session.mfaVerified) {
+      throw new UnauthorizedException('MFA verification is required before authenticator enrollment.');
+    }
+
+    const user = await this.repository.findUserById(session.userId);
+    if (!user?.totpPendingSecret) {
+      throw new UnprocessableEntityException('Start authenticator enrollment before confirming a code.');
+    }
+
+    const verified = verifyTotpCode(user.totpPendingSecret, input.code, {
+      lastUsedStep: user.totpLastUsedStep,
+    });
+    if (!verified.ok) {
+      await this.recordAudit({
+        tenantId: session.tenantId,
+        actorUserId: user.id,
+        action: 'AUTH_TOTP_ENROLLMENT_FAILED',
+        entityType: 'USER',
+        entityId: user.id,
+        metadata: { reason: 'INVALID_CODE' },
+      });
+      throw new UnauthorizedException('Invalid authenticator code.');
+    }
+
+    const now = new Date().toISOString();
+    const recoveryCodes = generateRecoveryCodes();
+    await this.repository.updateUserTotpEnrollment(user.id, {
+      totpSecret: user.totpPendingSecret,
+      totpPendingSecret: null,
+      totpEnrolledAt: now,
+      totpLastUsedStep: verified.step ?? null,
+      totpRecoveryCodeHashes: recoveryCodes.map((code) => this.hashRecoveryCode(user.id, code)),
+    });
+    await this.recordAudit({
+      tenantId: session.tenantId,
+      actorUserId: user.id,
+      action: 'AUTH_TOTP_ENROLLED',
+      entityType: 'USER',
+      entityId: user.id,
+      metadata: {
+        deliveryChannel: 'AUTHENTICATOR',
+        recoveryCodeCount: recoveryCodes.length,
+      },
+    });
+
+    return {
+      enrolled: true,
+      enrolledAt: now,
+      deliveryChannel: 'AUTHENTICATOR' as const,
+      recoveryCodes,
+      recoveryCodesRemaining: recoveryCodes.length,
+    };
+  }
+
+  async regenerateRecoveryCodes(input: RegenerateRecoveryCodesDto) {
+    const session = await this.requireSession(input.sessionToken);
+    if (!session.mfaVerified) {
+      throw new UnauthorizedException('MFA verification is required before regenerating recovery codes.');
+    }
+
+    const user = await this.repository.findUserById(session.userId);
+    if (!user?.totpSecret) {
+      throw new UnprocessableEntityException('Enroll an authenticator before regenerating recovery codes.');
+    }
+
+    const recoveryCodes = generateRecoveryCodes();
+    await this.repository.updateUserTotpEnrollment(user.id, {
+      totpRecoveryCodeHashes: recoveryCodes.map((code) => this.hashRecoveryCode(user.id, code)),
+    });
+    await this.recordAudit({
+      tenantId: session.tenantId,
+      actorUserId: user.id,
+      action: 'AUTH_RECOVERY_CODES_REGENERATED',
+      entityType: 'USER',
+      entityId: user.id,
+      metadata: { recoveryCodeCount: recoveryCodes.length },
+    });
+
+    return {
+      recoveryCodes,
+      recoveryCodesRemaining: recoveryCodes.length,
+    };
+  }
+
+  async getSession(sessionToken: string | undefined) {
+    const session = await this.requireSession(sessionToken);
+    const user = await this.repository.findUserById(session.userId);
+    const termsAcceptance = await this.repository.findTermsAcceptance(
+      session.userId,
+      session.tenantId,
+    );
+    return {
+      session: this.presentSession(session),
+      user: user ? this.presentUser(user) : undefined,
+      tenant: await this.repository.findTenantById(session.tenantId),
+      termsAcceptance,
+      termsGate: describeTermsAcceptanceGate(termsAcceptance),
+    };
+  }
+
+  async checkTenantSession(input: CheckTenantSessionDto) {
+    const session = await this.requireSession(input.sessionToken);
+    const allowed = session.tenantId === input.tenantId;
+
+    if (!allowed) {
+      throw new UnauthorizedException('Session is not authorized for this tenant.');
+    }
+
+    return {
+      allowed: true,
+      tenantId: session.tenantId,
+      userId: session.userId,
+      role: session.role,
+      mfaVerified: session.mfaVerified,
+    };
+  }
+
+  async checkPlatformSession(input: {
+    sessionToken: string;
+    permission: AccessPermission;
+  }): Promise<PlatformAccessSession> {
+    const session = await this.requireSession(input.sessionToken);
+    const assignments = (await this.repository.listAccessAssignmentsForUser(session.userId))
+      .filter((assignment) => this.isActiveAccessAssignment(assignment))
+      .filter((assignment) => roleHasPermission(assignment.role, input.permission));
+
+    if (assignments.length === 0) {
+      throw new UnauthorizedException(
+        'An active platform access assignment is required for this operation.',
+      );
+    }
+
+    if (
+      !session.mfaVerified &&
+      assignments.some((assignment) => assignment.mfaRequired || requiresMfa(assignment.role))
+    ) {
+      throw new UnauthorizedException('MFA verification is required for platform access.');
+    }
+
+    return {
+      sessionId: session.id,
+      sessionTenantId: session.tenantId,
+      userId: session.userId,
+      mfaVerified: session.mfaVerified,
+      assignments,
+    };
+  }
+
+  canPlatformAccess(
+    session: PlatformAccessSession,
+    permission: AccessPermission,
+    resource: AccessResourceScope,
+  ): boolean {
+    return this.evaluatePlatformAccess(session, permission, resource).allowed;
+  }
+
+  async requirePlatformAccess(
+    session: PlatformAccessSession,
+    permission: AccessPermission,
+    resource: AccessResourceScope,
+  ): Promise<AccessDecision> {
+    const decision = this.evaluatePlatformAccess(session, permission, resource);
+    await this.recordAccessDecision(session, decision, resource);
+
+    if (!decision.allowed) {
+      throw new ForbiddenException('Platform access scope does not allow this action.');
+    }
+
+    return decision;
+  }
+
+  async listTenants() {
+    return this.repository.listTenants();
+  }
+
+  async listTenantAuditLogs(input: CheckTenantSessionDto) {
+    const session = await this.requireSession(input.sessionToken);
+    if (session.tenantId !== input.tenantId || session.role !== 'OWNER') {
+      throw new UnauthorizedException('Only a tenant owner can view audit logs for this tenant.');
+    }
+
+    if (!session.mfaVerified) {
+      throw new UnauthorizedException('MFA verification is required before viewing audit logs.');
+    }
+
+    return this.listAuditLogsForTenant(input.tenantId);
+  }
+
+  async listAuditLogsForTenant(tenantId: string, query?: ProductAuditQuery) {
+    const auditLogs = await this.repository.listAuditLogsForTenant(tenantId);
+    return {
+      tenantId,
+      auditLogs: auditLogs
+        .filter((record) => matchesProductAuditQuery(record, query))
+        .map((record) => ({
+          ...record,
+          metadata: sanitizeProductAuditMetadata(record.metadata),
+        })),
+    };
+  }
+
+  async recordTenantAudit(input: Omit<AuthAuditRecord, 'id' | 'createdAt'>): Promise<void> {
+    await this.recordAudit(input);
+  }
+
+  async revokeSessionsForAccountDeletion(userId: string): Promise<void> {
+    await this.repository.revokeSessionsForUser(userId, new Date().toISOString());
+  }
+
+  async getVerifiedLoginPhone(userId: string): Promise<string | undefined> {
+    const user = await this.repository.findUserById(userId);
+    const phone = user?.phone?.trim();
+    // Only a phone proven by an OTP login counts; an unverified profile phone never receives STK.
+    return phone && user?.phoneVerifiedAt ? phone : undefined;
+  }
+
+  async hasCurrentTermsAcceptance(userId: string, tenantId: string): Promise<boolean> {
+    const evidence = await this.repository.findTermsAcceptance(userId, tenantId);
+    return Boolean(evidence && isCurrentTermsAcceptance(evidence));
+  }
+
+  async requireCurrentStoredTerms(
+    userId: string,
+    tenantId: string,
+    message = 'Current stored terms acceptance is required.',
+  ): Promise<void> {
+    if (!(await this.hasCurrentTermsAcceptance(userId, tenantId))) {
+      throw new UnprocessableEntityException(message);
+    }
+  }
+
+  async acceptCurrentTerms(input: { sessionToken: string; acceptedTerms: boolean }) {
+    const session = await this.requireSession(input.sessionToken);
+    if (session.mfaRequired && !session.mfaVerified) {
+      throw new UnauthorizedException('MFA verification is required before accepting updated terms.');
+    }
+
+    const user = await this.repository.findUserById(session.userId);
+    const tenant = await this.repository.findTenantById(session.tenantId);
+    if (!user || !tenant) {
+      throw new NotFoundException('Tenant session not found.');
+    }
+
+    const previous = await this.repository.findTermsAcceptance(session.userId, session.tenantId);
+    const stalePolicies = previous
+      ? staleTermsAcceptancePolicies(previous)
+      : [...termsAcceptancePolicyKeys];
+    const evidence = buildTermsAcceptanceEvidence({
+      accepted: input.acceptedTerms,
+      userId: user.id,
+      tenantId: tenant.id,
+      countryCode: tenant.countryCode,
+      locale: getCountry(tenant.countryCode)?.locale ?? 'en-KE',
+      appSurface: 'WEB',
+      acceptanceSource: previous ? 'REACCEPTANCE' : 'SIGNUP',
+      acceptedAt: new Date().toISOString(),
+    });
+    if (!evidence) {
+      throw new UnprocessableEntityException('Current terms acceptance is required.');
+    }
+
+    if (previous && isCurrentTermsAcceptance(previous)) {
+      return {
+        termsAcceptance: presentTermsAcceptanceLookup(previous),
+        termsGate: describeTermsAcceptanceGate(previous),
+        alreadyCurrent: true,
+      };
+    }
+
+    await this.repository.createTermsAcceptance(evidence);
+    await this.recordAudit({
+      tenantId: tenant.id,
+      actorUserId: user.id,
+      action: 'TERMS_REACCEPTED',
+      entityType: 'TERMS_ACCEPTANCE',
+      entityId: tenant.id,
+      metadata: {
+        termsVersion: evidence.termsVersion,
+        stalePolicyCount: stalePolicies.length,
+        stalePolicies: stalePolicies.join(','),
+        previouslyAccepted: Boolean(previous),
+      },
+    });
+
+    return {
+      termsAcceptance: presentTermsAcceptanceLookup(evidence),
+      termsGate: describeTermsAcceptanceGate(evidence),
+      alreadyCurrent: false,
+    };
+  }
+
+  async lookupTermsAcceptance(
+    session: PlatformAccessSession,
+    input: { tenantId: string; userId?: string },
+  ) {
+    const tenantId = input.tenantId.trim();
+    const userId = input.userId?.trim() || undefined;
+    if (!tenantId) {
+      throw new BadRequestException('A tenant id is required for policy-acceptance lookup.');
+    }
+
+    const tenant = await this.repository.findTenantById(tenantId);
+    if (!tenant) {
+      throw new NotFoundException('Tenant not found.');
+    }
+
+    if (!session.mfaVerified) {
+      throw new UnauthorizedException('MFA verification is required for policy-acceptance lookup.');
+    }
+
+    await this.requirePlatformAccess(session, 'VIEW_TENANT', {
+      tenantId,
+      countryCode: tenant.countryCode,
+    });
+
+    const lookup = buildTermsAcceptanceLookup(
+      await this.repository.listTermsAcceptance({ tenantId, userId }),
+    );
+    await this.recordAudit({
+      tenantId,
+      actorUserId: session.userId,
+      action: 'TERMS_ACCEPTANCE_LOOKED_UP',
+      entityType: 'TERMS_ACCEPTANCE',
+      entityId: tenantId,
+      metadata: {
+        resultCount: lookup.records.length,
+        currentCount: lookup.currentCount,
+        staleCount: lookup.staleCount,
+        filteredUser: Boolean(userId),
+      },
+    });
+
+    return lookup;
+  }
+
+  private async createSession(
+    user: AuthUserRecord,
+    tenantId: string,
+    role: TenantAccessRole,
+    options?: { mfaVerified?: boolean },
+  ): Promise<IssuedAuthSession> {
+    const now = new Date().toISOString();
+    const expiresAt = new Date(Date.parse(now) + 8 * 60 * 60 * 1000).toISOString();
+    const token = randomBytes(32).toString('base64url');
+    const session: AuthSessionRecord = {
+      id: randomUUID(),
+      tokenHash: this.hashSessionToken(token),
+      userId: user.id,
+      tenantId,
+      role,
+      mfaRequired: user.mfaRequired,
+      mfaVerified: options?.mfaVerified ?? !user.mfaRequired,
+      expiresAt,
+      createdAt: now,
+    };
+
+    await this.repository.createSession(session);
+    return this.presentSession(session, token, await this.createMfaChallenge(session));
+  }
+
+  private async requireSession(sessionToken: string | undefined): Promise<AuthSessionRecord> {
+    if (typeof sessionToken !== 'string' || sessionToken.length === 0) {
+      throw new UnauthorizedException('A valid active session is required.');
+    }
+    const session = await this.repository.findSessionByTokenHash(this.hashSessionToken(sessionToken));
+    if (!session || session.revokedAt || Date.parse(session.expiresAt) <= Date.now()) {
+      throw new UnauthorizedException('A valid active session is required.');
+    }
+
+    return session;
+  }
+
+  private evaluatePlatformAccess(
+    session: PlatformAccessSession,
+    permission: AccessPermission,
+    resource: AccessResourceScope,
+  ): AccessDecision {
+    let fallback: AccessDecision | undefined;
+
+    for (const assignment of session.assignments) {
+      const decision = evaluateAccess({
+        subject: {
+          userId: session.userId,
+          role: assignment.role,
+          mfaVerified: session.mfaVerified,
+          scope: {
+            level: assignment.scopeLevel,
+            regionCodes: assignment.regionCode ? [assignment.regionCode] : undefined,
+            continentCodes: assignment.continentCode ? [assignment.continentCode] : undefined,
+            countryCodes: assignment.countryCode ? [assignment.countryCode] : undefined,
+            tenantIds: this.assignmentTenantIds(assignment),
+          },
+        },
+        permission,
+        resource,
+      });
+
+      if (decision.allowed) {
+        return decision;
+      }
+
+      fallback ??= decision;
+    }
+
+    return (
+      fallback ?? {
+        allowed: false,
+        permission,
+        role: 'READ_ONLY_VIEWER',
+        scopeLevel: 'TENANT',
+        reason: 'ROLE_PERMISSION_DENIED',
+      }
+    );
+  }
+
+  private async recordAccessDecision(
+    session: PlatformAccessSession,
+    decision: AccessDecision,
+    resource: AccessResourceScope,
+  ): Promise<void> {
+    const normalizedResource = normalizeResourceScope(resource);
+    await this.repository.createAccessDecisionAudit({
+      id: randomUUID(),
+      tenantId: normalizedResource.tenantId,
+      actorUserId: session.userId,
+      role: decision.role,
+      permission: decision.permission,
+      scopeLevel: decision.scopeLevel,
+      allowed: decision.allowed,
+      reason: decision.reason,
+      targetTenantId: normalizedResource.tenantId,
+      targetCountryCode: normalizedResource.countryCode,
+      targetContinentCode: normalizedResource.continentCode,
+      targetRegionCode: normalizedResource.regionCode,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  private isActiveAccessAssignment(assignment: AccessAssignmentRecord): boolean {
+    return (
+      !assignment.revokedAt &&
+      (!assignment.expiresAt || Date.parse(assignment.expiresAt) > Date.now())
+    );
+  }
+
+  private assignmentTenantIds(assignment: AccessAssignmentRecord): string[] | undefined {
+    if (assignment.scopedTenantId) {
+      return [assignment.scopedTenantId];
+    }
+
+    return assignment.tenantId ? [assignment.tenantId] : undefined;
+  }
+
+  private async requireAccountChallenge(
+    token: string,
+    purpose: AuthAccountChallengePurpose,
+  ): Promise<AuthAccountChallengeRecord> {
+    const challenge = await this.repository.findAccountChallengeByTokenHash(
+      this.hashAccountChallengeToken(purpose, token),
+    );
+
+    if (
+      !challenge ||
+      challenge.purpose !== purpose ||
+      challenge.consumedAt ||
+      Date.parse(challenge.expiresAt) <= Date.now()
+    ) {
+      throw new UnauthorizedException('Invalid or expired account challenge.');
+    }
+
+    return challenge;
+  }
+
+  private async requireTenantInvite(token: string): Promise<AuthTenantInviteRecord> {
+    const invite = await this.repository.findTenantInviteByTokenHash(this.hashTenantInviteToken(token));
+
+    if (
+      !invite ||
+      invite.acceptedAt ||
+      invite.revokedAt ||
+      Date.parse(invite.expiresAt) <= Date.now()
+    ) {
+      throw new UnauthorizedException('Invalid or expired tenant invite.');
+    }
+
+    return invite;
+  }
+
+  private hashPassword(password: string) {
+    const salt = randomBytes(16).toString('base64url');
+    const iterations = 210_000;
+    const hash = pbkdf2Sync(password, salt, iterations, 32, 'sha256').toString('base64url');
+    return { salt, iterations, hash };
+  }
+
+  private hashSessionToken(token: string): string {
+    return createHash('sha256').update(token).digest('base64url');
+  }
+
+  private hashAuditIdentifier(value: string): string {
+    return createHash('sha256').update(value.trim().toLowerCase()).digest('base64url');
+  }
+
+  private hashAccountChallengeToken(purpose: AuthAccountChallengePurpose, token: string): string {
+    return createHash('sha256').update(`${purpose}:${token}`).digest('base64url');
+  }
+
+  /** Scope the OTP hash by phone so short 6-digit codes never collide across users. */
+  private hashPhoneOtp(phone: string, code: string): string {
+    return createHash('sha256').update(`PHONE_LOGIN:${phone}:${code}`).digest('base64url');
+  }
+
+  private async createPhoneOtpChallenge(user: AuthUserRecord, phone: string): Promise<string> {
+    const now = new Date().toISOString();
+    const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
+    const challenge: AuthAccountChallengeRecord = {
+      id: randomUUID(),
+      userId: user.id,
+      email: user.email,
+      phone,
+      purpose: 'PHONE_LOGIN',
+      tokenHash: this.hashPhoneOtp(phone, code),
+      expiresAt: new Date(Date.parse(now) + PHONE_OTP_TTL_MS).toISOString(),
+      createdAt: now,
+    };
+
+    await this.repository.createAccountChallenge(challenge);
+    return code;
+  }
+
+  private hashTenantInviteToken(token: string): string {
+    return createHash('sha256').update(`TENANT_INVITE:${token}`).digest('base64url');
+  }
+
+  private hashMfaCode(sessionId: string, code: string): string {
+    return createHash('sha256').update(`${sessionId}:${code}`).digest('base64url');
+  }
+
+  private hashRecoveryCode(userId: string, code: string): string {
+    return createHash('sha256')
+      .update(`RECOVERY:${userId}:${normalizeRecoveryCode(code)}`)
+      .digest('base64url');
+  }
+
+  private equalSecret(left: string, right: string): boolean {
+    const actual = Buffer.from(left);
+    const expected = Buffer.from(right);
+    return actual.length === expected.length && timingSafeEqual(actual, expected);
+  }
+
+  /**
+   * Google Play review sign-in. One designated, non-staff account
+   * (PLAY_REVIEW_EMAIL) may pass email MFA with a fixed six-digit code
+   * (PLAY_REVIEW_MFA_CODE) because the reviewer cannot read that inbox.
+   * Off unless both are set; never for accounts with platform access.
+   */
+  private async isPlayReviewCode(user: AuthUserRecord | undefined | null, code: string): Promise<boolean> {
+    const reviewEmail = process.env.PLAY_REVIEW_EMAIL?.trim().toLowerCase();
+    const reviewCode = process.env.PLAY_REVIEW_MFA_CODE?.trim();
+    if (!user || !reviewEmail || !reviewCode || !/^\d{6}$/.test(reviewCode)) return false;
+    if (user.email.trim().toLowerCase() !== reviewEmail) return false;
+    const assignments = await this.repository.listAccessAssignmentsForUser(user.id);
+    if (assignments.length > 0) return false;
+    return this.equalSecret(code.trim(), reviewCode);
+  }
+
+  private verifyMfaCode(sessionId: string, code: string, expectedHash: string): boolean {
+    return this.equalSecret(this.hashMfaCode(sessionId, code), expectedHash);
+  }
+
+  private verifyPassword(password: string, user: AuthUserRecord): boolean {
+    const actual = Buffer.from(
+      pbkdf2Sync(password, user.passwordSalt, user.passwordIterations, 32, 'sha256').toString('base64url'),
+    );
+    const expected = Buffer.from(user.passwordHash);
+    return actual.length === expected.length && timingSafeEqual(actual, expected);
+  }
+
+  private presentUser(user: AuthUserRecord) {
+    return {
+      id: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      phone: user.phone,
+      emailVerifiedAt: user.emailVerifiedAt,
+      phoneVerifiedAt: user.phoneVerifiedAt,
+      mfaRequired: user.mfaRequired,
+      mfaVerifiedAt: user.mfaVerifiedAt,
+      totpEnrolled: Boolean(user.totpSecret && user.totpEnrolledAt),
+      recoveryCodesRemaining: user.totpRecoveryCodeHashes?.length ?? 0,
+      createdAt: user.createdAt,
+    };
+  }
+
+  private async verifyAuthenticatorMfa(
+    session: AuthSessionRecord,
+    user: AuthUserRecord,
+    challenge: AuthMfaChallengeRecord | undefined,
+    code: string,
+  ) {
+    if (challenge && challenge.failedAttempts >= MFA_MAX_FAILED_ATTEMPTS) {
+      await this.recordAudit({
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        action: 'AUTH_MFA_FAILED',
+        entityType: 'AUTH_SESSION',
+        entityId: session.id,
+        metadata: { reason: 'CHALLENGE_LOCKED', method: 'AUTHENTICATOR', challengeId: challenge.id },
+      });
+      throw new UnauthorizedException('MFA challenge locked after too many attempts.');
+    }
+
+    const verified = verifyTotpCode(user.totpSecret, code, { lastUsedStep: user.totpLastUsedStep });
+    if (!verified.ok) {
+      if (challenge) {
+        await this.repository.updateMfaChallenge({
+          ...challenge,
+          failedAttempts: challenge.failedAttempts + 1,
+        });
+      }
+      await this.recordAudit({
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        action: 'AUTH_MFA_FAILED',
+        entityType: 'AUTH_SESSION',
+        entityId: session.id,
+        metadata: {
+          reason: 'INVALID_CODE',
+          method: 'AUTHENTICATOR',
+          ...(challenge ? { challengeId: challenge.id } : {}),
+          failedAttempts: (challenge?.failedAttempts ?? 0) + 1,
+        },
+      });
+      throw new UnauthorizedException('Invalid MFA code.');
+    }
+
+    await this.repository.updateUserTotpEnrollment(user.id, {
+      totpLastUsedStep: verified.step ?? null,
+    });
+    return this.completeMfaVerification(session, challenge, 'AUTHENTICATOR');
+  }
+
+  private async verifyRecoveryCodeMfa(
+    session: AuthSessionRecord,
+    user: AuthUserRecord,
+    challenge: AuthMfaChallengeRecord | undefined,
+    code: string,
+  ) {
+    if (challenge && challenge.failedAttempts >= MFA_MAX_FAILED_ATTEMPTS) {
+      await this.recordAudit({
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        action: 'AUTH_MFA_FAILED',
+        entityType: 'AUTH_SESSION',
+        entityId: session.id,
+        metadata: { reason: 'CHALLENGE_LOCKED', method: 'RECOVERY_CODE', challengeId: challenge.id },
+      });
+      throw new UnauthorizedException('MFA challenge locked after too many attempts.');
+    }
+
+    const remaining = [...(user.totpRecoveryCodeHashes ?? [])];
+    const presented = this.hashRecoveryCode(user.id, code);
+    const matchIndex = remaining.findIndex((stored) => this.equalSecret(stored, presented));
+    if (matchIndex < 0) {
+      if (challenge) {
+        await this.repository.updateMfaChallenge({
+          ...challenge,
+          failedAttempts: challenge.failedAttempts + 1,
+        });
+      }
+      await this.recordAudit({
+        tenantId: session.tenantId,
+        actorUserId: session.userId,
+        action: 'AUTH_MFA_FAILED',
+        entityType: 'AUTH_SESSION',
+        entityId: session.id,
+        metadata: {
+          reason: 'INVALID_CODE',
+          method: 'RECOVERY_CODE',
+          ...(challenge ? { challengeId: challenge.id } : {}),
+          failedAttempts: (challenge?.failedAttempts ?? 0) + 1,
+        },
+      });
+      throw new UnauthorizedException('Invalid MFA code.');
+    }
+
+    remaining.splice(matchIndex, 1);
+    await this.repository.updateUserTotpEnrollment(user.id, {
+      totpRecoveryCodeHashes: remaining,
+    });
+    await this.recordAudit({
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: 'AUTH_RECOVERY_CODE_USED',
+      entityType: 'USER',
+      entityId: user.id,
+      metadata: { recoveryCodesRemaining: remaining.length },
+    });
+    return this.completeMfaVerification(session, challenge, 'RECOVERY_CODE');
+  }
+
+  private async completeMfaVerification(
+    session: AuthSessionRecord,
+    challenge: AuthMfaChallengeRecord | undefined,
+    method: AuthMfaChallengeRecord['deliveryChannel'] | 'RECOVERY_CODE' = challenge?.deliveryChannel ?? 'EMAIL',
+  ) {
+    const now = new Date().toISOString();
+    const updated: AuthSessionRecord = {
+      ...session,
+      mfaVerified: true,
+    };
+    if (challenge) {
+      await this.repository.updateMfaChallenge({
+        ...challenge,
+        consumedAt: now,
+      });
+    }
+    await this.repository.markUserMfaVerified(session.userId, now);
+    await this.repository.updateSession(updated);
+    await this.recordAudit({
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: 'AUTH_MFA_VERIFIED',
+      entityType: 'AUTH_SESSION',
+      entityId: session.id,
+      metadata: {
+        ...(challenge ? { challengeId: challenge.id } : {}),
+        method,
+      },
+    });
+    return {
+      session: this.presentSession(updated),
+      mfaVerifiedAt: now,
+    };
+  }
+
+  private async createMfaChallenge(
+    session: AuthSessionRecord,
+  ): Promise<PresentedMfaChallenge | undefined> {
+    if (!session.mfaRequired || session.mfaVerified) {
+      return undefined;
+    }
+
+    const now = new Date().toISOString();
+    const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
+    const challengeId = randomUUID();
+    const expiresAt = new Date(Date.parse(now) + MFA_CHALLENGE_TTL_MS).toISOString();
+    const user = await this.repository.findUserById(session.userId);
+    const authenticatorEnrolled = Boolean(user?.totpSecret);
+    let challenge: AuthMfaChallengeRecord = {
+      id: challengeId,
+      sessionId: session.id,
+      userId: session.userId,
+      tenantId: session.tenantId,
+      codeHash: this.hashMfaCode(session.id, code),
+      deliveryChannel: authenticatorEnrolled
+        ? 'AUTHENTICATOR'
+        : this.isProductionRuntime()
+          ? 'EMAIL'
+          : 'DEVELOPMENT',
+      expiresAt,
+      failedAttempts: 0,
+      createdAt: now,
+    };
+
+    await this.repository.createMfaChallenge(challenge);
+
+    if (authenticatorEnrolled) {
+      return this.presentMfaChallenge(challenge);
+    }
+
+    const delivered = user
+      ? await this.deliverAuthEmail(
+          buildAuthEmailMessage({
+            purpose: 'MFA',
+            to: user.email,
+            code,
+            expiresAt,
+            idempotencyKey: challengeId,
+            tenantId: session.tenantId,
+          }),
+        )
+      : false;
+    if (delivered && challenge.deliveryChannel !== 'EMAIL') {
+      challenge = { ...challenge, deliveryChannel: 'EMAIL' };
+      await this.repository.updateMfaChallenge(challenge);
+    }
+
+    return this.presentMfaChallenge(challenge, code, delivered);
+  }
+
+  private async createAccountChallenge(
+    user: AuthUserRecord,
+    purpose: AuthAccountChallengePurpose,
+    ttlMs: number,
+  ): Promise<PresentedAccountChallenge> {
+    const now = new Date().toISOString();
+    const token = randomBytes(32).toString('base64url');
+    const challengeId = randomUUID();
+    const expiresAt = new Date(Date.parse(now) + ttlMs).toISOString();
+    const challenge: AuthAccountChallengeRecord = {
+      id: challengeId,
+      userId: user.id,
+      email: user.email,
+      purpose,
+      tokenHash: this.hashAccountChallengeToken(purpose, token),
+      expiresAt,
+      createdAt: now,
+    };
+
+    await this.repository.createAccountChallenge(challenge);
+    const emailPurpose: AuthEmailPurpose | undefined =
+      purpose === 'EMAIL_VERIFICATION' || purpose === 'PASSWORD_RESET' ? purpose : undefined;
+    const delivered = emailPurpose
+      ? await this.deliverAuthEmail(
+          buildAuthEmailMessage({
+            purpose: emailPurpose,
+            to: user.email,
+            token,
+            expiresAt,
+            idempotencyKey: challengeId,
+          }),
+        )
+      : false;
+    return this.presentAccountChallenge(challenge, token, delivered);
+  }
+
+  private async createTenantInviteRecord(input: {
+    tenantId: string;
+    tenantDisplayName: string;
+    email: string;
+    role: Exclude<TenantAccessRole, 'OWNER'>;
+    invitedByUserId: string;
+  }): Promise<PresentedTenantInvite> {
+    const now = new Date().toISOString();
+    const token = randomBytes(32).toString('base64url');
+    const inviteId = randomUUID();
+    const expiresAt = new Date(Date.parse(now) + TENANT_INVITE_TTL_MS).toISOString();
+    const invite: AuthTenantInviteRecord = {
+      id: inviteId,
+      tenantId: input.tenantId,
+      email: input.email,
+      role: input.role,
+      tokenHash: this.hashTenantInviteToken(token),
+      invitedByUserId: input.invitedByUserId,
+      expiresAt,
+      createdAt: now,
+    };
+
+    await this.repository.createTenantInvite(invite);
+    const delivered = await this.deliverAuthEmail(
+      buildAuthEmailMessage({
+        purpose: 'TENANT_INVITE',
+        to: input.email,
+        token,
+        tenantDisplayName: input.tenantDisplayName,
+        expiresAt,
+        idempotencyKey: inviteId,
+        tenantId: input.tenantId,
+      }),
+    );
+    return this.presentTenantInvite(invite, token, delivered);
+  }
+
+  private async deliverAuthEmail(message: AuthEmailMessage): Promise<boolean> {
+    if (!this.emailSender) {
+      return false;
+    }
+
+    try {
+      const result = await this.emailSender.sendAuthEmail(message);
+      return result.ok === true;
+    } catch {
+      return false;
+    }
+  }
+
+  private presentSession(session: AuthSessionRecord): PresentedAuthSession;
+  private presentSession(
+    session: AuthSessionRecord,
+    token: string,
+    mfaChallenge?: PresentedMfaChallenge,
+  ): IssuedAuthSession;
+  private presentSession(
+    session: AuthSessionRecord,
+    token?: string,
+    mfaChallenge?: PresentedMfaChallenge,
+  ): PresentedAuthSession | IssuedAuthSession {
+    const presented: PresentedAuthSession = {
+      id: session.id,
+      userId: session.userId,
+      tenantId: session.tenantId,
+      role: session.role,
+      mfaRequired: session.mfaRequired,
+      mfaVerified: session.mfaVerified,
+      expiresAt: session.expiresAt,
+      createdAt: session.createdAt,
+    };
+
+    if (token) {
+      return { ...presented, token, mfaChallenge };
+    }
+
+    return presented;
+  }
+
+  private presentMfaChallenge(
+    challenge: AuthMfaChallengeRecord,
+    developmentCode?: string,
+    delivered = false,
+  ): PresentedMfaChallenge {
+    const presented: PresentedMfaChallenge = {
+      id: challenge.id,
+      deliveryChannel: challenge.deliveryChannel,
+      expiresAt: challenge.expiresAt,
+      createdAt: challenge.createdAt,
+    };
+
+    if (!delivered && !this.isProductionRuntime() && developmentCode) {
+      return { ...presented, developmentCode };
+    }
+
+    return presented;
+  }
+
+  private presentAccountChallenge(
+    challenge: AuthAccountChallengeRecord,
+    developmentToken?: string,
+    delivered = false,
+  ): PresentedAccountChallenge {
+    const presented: PresentedAccountChallenge = {
+      id: challenge.id,
+      purpose: challenge.purpose,
+      expiresAt: challenge.expiresAt,
+      createdAt: challenge.createdAt,
+    };
+
+    if (!delivered && !this.isProductionRuntime()) {
+      return { ...presented, developmentToken };
+    }
+
+    return presented;
+  }
+
+  private presentTenantInvite(
+    invite: AuthTenantInviteRecord,
+    developmentToken?: string,
+    delivered = false,
+  ): PresentedTenantInvite {
+    const presented: PresentedTenantInvite = {
+      id: invite.id,
+      tenantId: invite.tenantId,
+      email: invite.email,
+      role: invite.role,
+      expiresAt: invite.expiresAt,
+      createdAt: invite.createdAt,
+    };
+
+    if (!delivered && !this.isProductionRuntime()) {
+      return { ...presented, developmentToken };
+    }
+
+    return presented;
+  }
+
+  private isProductionRuntime(): boolean {
+    return process.env.NODE_ENV === 'production';
+  }
+
+  private async recordAudit(input: Omit<AuthAuditRecord, 'id' | 'createdAt'>): Promise<void> {
+    await this.repository.createAuditLog({
+      id: randomUUID(),
+      ...input,
+      metadata: sanitizeProductAuditMetadata(input.metadata),
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  private assertSafe(input: object, message: string): void {
+    const safety = evaluateSafetyFields(input);
+    if (!safety.allowed) {
+      throw new UnprocessableEntityException({ message, safety });
+    }
+  }
+}

@@ -1,0 +1,102 @@
+# CANDIDATE ONLY — Fly.io is the live host (docs/FLY_DEPLOYMENT.md).
+# Do not create this app or point sellfindconnect.com here until a written
+# decision to leave Fly. Railway is archived (docs/GIT_RAILWAY_RUNBOOK.md).
+#
+# Usage (after that decision):
+#   doctl apps create --spec deploy/digitalocean/app.yaml
+#   doctl apps update <APP_ID> --spec deploy/digitalocean/app.yaml
+#
+# Layout: ONE App Platform app, path routing (not the live Fly hostnames).
+#   web -> https://sellfindconnect.com/
+#   api -> https://sellfindconnect.com/api  (prefix stripped; Nest sees /v1/...)
+#   public API base -> https://sellfindconnect.com/api/v1
+# Two-app api.sellfindconnect.com layout: docs/DIGITALOCEAN_DEPLOYMENT.md
+#
+# Secrets: set INTERNAL_JOB_KEY in the DO dashboard. Never commit real values.
+# PRE_DEPLOY runs the same migrate+seed script as Fly: deploy/api-release.sh
+name: sellfindconnect
+region: # set only when creating the candidate app (e.g. fra1)
+features:
+  - buildpack-stack=ubuntu-22
+
+domains:
+  - domain: sellfindconnect.com
+    type: PRIMARY
+    zone: sellfindconnect.com
+  - domain: www.sellfindconnect.com
+    type: ALIAS
+
+databases:
+  - name: sfc-postgres
+    engine: PG
+    version: "16"
+    production: true
+
+services:
+  - name: web
+    dockerfile_path: deploy/web.Dockerfile
+    source_dir: /
+    github:
+      repo: Bucrepinfo-lab/sellfindconnect.com
+      branch: main
+      deploy_on_push: true
+    http_port: 8080
+    instance_count: 1
+    instance_size_slug: basic-xs
+    routes:
+      - path: /
+    health_check:
+      http_path: /
+    envs:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        value: https://sellfindconnect.com/api/v1
+        scope: BUILD_AND_RUN_TIME
+
+  - name: api
+    dockerfile_path: deploy/api.Dockerfile
+    source_dir: /
+    github:
+      repo: Bucrepinfo-lab/sellfindconnect.com
+      branch: main
+      deploy_on_push: true
+    http_port: 8080
+    instance_count: 1
+    instance_size_slug: basic-xs
+    routes:
+      - path: /api
+        preserve_path_prefix: false
+    health_check:
+      http_path: /v1/health
+    envs:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "8080"
+      - key: WEB_ORIGIN
+        value: https://sellfindconnect.com
+      - key: DATABASE_URL
+        value: ${sfc-postgres.DATABASE_URL}
+        scope: RUN_TIME
+      - key: PERSISTENCE_DRIVER
+        value: prisma
+      - key: PAYMENT_PROVIDER
+        value: manual
+      - key: INTERNAL_JOB_KEY
+        type: SECRET
+        # Set in the dashboard to the same value as the GitHub Actions secret.
+
+jobs:
+  - name: db-migrate
+    kind: PRE_DEPLOY
+    dockerfile_path: deploy/api.Dockerfile
+    source_dir: /
+    github:
+      repo: Bucrepinfo-lab/sellfindconnect.com
+      branch: main
+    run_command: sh /app/deploy/api-release.sh
+    envs:
+      - key: DATABASE_URL
+        value: ${sfc-postgres.DATABASE_URL}
+        scope: RUN_TIME

@@ -11,6 +11,9 @@ messaging, analytics, subscription, and country tax-remittance platform.
 - `packages/database`: Prisma/PostgreSQL schema
 - `docs`: technical architecture and implementation backlog
 
+**Production:** Fly.io Frankfurt — see [`docs/FLY_DEPLOYMENT.md`](docs/FLY_DEPLOYMENT.md).
+Hosted Prisma and scheduled jobs are live. Native mobile remains out of scope.
+
 ## Brand And Growth
 
 - Primary brand domain: `SellFindConnect.com`
@@ -58,6 +61,10 @@ API: `http://localhost:4000/v1`
 
 OpenAPI: `http://localhost:4000/docs`
 
-The current vertical slice uses an in-memory profile-draft repository. PostgreSQL
-persistence is introduced after the initial schema and tenant boundary are
-validated.
+Auth, profile, advert, relationship, and analytics repositories use in-memory
+storage by default for local demo work. After migrations and seed data are
+ready, set `PERSISTENCE_DRIVER=prisma` with `DATABASE_URL` to overlay
+PostgreSQL-backed persistence for repositories and media queues. Named
+`PERSISTENCE_DRIVER=live` fail-closes without `DATABASE_URL`. Per-repository
+keys such as `AUTH_REPOSITORY=memory` still win over the overlay. `GET /v1/health`
+reports `persistence.driver`, `mode`, and `databaseConfigured` without the URL.

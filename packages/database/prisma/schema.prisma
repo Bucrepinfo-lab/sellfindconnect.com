@@ -33,9 +33,41 @@ enum ProfileStatus {
   DRAFT
   PENDING_REVIEW
   LIVE
+  RENEWAL_DUE
   PAUSED
+  EXPIRED
+  AUTO_DELETED
   ARCHIVED
   REJECTED
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  PUSH
+  WHATSAPP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  READ
+  FAILED
+}
+
+enum NotificationDeliveryStatus {
+  QUEUED
+  SUPPRESSED
+  SENT
+  FAILED
+}
+
+enum NotificationConsentState {
+  GRANTED
+  DENIED
+  REQUIRED
+  NOT_REQUIRED
 }
 
 enum PolicyAction {
@@ -94,6 +126,30 @@ enum AnalyticsEntityType {
   MEDIA_ASSET
 }
 
+enum ConversationStatus {
+  OPEN
+  ASSIGNED
+  WAITING_ON_ADVERTISER
+  WAITING_ON_REQUESTER
+  RESOLVED
+  BLOCKED
+}
+
+enum ConversationParticipantRole {
+  REQUESTER
+  ADVERTISER
+  TENANT_AGENT
+  SYSTEM
+}
+
+enum ConversationNotificationType {
+  NEW_CONVERSATION
+  NEW_MESSAGE
+  ASSIGNMENT
+  SLA_DUE_SOON
+  SLA_BREACHED
+}
+
 enum ConsentState {
   GRANTED
   DENIED
@@ -124,6 +180,8 @@ model Country {
   tenants                   Tenant[]
   profileDrafts             ProfileDraft[]
   publishedProfiles         PublishedProfile[]
+  advertDrafts              AdvertDraft[]
+  publishedAdverts          PublishedAdvert[]
   taxProfiles               CountryTaxProfile[]
 
   @@index([continentCode])
@@ -139,35 +197,86 @@ model IndustryCategory {
 }
 
 model User {
-  id             String             @id @default(uuid())
-  email          String             @unique @db.VarChar(320)
-  displayName    String             @db.VarChar(160)
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  memberships    TenantMembership[]
-  auditLogs      AuditLog[]
-  financeAlerts  FinanceAlert[]     @relation("FinanceAlertAssignee")
+  id                      String                    @id @default(uuid())
+  email                   String                    @unique @db.VarChar(320)
+  displayName             String                    @db.VarChar(160)
+  phone                   String?                   @db.VarChar(80)
+  passwordHash            String?
+  passwordSalt            String?
+  passwordIterations      Int?
+  emailVerifiedAt         DateTime?
+  phoneVerifiedAt         DateTime?
+  mfaRequired             Boolean                   @default(false)
+  mfaEnrolledAt           DateTime?
+  lastMfaVerifiedAt       DateTime?
+  totpSecret              String?                   @db.VarChar(64)
+  totpPendingSecret       String?                   @db.VarChar(64)
+  totpLastUsedStep        Int?
+  totpRecoveryCodeHashes  String[]                  @default([])
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  memberships             TenantMembership[]
+  auditLogs               AuditLog[]
+  financeAlerts           FinanceAlert[]            @relation("FinanceAlertAssignee")
+  assignedConversations   Conversation[]            @relation("ConversationAssignee")
+  accessAssignments       AccessAssignment[]
+  authSessions            AuthSession[]
+  authMfaChallenges       AuthMfaChallenge[]
+  authAccountChallenges   AuthAccountChallenge[]
+  sentTenantInvites       TenantInvite[]            @relation("TenantInviteInviter")
+  termsAcceptanceEvidence TermsAcceptanceEvidence[]
 }
 
 model Tenant {
-  id                String             @id @default(uuid())
-  displayName       String             @db.VarChar(160)
-  legalName         String?            @db.VarChar(240)
-  countryCode       String             @db.VarChar(2)
-  status            TenantStatus       @default(TRIAL_PENDING)
-  trialStartedAt    DateTime?
-  trialEndsAt       DateTime?
-  paidStartedAt     DateTime?
-  renewalDate       DateTime?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  country           Country            @relation(fields: [countryCode], references: [code])
-  memberships       TenantMembership[]
-  profileDrafts     ProfileDraft[]
-  publishedProfiles PublishedProfile[]
-  taxSnapshots      TaxCalculationSnapshot[]
-  analyticsEvents   AnalyticsEvent[]
-  auditLogs         AuditLog[]
+  id                           String                        @id @default(uuid())
+  displayName                  String                        @db.VarChar(160)
+  legalName                    String?                       @db.VarChar(240)
+  countryCode                  String                        @db.VarChar(2)
+  primaryIndustryCode          String?                       @db.VarChar(80)
+  primaryRole                  String?                       @db.VarChar(80)
+  onboardingUserType           String?                       @db.VarChar(80)
+  status                       TenantStatus                  @default(TRIAL_PENDING)
+  trialStartedAt               DateTime?
+  trialEndsAt                  DateTime?
+  paidStartedAt                DateTime?
+  renewalDate                  DateTime?
+  createdAt                    DateTime                      @default(now())
+  updatedAt                    DateTime                      @updatedAt
+  country                      Country                       @relation(fields: [countryCode], references: [code])
+  memberships                  TenantMembership[]
+  profileDrafts                ProfileDraft[]
+  publishedProfiles            PublishedProfile[]
+  advertDrafts                 AdvertDraft[]
+  publishedAdverts             PublishedAdvert[]
+  relationshipClaims           RelationshipClaim[]
+  savedSourceFinderSearches    SavedSourceFinderSearch[]
+  sourceFinderOpportunityAlerts SourceFinderOpportunityAlert[]
+  sourceFinderOutcomeFeedback  SourceFinderOutcomeFeedback[]
+  advertLifecycleNotifications AdvertLifecycleNotification[]
+  advertDiscoveryIndexes       AdvertDiscoveryIndex[]
+  savedAdvertSearches          SavedAdvertSearch[]
+  advertDiscoveryAlerts        AdvertDiscoveryAlert[]
+  mediaAssets                  MediaAsset[]
+  taxSnapshots                 TaxCalculationSnapshot[]
+  analyticsEvents              AnalyticsEvent[]
+  analyticsDailyRollups        AnalyticsDailyRollup[]
+  auditLogs                    AuditLog[]
+  notifications                Notification[]
+  conversations                Conversation[]
+  conversationMessages         ConversationMessage[]
+  conversationNotifications    ConversationNotification[]
+  notificationPreferences      NotificationPreference[]
+  notificationOutboxRecords    NotificationOutboxRecord[]
+  mediaProcessingJobs          MediaProcessingJob[]
+  mediaReviewCases             MediaReviewCase[]
+  accessAssignments            AccessAssignment[]
+  accessDecisionAudits         AccessDecisionAudit[]
+  authSessions                 AuthSession[]
+  authMfaChallenges            AuthMfaChallenge[]
+  tenantInvites                TenantInvite[]
+  termsAcceptanceEvidence      TermsAcceptanceEvidence[]
+  userContentReports           UserContentReport[]
+  userBlocks                   UserBlock[]
 
   @@index([countryCode])
   @@index([status])
@@ -186,49 +295,651 @@ model TenantMembership {
   @@index([userId])
 }
 
+model TenantInvite {
+  id              String    @id @default(uuid())
+  tenantId        String
+  email           String    @db.VarChar(320)
+  role            String    @db.VarChar(80)
+  tokenHash       String    @unique
+  invitedByUserId String
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invitedBy       User      @relation("TenantInviteInviter", fields: [invitedByUserId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([email, tenantId])
+  @@index([expiresAt, acceptedAt, revokedAt])
+}
+
+model AuthSession {
+  id            String             @id @default(uuid())
+  userId        String
+  tenantId      String
+  tokenHash     String             @unique
+  role          String             @db.VarChar(80)
+  mfaRequired   Boolean            @default(true)
+  mfaVerified   Boolean            @default(false)
+  expiresAt     DateTime
+  revokedAt     DateTime?
+  createdAt     DateTime           @default(now())
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  mfaChallenges AuthMfaChallenge[]
+
+  @@index([userId, tenantId])
+  @@index([expiresAt, revokedAt])
+}
+
+model AuthMfaChallenge {
+  id              String      @id @default(uuid())
+  sessionId       String
+  userId          String
+  tenantId        String
+  codeHash        String
+  deliveryChannel String      @db.VarChar(40)
+  expiresAt       DateTime
+  consumedAt      DateTime?
+  failedAttempts  Int         @default(0)
+  createdAt       DateTime    @default(now())
+  session         AuthSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant          Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, consumedAt, expiresAt])
+  @@index([userId, createdAt])
+  @@index([tenantId, createdAt])
+}
+
+model AuthAccountChallenge {
+  id         String    @id @default(uuid())
+  userId     String
+  email      String    @db.VarChar(320)
+  phone      String?   @db.VarChar(80)
+  purpose    String    @db.VarChar(40)
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose, createdAt])
+  @@index([purpose, expiresAt])
+}
+
+model TermsAcceptanceEvidence {
+  id                       String   @id @default(uuid())
+  userId                   String
+  tenantId                 String
+  countryCode              String   @db.VarChar(2)
+  locale                   String   @db.VarChar(24)
+  termsVersion             String   @db.VarChar(80)
+  privacyVersion           String   @db.VarChar(80)
+  prohibitedContentVersion String   @db.VarChar(80)
+  subscriptionTermsVersion String   @db.VarChar(80)
+  communityStandardsVersion String? @db.VarChar(80)
+  appSurface               String   @db.VarChar(40)
+  acceptanceSource         String   @db.VarChar(80)
+  acceptedAt               DateTime
+  ipHash                   String?
+  deviceHash               String?
+  createdAt                DateTime @default(now())
+  user                     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant                   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([userId, tenantId])
+  @@index([tenantId, acceptedAt])
+  @@index([countryCode, acceptedAt])
+}
+
+model AccessAssignment {
+  id             String    @id @default(uuid())
+  userId         String
+  tenantId       String?
+  role           String    @db.VarChar(80)
+  scopeLevel     String    @db.VarChar(40)
+  regionCode     String?   @db.VarChar(40)
+  continentCode  String?   @db.VarChar(8)
+  countryCode    String?   @db.VarChar(2)
+  scopedTenantId String?
+  mfaRequired    Boolean   @default(true)
+  assignedBy     String?
+  expiresAt      DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant         Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([userId, role])
+  @@index([tenantId, role])
+  @@index([scopeLevel, regionCode, continentCode, countryCode])
+  @@index([scopedTenantId])
+  @@index([revokedAt, expiresAt])
+}
+
+model AccessDecisionAudit {
+  id                  String   @id @default(uuid())
+  tenantId            String?
+  actorUserId         String   @db.VarChar(120)
+  role                String   @db.VarChar(80)
+  permission          String   @db.VarChar(80)
+  scopeLevel          String   @db.VarChar(40)
+  allowed             Boolean
+  reason              String   @db.VarChar(80)
+  targetTenantId      String?
+  targetCountryCode   String?  @db.VarChar(2)
+  targetContinentCode String?  @db.VarChar(8)
+  targetRegionCode    String?  @db.VarChar(40)
+  createdAt           DateTime @default(now())
+  tenant              Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([allowed, reason])
+  @@index([targetCountryCode, targetRegionCode])
+}
+
 model ProfileDraft {
-  id           String        @id @default(uuid())
+  id                String        @id @default(uuid())
+  tenantId          String
+  countryCode       String        @db.VarChar(2)
+  industryCode      String        @db.VarChar(80)
+  role              String        @db.VarChar(80)
+  displayName       String        @db.VarChar(160)
+  description       String
+  phone             String?       @db.VarChar(80)
+  whatsapp          String?       @db.VarChar(80)
+  email             String?       @db.VarChar(320)
+  website           String?       @db.VarChar(500)
+  physicalAddress   String?       @db.VarChar(500)
+  mapsUrl           String?       @db.VarChar(500)
+  socialLinks       Json?
+  serviceArea       Json?
+  status            ProfileStatus @default(DRAFT)
+  reviewReasons     Json?
+  reviewRequestedAt DateTime?
+  reviewDecision    String?       @db.VarChar(40)
+  reviewedAt        DateTime?
+  reviewedBy        String?       @db.VarChar(120)
+  reviewNote        String?       @db.VarChar(1000)
+  version           Int           @default(1)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  country           Country       @relation(fields: [countryCode], references: [code])
+
+  @@index([tenantId, status])
+  @@index([reviewDecision])
+  @@index([countryCode, industryCode])
+}
+
+model PublishedProfile {
+  id               String        @id @default(uuid())
+  tenantId         String
+  sourceDraftId    String?
+  countryCode      String        @db.VarChar(2)
+  industryCode     String        @db.VarChar(80)
+  role             String        @db.VarChar(80)
+  displayName      String        @db.VarChar(160)
+  description      String
+  phone            String?       @db.VarChar(80)
+  whatsapp         String?       @db.VarChar(80)
+  email            String?       @db.VarChar(320)
+  website          String?       @db.VarChar(500)
+  physicalAddress  String?       @db.VarChar(500)
+  mapsUrl          String?       @db.VarChar(500)
+  socialLinks      Json?
+  serviceArea      Json?
+  status           ProfileStatus @default(LIVE)
+  version          Int
+  publishedAt      DateTime      @default(now())
+  expiresAt        DateTime?
+  renewalAlert35At DateTime?
+  renewalAlert39At DateTime?
+  archivedAt       DateTime?
+  deletedAt        DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  tenant           Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  country          Country       @relation(fields: [countryCode], references: [code])
+
+  @@index([tenantId, status])
+  @@index([sourceDraftId])
+  @@index([status, expiresAt])
+  @@index([countryCode, industryCode])
+}
+
+model AdvertDraft {
+  id           String    @id @default(uuid())
   tenantId     String
-  countryCode  String        @db.VarChar(2)
-  industryCode String        @db.VarChar(80)
-  role         String        @db.VarChar(80)
-  displayName  String        @db.VarChar(160)
+  countryCode  String    @db.VarChar(2)
+  industryCode String    @db.VarChar(80)
+  role         String    @db.VarChar(80)
+  title        String    @db.VarChar(160)
+  displayName  String    @db.VarChar(160)
   description  String
-  phone        String?       @db.VarChar(80)
-  email        String?       @db.VarChar(320)
-  website      String?       @db.VarChar(500)
-  status       ProfileStatus @default(DRAFT)
-  version      Int           @default(1)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  country      Country       @relation(fields: [countryCode], references: [code])
+  phone        String?   @db.VarChar(80)
+  email        String?   @db.VarChar(320)
+  website      String?   @db.VarChar(500)
+  status       String    @default("DRAFT") @db.VarChar(40)
+  publishedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  country      Country   @relation(fields: [countryCode], references: [code])
 
   @@index([tenantId, status])
   @@index([countryCode, industryCode])
 }
 
-model PublishedProfile {
-  id           String        @id @default(uuid())
-  tenantId     String
-  countryCode  String        @db.VarChar(2)
-  industryCode String        @db.VarChar(80)
-  role         String        @db.VarChar(80)
-  displayName  String        @db.VarChar(160)
-  description  String
-  phone        String?       @db.VarChar(80)
-  email        String?       @db.VarChar(320)
-  website      String?       @db.VarChar(500)
-  status       ProfileStatus @default(LIVE)
-  version      Int
-  publishedAt  DateTime      @default(now())
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  country      Country       @relation(fields: [countryCode], references: [code])
+model PublishedAdvert {
+  id                String    @id @default(uuid())
+  tenantId          String
+  sourceDraftId     String?
+  countryCode       String    @db.VarChar(2)
+  industryCode      String    @db.VarChar(80)
+  role              String    @db.VarChar(80)
+  title             String    @db.VarChar(160)
+  displayName       String    @db.VarChar(160)
+  description       String
+  phone             String?   @db.VarChar(80)
+  email             String?   @db.VarChar(320)
+  website           String?   @db.VarChar(500)
+  status            String    @default("LIVE") @db.VarChar(40)
+  version           Int       @default(1)
+  publishedAt       DateTime
+  expiresAt         DateTime
+  boostedAt         DateTime?
+  boostExpiresAt    DateTime?
+  boostWeight       Int?
+  renewalAlertsSent Json?
+  pausedAt          DateTime?
+  archivedAt        DateTime?
+  deletedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  country           Country   @relation(fields: [countryCode], references: [code])
 
   @@index([tenantId, status])
+  @@index([sourceDraftId])
+  @@index([status, expiresAt])
+  @@index([status, boostExpiresAt])
   @@index([countryCode, industryCode])
+}
+
+model AdvertLifecycleNotification {
+  id           String   @id @default(uuid())
+  tenantId     String
+  advertId     String   @db.VarChar(120)
+  title        String   @db.VarChar(160)
+  message      String
+  scheduledFor DateTime
+  day          Int
+  createdAt    DateTime @default(now())
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([advertId, day])
+  @@index([tenantId, scheduledFor])
+}
+
+model AdvertDiscoveryIndex {
+  id                  String    @id @default(uuid())
+  tenantId            String
+  advertId            String    @db.VarChar(120)
+  countryCode         String    @db.VarChar(2)
+  industryCode        String    @db.VarChar(80)
+  role                String    @db.VarChar(80)
+  status              String    @db.VarChar(40)
+  title               String    @db.VarChar(160)
+  displayName         String    @db.VarChar(160)
+  description         String
+  searchText          String
+  tokenVector         Json
+  relationshipSignals Json?
+  publishedAt         DateTime
+  expiresAt           DateTime
+  boostedAt           DateTime?
+  boostExpiresAt      DateTime?
+  boostWeight         Int?
+  indexedAt           DateTime
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  tenant              Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, advertId])
+  @@index([countryCode, industryCode, role, status])
+  @@index([status, indexedAt])
+  @@index([tenantId, status, indexedAt])
+}
+
+model SavedAdvertSearch {
+  id             String                 @id @default(uuid())
+  tenantId       String
+  name           String                 @db.VarChar(120)
+  query          String                 @db.VarChar(240)
+  countryCode    String?                @db.VarChar(2)
+  industryCode   String?                @db.VarChar(80)
+  role           String?                @db.VarChar(80)
+  alertFrequency String                 @default("DAILY") @db.VarChar(40)
+  isActive       Boolean                @default(true)
+  lastAlertedAt  DateTime?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  tenant         Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  alerts         AdvertDiscoveryAlert[]
+
+  @@index([tenantId, isActive])
+  @@index([tenantId, updatedAt])
+}
+
+model AdvertDiscoveryAlert {
+  id            String            @id @default(uuid())
+  tenantId      String
+  savedSearchId String
+  advertId      String            @db.VarChar(120)
+  title         String            @db.VarChar(160)
+  message       String
+  rankScore     Int
+  reasonCodes   Json?
+  createdAt     DateTime          @default(now())
+  tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  savedSearch   SavedAdvertSearch @relation(fields: [savedSearchId], references: [id], onDelete: Cascade)
+
+  @@unique([savedSearchId, advertId])
+  @@index([tenantId, createdAt])
+}
+
+model RelationshipClaim {
+  id                   String    @id @default(uuid())
+  tenantId             String
+  sourceLabel          String    @db.VarChar(160)
+  sourceRole           String    @db.VarChar(80)
+  counterpartLabel     String    @db.VarChar(160)
+  counterpartRole      String    @db.VarChar(80)
+  counterpartTenantId  String?   @db.VarChar(120)
+  relationship         String    @db.VarChar(40)
+  visibility           String    @db.VarChar(40)
+  status               String    @db.VarChar(40)
+  note                 String?
+  createdByUserId      String    @db.VarChar(120)
+  decidedByUserId      String?   @db.VarChar(120)
+  decidedAt            DateTime?
+  decisionNote         String?
+  removedByUserId      String?   @db.VarChar(120)
+  removedAt            DateTime?
+  removalReason        String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  tenant               Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([counterpartTenantId, status])
+  @@index([status, visibility])
+}
+
+model SavedSourceFinderSearch {
+  id             String                          @id @default(uuid())
+  tenantId       String
+  name           String                          @db.VarChar(120)
+  query          String                          @db.VarChar(200)
+  role           String?                         @db.VarChar(80)
+  industryCode   String?                         @db.VarChar(80)
+  countryCode    String?                         @db.VarChar(2)
+  sortBy         String?                         @db.VarChar(40)
+  alertFrequency String                          @default("DAILY") @db.VarChar(40)
+  isActive       Boolean                         @default(true)
+  lastAlertedAt  DateTime?
+  createdAt      DateTime                        @default(now())
+  updatedAt      DateTime                        @updatedAt
+  tenant         Tenant                          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  alerts         SourceFinderOpportunityAlert[]
+
+  @@index([tenantId, isActive])
+  @@index([tenantId, updatedAt])
+}
+
+model SourceFinderOpportunityAlert {
+  id             String                   @id @default(uuid())
+  tenantId       String
+  savedSearchId  String
+  sourceRecordId String                   @db.VarChar(120)
+  sourceName     String                   @db.VarChar(200)
+  sourceRole     String                   @db.VarChar(80)
+  title          String                   @db.VarChar(160)
+  message        String
+  score          Int
+  reasonCodes    Json?
+  createdAt      DateTime                 @default(now())
+  tenant         Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  savedSearch    SavedSourceFinderSearch  @relation(fields: [savedSearchId], references: [id], onDelete: Cascade)
+
+  @@unique([savedSearchId, sourceRecordId])
+  @@index([tenantId, createdAt])
+}
+
+model SourceFinderOutcomeFeedback {
+  id                        String   @id @default(uuid())
+  tenantId                  String
+  sourceRecordId            String   @db.VarChar(120)
+  query                     String?  @db.VarChar(200)
+  action                    String   @db.VarChar(40)
+  note                      String?  @db.VarChar(500)
+  behavioralMatchingConsent Boolean  @default(false)
+  createdAt                 DateTime @default(now())
+  tenant                    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, sourceRecordId])
+  @@index([tenantId, createdAt])
+}
+
+model SourceFinderIndex {
+  id                  String   @id @default(uuid())
+  sourceRecordId      String   @unique @db.VarChar(120)
+  tenantId            String?  @db.VarChar(120)
+  name                String   @db.VarChar(200)
+  role                String   @db.VarChar(80)
+  industryCode        String   @db.VarChar(80)
+  countryCode         String   @db.VarChar(2)
+  location            String   @db.VarChar(160)
+  offers              Json
+  needs               Json
+  relatedLinks        Json
+  verified            Boolean
+  publishedAt         DateTime
+  responseTimeMinutes Int
+  analytics           Json
+  searchText          String
+  tokenVector         Json
+  indexedAt           DateTime
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([countryCode, industryCode, role])
+  @@index([indexedAt])
+}
+
+model MediaAsset {
+  id               String   @id @default(uuid())
+  tenantId         String
+  ownerType        String   @db.VarChar(40)
+  ownerId          String   @db.VarChar(120)
+  kind             String   @db.VarChar(20)
+  status           String   @db.VarChar(40)
+  sourceUrl        String   @db.VarChar(1000)
+  thumbnailUrl     String?  @db.VarChar(1000)
+  mimeType         String   @db.VarChar(120)
+  fileName         String   @db.VarChar(240)
+  fileSizeBytes    Int
+  width            Int?
+  height           Int?
+  durationSeconds  Int?
+  caption          String?  @db.VarChar(500)
+  altText          String?  @db.VarChar(500)
+  displayOrder     Int
+  visibility       String   @db.VarChar(40)
+  moderationStatus String   @db.VarChar(40)
+  moderationReason String?  @db.VarChar(120)
+  storageProvider  String?  @db.VarChar(80)
+  objectKey        String?  @db.VarChar(500)
+  cdnUrl           String?  @db.VarChar(1000)
+  transformStatus  String?  @db.VarChar(40)
+  variants         Json?
+  uploadedAt       DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, ownerType, ownerId, displayOrder])
+  @@index([tenantId, status])
+  @@index([ownerType, ownerId])
+  @@index([storageProvider, objectKey])
+}
+
+model MediaProcessingJob {
+  id          String    @id @default(uuid())
+  tenantId    String
+  mediaId     String    @db.VarChar(120)
+  ownerType   String    @db.VarChar(40)
+  ownerId     String    @db.VarChar(120)
+  type        String    @db.VarChar(40)
+  status      String    @default("QUEUED") @db.VarChar(40)
+  objectKey   String?   @db.VarChar(500)
+  sourceUrl   String    @db.VarChar(1000)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  availableAt DateTime  @default(now())
+  lockedAt    DateTime?
+  lockedBy    String?   @db.VarChar(160)
+  completedAt DateTime?
+  failedAt    DateTime?
+  lastError   String?
+  metadata    Json?
+  result      Json?
+  requestedAt DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([status, availableAt])
+  @@index([tenantId, status, availableAt])
+  @@index([type, status, availableAt])
+  @@index([mediaId, type, status])
+  @@index([lockedBy, status])
+}
+
+model MediaReviewCase {
+  id             String    @id @default(uuid())
+  tenantId       String
+  mediaId        String    @db.VarChar(120)
+  ownerType      String    @db.VarChar(40)
+  ownerId        String    @db.VarChar(120)
+  sourceJobId    String?   @db.VarChar(120)
+  jobType        String    @db.VarChar(40)
+  severity       String    @db.VarChar(40)
+  status         String    @default("OPEN") @db.VarChar(40)
+  reason         String    @db.VarChar(240)
+  provider       String?   @db.VarChar(120)
+  evidence       Json?
+  openedAt       DateTime  @default(now())
+  assignedTo     String?   @db.VarChar(120)
+  assignedAt     DateTime?
+  assignmentNote String?
+  resolvedAt     DateTime?
+  resolvedBy     String?   @db.VarChar(120)
+  resolution     String?   @db.VarChar(120)
+  notes          String?
+  escalationPlaybook Json?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status, openedAt])
+  @@index([mediaId, status])
+  @@index([jobType, status])
+  @@index([severity, status])
+  @@index([status, assignedTo, openedAt])
+  @@index([sourceJobId])
+}
+
+model Notification {
+  id           String              @id @default(uuid())
+  tenantId     String
+  userId       String?
+  channel      NotificationChannel @default(IN_APP)
+  status       NotificationStatus  @default(PENDING)
+  title        String              @db.VarChar(160)
+  message      String
+  entityType   String              @db.VarChar(80)
+  entityId     String              @db.VarChar(120)
+  scheduledFor DateTime
+  sentAt       DateTime?
+  readAt       DateTime?
+  createdAt    DateTime            @default(now())
+  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status, scheduledFor])
+  @@index([entityType, entityId])
+}
+
+model NotificationPreference {
+  id           String                   @id @default(uuid())
+  tenantId     String
+  userId       String?
+  channel      NotificationChannel
+  enabled      Boolean                  @default(false)
+  consentState NotificationConsentState
+  locale       String?                  @db.VarChar(24)
+  timezone     String?                  @db.VarChar(80)
+  updatedAt    DateTime                 @updatedAt
+  createdAt    DateTime                 @default(now())
+  tenant       Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, channel])
+  @@index([tenantId, enabled])
+}
+
+model NotificationOutboxRecord {
+  id                         String                        @id @default(uuid())
+  tenantId                   String
+  eventType                  String                        @db.VarChar(100)
+  severity                   String                        @db.VarChar(40)
+  title                      String                        @db.VarChar(160)
+  message                    String
+  entityType                 String?                       @db.VarChar(80)
+  entityId                   String?                       @db.VarChar(120)
+  selectedChannels           Json
+  suppressedChannels         Json
+  destination                Json?
+  channelStatuses            Json                          @default("[]")
+  requiresImmediateAttention Boolean                       @default(false)
+  createdAt                  DateTime                      @default(now())
+  updatedAt                  DateTime                      @updatedAt
+  tenant                     Tenant                        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deliveryAttempts           NotificationDeliveryAttempt[]
+
+  @@index([tenantId, createdAt])
+  @@index([eventType, severity])
+  @@index([entityType, entityId])
+}
+
+model NotificationDeliveryAttempt {
+  id                         String                     @id @default(uuid())
+  notificationOutboxRecordId String
+  channel                    NotificationChannel
+  status                     NotificationDeliveryStatus
+  provider                   String?                    @db.VarChar(80)
+  providerReference          String?                    @db.VarChar(160)
+  failureReason              String?
+  attemptedAt                DateTime?
+  createdAt                  DateTime                   @default(now())
+  notificationOutboxRecord   NotificationOutboxRecord   @relation(fields: [notificationOutboxRecordId], references: [id], onDelete: Cascade)
+
+  @@index([channel, status])
+  @@index([attemptedAt])
 }
 
 model AnalyticsEvent {
@@ -251,17 +962,123 @@ model AnalyticsEvent {
   @@index([entityType, entityId, occurredAt])
 }
 
+model AnalyticsDailyRollup {
+  id           String              @id @default(uuid())
+  day          DateTime
+  tenantId     String
+  countryCode  String              @db.VarChar(2)
+  industryCode String              @db.VarChar(80)
+  entityType   AnalyticsEntityType
+  entityId     String              @db.VarChar(120)
+  consentState ConsentState
+  impressions  Int                 @default(0)
+  views        Int                 @default(0)
+  clicks       Int                 @default(0)
+  inquiries    Int                 @default(0)
+  shares       Int                 @default(0)
+  downloads    Int                 @default(0)
+  saves        Int                 @default(0)
+  searches     Int                 @default(0)
+  matches      Int                 @default(0)
+  chatMessages Int                 @default(0)
+  responseTime Int                 @default(0)
+  eventCount   Int                 @default(0)
+  lastEventAt  DateTime
+  refreshedAt  DateTime
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([day, tenantId, countryCode, industryCode, entityType, entityId, consentState], map: "analytics_daily_rollup_unique")
+  @@index([tenantId, day], map: "analytics_daily_rollup_tenant_day_idx")
+  @@index([countryCode, industryCode, day], map: "analytics_daily_rollup_country_industry_day_idx")
+  @@index([entityType, entityId, day], map: "analytics_daily_rollup_entity_day_idx")
+}
+
+model Conversation {
+  id                   String                     @id @default(uuid())
+  tenantId             String
+  sourceRecordId       String                     @db.VarChar(120)
+  sourceName           String                     @db.VarChar(200)
+  sourceRole           String                     @db.VarChar(80)
+  inquiryType          String                     @db.VarChar(80)
+  status               ConversationStatus         @default(OPEN)
+  priority             String                     @db.VarChar(40)
+  matchConfidence      Int
+  responseSlaHours     Int
+  assigneeUserId       String?
+  assigneeDisplayName  String?                    @db.VarChar(160)
+  openedAt             DateTime
+  firstResponseDueAt   DateTime
+  firstResponseAt      DateTime?
+  lastInboundMessageAt DateTime
+  lastMessageAt        DateTime
+  typingRole           ConversationParticipantRole?
+  typingAt             DateTime?
+  resolvedAt           DateTime?
+  blockedAt            DateTime?
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime                   @updatedAt
+  tenant               Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignee             User?                      @relation("ConversationAssignee", fields: [assigneeUserId], references: [id])
+  messages             ConversationMessage[]
+  notifications        ConversationNotification[]
+
+  @@index([tenantId, status, updatedAt])
+  @@index([tenantId, assigneeUserId, status])
+  @@index([tenantId, firstResponseDueAt])
+  @@index([sourceRecordId])
+}
+
+model ConversationMessage {
+  id             String                       @id @default(uuid())
+  tenantId       String
+  conversationId String
+  senderRole     ConversationParticipantRole
+  body           String
+  deliveryStatus String                       @default("SENT") @db.VarChar(20)
+  deliveredAt    DateTime?
+  readAt         DateTime?
+  readByRole     ConversationParticipantRole?
+  attachments    Json?
+  createdAt      DateTime                     @default(now())
+  tenant         Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversation   Conversation                 @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, conversationId, createdAt])
+  @@index([senderRole, createdAt])
+  @@index([deliveryStatus, createdAt])
+}
+
+model ConversationNotification {
+  id             String                       @id @default(uuid())
+  tenantId       String
+  conversationId String
+  type           ConversationNotificationType
+  title          String                       @db.VarChar(160)
+  message        String
+  scheduledFor   DateTime
+  sentAt         DateTime?
+  readAt         DateTime?
+  createdAt      DateTime                     @default(now())
+  tenant         Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversation   Conversation                 @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, type, scheduledFor])
+  @@index([conversationId])
+}
+
 model SafetyPolicyDecision {
-  id             String       @id @default(uuid())
-  tenantId        String?
-  sourceSurface   String       @db.VarChar(80)
-  action          PolicyAction
-  category        String?      @db.VarChar(80)
-  policyCode      String?      @db.VarChar(80)
-  matchedTerm     String?      @db.VarChar(240)
-  reviewedBy      String?
-  evidence        Json?
-  createdAt       DateTime     @default(now())
+  id            String       @id @default(uuid())
+  tenantId      String?
+  sourceSurface String       @db.VarChar(80)
+  action        PolicyAction
+  category      String?      @db.VarChar(80)
+  policyCode    String?      @db.VarChar(80)
+  matchedTerm   String?      @db.VarChar(240)
+  reviewedBy    String?
+  evidence      Json?
+  createdAt     DateTime     @default(now())
 
   @@index([tenantId, action])
   @@index([category])
@@ -269,103 +1086,103 @@ model SafetyPolicyDecision {
 }
 
 model CountryTaxProfile {
-  id                    String            @id @default(uuid())
-  countryCode            String            @db.VarChar(2)
-  taxAuthorityName       String            @db.VarChar(200)
-  taxRegistrationStatus  String            @db.VarChar(80)
-  filingPortalUrl        String?           @db.VarChar(500)
-  localFinanceOwner      String            @db.VarChar(160)
-  filingFrequency        String            @db.VarChar(80)
-  recordRetentionYears   Int
-  taxInclusivePricing    Boolean           @default(true)
-  approvedAt             DateTime?
-  approvedBy             String?
-  createdAt              DateTime          @default(now())
-  updatedAt              DateTime          @updatedAt
-  country                Country           @relation(fields: [countryCode], references: [code])
-  ruleVersions           TaxRuleVersion[]
-  returns                TaxReturn[]
-  financeAlerts          FinanceAlert[]
+  id                    String           @id @default(uuid())
+  countryCode           String           @db.VarChar(2)
+  taxAuthorityName      String           @db.VarChar(200)
+  taxRegistrationStatus String           @db.VarChar(80)
+  filingPortalUrl       String?          @db.VarChar(500)
+  localFinanceOwner     String           @db.VarChar(160)
+  filingFrequency       String           @db.VarChar(80)
+  recordRetentionYears  Int
+  taxInclusivePricing   Boolean          @default(true)
+  approvedAt            DateTime?
+  approvedBy            String?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  country               Country          @relation(fields: [countryCode], references: [code])
+  ruleVersions          TaxRuleVersion[]
+  returns               TaxReturn[]
+  financeAlerts         FinanceAlert[]
 
   @@index([countryCode])
 }
 
 model TaxRuleVersion {
-  id                  String            @id @default(uuid())
-  countryTaxProfileId String
-  taxType             String            @db.VarChar(80)
-  taxRate             Decimal           @db.Decimal(9, 6)
-  productTaxCode      String            @db.VarChar(120)
-  registrationThreshold Decimal?        @db.Decimal(18, 4)
-  effectiveFrom       DateTime
-  effectiveTo         DateTime?
-  notes               String?
-  createdAt           DateTime          @default(now())
-  countryTaxProfile   CountryTaxProfile @relation(fields: [countryTaxProfileId], references: [id], onDelete: Cascade)
-  snapshots           TaxCalculationSnapshot[]
+  id                    String                   @id @default(uuid())
+  countryTaxProfileId   String
+  taxType               String                   @db.VarChar(80)
+  taxRate               Decimal                  @db.Decimal(9, 6)
+  productTaxCode        String                   @db.VarChar(120)
+  registrationThreshold Decimal?                 @db.Decimal(18, 4)
+  effectiveFrom         DateTime
+  effectiveTo           DateTime?
+  notes                 String?
+  createdAt             DateTime                 @default(now())
+  countryTaxProfile     CountryTaxProfile        @relation(fields: [countryTaxProfileId], references: [id], onDelete: Cascade)
+  snapshots             TaxCalculationSnapshot[]
 
   @@index([countryTaxProfileId, taxType])
   @@index([effectiveFrom, effectiveTo])
 }
 
 model TaxCalculationSnapshot {
-  id                String          @id @default(uuid())
-  tenantId          String
-  countryCode       String          @db.VarChar(2)
-  taxRuleVersionId  String?
-  provider          String          @db.VarChar(80)
-  providerReference String?         @db.VarChar(160)
-  grossAmount       Decimal         @db.Decimal(18, 4)
-  taxableAmount     Decimal         @db.Decimal(18, 4)
-  taxAmount         Decimal         @db.Decimal(18, 4)
-  netRevenueAmount  Decimal         @db.Decimal(18, 4)
-  presentmentCurrency String        @db.VarChar(3)
-  filingCurrency    String          @db.VarChar(3)
-  exchangeRate      Decimal?        @db.Decimal(18, 8)
-  customerEvidence  Json
-  calculationReason String          @db.VarChar(240)
-  transactionAt     DateTime
-  createdAt         DateTime        @default(now())
-  tenant            Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  taxRuleVersion    TaxRuleVersion? @relation(fields: [taxRuleVersionId], references: [id])
-  ledgerEntries     TaxLedgerEntry[]
+  id                  String           @id @default(uuid())
+  tenantId            String
+  countryCode         String           @db.VarChar(2)
+  taxRuleVersionId    String?
+  provider            String           @db.VarChar(80)
+  providerReference   String?          @db.VarChar(160)
+  grossAmount         Decimal          @db.Decimal(18, 4)
+  taxableAmount       Decimal          @db.Decimal(18, 4)
+  taxAmount           Decimal          @db.Decimal(18, 4)
+  netRevenueAmount    Decimal          @db.Decimal(18, 4)
+  presentmentCurrency String           @db.VarChar(3)
+  filingCurrency      String           @db.VarChar(3)
+  exchangeRate        Decimal?         @db.Decimal(18, 8)
+  customerEvidence    Json
+  calculationReason   String           @db.VarChar(240)
+  transactionAt       DateTime
+  createdAt           DateTime         @default(now())
+  tenant              Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  taxRuleVersion      TaxRuleVersion?  @relation(fields: [taxRuleVersionId], references: [id])
+  ledgerEntries       TaxLedgerEntry[]
 
   @@index([tenantId, transactionAt])
   @@index([countryCode, transactionAt])
 }
 
 model TaxLedgerEntry {
-  id                    String                 @id @default(uuid())
+  id                       String                 @id @default(uuid())
   taxCalculationSnapshotId String
-  entryType             String                 @db.VarChar(80)
-  amount                Decimal                @db.Decimal(18, 4)
-  currencyCode          String                 @db.VarChar(3)
-  occurredAt            DateTime
-  createdAt             DateTime               @default(now())
-  taxCalculationSnapshot TaxCalculationSnapshot @relation(fields: [taxCalculationSnapshotId], references: [id], onDelete: Cascade)
+  entryType                String                 @db.VarChar(80)
+  amount                   Decimal                @db.Decimal(18, 4)
+  currencyCode             String                 @db.VarChar(3)
+  occurredAt               DateTime
+  createdAt                DateTime               @default(now())
+  taxCalculationSnapshot   TaxCalculationSnapshot @relation(fields: [taxCalculationSnapshotId], references: [id], onDelete: Cascade)
 
   @@index([entryType, occurredAt])
 }
 
 model TaxReturn {
-  id                  String              @id @default(uuid())
+  id                  String            @id @default(uuid())
   countryTaxProfileId String
   periodStart         DateTime
   periodEnd           DateTime
   filingDeadline      DateTime
   paymentDeadline     DateTime
-  taxType             String              @db.VarChar(80)
-  filingCurrency      String              @db.VarChar(3)
-  computedTaxDue      Decimal             @db.Decimal(18, 4)
-  status              TaxReturnStatus     @default(DRAFT)
+  taxType             String            @db.VarChar(80)
+  filingCurrency      String            @db.VarChar(3)
+  computedTaxDue      Decimal           @db.Decimal(18, 4)
+  status              TaxReturnStatus   @default(DRAFT)
   approvedAt          DateTime?
   approvedBy          String?
   filedAt             DateTime?
-  authorityReference  String?             @db.VarChar(200)
-  evidenceUrl         String?             @db.VarChar(500)
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
-  countryTaxProfile   CountryTaxProfile   @relation(fields: [countryTaxProfileId], references: [id], onDelete: Cascade)
+  authorityReference  String?           @db.VarChar(200)
+  evidenceUrl         String?           @db.VarChar(500)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  countryTaxProfile   CountryTaxProfile @relation(fields: [countryTaxProfileId], references: [id], onDelete: Cascade)
   remittances         TaxRemittance[]
 
   @@index([countryTaxProfileId, periodStart, periodEnd])
@@ -373,18 +1190,18 @@ model TaxReturn {
 }
 
 model TaxRemittance {
-  id                 String              @id @default(uuid())
-  taxReturnId         String
-  amount              Decimal             @db.Decimal(18, 4)
-  currencyCode        String              @db.VarChar(3)
-  status              TaxRemittanceStatus @default(PENDING)
-  paymentReference    String?             @db.VarChar(200)
-  submittedAt         DateTime?
-  paidAt              DateTime?
-  evidenceUrl         String?             @db.VarChar(500)
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
-  taxReturn           TaxReturn           @relation(fields: [taxReturnId], references: [id], onDelete: Cascade)
+  id               String              @id @default(uuid())
+  taxReturnId      String
+  amount           Decimal             @db.Decimal(18, 4)
+  currencyCode     String              @db.VarChar(3)
+  status           TaxRemittanceStatus @default(PENDING)
+  paymentReference String?             @db.VarChar(200)
+  submittedAt      DateTime?
+  paidAt           DateTime?
+  evidenceUrl      String?             @db.VarChar(500)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  taxReturn        TaxReturn           @relation(fields: [taxReturnId], references: [id], onDelete: Cascade)
 
   @@index([status])
 }
@@ -402,6 +1219,7 @@ model FinanceAlert {
   createdAt           DateTime           @default(now())
   countryTaxProfile   CountryTaxProfile  @relation(fields: [countryTaxProfileId], references: [id], onDelete: Cascade)
   assignedTo          User?              @relation("FinanceAlertAssignee", fields: [assignedToUserId], references: [id])
+  dedupeKey           String?            @unique
 
   @@index([status, dueAt])
   @@index([assignedToUserId])
@@ -418,6 +1236,9 @@ model ReconciliationRun {
   varianceAmount Decimal  @db.Decimal(18, 4)
   status         String   @db.VarChar(80)
   createdAt      DateTime @default(now())
+  tenantId       String?
+  variances      Json?
+  matchedCount   Int      @default(0)
 
   @@index([countryCode, periodStart, periodEnd])
 }
@@ -429,7 +1250,7 @@ model CreditNote {
   currency  String   @db.VarChar(3)
   reason    String
   createdAt DateTime @default(now())
-
+  idempotencyKey String?
   @@index([tenantId])
 }
 
@@ -440,7 +1261,7 @@ model Refund {
   currency  String   @db.VarChar(3)
   reason    String
   createdAt DateTime @default(now())
-
+  idempotencyKey String?
   @@index([tenantId])
 }
 
@@ -452,7 +1273,7 @@ model Chargeback {
   status    String   @db.VarChar(80)
   evidence  Json?
   createdAt DateTime @default(now())
-
+idempotencyKey String?
   @@index([tenantId, status])
 }
 
@@ -470,4 +1291,167 @@ model AuditLog {
 
   @@index([tenantId, createdAt])
   @@index([actorUserId, createdAt])
+}
+
+model FinanceIdempotency {
+  id        String   @id @default(uuid())
+  tenantId  String
+  scope     String   @db.VarChar(80)
+  key       String
+  resultId  String
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, scope, key])
+  @@index([tenantId])
+}
+
+model FinanceSequence {
+  id        String @id @default(uuid())
+  countryId String @db.VarChar(2)
+  kind      String @db.VarChar(20)
+  year      Int
+  value     Int    @default(0)
+
+  @@unique([countryId, kind, year])
+}
+
+model FinancePeriodLock {
+  id        String   @id @default(uuid())
+  tenantId  String
+  countryId String   @db.VarChar(2)
+  period    String   @db.VarChar(7)
+  lockedAt  DateTime
+  lockedBy  String
+
+  @@unique([tenantId, countryId, period])
+  @@index([tenantId])
+}
+
+model FinanceReturnApproval {
+  id          String    @id @default(uuid())
+  tenantId    String
+  countryId   String    @db.VarChar(2)
+  period      String    @db.VarChar(7)
+  status      String    @default("PENDING") @db.VarChar(20)
+  requestedBy String
+  decidedBy   String?
+  decidedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([tenantId, countryId, period])
+  @@index([tenantId, status])
+}
+
+model CountryPricing {
+  country     String   @id @db.VarChar(2)
+  currency    String   @db.VarChar(3)
+  amountMinor BigInt
+  display     String   @db.VarChar(40)
+  mode        String   @db.VarChar(10)
+  updatedAt   DateTime @updatedAt
+}
+
+model FinanceWorkbenchRecord {
+  id          String   @id @default(uuid())
+  collection  String   @db.VarChar(40)
+  recordId    String
+  tenantId    String?
+  countryCode String?  @db.VarChar(2)
+  payload     Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([collection, recordId])
+  @@index([collection, tenantId])
+  @@index([collection, countryCode])
+}
+
+model AccountDeletionRequest {
+  id          String    @id @default(uuid())
+  tenantId    String
+  userId      String
+  status      String    @default("REQUESTED") @db.VarChar(20)
+  reason      String?
+  requestedAt DateTime  @default(now())
+  scheduledAt DateTime
+  cancelledAt DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([tenantId, userId])
+  @@index([status, scheduledAt])
+}
+
+model DataExportRequest {
+  id          String    @id @default(uuid())
+  tenantId    String
+  userId      String
+  status      String    @default("QUEUED") @db.VarChar(20)
+  downloadUrl String?   @db.VarChar(1000)
+  expiresAt   DateTime?
+  requestedAt DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([tenantId, userId])
+  @@index([status, expiresAt])
+}
+
+model UserContentReport {
+  id               String   @id @default(uuid())
+  reporterTenantId String
+  reporterUserId   String
+  targetType       String   @db.VarChar(40)
+  targetId         String   @db.VarChar(120)
+  targetTenantId   String?  @db.VarChar(120)
+  reason           String   @db.VarChar(80)
+  details          String?
+  status           String   @db.VarChar(40)
+  countryCode      String   @db.VarChar(2)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  reporterTenant   Tenant   @relation(fields: [reporterTenantId], references: [id], onDelete: Cascade)
+
+  @@index([reporterTenantId, createdAt])
+  @@index([status, createdAt])
+  @@index([targetType, targetId])
+}
+
+model UserBlock {
+  id              String   @id @default(uuid())
+  tenantId        String
+  blockedTargetId String   @db.VarChar(120)
+  blockedTenantId String?  @db.VarChar(120)
+  createdByUserId String
+  reason          String   @db.VarChar(80)
+  createdAt       DateTime @default(now())
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, blockedTargetId])
+  @@index([tenantId])
+}
+
+// ─── Payments (M-Pesa / mobile money via Africa's Talking) ─────────────────────
+
+model PaymentTxn {
+  id            String    @id @default(uuid())
+  provider      String    @default("africastalking") @db.VarChar(40)
+  kind          String    @db.VarChar(20) // CHECKOUT | B2C | C2B
+  status        String    @default("REQUESTED") @db.VarChar(20) // REQUESTED|PENDING|SUCCESS|FAILED
+  providerTxnId String?   @unique @db.VarChar(120) // AT transactionId
+  phone         String    @db.VarChar(80) // E.164 — payer or payee M-Pesa number
+  amount        Decimal   @db.Decimal(12, 2)
+  currency      String    @default("KES") @db.VarChar(8)
+  reason        String?   @db.VarChar(200)
+  userId        String?
+  tenantId      String?
+  metadata      Json?
+  rawCallback   Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([tenantId, status])
 }

@@ -1,0 +1,52 @@
+name: Deploy API (Fly.io)
+
+# Manual deploy of the SellFindConnect API to Fly (sellfindconnect-api).
+# Same command as docs/FLY_DEPLOYMENT.md:
+#   fly deploy --config fly.api.toml --remote-only
+# Fly applies any staged `fly secrets` in the same release, and fly.api.toml's
+# release_command runs Prisma migrations before traffic shifts.
+#
+# Required repo secret: FLY_API_TOKEN — a deploy token scoped to the API app:
+#   fly tokens create deploy -a sellfindconnect-api
+#
+# Manual only (Actions → Deploy API (Fly.io) → Run workflow); production
+# deploys stay a deliberate human action.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy sellfindconnect-api
+    runs-on: ubuntu-latest
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - name: Require deploy token
+        if: env.FLY_API_TOKEN == ''
+        run: |
+          echo "::error title=Deploy blocked::FLY_API_TOKEN repo secret is not set (fly tokens create deploy -a sellfindconnect-api)."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy
+        run: flyctl deploy --config fly.api.toml --remote-only
+
+      - name: Confirm the API is healthy
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            if curl -fsS https://api.sellfindconnect.com/v1/health; then
+              echo; echo "::notice title=Deploy live::api.sellfindconnect.com/v1/health is OK."
+              exit 0
+            fi
+            echo "health not ready (attempt $attempt), retrying in 10s"; sleep 10
+          done
+          echo "::error title=Deploy unverified::/v1/health did not return OK."
+          exit 1

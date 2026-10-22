@@ -1,0 +1,51 @@
+import type { ReactNode } from 'react';
+
+import '../styles/privacy.css';
+import { PolicyNav } from './PolicyNav';
+
+export function LegalSection({
+  id,
+  title,
+  children,
+}: {
+  id: string;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section id={id} className="sfc-privacy__section">
+      <h2>{title}</h2>
+      <div className="sfc-privacy__content">{children}</div>
+    </section>
+  );
+}
+
+export function LegalDocument({
+  eyebrow,
+  title,
+  version,
+  updated,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  version: string;
+  updated: string;
+  children: ReactNode;
+}) {
+  return (
+    <main className="sfc-privacy">
+      <div className="sfc-privacy__hero">
+        <span className="sfc-privacy__eyebrow">{eyebrow}</span>
+        <h1>{title}</h1>
+        <p className="sfc-privacy__meta">
+          {version} · Last updated: {updated} · Telpen Systems Ltd · Kenya
+        </p>
+      </div>
+      <div className="sfc-privacy__body">
+        {children}
+        <PolicyNav />
+      </div>
+    </main>
+  );
+}

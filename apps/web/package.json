@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npm run build -w @telpen/domain && next build",
+    "build": "npm run build -w @telpen/domain && cross-env NODE_ENV=production next build",
     "start": "next start",
     "typecheck": "npm run build -w @telpen/domain && tsc -p tsconfig.json --noEmit",
     "lint": "eslint ."

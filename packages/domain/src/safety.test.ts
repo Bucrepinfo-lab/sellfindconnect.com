@@ -66,6 +66,18 @@ describe('evaluateSafetyText', () => {
     }
   });
 
+  it('handles cyclic objects without crashing', () => {
+    const input: Record<string, unknown> = {
+      description: 'Fresh produce distributor',
+    };
+    input.self = input;
+
+    expect(evaluateSafetyFields(input)).toEqual({
+      allowed: true,
+      action: 'ALLOW',
+    });
+  });
+
   it('keeps compliant regulated services available', () => {
     expect(
       evaluateSafetyText('Licensed pharmacy supplying approved prescription medicine to hospitals'),

@@ -1,10 +1,20 @@
 # Product Requirements Document: Multi-Tenant Advertising SaaS
 
 Date: 2026-06-15
-Last updated: 2026-06-16
+Last updated: 2026-08-24
 Owner: Telpen Adverts
 Working name: Telpen Adverts Platform
 Status: Draft for validation
+
+> Implementation status (2026-08-21): MVP vertical slices are in place across
+> auth/tenancy, advertiser profiles, listings + media pipeline, Source Finder,
+> matching/lead conversion, conversations, analytics (with daily rollups and
+> hierarchy reports), and finance/tax. Fly.io Frankfurt is the live host for
+> `sellfindconnect.com` and `api.sellfindconnect.com`; the live image still
+> lags `main` (see `docs/FLY_DEPLOYMENT.md`). Google Play constraints and the
+> login-phone = STK Push identity rule are locked in `docs/PLAY_STORE.md`.
+> Native mobile remains out of scope. See `docs/IMPLEMENTATION_BACKLOG.md` for
+> per-epic progress and `Product_Memory.md` for the dated decision log.
 
 ## 1. Executive Summary
 
@@ -162,7 +172,7 @@ Each category must support:
 
 The platform must entirely block weapons, pornography, human trafficking/human trade, and other categories of similar severity. These categories are not "regulated industries" on Telpen; they are prohibited across signup, profiles, listings, media, search, matching, recommendations, chat, payment, links, and analytics exports.
 
-Hosting-provider acceptable-use alignment is mandatory. Because the current deployment uses Railway, Telpen must not allow users to publish, search, link, message, upload, promote, automate, or transact around activity that would violate Railway-style acceptable-use rules, including illegal activity, child exploitation, terrorism or violent extremism, human trafficking, nonconsensual intimate imagery, fraud, phishing, impersonation, malware, unauthorized access, DDoS, botnets, spam, abusive scraping, copyright piracy, crypto mining, torrenting, open proxies, anonymizers, compute resale, or other infrastructure abuse.
+Hosting-provider acceptable-use alignment is mandatory. Telpen must not allow users to publish, search, link, message, upload, promote, automate, or transact around activity that would violate strict cloud-hosting acceptable-use rules, including illegal activity, child exploitation, terrorism or violent extremism, human trafficking, nonconsensual intimate imagery, fraud, phishing, impersonation, malware, unauthorized access, DDoS, botnets, spam, abusive scraping, copyright piracy, crypto mining, torrenting, open proxies, anonymizers, compute resale, or other infrastructure abuse.
 
 Blocked categories:
 
@@ -191,6 +201,7 @@ Enforcement requirements:
 - One versioned, shared zero-tolerance catalogue must drive public policy labels, form validation, server enforcement, moderation reason codes, analytics, and audit logs so highlighted terms never disagree with executable controls.
 - Client-side detection is only an immediate user experience control. Every server-side write, search, upload, relationship-link, messaging, payment, export, recommendation, and indexing path must independently reject prohibited content before persistence or distribution.
 - Safety checking must inspect all user-controlled text and metadata recursively, including names, descriptions, contacts, URLs, tags, captions, filenames, OCR/transcripts, link previews, message attachments, and structured nested fields.
+- API request bodies must pass through shared sanitisation before validation and policy checks, including Unicode normalization, hidden control/format character removal, reasonable recursion limits, and preservation of secret fields such as passwords and tokens.
 - Normalization must resist basic evasion through casing, punctuation, spacing, Unicode variants, common character substitutions, coded terms, and country/language synonyms without silently publishing ambiguous high-risk content.
 - A blocked search must return no commercial results, suggestions, related entities, cached matches, analytics exports, or advertising inventory for the prohibited request.
 - A blocked draft must not be previewed externally, published, shared, downloaded, matched, messaged from, promoted, billed, or submitted for payment.
@@ -262,6 +273,36 @@ Requirements:
 - Require explicit acceptance/submission controls for terms, privacy policy, community rules, prohibited-content policy, and subscription trial terms.
 - Block account/profile setup when the selected industry, description, intended products, links, or uploaded media match a zero-tolerance category.
 
+Implementation progress on 2026-06-18:
+
+- Added shared owner onboarding helpers for password policy, trial subscription windows, active policy versions, and terms acceptance evidence.
+- Added an MVP auth API for tenant-owner registration, secure password hashing, login sessions, MFA verification, tenant-session checks, and tenant listing.
+- Added zero-tolerance checks during registration so prohibited tenant names or onboarding data cannot create an account.
+- Added a global API input sanitising pipe before validation so registration, profile, listing, search, lead, chat, analytics, notification, and finance request bodies are normalized before policy checks.
+- Added an auth repository boundary so the current in-memory MVP can be replaced by Prisma-backed persistence without changing public auth controller contracts.
+- Added session-token hash storage so raw bearer tokens are only shown at issuance time and are not retained as lookup keys.
+- Added generated, hashed, time-limited MFA challenges so the fixed development code is no longer accepted.
+- Added generated, hashed, expiring email verification and password reset challenges, including password reset session revocation.
+- Added MVP tenant invites so verified owners can invite non-owner tenant roles and invited users can accept with current terms, verified email, role-aware membership, and a fresh session.
+- Added auth audit logging for sensitive auth and invite events, plus an owner/MFA-protected tenant audit lookup endpoint that excludes raw secrets, tokens, codes, invite links, and raw email addresses.
+- Added existing-account invite acceptance requiring an active session for the invited account before linking that account to another tenant.
+- Added an opt-in Prisma auth repository for durable user, tenant, membership, session, MFA challenge, account challenge, tenant invite, and policy-acceptance persistence when `AUTH_REPOSITORY=prisma` is enabled with `DATABASE_URL`.
+- Added a reusable tenant session guard that validates `x-session-token` against `x-tenant-id` and requires MFA before protected tenant routes proceed.
+- Migrated profile draft/preview routes and advert listing/lifecycle routes to the MFA-verified tenant session guard.
+- Migrated lead conversion and conversation/chat routes to the MFA-verified tenant session guard.
+- Migrated Source Finder, notification, analytics, and finance routes to the MFA-verified tenant session guard and removed the obsolete header-only tenant context guard.
+- Added database support for password metadata, auth sessions, tenant onboarding attributes, and policy acceptance evidence.
+- Added a checked-in baseline Prisma migration plus repeatable database seed workflow for continents, pilot country setup, and industry categories.
+- Added a web Owner Onboarding panel showing password strength, trial end date, next billing amount, current terms versions, and signup lock state.
+- Added Resend overlay for email verification, password reset, tenant invites, and email MFA. Development tokens stay in non-production responses when no live sender is configured; `AUTH_EMAIL_PROVIDER=resend` fail-closes without credentials.
+- Added RFC 6238 authenticator TOTP enrollment. MFA-verified owners can start and confirm enrollment, later logins use `AUTHENTICATOR` delivery, and reused time-steps are rejected. Confirmation issues 10 hashed single-use recovery codes; regenerate invalidates the prior set.
+- Added hosted identity overlay for Auth0, Clerk, or generic OIDC. `POST /v1/auth/identity/session` verifies an RS256 ID token via JWKS and issues a first-party session for an existing tenant account. `AUTH_IDENTITY_PROVIDER=auth0|clerk|oidc|live` fail-closes without issuer and audience. Unverified emails and unknown accounts are rejected. New tenants still accept terms through owner signup.
+- Added `PERSISTENCE_DRIVER=prisma` overlay so production can select Prisma for all repositories and media queues with one env var when `DATABASE_URL` is set. Named `live` fail-closes without the URL. Per-repository `memory` overrides still win. Unset driver keeps the in-memory default even if `DATABASE_URL` exists. `GET /v1/health` reports driver, mode, and `databaseConfigured` without the URL.
+- Fly API deploys now run `deploy/api-release.sh` as `release_command` (migrate, then idempotent country/industry seed) and set `PERSISTENCE_DRIVER=prisma` only after that command succeeds. GitHub Actions scheduled jobs are enabled against `https://api.sellfindconnect.com/v1` once `INTERNAL_JOB_KEY` is set on Fly and in repository secrets. Migration SQL must not start with a UTF-8 BOM; a failed `finance_durability` apply from that BOM is marked rolled back and retried.
+- Remaining hardening: native mobile clients remain out of scope. The verified
+  E.164 login phone is also the STK Push destination; checkout must not accept a
+  different payer number (`docs/PLAY_STORE.md`).
+
 Acceptance criteria:
 
 - A new advertiser can create an account, select country, industry, and role within 3 minutes.
@@ -305,6 +346,87 @@ Requirements:
 - Previous public version must remain live until new draft is published.
 - Admin/moderator can require review for high-risk category changes.
 - Profile must show created date, updated date, and how long the profile has been active.
+
+Implementation progress on 2026-06-19:
+
+- Added the first tenant-session protected profile publish workflow: a safe draft
+  can become the tenant's live profile, the prior live profile is archived, and
+  profile versions plus days-live metadata are tracked.
+- Added API support for reading the current live profile and published profile
+  history.
+- Added profile publish audit evidence so sensitive publication events can be
+  reviewed from the tenant audit trail.
+- Added a profile repository boundary with in-memory default storage and
+  opt-in Prisma persistence for profile drafts, live profile publishing,
+  previous-live archiving, and source-draft linkage.
+- Added profile draft editing with audit evidence, publish-time request and
+  stored current-terms checks, and review-pending gates for high-risk industry,
+  role, or country changes.
+- Added persisted review reasons and an MVP owner/admin review workflow for
+  pending profile drafts, including review queue listing, approve/reject
+  decisions, review notes, and publish blocking for rejected drafts.
+- Added profile contact enrichment and service-area coverage for WhatsApp,
+  physical address, map URL, social/contact links, primary city, regions,
+  radius, remote availability, and operating countries, including preview and
+  live publish carry-over.
+- Added platform-level profile moderation access with MFA-required
+  `MODERATE_CONTENT` assignments, scoped pending-review queue filtering,
+  country/tenant access checks, platform review endpoints, and access-decision
+  audit persistence.
+- Added the profile media display foundation: shared media policy, ten-item
+  display cap, supported image/video metadata, recursive safety checks for media
+  captions/URLs/filenames, tenant-session protected draft media routes, preview
+  media slots, Prisma `MediaAsset` persistence, and publish-time media carry-over
+  into the live profile.
+- Added provider-neutral profile media upload preparation plus storage,
+  moderation, and CDN/transform adapter hooks, with persisted storage keys,
+  CDN URLs, transform status, and variant metadata.
+- Added S3-compatible presigned PUT upload support through env-configured
+  Signature V4 signing, plus scan/transform processing job interfaces.
+- Added durable Prisma/PostgreSQL media processing job outbox persistence with
+  worker claim, completion, retry, and final-failure support.
+- Added a shared media module and internal job-key protected media processing
+  runner, `POST /v1/operations/media/processing/run`, with development
+  processors for scan, moderation, image transform, and video transcode jobs.
+- Added generic HTTP provider-backed processor adapters for malware scan,
+  content moderation, image transform, and video transcode jobs.
+- Added Prisma media asset result publication from completed/final worker jobs,
+  including moderation state, blocked fail-closed states, transform status,
+  CDN URLs, thumbnails, and responsive variants.
+- Added durable unsafe-media review cases through Prisma `MediaReviewCase`
+  records for blocked or final-failed scan/moderation/transform output,
+  including severity, source job, provider, reason, and evidence.
+- Added protected platform media review endpoints for MFA-required
+  `MODERATE_CONTENT` moderators to list scoped review cases, resolve cases as
+  confirmed blocked, restored, escalated, or dismissed, block unsafe moderator
+  notes, and persist tenant audit evidence for the decision.
+- Added moderator assignment queues for open media review cases, including
+  assigned/unassigned filters, assignment notes, assignment timestamps, scoped
+  platform access enforcement, unsafe assignment-note blocking, and tenant audit
+  evidence.
+- Added live object-storage overlay for DigitalOcean Spaces via `SPACES_*`
+  aliases, plus approved ClamAV malware and Sightengine visual-moderation
+  scanners. Named providers fail-close without credentials. Scanner results
+  omit API secrets.
+- Added CDN publication verification on image and video transform jobs.
+  Public CDN URLs are checked with an HTTPS Range GET before the job succeeds.
+  `MEDIA_CDN_VERIFICATION_PROVIDER=live` fail-closes without a public origin.
+  Unreachable objects fail closed; 5xx/timeouts stay retryable.
+- Added Kenya legal/reporting escalation playbooks. Escalated cases and
+  HIGH/CRITICAL confirmed blocks require an approved country playbook, persist
+  reporting channels and legal-hold deadlines, and fail closed for other
+  countries. Audit metadata stores playbook codes only.
+- Added user-facing media review status on tenant profile, advert, and
+  conversation media. Internal reasons are omitted. Public discovery only
+  includes files that are ready to display.
+- Added richer media review-case management: computed SLAs (CRITICAL 24h,
+  HIGH 72h, MEDIUM 168h), GET by id, job-type and overdue filters,
+  mistaken-classification gates for HIGH/CRITICAL restore or dismiss, and
+  reopen of dismissed cases only. Escalated cases stay closed.
+- Added `PERSISTENCE_DRIVER=prisma` overlay for media review cases, job queues,
+  and result publication. Named `live` fail-closes without `DATABASE_URL`.
+  Per-driver `memory` overrides still win.
+- Remaining hardening: native mobile clients remain out of scope.
 
 ### 7.3 Media Display Area
 
@@ -357,8 +479,56 @@ Requirements:
 - Users can edit live listings through draft versions.
 - Users can schedule posts.
 - Users can pause, archive, duplicate, renew, or boost listings if future monetization allows.
+- Every post, advert, and listing expires automatically after 40 days unless renewed.
+- Renewal notification alerts must be sent on day 35 and day 39 before automatic deletion.
 - Regulated categories require extra verification and moderator approval.
 - Listings must support country, continent, and global visibility controls.
+
+Implementation progress:
+
+- Added the advert lifecycle foundation for 40-day expiry, day-35/day-39 renewal
+  alerts, and day-40 auto-deletion.
+- Added tenant-session protected advert media upload preparation, attach, and
+  listing routes using the shared media policy and storage/moderation/CDN
+  transform adapter hooks. Advert media enforces the ten-item cap, safety
+  checks, moderation status, transform metadata, display slots, and media
+  auto-archive when the advert auto-deletes.
+- Added S3-compatible presigned upload readiness and media processing job
+  queue contracts shared with profile media.
+- Added durable media processing job outbox support so advert scan/transform
+  jobs survive API restarts and can be processed by workers.
+- Added the protected media processing runner endpoint shared by advert and
+  profile media jobs.
+- Added shared HTTP processor adapters and Prisma media-result publication for
+  advert and profile media worker output.
+- Added durable media review cases for unsafe or final-failed advert/profile
+  media processing output.
+- Added protected platform media review-case listing and resolution actions for
+  scoped moderators, with unsafe review-note blocking and audit evidence.
+- Added richer media review-case management: computed SLAs, GET by id,
+  job-type and overdue filters, mistaken-classification restore/dismiss gates,
+  and reopen of dismissed cases only.
+- Added durable advert draft and published-advert repositories with in-memory
+  and Prisma implementations, database migration support, draft preview,
+  publish-to-live versioning, persisted renewal alerts, and pause/archive/renew
+  controls.
+- Added duplicate controls for draft and live adverts, boost metadata with
+  30-day maximum boost windows, and public listing discovery ranking that
+  filters live/renewal-due adverts by country, industry, role, blocked search
+  safety, active boost, freshness, query matches, and available media.
+- Added a persisted advert discovery index foundation with full-text token
+  fields, sparse vector scoring, relationship graph signals, saved advert
+  searches, de-duplicated discovery alerts, and index rebuild controls.
+- Added typo-tolerant query expansion, synonym dictionaries, saved-search
+  analytics events, discovery interaction counters, and web/PWA saved-search
+  controls.
+- Added scheduled advert publishing: a future `publishedAt` creates a
+  `SCHEDULED` listing that stays out of public discovery until the lifecycle
+  sweep promotes it to `LIVE` at the start time. The 40-day expiry window still
+  starts at go-live.
+- Live storage credentials, approved media vendors, production-grade search
+  provider hardening, persisted analytics rollups, external alert delivery, and
+  native mobile saved-search screens remain next.
 
 ### 7.5 Search and Discovery
 
@@ -383,6 +553,70 @@ Acceptance criteria:
 
 - Search result relevance can explain why an item appeared: matching category, location, role, product tag, query text, or relationship graph.
 - A user searching for an item can quickly discover producer, supplier, seller, related service provider, and likely consumer segments.
+
+Implementation progress on 2026-06-17:
+
+- Added a shared Source Finder ranking engine that scores results from query text, offers, declared needs, role, industry, country, verification, popularity, response speed, and relationship links.
+- Added reason codes and human-readable match reasons so users understand why a producer, supplier, buyer, logistics provider, or related service appears.
+- Added a tenant-scoped Source Finder API endpoint with server-side zero-tolerance blocking for prohibited searches.
+- Updated the web Source Finder to use the shared ranking engine, expose sort modes, show match reasons, and display related commercial links.
+- Remaining hardening for this ranking slice completed on 2026-08-21 with the
+  persisted catalog index, hierarchy dashboards, and Postgres full-text ranking.
+
+Implementation progress on 2026-08-21:
+
+- Added Source Finder saved searches with INSTANT/DAILY/WEEKLY cadences,
+  zero-tolerance query blocking, de-duplicated opportunity alerts, consent-aware
+  IN_APP/email delivery plans, and opt-in Prisma persistence through
+  `SOURCE_FINDER_REPOSITORY=prisma`.
+- Added tenant routes `POST/GET /v1/source-finder/saved-searches`,
+  `GET /v1/source-finder/alerts`, `POST /v1/source-finder/alerts/run`, and the
+  protected scheduler `POST /v1/operations/source-finder/alerts/run`.
+- Updated the web Saved Searches panel to save cadence-backed searches and run
+  opportunity alerts. Native mobile saved-search screens remain out of scope.
+- Added Source Finder outcome feedback: accept, save, dismiss, hide, and report
+  actions persist per tenant, hide/report always suppress results, and accept/save
+  ranking boosts apply only when behavioral matching consent is granted at both
+  record and search time. Routes: `POST/GET /v1/source-finder/outcomes`.
+- Added a persisted Source Finder search index: catalog documents store
+  search text and sparse token vectors, `POST /v1/source-finder/index/reindex`
+  rebuilds from the pilot catalog, `GET /v1/source-finder/index` lists summaries
+  without vectors, and `POST /v1/operations/source-finder/index/reindex` is the
+  scheduler job. Search uses indexed documents when present and falls back to
+  the in-memory catalog otherwise. Opt-in Prisma persistence reuses
+  `SOURCE_FINDER_REPOSITORY=prisma`.
+- Added Source Finder hierarchy dashboards: country, industry, role, and
+  relationship-link rollups from the indexed catalog, exposed as
+  `GET /v1/source-finder/hierarchy` and shown on the Relationship Graph panel.
+- Added Postgres full-text ranking on the Source Finder catalog index. Indexed
+  documents score with token overlap in memory and `tsvector` search in Prisma.
+  Search responses include `searchMode` (`RULES` | `FTS` | `HYBRID` | `SEMANTIC`)
+  and `KEYWORD_MATCH` without requiring live OpenAI embeddings.
+- Added optional OpenAI embedding overlay. `OPENAI_API_KEY` embeds Source Finder
+  index documents and queries with `text-embedding-3-small`. Named
+  `SOURCE_FINDER_EMBEDDING_PROVIDER=openai` or `live` fail-closes without the
+  key; `development` keeps FTS-only. Semantic hits add `SEMANTIC_MATCH`.
+- Added `PERSISTENCE_DRIVER=prisma` overlay so Source Finder catalog, embeddings,
+  and hierarchy persistence can follow the hosted PostgreSQL driver without
+  setting every `*_REPOSITORY` key. Per-repository `memory` overrides still win.
+- Remaining hardening: native mobile screens are out of scope.
+
+Implementation progress on 2026-06-20:
+
+- Added a public advert discovery route with zero-tolerance search blocking,
+  country/industry/role filters, explainable ranking reasons, live/renewal-due
+  visibility checks, active boost scoring, freshness scoring, and media presence
+  scoring.
+- Added persisted advert discovery index records, deterministic sparse vector
+  scoring, relationship graph role signals, saved searches, de-duplicated alert
+  records, and tenant reindex controls.
+- Added typo-tolerant query correction, synonym expansion dictionaries, expanded
+  role inference, saved-search save/search/match analytics events, and listing
+  discovery interaction counters for views, clicks, inquiries, shares, and
+  downloads.
+- Added web/PWA saved-search UX with named searches, alert cadence, blocked
+  search handling, restored-search controls, and previewable alert candidates.
+- Remaining hardening: native mobile saved-search screens are out of scope.
 
 ### 7.6 Precision Matching and Link Intelligence
 
@@ -444,6 +678,19 @@ Recommended matching architecture:
 - Phase 4: ML ranking using feedback and outcomes.
 - Phase 5: explainable AI assistant for lead recommendations and profile improvements, subject to privacy disclosures.
 
+Implementation progress on 2026-06-17:
+
+- Added shared lead-conversion intelligence that turns a Source Finder match into match confidence, priority, response SLA, reason codes, and next-best actions.
+- Added API support for match feedback actions: accept, save, dismiss, hide, and report.
+- Added API support for safe inquiry/RFQ creation, with current terms acceptance required before a match can become a lead.
+- Added a tenant lead inbox with status transitions for new, contacted, qualified, negotiating, won, lost, and blocked leads.
+- Migrated match feedback, inquiry/RFQ, lead inbox, lead status, conversation, message, assignment, notification, and SLA endpoints to MFA-verified tenant sessions.
+- Added a web Lead Conversion panel showing selected match, confidence, SLA, feedback action, lead status, inquiry lock/unlock state, and next-best actions.
+- Added the first messaging and SLA workspace: shared conversation rules, saved replies, terms-gated tenant conversation API, safe message submission, assignment, SLA notification checks, Prisma conversation/message/notification models, and a web Conversation Workspace panel.
+- Added consent-aware notification orchestration for in-app, email, SMS, push, and WhatsApp channels, with tenant preferences, an API outbox, and a web Notification Delivery readiness panel.
+- Added a protected internal conversation SLA sweep endpoint for scheduled response-time alerts: `POST /v1/operations/conversations/sla/run`.
+- Added HTTP delivery receipts, read receipts, typing indicators, unread counts, and opt-in Prisma conversation persistence through `CONVERSATIONS_REPOSITORY=prisma`.
+
 ### 7.7 Relationship Links
 
 Requirements:
@@ -454,6 +701,23 @@ Requirements:
 - Linked parties can approve or reject public relationship claims.
 - Relationship graph powers search and matching.
 - Admin/moderator can remove fraudulent relationship links.
+
+Implementation progress on 2026-08-21:
+
+- Added shared relationship-claim helpers for the 13 PRD relationship kinds,
+  public/private/request-only/verified visibility, pending counterpart
+  approval, moderator removal, and zero-tolerance/terms gating.
+- Private claims auto-approve for the claiming tenant and stay off the public
+  graph. Public and verified claims stay pending until the counterpart or a
+  `MODERATE_CONTENT` moderator decides them.
+- Added tenant-session protected relationship APIs for claim create, inbox,
+  graph listing, counterpart decide, and owner/counterpart remove, plus
+  platform moderation decide/remove routes.
+- Added in-memory and opt-in Prisma relationship persistence through
+  `RELATIONSHIPS_REPOSITORY=prisma`.
+- Approved public/verified claims now attach to Source Finder records and rank
+  through existing `RELATIONSHIP_LINKS` scoring. The web Graph panel can claim,
+  approve, and preview live links.
 
 ### 7.8 Messaging, Chat, and Inquiries
 
@@ -480,6 +744,120 @@ MVP decision:
 - Start with in-app chat and email/push notifications.
 - Add WhatsApp/deep link contact options if locally compliant.
 - Add voice/video later only after moderation and safety review.
+
+Notification delivery requirements:
+
+- In-app notification must be available as the baseline channel for operational alerts.
+- Email, SMS, push, and WhatsApp delivery must respect channel consent, country rules, and recipient preferences.
+- High and critical alerts such as breached chat SLAs, tax due/overdue notices, payment failures, security alerts, and advert auto-delete notices must be marked for immediate attention.
+- Delivery providers must be adapters so the platform can switch vendors or use different providers per country.
+- Every outbound notification must keep an outbox record, selected channels, suppressed channels, delivery attempts, provider references, failures, and timestamps.
+- Prohibited content must not be queued into notification titles, messages, metadata, or provider payloads.
+
+Implementation progress on 2026-06-17:
+
+- Added shared conversation states, participant roles, notification types, saved reply suggestions, and response-SLA decisions.
+- Added tenant-scoped conversation endpoints for creating a thread from a safe match, listing messages, sending safe messages, assigning an owner, changing status, listing notifications, and running SLA checks.
+- Required current terms acceptance before conversation creation or message sending.
+- Added zero-tolerance safety checks before any message, assignment metadata, or conversation starter can be persisted.
+- Added a web Conversation Workspace preview for owner assignment, SLA state, status transitions, safe reply drafting, and saved replies.
+- Added Prisma models for durable `Conversation`, `ConversationMessage`, and `ConversationNotification` records.
+- Added a tenant notification preferences API, consent-aware delivery planning API, notification outbox, and protected internal SLA sweep endpoint.
+
+Implementation progress on 2026-08-21:
+
+- Added shared message delivery states (`SENT`, `DELIVERED`, `READ`, `FAILED`),
+  read-receipt rules that reject self-read and failed-message transitions, and a
+  15-second typing-indicator window.
+- Added tenant-session conversation receipt and typing routes:
+  `POST /v1/conversations/:id/messages/:messageId/delivered`,
+  `POST /v1/conversations/:id/messages/:messageId/read`,
+  `POST /v1/conversations/:id/receipts/delivered`,
+  `POST /v1/conversations/:id/receipts/read`, and
+  `POST /v1/conversations/:id/typing`.
+- Conversation list/detail now includes tenant unread counts and whether a
+  typing indicator is still active.
+- Added an in-memory conversation repository plus opt-in Prisma persistence
+  through `CONVERSATIONS_REPOSITORY=prisma`, including `deliveryStatus`,
+  `deliveredAt`, `readAt`, `readByRole`, `typingRole`, and `typingAt`.
+- Updated the web Conversation Workspace to preview inbound/outbound receipts,
+  unread count, typing, mark-delivered, and mark-read.
+
+Implementation progress on 2026-08-21:
+
+- Added conversation image/video attachments that reuse the shared media
+  policy, malware-scan job queue, and moderation adapters. Chat media is
+  tenant-only. Blocked files cannot be attached, and PENDING scans cannot be
+  sent until moderation status is `PASSED`.
+- Added tenant routes `POST /v1/conversations/:id/media/prepare`,
+  `POST /v1/conversations/:id/media`, `GET /v1/conversations/:id/media`, and
+  `mediaAssetIds` on send-message.
+- Updated the Conversation Workspace preview with a scan-ready attachment
+  control.
+
+Implementation progress on 2026-08-21:
+
+- Added a session-authenticated Socket.IO namespace at `/v1/conversations`
+  for live `conversation.message`, `conversation.typing`,
+  `conversation.receipt`, and `conversation.presence` events. Handshake auth
+  accepts MFA-verified `x-session-token` / tenant credentials from Socket.IO
+  `auth`, query, or headers.
+- Online presence is tracked in-process with a 45-second online window and a
+  60-second away window. HTTP fallback routes are
+  `GET /v1/conversations/:id/presence` and
+  `POST /v1/conversations/:id/presence`.
+- Conversation detail now includes a presence snapshot. The Conversation
+  Workspace preview shows live-channel status.
+
+Implementation progress on 2026-08-21:
+
+- Queued notification outbox records now dispatch through channel adapters.
+  Memory adapters are the default for IN_APP, EMAIL, SMS, PUSH, and WHATSAPP.
+  Resend email, Africa's Talking SMS, FCM push, and WhatsApp Cloud overlay when
+  `RESEND_API_KEY`, `AT_API_KEY`/`AT_USERNAME`, `FCM_SERVICE_ACCOUNT_JSON`, or
+  `WHATSAPP_TOKEN`/`WHATSAPP_PHONE_NUMBER_ID` are set. Missing destinations fail
+  closed with a delivery attempt.
+- Added `GET /v1/notifications/adapters`,
+  `POST /v1/notifications/outbox/:id/dispatch`, and
+  `POST /v1/operations/notifications/dispatch/run`.
+- Conversation SLA alerts and Source Finder opportunity alerts now create
+  outbox records and dispatch selected channels.
+- The Notification Delivery panel previews adapter send vs missing-destination
+  skips.
+
+Implementation progress on 2026-08-21:
+
+- Tenant product audit logs now record conversation create/send/assign/status/
+  receipt/media events and notification plan/dispatch events. Chat copy,
+  emails, tokens, and secrets are stripped from metadata.
+- Owner and admin lookup is `GET /v1/audit` behind the MFA tenant session
+  guard. `POST /v1/auth/audit/tenant` still lists the same trail.
+- The Product Audit workspace panel previews redacted events and the owner/
+  admin gate.
+
+Implementation progress on 2026-08-21:
+
+- Extended tenant product audit coverage to analytics exports, privacy/retention/
+  rollup jobs, invoice create/receipt/capture/refund, provider capture
+  settlement, and Africa's Talking checkout/payout requests. Metadata omits
+  chat copy, emails, phones, invoice numbers, payment references, and secrets.
+- `GET /v1/audit` accepts optional `action` and `entityType` filters for owner
+  or admin lookup.
+
+Implementation progress on 2026-08-21:
+
+- Added an in-memory notification repository plus opt-in Prisma persistence
+  through `NOTIFICATIONS_REPOSITORY=prisma`. Tenant preferences, outbox
+  destination, channel statuses, and delivery attempts survive process
+  restarts when PostgreSQL is enabled.
+- The operations dispatch sweep retries queued or failed channels from that
+  durable outbox. The Notification Delivery panel now shows Prisma persistence
+  readiness.
+- Added live WhatsApp notification adapters. Memory remains the default.
+  WhatsApp Cloud overlays when `WHATSAPP_TOKEN` and `WHATSAPP_PHONE_NUMBER_ID`
+  are set. `WHATSAPP_PROVIDER=meta` or `africastalking` fail-closes without
+  credentials. Destinations that are not E.164 numbers are rejected. An optional
+  approved `WHATSAPP_TEMPLATE_NAME` sends a template instead of free-form text.
 
 ### 7.9 Analytics and Monitoring
 
@@ -551,8 +929,57 @@ Analytics requirements:
 - Events must include timestamp, tenant_id, profile_id, listing_id, actor_id when known, anonymous_session_id when allowed, country_id, continent_id, device_type, platform, source, campaign, referrer, and privacy consent state.
 - Use aggregated and anonymized dashboards where possible.
 - Retain raw event data according to privacy and retention policy.
-- Provide CSV/PDF export for tenant reports and internal reports.
+- Provide CSV/JSON/PDF export for tenant reports and internal reports.
 - Provide API/export for enterprise plans later.
+
+Implementation progress on 2026-06-20:
+
+- Added a selectable analytics repository boundary with in-memory development
+  storage and opt-in Prisma/PostgreSQL persistence through
+  `ANALYTICS_REPOSITORY=prisma`.
+- Analytics events now persist to the durable `AnalyticsEvent` store when Prisma
+  mode is enabled and tenant summaries read from the configured repository.
+- Saved-search and advert discovery interaction analytics now await durable
+  writes before returning, so view, click, inquiry, share, download, save,
+  search, and match counters survive API restarts in production mode.
+- Added aggregated tenant analytics report and export endpoints with CSV/JSON/PDF
+  output that excludes raw event metadata by default.
+- Added a protected internal analytics retention sweep with dry-run support and
+  a 395-day default retention window for raw event pruning.
+- Added configurable analytics raw-event retention policy resolution with
+  country-scoped pruning, policy legal basis metadata, and emergency
+  retention-day overrides for internal jobs.
+- Added platform hierarchy analytics foundation with `VIEW_ANALYTICS` scoped
+  access checks for global, regional, continental, country, and tenant reports.
+- Added web/PWA hierarchy dashboard controls for report scope, CSV/JSON/PDF export
+  readiness, access grant/block state, aggregate metrics, top country, top
+  industry, and top tenant previews.
+- Added protected platform hierarchy CSV/JSON/PDF export output plus web/PWA report
+  and export route surfacing for the API-backed dashboard contract.
+- Added web/PWA live hierarchy report loading from the protected report API
+  using platform `x-session-token` authorization, while retaining seeded preview
+  metrics as the unauthenticated fallback.
+- Added first-party web/PWA platform auth controls for dashboard sign-in,
+  session verification, MFA verification, managed token use, and safe fallback
+  to preview metrics when the session changes.
+- Added a daily analytics warehouse rollup table plus a protected internal
+  rollup rebuild job with dry-run support, tenant/country scoping, replacement
+  counts, and no raw metadata in aggregate rows.
+- Added rollup-backed tenant and hierarchy report reads with `AUTO`, `RAW`, and
+  `ROLLUP` data-source selection plus web/PWA controls that surface the resolved
+  raw-event or daily-rollup source.
+- Added a protected analytics privacy request job for tenant-scoped access
+  summaries and erasure workflows with dry-run-by-default deletion, optional
+  country/date scoping, rollup cleanup/rebuild, and no raw metadata in returned
+  summaries.
+- Added country/legal retention approval metadata, pending-review dates, and
+  mandatory approval references before operators can apply emergency
+  retention-day overrides.
+- Remaining follow-up: obtain and record external legal approvals for each
+  country schedule before changing pending policy status to approved.
+- Added product-audit events for tenant analytics exports, privacy requests,
+  retention runs, and rollup refreshes. Export content and raw event metadata
+  stay out of the trail. `GET /v1/audit` can filter by action or entity type.
 
 ### 7.10 Subscription and Billing
 
@@ -603,7 +1030,10 @@ Core requirements:
 - Calculate tax at checkout, subscription renewal, invoice generation, credit note, refund, adjustment, manual payment, app-store receipt import, and off-platform payment import.
 - Use seller/platform location, customer billing country, customer tax ID, business/consumer status, product tax code, performance/location-of-supply rules, payment method evidence, currency, exemption certificate, reverse-charge status, and marketplace liability rules to compute tax.
 - Store an immutable tax calculation snapshot per transaction: gross amount, taxable amount, non-taxable amount, net revenue, tax type, tax rate, tax amount, filing currency, exchange rate, jurisdiction, customer evidence, rule version, calculation provider, and timestamp.
-- Support external tax engines such as Stripe Tax, TaxJar, Taxually, Avalara, or local providers through an adapter layer. The product must not depend on a single provider's data model.
+- Support Stripe Tax through the finance adapter as the rate engine. The
+  operator stays merchant of record; Stripe Tax does not file or remit.
+  Paddle / Lemon Squeezy / Dodo are forbidden. See
+  `docs/GROUP_TAX_OPERATING_MODEL.md`.
 - Support manual tax-rule override only with dual approval, reason, document attachment, effective date, expiry date, and audit log.
 - Reconcile payment provider data, app-store proceeds, local payment rails, bank deposits, refunds, failed payments, chargebacks, and tax liability.
 - Separate collected tax from platform revenue in reports and ledgers.
@@ -654,11 +1084,83 @@ Finance roles and controls:
 Acceptance criteria:
 
 - Before any country becomes paid-live, it must have an approved country tax profile, pricing row, payment provider setup, invoice template, tax calendar, responsible finance owner, and filing/remittance workflow.
+- The operator stays merchant of record. Kenya files on iTax (or through one Kenyan tax representative). STK remains the local rail. Rates come from the finance module and Stripe Tax. EU OSS is later expansion. Merchant-of-record checkouts are forbidden.
 - Every paid transaction must produce an invoice/receipt and an immutable tax snapshot.
 - Finance users can see the exact VAT/GST/sales tax or other obliged tax computed for each country and period.
 - The system alerts responsible users before every filing and remittance deadline.
 - No tax period can be marked complete without filing evidence, remittance evidence, approver identity, and timestamp.
 - The module can export country-level tax reports for local advisors and tax authorities.
+
+Implementation progress on 2026-06-17:
+
+- Added shared finance/tax calculation helpers for tax-inclusive and tax-exclusive pricing, using configured country rules rather than hard-coded legal rates.
+- Added finance API endpoints for country tax profiles, effective-dated tax rules, tenant tax calculation snapshots, ledger entries, draft tax returns, and timed remittance alerts.
+- Added zero-tolerance input checks to finance configuration and calculation metadata.
+- Added the web Finance Readiness panel with computed subscription tax, net revenue, and next remittance alert status.
+- Continued implementation on 2026-06-23 with protected invoice and receipt command endpoints, country/year document numbering, payment-balance tracking, and a paid transaction path that creates an invoice, optional receipt, immutable tax snapshot, and ledger entries.
+- Continued implementation on 2026-06-24 with protected refund, chargeback, adjustment listing, and dunning commands, including refund credit-note numbering, proportional tax/revenue reversal ledger entries, disputed-balance reopening, and duplicate-safe overdue invoice notices.
+- Continued implementation on 2026-08-21 with the tax return workbench: review submission, reconciliation-gated approval, dual filing approval above 10,000 filing-currency units, filing/remittance evidence, period lock, CSV/JSON country tax exports, `COUNTRY_FINANCE_ADMIN` access, and product-audit events that omit notes and receipt references.
+- Continued implementation on 2026-08-21 with an in-memory finance repository plus opt-in Prisma persistence through `FINANCE_REPOSITORY=prisma`. Country tax profiles, rules, snapshots, ledger entries, invoices, receipts, adjustments, tax returns, payments, and reconciliation runs survive process restarts when PostgreSQL is enabled.
+- Continued implementation on 2026-08-21 with controlled post-lock tax-return corrections. Locked periods stay locked; finance admins can post signed correction entries with `PERIOD_CORRECTION` evidence, ledger impact, dual-control above 10,000 units, and product-audit events that omit notes and authority references.
+- Continued implementation on 2026-08-21 with live payment-provider adapters. Invoice capture stays on the manual development adapter by default. `PAYMENT_PROVIDER=stripe`, `africastalking`, or `live` selects Stripe PaymentIntents and/or Africa's Talking M-Pesa checkout, rejects raw card numbers, records `REQUIRES_CAPTURE` until `POST /v1/finance/payments/settle`, and fail-closes when credentials are missing.
+- Continued implementation on 2026-08-21 with `PERSISTENCE_DRIVER=prisma` overlay for finance and payment repositories. Named `live` fail-closes without `DATABASE_URL`; `FINANCE_REPOSITORY=memory` still wins.
+- Continued implementation on 2026-08-21 with product-audit events for invoice create/receipt/capture/refund, provider capture settlement, and mobile checkout/payout. Metadata stores amounts and status only.
+- Continued implementation on 2026-08-22 with a DRAFT Kenya tax profile
+  (KRA 16% VAT, monthly iTax due on the 20th, digital-marketplace registration
+  threshold 0) seeded into the finance workbench store. Paid STK checkout
+  fail-closes with `tax_profile` until a human approves the profile.
+  `GET /v1/finance/launch-readiness` reports the gate. The Finance Readiness
+  panel shows Draft — not approved. Remote iTax simplified VAT (or a Kenyan
+  tax representative) is the intended compliance path; eTIMS is not required
+  for non-resident digital suppliers. The group operating model is locked:
+  stay merchant of record, Kenya iTax or one Kenyan agent, keep STK, finance
+  module + Stripe Tax for rates, EU OSS later
+  (`docs/GROUP_TAX_OPERATING_MODEL.md`). `PAYMENT_PROVIDER=paddle` and other
+  merchant-of-record checkouts fail closed.
+  Significant Economic Presence tax remains an owner/CPA question.
+- Continued implementation on 2026-08-22 with a fail-closed Stripe Tax rate
+  overlay. Unset `TAX_RATE_PROVIDER` keeps finance-module rules.
+  `TAX_RATE_PROVIDER=stripe_tax` quotes Stripe Tax Calculations and must match
+  the approved finance rate. Stripe Tax does not remit, file, or approve Kenya.
+- Continued implementation on 2026-08-22 with public `/terms` and
+  `/subscription` pages at versions `terms-2026-08-22` and
+  `subscription-2026-08-22`. Material version bump forces re-acceptance.
+  Counsel still reviews before treating them as a signed production contract.
+- Continued implementation on 2026-08-22 with public `/prohibited` from the
+  shared zero-tolerance summaries, `/dashboard` redirects into the home
+  workspace, and onboarding links to the public policies.
+- Continued implementation on 2026-08-22 so home honors `view`, `q`,
+  `industry`, and `role` query params from those dashboard redirects. Find
+  onboarding maps AGRI-style quick codes onto catalog industries and opens
+  Source Finder; sell onboarding opens Advertiser Setup.
+- Continued implementation on 2026-08-22 with public `/community` community
+  standards (`community-2026-08-22`). Play UGC requires a user policy that
+  defines objectionable content and behavior, report/block, and
+  child-safety. Sexual content stays fully prohibited. Not counsel sign-off.
+- Continued implementation on 2026-08-22 with tenant UGC report and block
+  APIs plus Source Finder Report/Block controls. Moderators close reports.
+  Product audit omits report details. This is the Play UGC report/block
+  control; native Play remains out of scope.
+- Continued implementation on 2026-08-22 so a tenant block is enforced on
+  conversation create/send/media/typing, lead inquiry, Source Finder search
+  and opportunity alerts, not only the home result list. Unblock restores
+  messaging; SLA checks skip blocked targets.
+- Continued implementation on 2026-08-24 with a UGC moderator queue: reports
+  get severity and SLA from reason, `GET /v1/platform/ugc/reports` returns
+  open/overdue counts, and home can load/resolve with an MFA
+  `MODERATE_CONTENT` session. Product audit still omits report details.
+- Continued implementation on 2026-08-24 with legal/support lookup of accepted
+  policy versions. `GET /v1/platform/legal/terms-acceptances` is scoped by
+  MFA `VIEW_TENANT` assignment and tenant country, returns current vs stale
+  versions, and records `TERMS_ACCEPTANCE_LOOKED_UP` without emails or hashes.
+- Continued implementation on 2026-08-24 with forced re-acceptance after
+  material policy version changes. Session payloads include `termsGate`.
+  Stale stored versions lock publish, chat, inquiry, UGC, relationship claims,
+  and STK checkout (`reason: terms`). `POST /v1/auth/terms/accept` writes a
+  new `REACCEPTANCE` evidence row after MFA. Home can re-accept from Terms Gate.
+- Remaining hardening: app-store billing rails are out of scope while native
+  mobile is not in delivery. A future Google Play listing must use Play Billing
+  for the digital SaaS subscription. Web/PWA STK Push stays on the login phone.
 
 ### 7.11 Moderation, Trust, and Safety
 
@@ -679,6 +1181,15 @@ Requirements:
 - Moderator tooling to distinguish regulated-but-allowed industries from fully blocked categories.
 - Terms acceptance evidence must be visible to authorized support, legal, trust, and finance users when investigating user content, disputes, payments, reports, or enforcement.
 - Terms acceptance must not reduce Telpen's own obligations to run reporting, moderation, privacy, tax, consumer-protection, app-store, and regulated-marketplace controls.
+
+Implementation progress on 2026-08-24:
+
+- Authorized support, legal, trust, and finance roles with `VIEW_TENANT` can look
+  up accepted policy versions at `GET /v1/platform/legal/terms-acceptances`.
+  Responses flag current vs stale policies and omit emails and hashes.
+- Forced re-acceptance after material policy version changes. Session
+  `termsGate` plus `POST /v1/auth/terms/accept` keep stored versions current
+  before publish, chat, inquiry, UGC, relationship claims, and checkout.
 
 ### 7.12 Reviews and Reputation
 
@@ -706,7 +1217,11 @@ Requirements:
 - Push notifications for inquiry, chat, match, trial ending, subscription, moderation, and account security.
 - App-store metadata must accurately describe core experience.
 - Demo account/demo mode required for app review.
-- Privacy policy and account deletion links must be available inside app and on public web.
+- Privacy policy, terms, subscription terms, and account deletion links must be available inside app and on public web
+  (`/privacy`, `/terms`, `/subscription`, `/prohibited`, `/community`, `/account/delete`, `POST /v1/privacy/deletion`). After the
+  30-day grace period, `POST /v1/operations/privacy/deletions/run` erases
+  profile, adverts, conversations, and media, revokes sessions, and retains
+  billing, analytics, and auth-audit records required by tax and security law.
 - Country flag and local currency must be visible in onboarding, billing, and profile contexts.
 
 ### 7.14 Administration
@@ -753,6 +1268,8 @@ Core entities:
 - Subcategory
 - Profile
 - ProfileDraft
+- ProfileServiceArea
+- ProfileSocialLink
 - Listing
 - ListingDraft
 - MediaAsset
@@ -830,6 +1347,21 @@ Permission requirements:
 - Prevent country admins from accessing other countries unless assigned.
 - Support audit logs for all sensitive actions.
 
+Implementation progress on 2026-06-18:
+
+- Added shared RBAC rules covering global head office, regional/multicontinental, continental, country, and tenant scopes.
+- Added role permission matrices and MFA-required checks for privileged roles.
+- Added access decision logic that blocks tenant-to-tenant horizontal access and country-admin access outside assigned countries.
+- Added API endpoints for role matrices, access evaluation, and MVP access decision audit evidence.
+- Added web Hierarchy Access controls showing role, scope, permission, MFA, and grant/block state.
+- Added database fields and models for MFA state, access assignments, and access decision audit records.
+- Added owner registration and login session groundwork so tenants can be created with an owner membership and first-month-free trial state.
+- Added generated, expiring MFA challenge records for tenant-owner sessions; email MFA overlays through Resend when credentials are present. Authenticator TOTP enrollment is available after the first MFA-verified session (`POST /v1/auth/mfa/totp/enroll` and `/confirm`). Confirmation issues hashed recovery codes; `POST /v1/auth/mfa/recovery-codes/regenerate` replaces them.
+- Added hashed account challenge records for email verification and password reset; verification, password-reset, and tenant-invite mail overlay through Resend when `RESEND_API_KEY` and `EMAIL_FROM` are set.
+- Added tenant invite tokens for non-owner tenant roles.
+- Added audit evidence for registration, login, MFA, email verification, password reset, tenant invite creation, and invite acceptance.
+- Added existing-user invite linking with same-account session verification before tenant membership is created.
+
 ## 10. Nonfunctional Requirements
 
 Performance:
@@ -851,7 +1383,7 @@ Security:
 
 - HTTPS everywhere.
 - Encryption at rest for sensitive data.
-- Strong authentication, optional MFA for admins and tenant owners.
+- Strong authentication with generated MFA challenges for tenant owners and privileged roles.
 - Secure password storage.
 - Session management with refresh token rotation.
 - API authorization checks on every tenant object.
@@ -985,11 +1517,22 @@ Backend:
 Infrastructure:
 
 - Cloud-hosted, containerized services.
+- Deployment migration is paused while core coding continues.
+- DigitalOcean is the leading production candidate to evaluate before paid
+  subscriber onboarding because the first country launch needs strong Africa
+  latency and a Cape Town/South Africa deployment location would be valuable if
+  the required managed services are available there.
+- Railway remains the current proven fallback/staging deployment until the
+  final platform is selected, verified, and cut over.
 - CI/CD with automated tests and security scans.
 - Infrastructure as code.
 - Feature flags.
 - Environment separation: dev, staging, production.
 - Local executable environment: Docker Desktop/Compose for PostgreSQL, Redis, search, and local email capture; Node.js 24 LTS pinned with a version manager such as Volta.
+- Database release commands: validate Prisma schema, generate Prisma client,
+  deploy checked-in migrations, check migration status, and seed baseline
+  geography/industry data before enabling Prisma persistence in any hosted
+  environment.
 
 Tooling and vendor candidates:
 
@@ -1002,7 +1545,7 @@ Tooling and vendor candidates:
 - Realtime chat: WebSockets/Socket.IO for custom MVP; evaluate Twilio Conversations, Stream, or similar if cross-channel chat and agent workflows need faster launch.
 - Notifications: Firebase Cloud Messaging for Android/web, APNs for iOS, plus email/SMS/WhatsApp providers by country.
 - Payments: Stripe where supported, Google Play Billing and Apple In-App Purchase where required, and local payment rails such as mobile money providers for launch countries.
-- Tax automation: Stripe Tax for calculation/threshold monitoring where supported; TaxJar, Taxually, Avalara, Marosa, or local tax providers for filing/remittance; controlled manual tax profiles for unsupported countries until an approved provider is available.
+- Tax automation: finance-module country tax rules plus Stripe Tax for rates; Kenyan iTax or one tax representative files; EU Non-Union OSS later. Stripe Tax does not become the seller. Paddle / Lemon Squeezy / Dodo are forbidden merchant-of-record checkouts.
 - Media: S3-compatible object storage, CDN, image resizing, video transcoding, malware scanning, and content moderation APIs.
 - Analytics: event collector, warehouse, BI dashboard, and product analytics. Candidate tools include PostHog, Mixpanel, Amplitude, Segment, ClickHouse, BigQuery, Metabase, and Superset.
 - Safety operations: moderation queue, audit log, blocked keyword libraries, media review tools, report handling, escalation workflow, and evidence preservation.
@@ -1284,17 +1827,22 @@ Risk register status: updated. Each risk below has required controls that must b
 
 ## 16. Open Decisions
 
-1. What is the first launch country or region?
-2. Which countries need fallback pricing because payment-provider or app-store minimums prevent charging exactly 10 local currency units?
-3. Which payment methods are mandatory for launch countries?
-4. Will advertisers only subscribe, or will buyers/searchers also have paid plans later?
-5. Will the platform allow public reviews in MVP?
-6. Which launch countries require specific legal reporting channels, safety contacts, or law-enforcement escalation rules for zero-tolerance violations?
-7. Is the initial mobile app required on day one, or can the first launch use web + PWA while native apps are built?
-8. Which tax provider or combination of providers will be used for each launch country?
-9. Which accounting system must the finance module export to or integrate with?
-10. Who is the named Country Finance Admin and external tax advisor for each launch country?
-11. What is the approved fallback process where an external tax provider does not support a country or tax type?
+1. Which countries need fallback pricing because payment-provider or app-store minimums prevent charging exactly 10 local currency units?
+2. Will advertisers only subscribe, or will buyers/searchers also have paid plans later?
+3. Will the platform allow public reviews in MVP?
+4. Kenya pilot reporting uses KE-CIRT incident and youth-protection forms, the
+   NCMEC CyberTipline, hosting-provider abuse, and an internal legal hold.
+   Other countries fail closed until an approved playbook is added. Counsel must
+   still confirm named contacts before paid launch.
+5. Is the initial mobile app required on day one, or can the first launch use web + PWA while native apps are built?
+6. Which accounting system must the finance module export to or integrate with?
+7. Who is the named Country Finance Admin and Kenyan tax advisor (iTax contact)?
+8. What is the approved fallback process where Stripe Tax does not support a country or tax type (finance-module rules remain the fail-closed rate source)?
+
+Locked (no longer open): first paid-launch country is Kenya; payment rails are
+STK + Stripe; tax operating model is self merchant of record, iTax or one
+Kenyan agent, finance module + Stripe Tax, EU OSS later
+(`docs/GROUP_TAX_OPERATING_MODEL.md`).
 
 ## 17. Build Readiness Checklist
 
