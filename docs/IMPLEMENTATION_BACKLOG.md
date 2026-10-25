@@ -663,3 +663,7 @@ Progress:
 15. Forced re-acceptance after material policy version changes — **live**
     (API + web). Community standards join the same gate after PR #55 is
     merged and deployed (API then web).
+16. Owner standing rules — **adopted 2026-10-25** (`docs/STANDING_RULES.md`,
+    `health-audit-guard` on `fix/health-audit-*` PRs). Follow-ups for the owner:
+    a scheduled live health audit against `/v1/health`, and a review of the
+    `*/15` scheduled-jobs cron cost (rule 12).
