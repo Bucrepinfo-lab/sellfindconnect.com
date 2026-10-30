@@ -1,0 +1,79 @@
+name: Health audit guard
+
+# Owner standing rule (Telpen Edu, 24/10/26; adopted here 25/10/26 — see
+# docs/STANDING_RULES.md §3): an automated fix must stop and ask the owner
+# instead of fixing when it would touch billing, payments, passwords or keys,
+# sign-in or tenancy, a policy or approval decision, deploy config or the
+# database, or when it weakens a test.
+#
+# Runs on every PR from a `fix/health-audit-*` branch. It uses
+# pull_request_target, so main's copy of this file always applies (a PR cannot
+# edit the guard to get past it), and it only reads the PR's file list and
+# patches through the API; it never checks out or runs PR code.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  health-audit-guard:
+    if: startsWith(github.head_ref, 'fix/health-audit-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Refuse changes an automated fix must escalate instead
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/$REPO/pulls/$PR/files" \
+            --jq '.[] | [.filename, .status, (.patch // ""), (.previous_filename // "")] | @json' > files.jsonl
+
+          fail=0
+          report() { echo "::error::$1"; fail=1; }
+
+          # 1. Protected paths (docs/STANDING_RULES.md §3).
+          protected='^(\.github/|fly\.(api|web)\.toml$|deploy/|compose\.yaml$|(.*/)?Dockerfile|(.*/)?\.env|apps/api/src/modules/(payments|finance|auth|tenant|access)/|apps/api/src/persistence\.ts$|packages/database/|packages/domain/src/(payments|finance|kenya-tax-profile|stripe-tax-rate|tax-operating-model|auth-tenancy|access-control|totp|safety|sanitization|ugc-moderation|community-standards|media-review-policy|privacy)\.ts$|apps/web/src/app/terms/|\.claude/skills/(finance-tax-reference|legal-policy-reference|tenancy-guard)/)'
+          approval='\bapprovedBy\b|\bAPPROVED\b|POLICY_VERSION|policyVersion'
+          while IFS= read -r line; do
+            name=$(echo "$line" | jq -r '.[0]')
+            status=$(echo "$line" | jq -r '.[1]')
+            patch=$(echo "$line" | jq -r '.[2]')
+            prev=$(echo "$line" | jq -r '.[3]')
+            for f in "$name" "$prev"; do
+              [ -z "$f" ] && continue
+              if echo "$f" | grep -Eq "$protected"; then
+                report "$f is protected: payments/billing, keys or config, sign-in/tenancy, policy/approvals or the database. Escalate to the owner instead of fixing."
+              fi
+              case "$f" in
+                *secret*|*Secret*|*credential*|*.pem|*.key|*.p12|*.keystore|*.jks) report "$f looks like a secret or key file. Escalate to the owner." ;;
+              esac
+            done
+            # 2. Tests may not be deleted, skipped or narrowed.
+            if echo "$name" | grep -Eq '\.(test|spec)\.(ts|tsx|js|mjs|cjs)$'; then
+              [ "$status" = "removed" ] && report "$name deletes a test. Never delete a test to get a pass."
+              if echo "$patch" | grep -E '^\+' | grep -Eq '\b(it|test|describe)\.(skip|only|todo)\b|\bskipIf\(true\)|\bxit\(|\bxdescribe\(|\bxtest\('; then
+                report "$name skips or narrows a test. Never weaken a test to get a pass."
+              fi
+              if echo "$patch" | grep -E '^-' | grep -Ev '^---' | grep -Eq '\b(it|test)\('; then
+                if ! echo "$patch" | grep -E '^\+' | grep -Eq '\b(it|test)\('; then
+                  report "$name removes test cases without replacing them. Escalate instead."
+                fi
+              fi
+            fi
+            # 3. Approval decisions (where the repo has them).
+            if [ -n "$approval" ] && echo "$patch" | grep -E '^[+-]' | grep -Ev '^(\+\+\+|---)' | grep -Eq "$approval"; then
+              report "$name changes an approval or policy version. That is the owner's decision; escalate."
+            fi
+          done < files.jsonl
+
+          if [ "$fail" -ne 0 ]; then
+            echo "Health audit guard: this fix must be escalated to the owner, not merged automatically."
+            exit 1
+          fi
+          echo "Health audit guard: no protected area touched."

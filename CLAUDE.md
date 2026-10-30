@@ -51,6 +51,16 @@ Keep `packages/domain` tests green: it is the safety and finance core. Database:
 - **Commits** small, coherent, reviewable; update the PRD, backlog, and the
   dated `Product_Memory.md` log in the same change. Push only when asked.
 
+## Owner standing rules
+`docs/STANDING_RULES.md` binds every contributor and agent: live stays live (fix
+forward, never switch a live country/tenant off to pass a check); fix once, fix
+everywhere (every country, tenant, web and API); escalate, don't fix, in protected
+areas (payments, finance/tax, auth/MFA/tenancy, zero-tolerance safety and policy,
+tax-profile approvals, database, deploy config, secrets) or after three failed
+attempts — enforced on `fix/health-audit-*` PRs by `health-audit-guard`; never
+weaken a test; merge only green at the exact head SHA, then confirm
+`https://api.sellfindconnect.com/v1/health`.
+
 ## Where the personas and skills live
 - Canonical agent personas: `.claude/agents/` — `research-agent`, `sales-agent`,
   `support-agent`, `operation-agent`, `finance-agent`, `legal-agent`.
