@@ -225,6 +225,8 @@ model User {
   authAccountChallenges   AuthAccountChallenge[]
   sentTenantInvites       TenantInvite[]            @relation("TenantInviteInviter")
   termsAcceptanceEvidence TermsAcceptanceEvidence[]
+  pin                     UserPin?
+  trustedDevices          TrustedDevice[]
 }
 
 model Tenant {
@@ -1454,4 +1456,48 @@ model PaymentTxn {
   @@index([userId])
   @@index([status])
   @@index([tenantId, status])
+}
+
+/// Phone sign-in: 6-digit SMS codes (and short-lived registration tickets),
+/// keyed by phone because the number may not belong to a user yet.
+model PhoneCodeChallenge {
+  id             String    @id @default(uuid())
+  phone          String    @db.VarChar(80)
+  purpose        String    @db.VarChar(40)
+  codeHash       String
+  expiresAt      DateTime
+  consumedAt     DateTime?
+  failedAttempts Int       @default(0)
+  createdAt      DateTime  @default(now())
+
+  @@index([phone, purpose, createdAt])
+  @@index([expiresAt])
+}
+
+/// 4-digit PIN for later sign-ins on a trusted device. Hash only; locks after 5 misses.
+model UserPin {
+  userId         String    @id
+  pinHash        String
+  pinSalt        String    @db.VarChar(64)
+  failedAttempts Int       @default(0)
+  lockedAt       DateTime?
+  setAt          DateTime
+  updatedAt      DateTime  @updatedAt
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// A device that completed SMS sign-in. The browser holds the token in an
+/// httpOnly cookie; only its hash is stored. Revocable.
+model TrustedDevice {
+  id         String    @id @default(uuid())
+  userId     String
+  tokenHash  String    @unique
+  label      String?   @db.VarChar(120)
+  expiresAt  DateTime
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
 }

@@ -149,6 +149,7 @@ import { clearSession, isStaffRole, saveSession, useStoredSession } from '../lib
 import { SignUpForm } from './SignUpForm';
 import { WebOnly, WebOnlyCheckout, useClientAppContext } from '../lib/app-context';
 import { BusinessManager } from './BusinessManager';
+import { PhoneSignIn } from './PhoneSignIn';
 import { useHomeWorkspaceLanding } from '../lib/use-home-workspace-landing';
 
 const tenantId = '11111111-1111-4111-8111-111111111111';
@@ -408,6 +409,8 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
   const hideDemoInApp = showMember && appContext !== 'web';
   const landing = useHomeWorkspaceLanding();
   const [authModeChoice, setAuthMode] = useState<'sign-in' | 'sign-up' | null>(null);
+  // Owner standing rule (07/11/26): phone + SMS code / PIN is the primary sign-in; email is optional.
+  const [authMethod, setAuthMethod] = useState<'phone' | 'email'>('phone');
   const signupRequested = useSyncExternalStore(
     subscribeToLocation,
     () => new URLSearchParams(window.location.search).get('signup') === '1',
@@ -2127,6 +2130,10 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
           <aside className="right-rail">
             {needsSignIn ? (
               <section className="side-panel sign-in-panel" id="sign-in">
+                {area === 'member' && authMethod === 'phone' ? (
+                  <PhoneSignIn onUseEmail={() => setAuthMethod('email')} />
+                ) : (
+                <>
                 {authMode === 'sign-up' && area === 'member' ? (
                   <SignUpForm
                     apiBaseUrl={analyticsApiBaseUrl}
@@ -2212,6 +2219,15 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
                     <WebOnlyCheckout> — the first month is free.</WebOnlyCheckout>
                   </p>
                 ) : null}
+                {area === 'member' ? (
+                  <p className="form-note">
+                    <button className="text-link" type="button" onClick={() => setAuthMethod('phone')}>
+                      Use your phone number instead
+                    </button>
+                  </p>
+                ) : null}
+                </>
+                )}
               </section>
             ) : null}
             {showMember ? (

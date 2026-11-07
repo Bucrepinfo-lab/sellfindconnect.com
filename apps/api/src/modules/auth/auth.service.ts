@@ -65,6 +65,7 @@ import type {
 } from './auth.records';
 import { AUTH_REPOSITORY, type AuthRepository } from './auth.repository';
 import { SMS_SENDER, type SmsSender } from './africastalking-sms';
+import { PHONE_AUTH_REPOSITORY, type PhoneAuthRepository } from './phone-auth.repository';
 import {
   EMAIL_SENDER,
   buildAuthEmailMessage,
@@ -101,7 +102,9 @@ const MFA_CHALLENGE_TTL_MS = 10 * 60 * 1000;
 const MFA_MAX_FAILED_ATTEMPTS = 5;
 const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 const PASSWORD_RESET_TTL_MS = 30 * 60 * 1000;
-const PHONE_OTP_TTL_MS = 10 * 60 * 1000;
+const PHONE_OTP_TTL_MS = 5 * 60 * 1000;
+/** Phone-only accounts get a non-routable placeholder (RFC 2606 .invalid); email is optional. */
+export const PHONE_ONLY_EMAIL_DOMAIN = 'phone.sellfindconnect.invalid';
 const TENANT_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 @Injectable()
@@ -122,6 +125,9 @@ export class AuthService {
     @Optional()
     @Inject(HOSTED_IDENTITY_VERIFIER)
     identityVerifier?: HostedIdentityVerifier | null,
+    @Optional()
+    @Inject(PHONE_AUTH_REPOSITORY)
+    private readonly phoneAuthRepository?: PhoneAuthRepository,
   ) {
     this.emailSender = emailSender ?? undefined;
     this.identityVerifier = identityVerifier ?? undefined;
@@ -396,7 +402,7 @@ export class AuthService {
         await this.smsSender
           .sendSms(
             phone,
-            `${code} is your Telpen Adverts login code. It expires in 10 minutes. Do not share it.`,
+            `${code} is your SellFindConnect sign-in code. It expires in 5 minutes. Never share it.`,
           )
           .catch(() => undefined);
       }
@@ -470,6 +476,159 @@ export class AuthService {
       tenant: await this.repository.findTenantById(membership.tenantId),
       session,
     };
+  }
+
+  // ── Phone-first sign-in support (used by PhoneAuthService) ─────────────────
+
+  isPhoneOnlyEmail(email: string | undefined): boolean {
+    return Boolean(email?.toLowerCase().endsWith(`@${PHONE_ONLY_EMAIL_DOMAIN}`));
+  }
+
+  async findUserByVerifiablePhone(phone: string): Promise<AuthUserRecord | undefined> {
+    return (await this.repository.findUserByPhone(phone)) ?? undefined;
+  }
+
+  async findUserRecordById(userId: string): Promise<AuthUserRecord | undefined> {
+    return (await this.repository.findUserById(userId)) ?? undefined;
+  }
+
+  /** Staff (platform access assignments) never use the phone/PIN path or review shortcuts. */
+  async isStaffUser(userId: string): Promise<boolean> {
+    return (await this.repository.listAccessAssignmentsForUser(userId)).length > 0;
+  }
+
+  /**
+   * Issues a tenant session whose MFA is already satisfied: by a fresh SMS code
+   * (first sign-in on a device) or by PIN + trusted device token afterwards.
+   */
+  async issuePhoneVerifiedSession(user: AuthUserRecord, method: 'SMS_CODE' | 'PIN' | 'PLAY_REVIEW') {
+    const membership = await this.repository.findFirstMembershipForUser(user.id);
+    if (!membership) {
+      throw new UnauthorizedException('No tenant membership is attached to this account.');
+    }
+    const now = new Date().toISOString();
+    if (method !== 'PIN' && !user.phoneVerifiedAt) {
+      await this.repository.markUserPhoneVerified(user.id, now);
+    }
+    const session = await this.createSession(user, membership.tenantId, membership.role, { mfaVerified: true });
+    await this.recordAudit({
+      tenantId: membership.tenantId,
+      actorUserId: user.id,
+      action: 'AUTH_PHONE_SIGN_IN_SUCCEEDED',
+      entityType: 'AUTH_SESSION',
+      entityId: session.id,
+      metadata: { role: membership.role, method },
+    });
+    return {
+      user: this.presentUser({ ...user, phoneVerifiedAt: user.phoneVerifiedAt ?? (method === 'PIN' ? undefined : now) }),
+      tenant: await this.repository.findTenantById(membership.tenantId),
+      session,
+    };
+  }
+
+  /**
+   * Sign-up with a phone number that was just proven by an SMS code. Email is
+   * optional; without one the account gets a non-routable placeholder that is
+   * never shown or emailed. No password: later sign-ins use SMS code or PIN.
+   */
+  async registerPhoneOwner(
+    input: Omit<RegisterTenantOwnerDto, 'email' | 'password' | 'phone'> & { email?: string },
+    verifiedPhone: string,
+  ) {
+    this.assertSafe(input, 'Registration contains blocked content.');
+    if (await this.repository.findUserByPhone(verifiedPhone)) {
+      throw new ConflictException('This phone number already has an account. Sign in instead.');
+    }
+    const email = input.email?.trim().toLowerCase() || `${verifiedPhone.replace(/\D/g, '')}@${PHONE_ONLY_EMAIL_DOMAIN}`;
+    if (await this.repository.findUserByEmail(email)) {
+      throw new ConflictException(
+        input.email ? 'An account with this email already exists.' : 'This phone number already has an account. Sign in instead.',
+      );
+    }
+    const country = getCountry(input.countryCode);
+    if (!country) {
+      throw new UnprocessableEntityException('Unsupported country.');
+    }
+    if (!industryCategories.some((industry) => industry.code === input.industryCode)) {
+      throw new UnprocessableEntityException('Unsupported industry.');
+    }
+
+    const now = new Date().toISOString();
+    const userId = randomUUID();
+    const tenantId = randomUUID();
+    // Unusable random password: phone accounts sign in with SMS code or PIN only.
+    const password = this.hashPassword(randomBytes(32).toString('base64url'));
+    const subscription = calculateTrialSubscription({
+      startedAt: now,
+      monthlyAmount: country.monthlySubscriptionAmount,
+      currencyCode: country.currencyCode,
+    });
+    const user: AuthUserRecord = {
+      id: userId,
+      email,
+      displayName: input.displayName,
+      phone: verifiedPhone,
+      phoneVerifiedAt: now,
+      passwordHash: password.hash,
+      passwordSalt: password.salt,
+      passwordIterations: password.iterations,
+      mfaRequired: true,
+      createdAt: now,
+    };
+    const tenant: AuthTenantRecord = {
+      id: tenantId,
+      displayName: input.tenantDisplayName,
+      countryCode: country.code,
+      industryCode: input.industryCode,
+      primaryRole: input.primaryRole,
+      userType: input.userType,
+      status: subscription.status,
+      trialStartedAt: subscription.trialStartedAt,
+      trialEndsAt: subscription.trialEndsAt,
+      nextBillingAt: subscription.nextBillingAt,
+      monthlyAmount: subscription.monthlyAmount,
+      currencyCode: subscription.currencyCode,
+      createdAt: now,
+    };
+    const membership: TenantMembershipRecord = {
+      id: randomUUID(),
+      userId,
+      tenantId,
+      role: 'OWNER',
+      createdAt: now,
+    };
+    const termsAcceptance = buildTermsAcceptanceEvidence({
+      accepted: input.acceptedTerms,
+      userId,
+      tenantId,
+      countryCode: country.code,
+      locale: country.locale,
+      appSurface: 'WEB',
+      acceptanceSource: 'SIGNUP',
+      acceptedAt: now,
+    });
+    if (!termsAcceptance) {
+      throw new UnprocessableEntityException('Current terms acceptance is required.');
+    }
+
+    await this.repository.createOwnerRegistration({ user, tenant, membership, termsAcceptance });
+    await this.recordAudit({
+      tenantId,
+      actorUserId: userId,
+      action: 'AUTH_TENANT_OWNER_REGISTERED',
+      entityType: 'TENANT',
+      entityId: tenantId,
+      metadata: {
+        countryCode: country.code,
+        industryCode: input.industryCode,
+        role: 'OWNER',
+        termsVersion: termsAcceptance.termsVersion,
+        method: 'PHONE',
+        emailProvided: Boolean(input.email),
+      },
+    });
+    const signedIn = await this.issuePhoneVerifiedSession(user, 'SMS_CODE');
+    return { ...signedIn, membership, termsAcceptance };
   }
 
   async requestEmailVerification(input: RequestEmailVerificationDto) {
@@ -1121,7 +1280,11 @@ export class AuthService {
   }
 
   async revokeSessionsForAccountDeletion(userId: string): Promise<void> {
-    await this.repository.revokeSessionsForUser(userId, new Date().toISOString());
+    const now = new Date().toISOString();
+    await this.repository.revokeSessionsForUser(userId, now);
+    // Trusted devices and the PIN go with the account.
+    await this.phoneAuthRepository?.revokeDevicesForUser(userId, now);
+    await this.phoneAuthRepository?.deletePin(userId);
   }
 
   async getVerifiedLoginPhone(userId: string): Promise<string | undefined> {
@@ -1496,7 +1659,7 @@ export class AuthService {
   private presentUser(user: AuthUserRecord) {
     return {
       id: user.id,
-      email: user.email,
+      email: this.isPhoneOnlyEmail(user.email) ? undefined : user.email,
       displayName: user.displayName,
       phone: user.phone,
       emailVerifiedAt: user.emailVerifiedAt,

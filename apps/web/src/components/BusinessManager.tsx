@@ -17,7 +17,7 @@ import {
 import { ApiError, apiRequest, isTermsError } from '../lib/api-client';
 import { formatDmy } from '../lib/dates';
 import { advertStatusLabel, codeLabel, industryLabel } from '../lib/labels';
-import { readTenantSession } from '../lib/public-api';
+import { publicApiBaseUrl, readTenantSession } from '../lib/public-api';
 import '../styles/business.css';
 
 type MediaItem = {
@@ -385,6 +385,19 @@ export function BusinessManager() {
     });
   };
 
+  const forgetDevices = () =>
+    run('devices', async () => {
+      const { sessionToken } = readTenantSession();
+      const response = await fetch(`${publicApiBaseUrl.replace(/\/$/, '')}/auth/phone/devices/revoke`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionToken }),
+      }).catch(() => null);
+      if (!response?.ok) throw new Error('Could not remove trusted devices. Try again.');
+      return 'Trusted devices removed. Next time, sign in with an SMS code.';
+    });
+
   if (loading) {
     return (
       <section className="biz" id="business" aria-busy="true">
@@ -718,7 +731,13 @@ export function BusinessManager() {
           <Link className="secondary-button" href="/account/delete">
             Delete account
           </Link>
+          <button className="secondary-button" type="button" disabled={Boolean(busy)} onClick={() => void forgetDevices()}>
+            Remove trusted devices
+          </button>
         </div>
+        <p className="biz-sub" style={{ marginTop: 10 }}>
+          Removing trusted devices means every phone, including this one, needs a new SMS code before the PIN works.
+        </p>
       </div>
     </section>
   );
