@@ -74,7 +74,10 @@ export class PhoneAuthService {
     private readonly smsSender?: SmsSender,
   ) {}
 
-  async requestCode(rawPhone: string, ip: string) {
+  async requestCode(
+    rawPhone: string,
+    ip: string,
+  ): Promise<{ sent: boolean; expiresInSeconds: number; developmentCode?: string }> {
     const phone = toE164(rawPhone);
     if (!phone) {
       throw new UnprocessableEntityException('Enter a valid phone number.');
