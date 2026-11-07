@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Post, UseGuards } from '@nestjs/common';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 
+import { RequireTenantPermission } from '../../common/tenant-permission.guard';
 import { TenantAuthSession, TenantId } from '../tenant/tenant-context.decorator';
 import { TenantSessionGuard, type TenantSessionDecision } from '../tenant/tenant-session.guard';
 import { PrivacyService } from './privacy.service';
@@ -34,6 +35,7 @@ export class PrivacyController {
   }
 
   @Post('deletion')
+  @RequireTenantPermission('MANAGE_ACCESS')
   requestDeletion(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,
@@ -43,6 +45,7 @@ export class PrivacyController {
   }
 
   @Delete('deletion')
+  @RequireTenantPermission('MANAGE_ACCESS')
   cancelDeletion(@TenantId() tenantId: string, @TenantAuthSession() session: TenantSessionDecision) {
     return this.svc.cancelDeletion(tenantId, session.userId);
   }

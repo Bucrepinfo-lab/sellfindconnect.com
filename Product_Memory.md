@@ -403,3 +403,6 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   media only; paused, archived, expired or unknown ids are 404). Profile and
   advert write routes now require `EDIT_PROFILE` / `MANAGE_LISTINGS` on the
   server (`TenantPermissionGuard`): owners, admins and editors only.
+  Requesting account deletion now takes the business's adverts out of search
+  straight away (as the deletion page promises), and only the account owner
+  (`MANAGE_ACCESS`) can request or cancel deletion of the business account.

@@ -68,3 +68,24 @@ describe('PrivacyService', () => {
     expect(JSON.stringify(run)).not.toContain('I no longer need');
   });
 });
+
+describe('PrivacyService deletion request', () => {
+  it('takes the tenant adverts out of search as soon as deletion is requested', async () => {
+    const adverts = new AdvertsService(new InMemoryAdvertsRepository());
+    const advert = await adverts.createAdvert(tenantId, {
+      title: 'Fresh vegetable supply',
+      displayName: 'Nairobi Fresh Produce',
+      industryCode: 'AGRICULTURE',
+      role: 'SUPPLIER',
+      description: 'We supply fresh vegetables to hotels and retailers in Nairobi.',
+      countryCode: 'KE',
+    });
+    const svc = new PrivacyService(new InMemoryPrivacyRepository(), adverts);
+
+    await svc.requestDeletion(tenantId, userId);
+
+    const search = await adverts.searchPublicAdverts({ q: 'vegetable' });
+    expect(search.results.map((result) => result.id)).not.toContain(advert.id);
+    expect((await adverts.listAdverts(tenantId)).map((item) => item.status)).toEqual(['PAUSED']);
+  });
+});

@@ -472,6 +472,18 @@ export class AdvertsService {
     return this.withMedia(paused);
   }
 
+  /** Takes every public advert of a tenant out of search (account deletion requested). */
+  async unpublishAllForTenant(tenantId: string, actorUserId?: string): Promise<number> {
+    const adverts = await this.repository.listPublishedAdverts(tenantId);
+    const visible = adverts.filter((advert) =>
+      ['LIVE', 'RENEWAL_DUE', 'SCHEDULED'].includes(advert.status),
+    );
+    for (const advert of visible) {
+      await this.pauseAdvert(tenantId, advert.id, actorUserId);
+    }
+    return visible.length;
+  }
+
   async archiveAdvert(tenantId: string, id: string, actorUserId?: string): Promise<AdvertPost> {
     const advert = await this.getMutableAdvert(tenantId, id);
     const now = new Date().toISOString();
