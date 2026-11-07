@@ -12,7 +12,7 @@ import {
 import { randomUUID } from 'node:crypto';
 
 import { UgcService } from '../ugc/ugc.service';
-import type { AuthService } from '../auth/auth.service';
+import { AuthService } from '../auth/auth.service';
 import type {
   CreateInquiryDto,
   CreateMatchFeedbackDto,

@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 
+import { RequireTenantPermission } from '../../common/tenant-permission.guard';
 import { PlatformAnalyticsGuard } from '../access/platform-analytics.guard';
 import { PlatformAuthSession } from '../access/platform-access.decorator';
 import type { PlatformAccessSession } from '../auth/auth.records';
@@ -35,16 +36,19 @@ export class AnalyticsController {
   }
 
   @Get('summary')
+  @RequireTenantPermission('VIEW_ANALYTICS')
   summarizeTenant(@TenantId() tenantId: string, @Query() query: AnalyticsSummaryQueryDto) {
     return this.analytics.summarizeTenant(tenantId, query);
   }
 
   @Get('report')
+  @RequireTenantPermission('VIEW_ANALYTICS')
   buildTenantReport(@TenantId() tenantId: string, @Query() query: AnalyticsSummaryQueryDto) {
     return this.analytics.buildTenantReport(tenantId, query);
   }
 
   @Get('export')
+  @RequireTenantPermission('VIEW_ANALYTICS')
   exportTenantReport(@TenantId() tenantId: string, @Query() query: AnalyticsExportQueryDto) {
     return this.analytics.exportTenantReport(tenantId, query);
   }

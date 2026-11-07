@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 
+import { RequireTenantPermission } from '../../common/tenant-permission.guard';
 import { TenantAuthSession, TenantId } from '../tenant/tenant-context.decorator';
 import { TenantSessionGuard, type TenantSessionDecision } from '../tenant/tenant-session.guard';
 import {
@@ -40,6 +41,7 @@ export class SourceFinderController {
   }
 
   @Post('index/reindex')
+  @RequireTenantPermission('MANAGE_PLATFORM')
   rebuildIndex(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,
@@ -59,6 +61,7 @@ export class SourceFinderController {
   }
 
   @Post('saved-searches')
+  @RequireTenantPermission('MANAGE_LEADS')
   createSavedSearch(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,
@@ -78,6 +81,7 @@ export class SourceFinderController {
   }
 
   @Post('alerts/run')
+  @RequireTenantPermission('MANAGE_LEADS')
   runOpportunityAlerts(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,
@@ -87,6 +91,7 @@ export class SourceFinderController {
   }
 
   @Post('outcomes')
+  @RequireTenantPermission('MANAGE_LEADS')
   recordOutcome(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,

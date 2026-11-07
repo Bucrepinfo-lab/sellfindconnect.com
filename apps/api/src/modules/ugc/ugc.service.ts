@@ -20,7 +20,7 @@ import {
 } from '@telpen/domain';
 import { randomUUID } from 'node:crypto';
 
-import type { AuthService } from '../auth/auth.service';
+import { AuthService } from '../auth/auth.service';
 import type { CreateUgcBlockDto, CreateUgcReportDto, ResolveUgcReportDto } from './dto/ugc.dto';
 import { InMemoryUgcRepository } from './in-memory-ugc.repository';
 import { UGC_REPOSITORY, type UgcRepository } from './ugc.repository';

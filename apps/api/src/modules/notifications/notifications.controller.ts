@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 
+import { RequireTenantPermission } from '../../common/tenant-permission.guard';
 import { TenantId } from '../tenant/tenant-context.decorator';
 import { TenantSessionGuard } from '../tenant/tenant-session.guard';
 import { CreateNotificationPlanDto, UpdateNotificationPreferencesDto } from './dto/notifications.dto';
@@ -26,6 +27,7 @@ export class NotificationsController {
   }
 
   @Patch('preferences')
+  @RequireTenantPermission('MANAGE_TENANT')
   updatePreferences(@TenantId() tenantId: string, @Body() body: UpdateNotificationPreferencesDto) {
     return this.notifications.updatePreferences(tenantId, body);
   }
@@ -36,6 +38,7 @@ export class NotificationsController {
   }
 
   @Post('plan')
+  @RequireTenantPermission('MANAGE_TENANT')
   planAndQueue(@TenantId() tenantId: string, @Body() body: CreateNotificationPlanDto) {
     return this.notifications.planAndQueue(tenantId, body);
   }
@@ -46,6 +49,7 @@ export class NotificationsController {
   }
 
   @Post('outbox/:outboxId/dispatch')
+  @RequireTenantPermission('MANAGE_TENANT')
   dispatchOutbox(
     @TenantId() tenantId: string,
     @Param('outboxId') outboxId: string,

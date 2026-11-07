@@ -115,6 +115,7 @@ export class AdvertsController {
   }
 
   @Post('discovery/reindex')
+  @RequireTenantPermission('MANAGE_LISTINGS')
   rebuildDiscoveryIndex(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,
@@ -123,6 +124,7 @@ export class AdvertsController {
   }
 
   @Post('saved-searches')
+  @RequireTenantPermission('MANAGE_LEADS')
   createSavedSearch(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,
@@ -137,6 +139,7 @@ export class AdvertsController {
   }
 
   @Post('saved-searches/alerts/run')
+  @RequireTenantPermission('MANAGE_LEADS')
   runSavedSearchAlerts(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,
@@ -263,6 +266,7 @@ export class AdvertsController {
   }
 
   @Post('lifecycle/run')
+  @RequireTenantPermission('MANAGE_LISTINGS')
   runLifecycle(@TenantId() tenantId: string, @Body() body: RunAdvertLifecycleDto) {
     return this.adverts.runLifecycle(tenantId, body);
   }
