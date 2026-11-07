@@ -3,6 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 
+import { formatDmy } from "../../../lib/dates";
 import { publicApiBaseUrl, readTenantSession, tenantSessionHeaders } from "../../../lib/public-api";
 import "../../../styles/privacy.css";
 
@@ -132,11 +133,7 @@ export default function PrivacySettingsPage() {
           <span>
             Permanent deletion on{" "}
             <strong>
-              {new Date(summary.deletion.scheduledAt).toLocaleDateString("en-KE", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
+              {formatDmy(summary.deletion.scheduledAt)}
             </strong>
             . <Link href="/account/delete">Cancel</Link>
           </span>

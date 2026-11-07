@@ -518,6 +518,7 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
   const [userBlocks, setUserBlocks] = useState<UserBlock[]>([]);
   const [userReports, setUserReports] = useState<UserContentReport[]>([]);
   const [reportReason, setReportReason] = useState<UgcReportReason>('HARASSMENT');
+  const [ugcNotice, setUgcNotice] = useState('');
   const [moderatorQueue, setModeratorQueue] = useState<UgcModeratorQueue | null>(null);
   const [moderatorQueueStatus, setModeratorQueueStatus] = useState<ModeratorQueueStatus>('PREVIEW');
   const [moderatorQueueError, setModeratorQueueError] = useState('');
@@ -1334,16 +1335,22 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
     .filter((item) => item.lifecycle.status !== 'LIVE')
     .sort((a, b) => b.lifecycle.daysLive - a.lifecycle.daysLive);
 
-  const persistUgc = async (path: string, body: unknown) => {
+  const persistUgc = async (path: string, body: unknown, done: string) => {
     const session = readTenantSession();
     if (!session.sessionToken || !session.tenantId) {
+      setUgcNotice('Sign in to send reports and blocks to our moderators.');
       return;
     }
-    await fetch(`${publicApiBaseUrl}${path}`, {
-      method: 'POST',
-      headers: tenantSessionHeaders(),
-      body: JSON.stringify(body),
-    });
+    try {
+      const response = await fetch(`${publicApiBaseUrl}${path}`, {
+        method: 'POST',
+        headers: tenantSessionHeaders(),
+        body: JSON.stringify(body),
+      });
+      setUgcNotice(response.ok ? done : await readApiError(response, 'Could not send. Try again.'));
+    } catch {
+      setUgcNotice('Could not send. Check your connection and try again.');
+    }
   };
 
   const explainMatch = async (result: SourceFinderSearchResult) => {
@@ -1402,12 +1409,16 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
       crypto.randomUUID(),
     );
     setUserReports((current) => [report, ...current]);
-    void persistUgc('/ugc/reports', {
-      targetType: 'USER',
-      targetId,
-      reason: reportReason,
-      acceptedTerms: true,
-    });
+    void persistUgc(
+      '/ugc/reports',
+      {
+        targetType: 'USER',
+        targetId,
+        reason: reportReason,
+        acceptedTerms: true,
+      },
+      'Report sent. Our moderators will review it.',
+    );
   };
 
   const blockSource = (targetId: string) => {
@@ -1424,11 +1435,15 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
       crypto.randomUUID(),
     );
     setUserBlocks((current) => [block, ...current]);
-    void persistUgc('/ugc/blocks', {
-      blockedTargetId: targetId,
-      reason: reportReason,
-      acceptedTerms: true,
-    });
+    void persistUgc(
+      '/ugc/blocks',
+      {
+        blockedTargetId: targetId,
+        reason: reportReason,
+        acceptedTerms: true,
+      },
+      'Blocked. You will no longer see or hear from this business.',
+    );
   };
 
   const previewModeratorQueue = buildUgcModeratorQueue(userReports);
@@ -1639,6 +1654,14 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
                 <FileCheck2 size={18} />
                 <span>Terms</span>
               </Link>
+              <Link className="nav-item" href="/privacy">
+                <ShieldCheck size={18} />
+                <span>Privacy</span>
+              </Link>
+              <Link className="nav-item" href="/account/delete">
+                <UserCheck size={18} />
+                <span>Delete account</span>
+              </Link>
             </>
           ) : null}
           {area === 'member' ? (
@@ -1712,8 +1735,8 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
             <h1>Find the supplier, buyer or transporter your business needs.</h1>
             <p className="hero-lede">
               Search verified businesses across every link of the supply chain, see why each one
-              matches, and contact them directly. Listing your business is free for the first
-              month.
+              matches, and contact them directly.
+              <WebOnlyCheckout> Listing your business is free for the first month.</WebOnlyCheckout>
             </p>
             <ol className="chain" aria-label="How a supply chain connects">
               <li>Producer</li>
@@ -2001,6 +2024,11 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
               </div>
             ) : (
               <div className="result-list">
+                {ugcNotice ? (
+                  <p className="match-explanation" role="status" aria-live="polite">
+                    {ugcNotice}
+                  </p>
+                ) : null}
                 {filteredResults.map((result) => {
                   const industry = industryCategories.find(
                     (item) => item.code === result.industryCode,
@@ -2054,6 +2082,7 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
                           className="link-button"
                           type="button"
                           disabled={!termsAccepted}
+                          title={termsAccepted ? 'Report this business' : 'Sign in and accept the terms to report'}
                           onClick={() => reportSource(result.id)}
                         >
                           <Flag size={14} /> Report
@@ -2062,6 +2091,7 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
                           className="link-button"
                           type="button"
                           disabled={!termsAccepted}
+                          title={termsAccepted ? 'Block this business' : 'Sign in and accept the terms to block'}
                           onClick={() => blockSource(result.id)}
                         >
                           <Ban size={14} /> Block

@@ -1,9 +1,11 @@
 ﻿"use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { publicApiBaseUrl, readTenantSession, tenantSessionHeaders } from "../../../lib/public-api";
+import { formatDmy } from "../../../lib/dates";
+import { publicApiBaseUrl, tenantSessionHeaders } from "../../../lib/public-api";
+import { clearSession, useStoredSession } from "../../../lib/use-session";
 import { PolicyNav } from "../../../components/PolicyNav";
 import "../../../styles/privacy.css";
 
@@ -17,22 +19,9 @@ const REASONS = [
   "Other",
 ];
 
-function subscribeSession(onStoreChange: () => void) {
-  if (typeof window === "undefined") {
-    return () => undefined;
-  }
-  window.addEventListener("storage", onStoreChange);
-  return () => window.removeEventListener("storage", onStoreChange);
-}
-
-function hasTenantSession() {
-  const session = readTenantSession();
-  return Boolean(session.sessionToken && session.tenantId);
-}
-
 export default function AccountDeletionPage() {
   const router = useRouter();
-  const signedIn = useSyncExternalStore(subscribeSession, hasTenantSession, () => false);
+  const signedIn = Boolean(useStoredSession());
   const [step, setStep] = useState<Step>("CONFIRM");
   const [reason, setReason] = useState("");
   const [date, setDate] = useState("");
@@ -46,21 +35,22 @@ export default function AccountDeletionPage() {
       const response = await fetch(`${publicApiBaseUrl}/privacy/deletion`, {
         method: "POST",
         headers: tenantSessionHeaders(),
-        body: JSON.stringify({ reason }),
+        body: JSON.stringify(reason ? { reason } : {}),
       });
+      if (response.status === 401) {
+        // Expired or revoked session: show the signed-out steps instead of a raw error.
+        clearSession();
+        return;
+      }
       const payload = (await response.json()) as { message?: string; scheduledAt?: string };
       if (!response.ok) {
-        throw new Error(payload.message ?? "failed");
+        throw new Error(
+          response.status === 409
+            ? "Your account is already scheduled for deletion. You can cancel it from Data and privacy."
+            : (payload.message ?? "failed"),
+        );
       }
-      setDate(
-        payload.scheduledAt
-          ? new Date(payload.scheduledAt).toLocaleDateString("en-KE", {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })
-          : "the end of the 30-day grace period",
-      );
+      setDate(payload.scheduledAt ? formatDmy(payload.scheduledAt) : "the end of the 30-day grace period");
       setStep("SCHEDULED");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Deletion request failed.");
@@ -77,6 +67,10 @@ export default function AccountDeletionPage() {
         method: "DELETE",
         headers: tenantSessionHeaders(),
       });
+      if (response.status === 401) {
+        clearSession();
+        return;
+      }
       const payload = (await response.json()) as { message?: string };
       if (!response.ok) {
         throw new Error(payload.message ?? "failed");
