@@ -138,6 +138,37 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : 'Something went wrong. Try again.';
 }
 
+type BusinessData = {
+  live: LiveProfile | null;
+  editable: ProfileDraft | null;
+  draftMedia: MediaItem[];
+  advertDrafts: AdvertDraft[];
+  adverts: LiveAdvert[];
+};
+
+async function fetchBusiness(): Promise<BusinessData> {
+  const [drafts, live, aDrafts, aLive] = await Promise.all([
+    apiRequest<ProfileDraft[]>('/profiles/drafts'),
+    apiRequest<LiveProfile>('/profiles/published/live').catch((error: unknown) => {
+      if (error instanceof ApiError && error.status === 404) return null;
+      throw error;
+    }),
+    apiRequest<AdvertDraft[]>('/adverts/drafts'),
+    apiRequest<LiveAdvert[]>('/adverts'),
+  ]);
+  const editable = drafts.find((draft) => EDITABLE_PROFILE.has(draft.status)) ?? null;
+  const draftMedia = editable
+    ? await apiRequest<MediaItem[]>(`/profiles/drafts/${editable.id}/media`).catch(() => [])
+    : [];
+  return {
+    live,
+    editable,
+    draftMedia,
+    advertDrafts: aDrafts.filter((draft) => draft.status === 'DRAFT'),
+    adverts: aLive,
+  };
+}
+
 export function BusinessManager() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
@@ -151,38 +182,37 @@ export function BusinessManager() {
   const [adverts, setAdverts] = useState<LiveAdvert[]>([]);
   const [advertForm, setAdvertForm] = useState<AdvertForm | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      const [drafts, live, aDrafts, aLive] = await Promise.all([
-        apiRequest<ProfileDraft[]>('/profiles/drafts'),
-        apiRequest<LiveProfile>('/profiles/published/live').catch((error: unknown) => {
-          if (error instanceof ApiError && error.status === 404) return null;
-          throw error;
-        }),
-        apiRequest<AdvertDraft[]>('/adverts/drafts'),
-        apiRequest<LiveAdvert[]>('/adverts'),
-      ]);
-      const editable = drafts.find((draft) => EDITABLE_PROFILE.has(draft.status)) ?? null;
-      setLiveProfile(live);
-      setProfileDraft(editable);
-      setProfileForm(editable ? profileToForm(editable) : live ? profileToForm(live) : emptyProfile);
-      setEditingProfile(!live || Boolean(editable));
-      setDraftMedia(
-        editable ? await apiRequest<MediaItem[]>(`/profiles/drafts/${editable.id}/media`).catch(() => []) : [],
-      );
-      setAdvertDrafts(aDrafts.filter((draft) => draft.status === 'DRAFT'));
-      setAdverts(aLive);
-    } catch (error) {
-      setNotice({ tone: 'error', text: errorText(error) });
-    } finally {
-      setLoading(false);
-    }
+  const apply = useCallback((data: BusinessData) => {
+    setLiveProfile(data.live);
+    setProfileDraft(data.editable);
+    setProfileForm(data.editable ? profileToForm(data.editable) : data.live ? profileToForm(data.live) : emptyProfile);
+    setEditingProfile(!data.live || Boolean(data.editable));
+    setDraftMedia(data.draftMedia);
+    setAdvertDrafts(data.advertDrafts);
+    setAdverts(data.adverts);
+    setLoading(false);
   }, []);
 
+  const load = useCallback(async () => {
+    apply(await fetchBusiness());
+  }, [apply]);
+
   useEffect(() => {
-    // Initial load from the API; state is only set after the requests resolve.
-    void load();
-  }, [load]);
+    // Initial load; state is only set in the promise callbacks.
+    let cancelled = false;
+    fetchBusiness()
+      .then((data) => {
+        if (!cancelled) apply(data);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setNotice({ tone: 'error', text: errorText(error) });
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apply]);
 
   const run = async (label: string, action: () => Promise<string | void>) => {
     setBusy(label);
