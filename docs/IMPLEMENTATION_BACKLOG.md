@@ -41,8 +41,9 @@ Exit: clean install, type check, tests, and production builds pass.
 Progress:
 
 - Deployment: Fly.io Frankfurt is live (`docs/FLY_DEPLOYMENT.md`). DigitalOcean
-  remains a candidate runbook. Historical Railway URLs no longer serve traffic.
-- Added `docs/DIGITALOCEAN_DEPLOYMENT.md` as a candidate runbook for
+  was dropped on 07/11/26 (runbook, spec and `SPACES_*` aliases removed).
+  Historical Railway URLs no longer serve traffic.
+- (Removed 07/11/26) Added `docs/DIGITALOCEAN_DEPLOYMENT.md` as a candidate runbook for
   DigitalOcean evaluation, with Cape Town/South Africa latency as the main
   driver and service-availability verification as a required gate.
 - Added a checked-in baseline Prisma migration plus root database commands for

@@ -43,7 +43,7 @@ async function bootstrap() {
 
   const port = Number(config.get<string>("PORT") ?? config.get<string>("API_PORT") ?? 4000);
   app.useWebSocketAdapter(new ConversationsIoAdapter(app, webOrigins));
-  // Bind all interfaces so Fly.io, DigitalOcean, and local Docker health checks work.
+  // Bind all interfaces so Fly.io and local Docker health checks work.
   await app.listen(port, "0.0.0.0");
   console.log(`API listening on 0.0.0.0:${port} [${process.env.NODE_ENV ?? "development"}]`);
 }

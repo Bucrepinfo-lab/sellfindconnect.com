@@ -9,8 +9,8 @@ Last updated: 2026-08-21
 - Development mode returns deterministic local-style upload URLs without
   external credentials.
 - S3-compatible mode creates presigned PUT URLs with AWS Signature Version 4
-  using Node.js crypto, without adding an SDK dependency. DigitalOcean
-  `SPACES_*` credentials overlay that signer automatically.
+  using Node.js crypto, without adding an SDK dependency. `MEDIA_S3_*`
+  credentials overlay that signer automatically.
 - Media attach flows queue processing jobs through a worker-facing interface for
   malware scan, content moderation, image transform, and video transcode work.
 - Processing jobs use an in-memory development queue by default and can switch
@@ -53,33 +53,23 @@ MEDIA_STORAGE_DRIVER=development
 MEDIA_DEVELOPMENT_BASE_URL=https://media.local.sellfindconnect.test
 ```
 
-S3-compatible / DigitalOcean Spaces:
+S3-compatible storage (any provider, for example Tigris on Fly, Cloudflare R2,
+AWS S3 or MinIO). DigitalOcean Spaces and its `SPACES_*` aliases were removed
+on 07/11/26; only the `MEDIA_S3_*` names are read:
 
-```text
-MEDIA_STORAGE_DRIVER=spaces
-SPACES_ENDPOINT=https://sellfindconnect-media.fra1.digitaloceanspaces.com
-SPACES_BUCKET=sellfindconnect-media
-SPACES_ACCESS_KEY=...
-SPACES_SECRET_KEY=...
-SPACES_CDN_ENDPOINT=https://sellfindconnect-media.fra1.cdn.digitaloceanspaces.com
-```
-
-`SPACES_*` aliases map onto the S3-compatible signer. If the Spaces origin
-hostname already includes the bucket, the adapter does not prepend it again.
-`MEDIA_STORAGE_DRIVER=s3` or `spaces` fail-closes without credentials. When the
-driver is unset, present Spaces/S3 keys overlay live storage automatically.
-
-The `MEDIA_S3_*` names remain supported:
+`MEDIA_STORAGE_DRIVER=s3` fail-closes without credentials. When the driver is
+unset, present `MEDIA_S3_*` keys overlay live storage automatically. If the
+endpoint hostname already includes the bucket, the adapter does not prepend it.
 
 ```text
 MEDIA_STORAGE_DRIVER=s3
-MEDIA_S3_ENDPOINT=https://sfo3.digitaloceanspaces.com
-MEDIA_S3_REGION=sfo3
+MEDIA_S3_ENDPOINT=https://fly.storage.tigris.dev
+MEDIA_S3_REGION=auto
 MEDIA_S3_BUCKET=sellfindconnect-media
 MEDIA_S3_ACCESS_KEY_ID=...
 MEDIA_S3_SECRET_ACCESS_KEY=...
 MEDIA_S3_PUBLIC_BASE_URL=https://cdn.sellfindconnect.com
-MEDIA_S3_PROVIDER_NAME=digitalocean-spaces
+MEDIA_S3_PROVIDER_NAME=s3-compatible
 MEDIA_S3_FORCE_PATH_STYLE=false
 MEDIA_UPLOAD_URL_TTL_SECONDS=900
 ```
@@ -164,12 +154,12 @@ CDN publication verification:
 ```text
 MEDIA_CDN_VERIFICATION_PROVIDER=
 MEDIA_CDN_ALLOWED_ORIGINS=
-SPACES_CDN_ENDPOINT=https://sellfindconnect-media.fra1.cdn.digitaloceanspaces.com
+MEDIA_S3_PUBLIC_BASE_URL=https://cdn.sellfindconnect.com
 ```
 
-Present `SPACES_CDN_ENDPOINT` or `MEDIA_S3_PUBLIC_BASE_URL` overlays HTTPS
+Present `MEDIA_S3_PUBLIC_BASE_URL` overlays HTTPS
 Range GET checks on `IMAGE_TRANSFORM` and `VIDEO_TRANSCODE` results. Allowed
-origins also include `SPACES_ENDPOINT` / `MEDIA_S3_ENDPOINT` and optional
+origins also include `MEDIA_S3_ENDPOINT` and optional
 comma-separated `MEDIA_CDN_ALLOWED_ORIGINS`. `MEDIA_CDN_VERIFICATION_PROVIDER=live`
 fail-closes without a public origin. `development` / `off` skips the overlay
 even when CDN origins exist. Verification accepts HTTP 200, 204, or 206, does

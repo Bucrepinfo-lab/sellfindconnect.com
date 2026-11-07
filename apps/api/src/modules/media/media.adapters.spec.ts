@@ -7,6 +7,8 @@ import {
   createConfiguredMediaAdapters,
   createConfiguredMediaAdaptersAsync,
   enqueueMediaProcessingJobs,
+  legacySpacesConfigKeys,
+  resolveMediaStorageDriver,
   type MediaAdapters,
 } from './media.adapters';
 import type { MediaAsset } from '@telpen/domain';
@@ -14,8 +16,8 @@ import type { MediaAsset } from '@telpen/domain';
 describe('media adapters', () => {
   it('creates S3-compatible presigned upload URLs', () => {
     const adapter = new S3CompatibleMediaStorageAdapter({
-      endpoint: 'https://sfo3.digitaloceanspaces.com',
-      region: 'sfo3',
+      endpoint: 'https://eu-central-1.storage.example.test',
+      region: 'eu-central-1',
       bucket: 'sellfindconnect-media',
       accessKeyId: 'TESTACCESSKEY',
       secretAccessKey: 'test-secret',
@@ -44,11 +46,11 @@ describe('media adapters', () => {
       },
       expiresAt: '2026-06-19T12:15:00.000Z',
     });
-    expect(uploadUrl.hostname).toBe('sellfindconnect-media.sfo3.digitaloceanspaces.com');
+    expect(uploadUrl.hostname).toBe('sellfindconnect-media.eu-central-1.storage.example.test');
     expect(uploadUrl.pathname).toBe('/advert/tenant-1/advert-1/media-id-1-fresh-stall.jpg');
     expect(uploadUrl.searchParams.get('X-Amz-Algorithm')).toBe('AWS4-HMAC-SHA256');
     expect(uploadUrl.searchParams.get('X-Amz-Credential')).toBe(
-      'TESTACCESSKEY/20260619/sfo3/s3/aws4_request',
+      'TESTACCESSKEY/20260619/eu-central-1/s3/aws4_request',
     );
     expect(uploadUrl.searchParams.get('X-Amz-Date')).toBe('20260619T120000Z');
     expect(uploadUrl.searchParams.get('X-Amz-Expires')).toBe('900');
@@ -75,15 +77,15 @@ describe('media adapters', () => {
     expect(development.storage).not.toBeInstanceOf(S3CompatibleMediaStorageAdapter);
   });
 
-  it('wires DigitalOcean Spaces credentials without duplicating the bucket hostname', async () => {
+  it('wires MEDIA_S3_* credentials without duplicating the bucket hostname', async () => {
     const configured = createConfiguredMediaAdapters({
       get: (key: string) =>
         ({
-          SPACES_ACCESS_KEY: 'spaces-key',
-          SPACES_SECRET_KEY: 'spaces-secret',
-          SPACES_ENDPOINT: 'https://sellfindconnect-media.fra1.digitaloceanspaces.com',
-          SPACES_BUCKET: 'sellfindconnect-media',
-          SPACES_CDN_ENDPOINT: 'https://sellfindconnect-media.fra1.cdn.digitaloceanspaces.com',
+          MEDIA_S3_ACCESS_KEY_ID: 'access-key',
+          MEDIA_S3_SECRET_ACCESS_KEY: 'secret-key',
+          MEDIA_S3_ENDPOINT: 'https://sellfindconnect-media.storage.example.test',
+          MEDIA_S3_BUCKET: 'sellfindconnect-media',
+          MEDIA_S3_PUBLIC_BASE_URL: 'https://cdn.sellfindconnect.test',
         })[key],
     });
     const upload = await configured.storage.prepareUpload({
@@ -97,14 +99,38 @@ describe('media adapters', () => {
     const uploadUrl = new URL(upload.uploadUrl);
 
     expect(configured.storage).toBeInstanceOf(S3CompatibleMediaStorageAdapter);
-    expect(upload.provider).toBe('digitalocean-spaces');
-    expect(uploadUrl.hostname).toBe('sellfindconnect-media.fra1.digitaloceanspaces.com');
-    expect(upload.publicUrl).toContain('sellfindconnect-media.fra1.cdn.digitaloceanspaces.com');
+    expect(upload.provider).toBe('s3-compatible');
+    expect(uploadUrl.hostname).toBe('sellfindconnect-media.storage.example.test');
+    expect(upload.publicUrl).toContain('cdn.sellfindconnect.test');
     expect(() =>
       createConfiguredMediaAdapters({
-        get: (key: string) => ({ MEDIA_STORAGE_DRIVER: 'spaces' })[key],
+        get: (key: string) => ({ MEDIA_STORAGE_DRIVER: 's3' })[key],
       }),
     ).toThrow('MEDIA_S3_ENDPOINT is required when MEDIA_STORAGE_DRIVER=s3.');
+  });
+
+  it('no longer reads DigitalOcean SPACES_* settings and names them for the owner', () => {
+    const legacy = {
+      MEDIA_STORAGE_DRIVER: 'spaces',
+      SPACES_ACCESS_KEY: 'spaces-key',
+      SPACES_SECRET_KEY: 'spaces-secret',
+      SPACES_ENDPOINT: 'https://legacy.example.test',
+      SPACES_BUCKET: 'legacy',
+    } as Record<string, string>;
+    const reader = { get: (key: string) => legacy[key] };
+
+    expect(legacySpacesConfigKeys(reader)).toEqual([
+      'SPACES_ACCESS_KEY',
+      'SPACES_SECRET_KEY',
+      'SPACES_ENDPOINT',
+      'SPACES_BUCKET',
+      'MEDIA_STORAGE_DRIVER',
+    ]);
+    expect(resolveMediaStorageDriver(reader)).toBe('development');
+    expect(createConfiguredMediaAdapters(reader).storage).not.toBeInstanceOf(
+      S3CompatibleMediaStorageAdapter,
+    );
+    expect(legacySpacesConfigKeys()).toEqual([]);
   });
 
   it('requires a database URL when durable Prisma queueing is enabled', async () => {

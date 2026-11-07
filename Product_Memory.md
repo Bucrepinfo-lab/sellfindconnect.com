@@ -377,3 +377,10 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   `AndroidAppCheckoutGuard` refuses `POST /v1/payments/checkout` and any
   non-`WALLET` (non-Play Billing) `POST /v1/finance/payment-invoices/pay` with
   403. Web and browser users keep checkout.
+- 2026-11-07: Removed DigitalOcean (owner dropped it): `deploy/digitalocean/`,
+  `docs/DIGITALOCEAN_DEPLOYMENT.md`, the `SPACES_*` storage aliases, the
+  `spaces` storage driver name, DO image hosts in `next.config.mjs` and DO
+  wording in docs. Live object storage reads `MEDIA_S3_*` only. Legacy
+  `SPACES_*` settings are ignored with a boot warning (never a crash). The
+  media escalation playbook's hosting abuse desk is now Fly.io
+  (`mailto:abuse@fly.io`).

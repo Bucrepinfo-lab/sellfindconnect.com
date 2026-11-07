@@ -57,8 +57,8 @@ function httpsOrigin(value: string): string | undefined {
 export function resolveAllowedCdnOrigins(config?: ConfigReader): string[] {
   const origins = new Set<string>();
   const configured = [
-    firstConfig(config, ['SPACES_CDN_ENDPOINT', 'MEDIA_S3_PUBLIC_BASE_URL']),
-    firstConfig(config, ['SPACES_ENDPOINT', 'MEDIA_S3_ENDPOINT']),
+    firstConfig(config, ['MEDIA_S3_PUBLIC_BASE_URL']),
+    firstConfig(config, ['MEDIA_S3_ENDPOINT']),
     ...(optionalConfig(config, 'MEDIA_CDN_ALLOWED_ORIGINS') ?? '')
       .split(',')
       .map((part) => part.trim())
@@ -253,7 +253,7 @@ export function overlayCdnPublicationVerification(
   const origins = resolveAllowedCdnOrigins(config);
   if (['live', 'http', 'cdn', 'spaces'].includes(provider) && origins.length === 0) {
     throw new Error(
-      'SPACES_CDN_ENDPOINT or MEDIA_S3_PUBLIC_BASE_URL is required when MEDIA_CDN_VERIFICATION_PROVIDER=live.',
+      'MEDIA_S3_PUBLIC_BASE_URL is required when MEDIA_CDN_VERIFICATION_PROVIDER=live.',
     );
   }
   if (!origins.length) {

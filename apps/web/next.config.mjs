@@ -1,18 +1,6 @@
 ﻿/** @type {import("next").NextConfig} */
 const nextConfig = {
   output: "standalone",
-  images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "sellfindconnect-media.fra1.digitaloceanspaces.com",
-      },
-      {
-        protocol: "https",
-        hostname: "sellfindconnect-media.fra1.cdn.digitaloceanspaces.com",
-      },
-    ],
-  },
   transpilePackages: ["@telpen/domain"],
   experimental: {
     serverActions: { allowedOrigins: ["sellfindconnect.com", "www.sellfindconnect.com"] },

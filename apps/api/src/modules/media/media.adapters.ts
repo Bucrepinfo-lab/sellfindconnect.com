@@ -621,7 +621,36 @@ export type MediaAdapterConfigReader = {
   get(key: string): string | undefined;
 };
 
+/**
+ * DigitalOcean was dropped on 07/11/26 and its `SPACES_*` aliases are no longer
+ * read. Returns any legacy names still set so boot can warn (never crash: live
+ * stays live) and the owner can move them to `MEDIA_S3_*`.
+ */
+export function legacySpacesConfigKeys(config?: MediaAdapterConfigReader): string[] {
+  const legacy = [
+    'SPACES_ACCESS_KEY',
+    'SPACES_SECRET_KEY',
+    'SPACES_ENDPOINT',
+    'SPACES_CDN_ENDPOINT',
+    'SPACES_BUCKET',
+    'SPACES_REGION',
+  ].filter((key) => Boolean(normalizeOptionalConfigString(config?.get(key))));
+  const driver = normalizeOptionalConfigString(
+    config?.get('MEDIA_STORAGE_DRIVER') ?? config?.get('MEDIA_STORAGE_PROVIDER'),
+  )?.toLowerCase();
+  if (driver === 'spaces' || driver === 'digitalocean-spaces') {
+    legacy.push('MEDIA_STORAGE_DRIVER');
+  }
+  return legacy;
+}
+
 export function createConfiguredMediaAdapters(config?: MediaAdapterConfigReader): MediaAdapters {
+  const legacyKeys = legacySpacesConfigKeys(config);
+  if (legacyKeys.length > 0) {
+    console.warn(
+      `[media] Ignoring DigitalOcean Spaces settings (${legacyKeys.join(', ')}); set MEDIA_S3_* and MEDIA_STORAGE_DRIVER=s3 instead.`,
+    );
+  }
   const storageDriver = resolveMediaStorageDriver(config);
   const storage =
     storageDriver === 's3'
@@ -727,10 +756,10 @@ export function createConfiguredMediaJobProcessors(
 
 export function hasLiveObjectStorageConfig(config?: MediaAdapterConfigReader): boolean {
   return Boolean(
-    firstConfig(config, ['MEDIA_S3_ACCESS_KEY_ID', 'SPACES_ACCESS_KEY']) &&
-      firstConfig(config, ['MEDIA_S3_SECRET_ACCESS_KEY', 'SPACES_SECRET_KEY']) &&
-      firstConfig(config, ['MEDIA_S3_ENDPOINT', 'SPACES_ENDPOINT']) &&
-      firstConfig(config, ['MEDIA_S3_BUCKET', 'SPACES_BUCKET']),
+    firstConfig(config, ['MEDIA_S3_ACCESS_KEY_ID']) &&
+      firstConfig(config, ['MEDIA_S3_SECRET_ACCESS_KEY']) &&
+      firstConfig(config, ['MEDIA_S3_ENDPOINT']) &&
+      firstConfig(config, ['MEDIA_S3_BUCKET']),
   );
 }
 
@@ -741,31 +770,23 @@ export function resolveMediaStorageDriver(config?: MediaAdapterConfigReader): 'd
   if (explicit === 'development' || explicit === 'local' || explicit === 'memory') {
     return 'development';
   }
-  if (
-    explicit === 's3' ||
-    explicit === 's3-compatible' ||
-    explicit === 'spaces' ||
-    explicit === 'digitalocean-spaces'
-  ) {
+  if (explicit === 's3' || explicit === 's3-compatible') {
     return 's3';
   }
   return hasLiveObjectStorageConfig(config) ? 's3' : 'development';
 }
 
 function createS3CompatibleStorageAdapter(config?: MediaAdapterConfigReader): S3CompatibleMediaStorageAdapter {
-  const endpoint = requiredStorageConfig(config, ['MEDIA_S3_ENDPOINT', 'SPACES_ENDPOINT']);
-  const usingSpaces = Boolean(firstConfig(config, ['SPACES_ACCESS_KEY', 'SPACES_SECRET_KEY', 'SPACES_ENDPOINT']));
+  const endpoint = requiredStorageConfig(config, ['MEDIA_S3_ENDPOINT']);
   const options = {
     endpoint,
-    region:
-      firstConfig(config, ['MEDIA_S3_REGION', 'SPACES_REGION']) ?? deriveObjectStorageRegion(endpoint),
-    bucket: requiredStorageConfig(config, ['MEDIA_S3_BUCKET', 'SPACES_BUCKET']),
-    accessKeyId: requiredStorageConfig(config, ['MEDIA_S3_ACCESS_KEY_ID', 'SPACES_ACCESS_KEY']),
-    secretAccessKey: requiredStorageConfig(config, ['MEDIA_S3_SECRET_ACCESS_KEY', 'SPACES_SECRET_KEY']),
-    publicBaseUrl: firstConfig(config, ['MEDIA_S3_PUBLIC_BASE_URL', 'SPACES_CDN_ENDPOINT']),
-    providerName:
-      firstConfig(config, ['MEDIA_S3_PROVIDER_NAME']) ??
-      (usingSpaces ? 'digitalocean-spaces' : undefined),
+    // Set MEDIA_S3_REGION for providers that need a specific region; 'us-east-1' is the S3 default.
+    region: firstConfig(config, ['MEDIA_S3_REGION']) ?? 'us-east-1',
+    bucket: requiredStorageConfig(config, ['MEDIA_S3_BUCKET']),
+    accessKeyId: requiredStorageConfig(config, ['MEDIA_S3_ACCESS_KEY_ID']),
+    secretAccessKey: requiredStorageConfig(config, ['MEDIA_S3_SECRET_ACCESS_KEY']),
+    publicBaseUrl: firstConfig(config, ['MEDIA_S3_PUBLIC_BASE_URL']),
+    providerName: firstConfig(config, ['MEDIA_S3_PROVIDER_NAME']),
     forcePathStyle: normalizeConfigBoolean(config?.get('MEDIA_S3_FORCE_PATH_STYLE')),
     expiresSeconds: normalizeConfigInt(config?.get('MEDIA_UPLOAD_URL_TTL_SECONDS')),
   };
@@ -788,19 +809,6 @@ function firstConfig(config: MediaAdapterConfigReader | undefined, keys: string[
     }
   }
   return undefined;
-}
-
-function deriveObjectStorageRegion(endpoint: string): string {
-  try {
-    const host = new URL(endpoint).hostname;
-    const spaces = host.match(/(?:^|\.)([a-z0-9]+)\.digitaloceanspaces\.com$/i);
-    if (spaces?.[1] && spaces[1] !== 'cdn') {
-      return spaces[1];
-    }
-  } catch {
-    // Fall through to the generic S3 default.
-  }
-  return 'us-east-1';
 }
 
 function buildMediaObjectKey(
