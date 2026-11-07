@@ -17,7 +17,7 @@ const job: MediaProcessingJob = {
   ownerType: 'ADVERT',
   ownerId: 'advert-1',
   objectKey: 'advert/tenant-1/advert-1/media.jpg',
-  sourceUrl: 'https://sellfindconnect-media.fra1.cdn.digitaloceanspaces.com/advert/media.jpg',
+  sourceUrl: 'https://cdn.sellfindconnect.test/advert/media.jpg',
   status: 'RUNNING',
   attempts: 1,
   maxAttempts: 3,
@@ -30,7 +30,7 @@ function statusFetch(status: number) {
 }
 
 describe('CDN publication verification', () => {
-  it('collects public URLs and resolves allowed Spaces CDN origins', () => {
+  it('collects public URLs and resolves allowed CDN origins', () => {
     expect(
       collectPublicationUrls(job, {
         cdnUrl: 'https://cdn.sellfindconnect.test/display.jpg',
@@ -45,20 +45,20 @@ describe('CDN publication verification', () => {
       resolveAllowedCdnOrigins({
         get: (key: string) =>
           ({
-            SPACES_CDN_ENDPOINT: 'https://sellfindconnect-media.fra1.cdn.digitaloceanspaces.com',
-            SPACES_ENDPOINT: 'https://sellfindconnect-media.fra1.digitaloceanspaces.com',
+            MEDIA_S3_PUBLIC_BASE_URL: 'https://cdn.sellfindconnect.test',
+            MEDIA_S3_ENDPOINT: 'https://sellfindconnect-media.storage.example.test',
           })[key],
       }),
     ).toEqual([
-      'https://sellfindconnect-media.fra1.cdn.digitaloceanspaces.com',
-      'https://sellfindconnect-media.fra1.digitaloceanspaces.com',
+      'https://cdn.sellfindconnect.test',
+      'https://sellfindconnect-media.storage.example.test',
     ]);
   });
 
   it('accepts a reachable CDN object and fail-closes on 404', async () => {
     const okFetch = statusFetch(206);
     const verifier = new HttpCdnPublicationVerifier(
-      ['https://sellfindconnect-media.fra1.cdn.digitaloceanspaces.com'],
+      ['https://cdn.sellfindconnect.test'],
       okFetch,
     );
     await expect(verifier.verifyUrls([job.sourceUrl])).resolves.toEqual({
@@ -75,7 +75,7 @@ describe('CDN publication verification', () => {
     );
 
     const missing = new HttpCdnPublicationVerifier(
-      ['https://sellfindconnect-media.fra1.cdn.digitaloceanspaces.com'],
+      ['https://cdn.sellfindconnect.test'],
       statusFetch(404),
     );
     await expect(missing.verifyUrls([job.sourceUrl])).resolves.toMatchObject({
@@ -97,7 +97,7 @@ describe('CDN publication verification', () => {
     const processor = new CdnVerifiedMediaJobProcessorAdapter(
       inner,
       new HttpCdnPublicationVerifier(
-        ['https://sellfindconnect-media.fra1.cdn.digitaloceanspaces.com'],
+        ['https://cdn.sellfindconnect.test'],
         statusFetch(503),
       ),
     );
@@ -111,7 +111,7 @@ describe('CDN publication verification', () => {
 
   it('rejects hosts outside the allowlist and http URLs', async () => {
     const verifier = new HttpCdnPublicationVerifier(
-      ['https://sellfindconnect-media.fra1.cdn.digitaloceanspaces.com'],
+      ['https://cdn.sellfindconnect.test'],
       statusFetch(200),
     );
     await expect(
@@ -128,7 +128,7 @@ describe('CDN publication verification', () => {
     const processors = overlayCdnPublicationVerification(createDevelopmentMediaJobProcessors(), {
       get: (key: string) =>
         ({
-          SPACES_CDN_ENDPOINT: 'https://sellfindconnect-media.fra1.cdn.digitaloceanspaces.com',
+          MEDIA_S3_PUBLIC_BASE_URL: 'https://cdn.sellfindconnect.test',
         })[key],
     }, fetcher);
 
@@ -145,13 +145,13 @@ describe('CDN publication verification', () => {
       overlayCdnPublicationVerification(createDevelopmentMediaJobProcessors(), {
         get: (key: string) => ({ MEDIA_CDN_VERIFICATION_PROVIDER: 'live' })[key],
       }),
-    ).toThrow('SPACES_CDN_ENDPOINT or MEDIA_S3_PUBLIC_BASE_URL is required when MEDIA_CDN_VERIFICATION_PROVIDER=live.');
+    ).toThrow('MEDIA_S3_PUBLIC_BASE_URL is required when MEDIA_CDN_VERIFICATION_PROVIDER=live.');
     expect(
       overlayCdnPublicationVerification(createDevelopmentMediaJobProcessors(), {
         get: (key: string) =>
           ({
             MEDIA_CDN_VERIFICATION_PROVIDER: 'development',
-            SPACES_CDN_ENDPOINT: 'https://sellfindconnect-media.fra1.cdn.digitaloceanspaces.com',
+            MEDIA_S3_PUBLIC_BASE_URL: 'https://cdn.sellfindconnect.test',
           })[key],
       }).IMAGE_TRANSFORM,
     ).not.toBeInstanceOf(CdnVerifiedMediaJobProcessorAdapter);

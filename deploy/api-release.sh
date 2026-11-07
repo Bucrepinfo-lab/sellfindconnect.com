@@ -1,5 +1,5 @@
 #!/bin/sh
-# Fly / DigitalOcean release command: apply Prisma migrations, then load
+# Fly release command: apply Prisma migrations, then load
 # idempotent reference data (continents, countries, industries).
 # Fail closed if DATABASE_URL is missing so PERSISTENCE_DRIVER=prisma never
 # boots against an unmigrated or unconfigured database.

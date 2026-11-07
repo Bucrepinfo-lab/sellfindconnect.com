@@ -69,8 +69,8 @@ const CHANNELS: Record<MediaEscalationChannelCode, MediaEscalationChannel> = {
   },
   HOSTING_ABUSE: {
     code: 'HOSTING_ABUSE',
-    label: 'Hosting provider abuse desk',
-    reportUrl: 'https://www.digitalocean.com/company/contact/abuse',
+    label: 'Hosting provider abuse desk (Fly.io)',
+    reportUrl: 'mailto:abuse@fly.io',
   },
   INTERNAL_LEGAL_HOLD: {
     code: 'INTERNAL_LEGAL_HOLD',

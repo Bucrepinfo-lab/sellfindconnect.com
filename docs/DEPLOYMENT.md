@@ -1,17 +1,15 @@
 # Deployment index
 
-Status: Live on Fly.io Frankfurt. DigitalOcean is a candidate only. Railway is archived.
+Status: Live on Fly.io Frankfurt. DigitalOcean was dropped (07/11/26). Railway is archived.
 Date: 2026-06-15
 Last updated: 2026-08-22
 
 | Host | Role | File |
 | --- | --- | --- |
 | **Fly.io Frankfurt** | **Live production** | `docs/FLY_DEPLOYMENT.md` |
-| DigitalOcean App Platform | Candidate only — do not cut DNS | `docs/DIGITALOCEAN_DEPLOYMENT.md` |
 | Railway | Archived — URLs 404 | `docs/GIT_RAILWAY_RUNBOOK.md` |
 
-Play Store constraints: `docs/PLAY_STORE.md`  
-Spec: `deploy/digitalocean/app.yaml` (unused until a written host change)
+Play Store constraints: `docs/PLAY_STORE.md`
 
 ## Live production (verified 2026-08-22)
 

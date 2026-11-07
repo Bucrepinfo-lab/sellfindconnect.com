@@ -92,7 +92,7 @@ describe('media escalation playbooks', () => {
       undefined,
       'https://report.cybertip.org/',
       'https://ke-cirt.go.ke/child-related-cyber-incident-reporting-form/',
-      'https://www.digitalocean.com/company/contact/abuse',
+      'mailto:abuse@fly.io',
     ]);
   });
 

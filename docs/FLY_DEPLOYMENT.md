@@ -122,12 +122,10 @@ Do not onboard paying subscribers until:
   reviewed)
 - An approved country tax profile and finance gates pass
 
-## DigitalOcean and Railway
+## Other hosts
 
-DigitalOcean App Platform remains a documented **candidate**
-(`docs/DIGITALOCEAN_DEPLOYMENT.md`, `deploy/digitalocean/app.yaml`) with
-path-routed `/api`. That layout is **not** what is live. The same
-`deploy/api-release.sh` path is the DigitalOcean pre-deploy job.
+DigitalOcean was dropped by the owner (07/11/26); its App Platform spec,
+runbook and `SPACES_*` storage aliases were removed. Fly.io is the only host.
 
 Railway temporary URLs and `adverts.telpen.net` are archived. They are not a
 fallback or recovery path. See `docs/GIT_RAILWAY_RUNBOOK.md`.

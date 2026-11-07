@@ -29,7 +29,6 @@ docs/
   IMPLEMENTATION_BACKLOG.md
   FLY_DEPLOYMENT.md
   PLAY_STORE.md
-  DIGITALOCEAN_DEPLOYMENT.md
   TAX_COMPLIANCE_RESEARCH.md
   GROUP_TAX_OPERATING_MODEL.md
 ```
@@ -114,8 +113,8 @@ without validating it against the authenticated user's assignments.
   state, blocked fail-closed state, transform status, CDN URLs, thumbnails, and
   variants. Unsafe or final-failed processing creates durable
   `MediaReviewCase` records with severity, reason, source job, provider, and
-  evidence. DigitalOcean Spaces credentials overlay live object storage through
-  `SPACES_*` aliases. ClamAV and Sightengine overlay malware and visual
+  evidence. Any S3-compatible bucket overlays live object storage through
+  `MEDIA_S3_*` settings. ClamAV and Sightengine overlay malware and visual
   moderation when configured. Transform jobs verify public CDN URLs with an
   HTTPS Range GET before succeeding. Kenya legal/reporting playbooks attach
   KE-CIRT, NCMEC CyberTipline, and hosting-abuse channels on escalate and
@@ -358,8 +357,8 @@ enabled only where consent, country rules, and provider support allow them.
 ## Initial Deployment Shape
 
 The MVP begins as a modular monolith. **Fly.io Frankfurt is the live production
-host** (`docs/FLY_DEPLOYMENT.md`). DigitalOcean App Platform remains a documented
-candidate (`docs/DIGITALOCEAN_DEPLOYMENT.md`). Historical Railway URLs no longer
+host** (`docs/FLY_DEPLOYMENT.md`). DigitalOcean was dropped (07/11/26).
+Historical Railway URLs no longer
 serve traffic.
 
 - One NestJS API web service.

@@ -3291,7 +3291,7 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
                 <div>
                   <strong>Live media storage</strong>
                   <span>
-                    SPACES_* credentials overlay DigitalOcean Spaces uploads. ClamAV and Sightengine
+                    MEDIA_S3_* credentials overlay S3-compatible uploads. ClamAV and Sightengine
                     scanners overlay when their keys are set. Transform jobs verify public CDN URLs
                     before marking READY. Kenya reporting playbooks attach on escalate. Moderators
                     work a review queue with SLAs and can restore only mistaken classifications.

@@ -4,8 +4,7 @@ Status: **Archived.** Fly.io is the live production host.
 Date archived: 2026-08-21
 Do not use this file to deploy, reconnect GitHub, or add DNS.
 
-Live runbook: `docs/FLY_DEPLOYMENT.md`  
-Candidate host (if leaving Fly): `docs/DIGITALOCEAN_DEPLOYMENT.md`
+Live runbook: `docs/FLY_DEPLOYMENT.md`
 
 Railway CLI scripts and the `@railway/cli` package were removed from this
 repository on 2026-06-18. Do not add them back.
