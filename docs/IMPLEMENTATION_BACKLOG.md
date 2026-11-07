@@ -674,3 +674,15 @@ Progress:
 18. Media moderation fails safe without a provider (held for human review,
     released on moderator approval) — **done 07/11/26**. Follow-up: a moderator
     screen for `/v1/platform/media/reviews` in the staff console.
+19. Scoped pickers, server ownership, day-first dates and export filters
+    (portfolio audit from Telpen Edu) — **done 07/11/26**: tenant write routes
+    require their department permission, adverts are bound to the tenant's own
+    profile, live-advert edits replace in one API call, AuthService is injected
+    into adverts/leads/relationships/source-finder/UGC, one shared dd/mm/yy
+    formatter, CSV/PDF exports state their filters, search filters stay in the
+    URL. Escalated to the owner: conversation assignee must be a member of the
+    tenant (needs an auth-module membership lookup); auth emails show raw ISO
+    expiry times (`apps/api/src/modules/auth/resend-email.ts`); unused
+    `formatDate` in `packages/domain/src/privacy.ts` is month-name based;
+    advert drafts have no `sourceAdvertId` column (schema change) to tie an
+    edit copy to its original across devices.

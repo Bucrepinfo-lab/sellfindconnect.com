@@ -1346,6 +1346,15 @@ Permission requirements:
 - Prevent horizontal access between tenants.
 - Prevent country admins from accessing other countries unless assigned.
 - Support audit logs for all sensitive actions.
+- Least privilege on the server: each tenant role sees and acts only on its own
+  department (listings, profile, leads/chat, billing, analytics); owners and
+  admins keep the full tenant view; staff report scopes follow their assigned
+  reach. Every tenant write route names the permission it needs (07/11/26).
+- Pickers and dropdowns offer only records the user's tenant owns or may act
+  on, each once; adverts always carry the tenant's own published profile
+  identity.
+- User-facing dates are day-first (dd/mm/yy, Africa/Nairobi) whatever the
+  device locale; exports state the filters they were built with.
 
 Implementation progress on 2026-06-18:
 

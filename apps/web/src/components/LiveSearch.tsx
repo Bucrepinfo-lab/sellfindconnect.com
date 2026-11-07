@@ -61,6 +61,25 @@ async function runSearch(filters: SearchFilters): Promise<SearchState> {
   }
 }
 
+/** Keep the applied filters in the address bar so the search can be shared or reloaded. */
+function writeFiltersToUrl(filters: SearchFilters) {
+  try {
+    const url = new URL(window.location.href);
+    const set = (key: string, value: string) => {
+      if (value) url.searchParams.set(key, value);
+      else url.searchParams.delete(key);
+    };
+    set('q', filters.q.trim().slice(0, 160));
+    set('industry', filters.industry);
+    set('role', filters.role);
+    url.searchParams.delete('query');
+    url.searchParams.delete('industryCode');
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  } catch {
+    // Address bar updates are a convenience; the search itself already ran.
+  }
+}
+
 /** Source Finder over real, published adverts (GET /v1/public/adverts/search). */
 export function LiveSearch({ initial }: { initial: SearchFilters }) {
   const session = useStoredSession();
@@ -71,8 +90,10 @@ export function LiveSearch({ initial }: { initial: SearchFilters }) {
   const [blockedTenants, setBlockedTenants] = useState<string[]>([]);
 
   const search = async () => {
+    const filters = { q: query, industry, role };
     setState((current) => ({ ...current, status: 'loading' }));
-    setState(await runSearch({ q: query, industry, role }));
+    writeFiltersToUrl(filters);
+    setState(await runSearch(filters));
   };
 
   const { q: initialQ, industry: initialIndustry, role: initialRole } = initial;
