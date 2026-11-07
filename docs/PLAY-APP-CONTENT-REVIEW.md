@@ -39,19 +39,25 @@ Most of the app needs a business account, so choose **All or some
 functionality is restricted** and add:
 
 - Name: `Play reviewer`
-- Username: the email of the review account (`PLAY_REVIEW_EMAIL`)
-- Password: the review account's password
+- Username: the review phone number (`PLAY_REVIEW_PHONE`, e.g. 07XX XXX XXX)
+- Password: the 6-digit review code (`PLAY_REVIEW_CODE`)
 - Instructions:
 
 ```
-Open the app and tap "Your business" (or go to Sign in). Sign in with the email and password above. When asked for a 6-digit code, enter <PLAY_REVIEW_MFA_CODE>. Source Finder is on the home screen; each result has Report and Block. Account deletion is under Account.
+Open the app and tap "Sign in" (or "Your business"). Enter the phone number above and tap "Send code". No SMS is sent to this review number: type the 6-digit code above and tap Continue. When asked to set a PIN you can tap "Skip for now". Source Finder is on the home screen; open a listing to Report or Block it. Account deletion is under Account (or https://sellfindconnect.com/account/delete).
 ```
 
+Sign-in for everyone is phone number + 6-digit SMS code (5 minutes, single use)
+on a new device, then a 4-digit PIN on that trusted device (5 wrong PINs = new
+SMS code). Email is optional. The older email review login
+(`PLAY_REVIEW_EMAIL` + `PLAY_REVIEW_MFA_CODE`, "Sign in with email instead")
+still works if you prefer it.
+
 Setup (owner, once):
-1. Create the account in the app with **Create a business account**, using an
-   email you control (for example a `+playreview` Gmail alias). No staff role.
-2. Fly → `sellfindconnect-api` → Secrets: set `PLAY_REVIEW_EMAIL` to that email
-   and `PLAY_REVIEW_MFA_CODE` to six random digits. Deploy secrets.
+1. In the app, sign up with **the review phone number** (any Kenyan mobile
+   number you control). Do not give it a staff role.
+2. Fly → `sellfindconnect-api` → Secrets: set `PLAY_REVIEW_PHONE` to that
+   number and `PLAY_REVIEW_CODE` to six random digits. Deploy secrets.
 3. Paste those values into this card only (not into chat or the repo).
 
 The fixed code works only for that one account, and never for an account

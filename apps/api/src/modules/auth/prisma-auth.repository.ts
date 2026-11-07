@@ -169,6 +169,9 @@ export class PrismaAuthRepository implements AuthRepository {
           emailVerifiedAt: records.user.emailVerifiedAt
             ? new Date(records.user.emailVerifiedAt)
             : undefined,
+          phoneVerifiedAt: records.user.phoneVerifiedAt
+            ? new Date(records.user.phoneVerifiedAt)
+            : undefined,
           mfaRequired: records.user.mfaRequired,
           createdAt: new Date(records.user.createdAt),
         },

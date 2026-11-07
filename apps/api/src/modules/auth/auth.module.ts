@@ -7,6 +7,10 @@ import { AuthController } from './auth.controller';
 import { AUTH_REPOSITORY } from './auth.repository';
 import { AuthService } from './auth.service';
 import { InMemoryAuthRepository } from './in-memory-auth.repository';
+import { InMemoryPhoneAuthRepository } from './in-memory-phone-auth.repository';
+import { PhoneAuthController } from './phone-auth.controller';
+import { PHONE_AUTH_REPOSITORY } from './phone-auth.repository';
+import { PhoneAuthService } from './phone-auth.service';
 import { EMAIL_SENDER, createAuthEmailSender } from './resend-email';
 import {
   HOSTED_IDENTITY_VERIFIER,
@@ -14,9 +18,23 @@ import {
 } from './oidc-identity';
 
 @Module({
-  controllers: [AuthController],
+  controllers: [AuthController, PhoneAuthController],
   providers: [
     InMemoryAuthRepository,
+    InMemoryPhoneAuthRepository,
+    {
+      provide: PHONE_AUTH_REPOSITORY,
+      inject: [ConfigService, InMemoryPhoneAuthRepository],
+      useFactory: async (config: ConfigService, inMemory: InMemoryPhoneAuthRepository) => {
+        if (resolvePersistenceMode(config, ['AUTH_REPOSITORY']) === 'memory') {
+          return inMemory;
+        }
+        const databaseUrl = requireDatabaseUrl(config, 'AUTH_REPOSITORY');
+        const { createAuthPrismaClient } = await import('./prisma-auth.repository.js');
+        const { PrismaPhoneAuthRepository } = await import('./prisma-phone-auth.repository.js');
+        return new PrismaPhoneAuthRepository(createAuthPrismaClient(databaseUrl));
+      },
+    },
     { provide: SMS_SENDER, useClass: AfricasTalkingSmsSender },
     {
       provide: EMAIL_SENDER,
@@ -50,7 +68,8 @@ import {
       },
     },
     AuthService,
+    PhoneAuthService,
   ],
-  exports: [AUTH_REPOSITORY, AuthService],
+  exports: [AUTH_REPOSITORY, AuthService, PhoneAuthService],
 })
 export class AuthModule {}

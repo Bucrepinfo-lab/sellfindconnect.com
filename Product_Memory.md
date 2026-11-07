@@ -414,3 +414,18 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   `/listing/[id]` (contact by call/WhatsApp/email/website, report, block).
   Inside the Android app the preview/demo panels and their no-op buttons are
   hidden; the dead "Publish Draft" and notifications buttons are gone.
+- 2026-11-07: Owner standing rule (07/11/26) applied: sign-in is the phone
+  number. New device = 6-digit SMS code via Africa's Talking (5 minutes, single
+  use, burnt after 5 wrong tries, max 3 codes per number per 10 minutes and 10
+  per day, per-IP limits); that code satisfies tenant-session MFA. The device
+  then gets an httpOnly trusted-device cookie (180 days, hash stored,
+  revocable) and the user sets a 4-digit PIN (scrypt hash, weak PINs refused).
+  PIN sign-in needs that device cookie; 5 wrong PINs lock it until a new SMS
+  code. New numbers go through a registration ticket; email is optional
+  (phone-only accounts get a non-routable `.invalid` placeholder that is never
+  shown or emailed). Email + password + email code stays as "Sign in with email
+  instead". Staff accounts cannot use the phone/PIN path. Reviewer:
+  `PLAY_REVIEW_PHONE` + `PLAY_REVIEW_CODE` (only when set, never staff), and
+  the email review login still works. Migration
+  `20261107120000_add_phone_pin_sign_in` adds three tables (additive). Data
+  safety: phone now required, email optional.
