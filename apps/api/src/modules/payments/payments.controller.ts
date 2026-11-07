@@ -1,6 +1,7 @@
-import { Body, Controller, Headers, Post, Query } from '@nestjs/common';
+import { Body, Controller, Headers, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 
+import { AndroidAppCheckoutGuard } from '../../common/android-app-checkout.guard';
 import { CheckoutDto, PayoutDto } from './dto/payments.dto';
 import { PaymentsService } from './payments.service';
 
@@ -10,6 +11,7 @@ export class PaymentsController {
   constructor(private readonly payments: PaymentsService) {}
 
   @Post('checkout')
+  @UseGuards(AndroidAppCheckoutGuard)
   @ApiHeader({ name: 'x-session-token', required: true })
   checkout(@Headers('x-session-token') sessionToken: string, @Body() body: CheckoutDto) {
     return this.payments.requestCheckout(sessionToken, body);

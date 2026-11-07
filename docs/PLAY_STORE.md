@@ -46,6 +46,22 @@ Do not enable in-app SaaS checkout via STK in a Play build. Keep STK on web/PWA
 and for counterparty marketplace payments. A future Play binary needs a Play
 Billing adapter behind the existing `PAYMENT_PROVIDER` boundary.
 
+### How the app hides checkout (07/11/26)
+
+- `packages/domain/src/android-app-context.ts` decides "in the Android app"
+  from the TWA launch referrer (`android-app://com.sellfindconnect.app`), a
+  `?source=twa` start flag, a per-tab sessionStorage flag, and Android +
+  `display-mode: standalone` (fail-safe hint; a Chrome-installed PWA on Android
+  is treated as the app too and can still pay in the browser).
+- Web: `WebOnlyCheckout` (`apps/web/src/lib/app-context.tsx`) hides the
+  subscription price, trial/"no card" copy, the staff Finance Readiness panel
+  and the subscription page's price / collection / launch-gate sections.
+- API: calls from the app send `x-sfc-client: android-twa`;
+  `AndroidAppCheckoutGuard` returns 403 for STK checkout and any non-`WALLET`
+  invoice payment.
+- Next `.aab`: set the TWA start URL to `https://sellfindconnect.com/?source=twa`
+  so detection does not rely on the referrer alone.
+
 ## SMS, OTP, and sensitive permissions
 
 Phone login is allowed. The implementation must stay on:

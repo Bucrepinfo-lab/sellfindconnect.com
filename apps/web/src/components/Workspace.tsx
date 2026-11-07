@@ -147,6 +147,7 @@ import {
 import { publicApiBaseUrl, readTenantSession, tenantSessionHeaders } from '../lib/public-api';
 import { clearSession, isStaffRole, saveSession, useStoredSession } from '../lib/use-session';
 import { SignUpForm } from './SignUpForm';
+import { WebOnlyCheckout } from '../lib/app-context';
 import { useHomeWorkspaceLanding } from '../lib/use-home-workspace-landing';
 
 const tenantId = '11111111-1111-4111-8111-111111111111';
@@ -1769,9 +1770,11 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
                 <Flag size={14} />
                 {country.flag} {country.name}
               </span>
-              <span>
-                {country.currencyCode} {country.monthlySubscriptionAmount}/month after trial
-              </span>
+              <WebOnlyCheckout>
+                <span>
+                  {country.currencyCode} {country.monthlySubscriptionAmount}/month after trial
+                </span>
+              </WebOnlyCheckout>
               <span>Tenant {tenantId.slice(0, 8)}</span>
             </div>
           </div>
@@ -2435,10 +2438,12 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
                   year: 'numeric',
                 }).format(new Date(ownerTrial.trialEndsAt))}
               />
-              <FinanceRow
-                label="Next billing"
-                value={formatMoney(ownerTrial.monthlyAmount, country.currencyCode, country.locale)}
-              />
+              <WebOnlyCheckout>
+                <FinanceRow
+                  label="Next billing"
+                  value={formatMoney(ownerTrial.monthlyAmount, country.currencyCode, country.locale)}
+                />
+              </WebOnlyCheckout>
               <FinanceRow label="Terms version" value={activePolicyVersions.termsVersion} />
               <FinanceRow
                 label="Policy version"
@@ -2744,6 +2749,7 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
             ) : null}
 
             {showAdmin ? (
+            <WebOnlyCheckout>
             <section className="side-panel" id="finance">
               <div className="panel-heading tight">
                 <h2>Finance Readiness</h2>
@@ -2885,6 +2891,7 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
                 </div>
               )}
             </section>
+            </WebOnlyCheckout>
             ) : null}
 
             {showMember ? (
