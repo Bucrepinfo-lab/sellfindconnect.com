@@ -90,6 +90,8 @@ export class PrivacyService {
     if (existing && (existing.status === 'REQUESTED' || existing.status === 'PROCESSING')) {
       throw new ConflictException('Deletion already pending.');
     }
+    // The deletion page promises adverts leave search at once, not after the grace period.
+    await this.adverts?.unpublishAllForTenant(tenantId, userId);
     const now = new Date().toISOString();
     const req: DeletionRequest = {
       id: randomUUID(),

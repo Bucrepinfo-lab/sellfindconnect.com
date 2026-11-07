@@ -261,6 +261,11 @@ export class ProfilesService {
     return reviewed;
   }
 
+  /** The tenant's own drafts, newest first (tenant-scoped by the repository). */
+  async listDrafts(tenantId: string): Promise<ProfileDraft[]> {
+    return this.repository.listDrafts(tenantId);
+  }
+
   async getDraft(tenantId: string, id: string): Promise<ProfileDraft> {
     const draft = await this.repository.findDraft(tenantId, id);
     if (!draft) {

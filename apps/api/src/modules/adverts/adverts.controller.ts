@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 
+import { RequireTenantPermission } from '../../common/tenant-permission.guard';
 import { TenantAuthSession, TenantId } from '../tenant/tenant-context.decorator';
 import { TenantSessionGuard, type TenantSessionDecision } from '../tenant/tenant-session.guard';
 import { AdvertsService } from './adverts.service';
@@ -36,6 +37,7 @@ export class AdvertsController {
   constructor(private readonly adverts: AdvertsService) {}
 
   @Post()
+  @RequireTenantPermission('MANAGE_LISTINGS')
   createAdvert(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,
@@ -45,6 +47,7 @@ export class AdvertsController {
   }
 
   @Post('drafts')
+  @RequireTenantPermission('MANAGE_LISTINGS')
   createDraft(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,
@@ -64,6 +67,7 @@ export class AdvertsController {
   }
 
   @Patch('drafts/:id')
+  @RequireTenantPermission('MANAGE_LISTINGS')
   updateDraft(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,
@@ -74,6 +78,7 @@ export class AdvertsController {
   }
 
   @Post('drafts/:id/duplicate')
+  @RequireTenantPermission('MANAGE_LISTINGS')
   duplicateDraft(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,
@@ -89,6 +94,7 @@ export class AdvertsController {
   }
 
   @Post('drafts/:id/publish')
+  @RequireTenantPermission('MANAGE_LISTINGS')
   publishDraft(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,
@@ -160,6 +166,7 @@ export class AdvertsController {
   }
 
   @Post('drafts/:id/media/uploads/prepare')
+  @RequireTenantPermission('MANAGE_LISTINGS')
   prepareDraftMediaUpload(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,
@@ -170,6 +177,7 @@ export class AdvertsController {
   }
 
   @Post('drafts/:id/media')
+  @RequireTenantPermission('MANAGE_LISTINGS')
   addDraftMedia(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,
@@ -180,6 +188,7 @@ export class AdvertsController {
   }
 
   @Post(':id/media/uploads/prepare')
+  @RequireTenantPermission('MANAGE_LISTINGS')
   prepareAdvertMediaUpload(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,
@@ -190,6 +199,7 @@ export class AdvertsController {
   }
 
   @Post(':id/media')
+  @RequireTenantPermission('MANAGE_LISTINGS')
   addAdvertMedia(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,
@@ -200,6 +210,7 @@ export class AdvertsController {
   }
 
   @Post(':id/pause')
+  @RequireTenantPermission('MANAGE_LISTINGS')
   pauseAdvert(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,
@@ -209,6 +220,7 @@ export class AdvertsController {
   }
 
   @Post(':id/archive')
+  @RequireTenantPermission('MANAGE_LISTINGS')
   archiveAdvert(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,
@@ -218,6 +230,7 @@ export class AdvertsController {
   }
 
   @Post(':id/duplicate')
+  @RequireTenantPermission('MANAGE_LISTINGS')
   duplicateAdvert(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,
@@ -228,6 +241,7 @@ export class AdvertsController {
   }
 
   @Post(':id/renew')
+  @RequireTenantPermission('MANAGE_LISTINGS')
   renewAdvert(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,
@@ -238,6 +252,7 @@ export class AdvertsController {
   }
 
   @Post(':id/boost')
+  @RequireTenantPermission('MANAGE_LISTINGS')
   boostAdvert(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,
@@ -261,5 +276,10 @@ export class PublicAdvertsController {
   @Get('search')
   search(@Query() query: PublicAdvertSearchDto) {
     return this.adverts.searchPublicAdverts(query);
+  }
+
+  @Get(':id')
+  getOne(@Param('id') id: string) {
+    return this.adverts.getPublicAdvert(id);
   }
 }

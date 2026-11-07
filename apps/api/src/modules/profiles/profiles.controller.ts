@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 
+import { RequireTenantPermission } from '../../common/tenant-permission.guard';
 import { TenantAuthSession, TenantId } from '../tenant/tenant-context.decorator';
 import { TenantSessionGuard, type TenantSessionDecision } from '../tenant/tenant-session.guard';
 import {
@@ -27,8 +28,14 @@ export class ProfilesController {
   constructor(private readonly profiles: ProfilesService) {}
 
   @Post('drafts')
+  @RequireTenantPermission('EDIT_PROFILE')
   createDraft(@TenantId() tenantId: string, @Body() body: CreateProfileDraftDto) {
     return this.profiles.createDraft(tenantId, body);
+  }
+
+  @Get('drafts')
+  listDrafts(@TenantId() tenantId: string) {
+    return this.profiles.listDrafts(tenantId);
   }
 
   @Get('drafts/:id')
@@ -37,6 +44,7 @@ export class ProfilesController {
   }
 
   @Patch('drafts/:id')
+  @RequireTenantPermission('EDIT_PROFILE')
   updateDraft(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,
@@ -57,6 +65,7 @@ export class ProfilesController {
   }
 
   @Post('drafts/:id/media/uploads/prepare')
+  @RequireTenantPermission('EDIT_PROFILE')
   prepareDraftMediaUpload(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,
@@ -67,6 +76,7 @@ export class ProfilesController {
   }
 
   @Post('drafts/:id/media')
+  @RequireTenantPermission('EDIT_PROFILE')
   addDraftMedia(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,
@@ -95,6 +105,7 @@ export class ProfilesController {
   }
 
   @Post('drafts/:id/publish')
+  @RequireTenantPermission('EDIT_PROFILE')
   publishDraft(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,

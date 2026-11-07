@@ -472,6 +472,18 @@ export class AdvertsService {
     return this.withMedia(paused);
   }
 
+  /** Takes every public advert of a tenant out of search (account deletion requested). */
+  async unpublishAllForTenant(tenantId: string, actorUserId?: string): Promise<number> {
+    const adverts = await this.repository.listPublishedAdverts(tenantId);
+    const visible = adverts.filter((advert) =>
+      ['LIVE', 'RENEWAL_DUE', 'SCHEDULED'].includes(advert.status),
+    );
+    for (const advert of visible) {
+      await this.pauseAdvert(tenantId, advert.id, actorUserId);
+    }
+    return visible.length;
+  }
+
   async archiveAdvert(tenantId: string, id: string, actorUserId?: string): Promise<AdvertPost> {
     const advert = await this.getMutableAdvert(tenantId, id);
     const now = new Date().toISOString();
@@ -615,6 +627,30 @@ export class AdvertsService {
         )
         .slice(0, limit),
     };
+  }
+
+  /**
+   * One discoverable advert for the public detail page. Only LIVE / RENEWAL_DUE /
+   * started SCHEDULED adverts in the discovery index are returned, with media a
+   * moderator has cleared; paused, archived, expired and unknown ids are 404.
+   */
+  async getPublicAdvert(id: string, now = new Date().toISOString()): Promise<PublicAdvertSearchResult> {
+    const advertId = id.trim();
+    const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const [entry] = uuidLike.test(advertId)
+      ? await this.repository.listDiscoveryIndex({
+          advertId,
+          statuses: ['LIVE', 'RENEWAL_DUE', 'SCHEDULED'],
+        })
+      : [];
+    const result =
+      entry && this.isDiscoveryEntryDiscoverable(entry, {}, now)
+        ? await this.rankPublicAdvert(entry, undefined, [], now)
+        : undefined;
+    if (!result) {
+      throw new NotFoundException('Advert not found.');
+    }
+    return result;
   }
 
   async createSavedSearch(

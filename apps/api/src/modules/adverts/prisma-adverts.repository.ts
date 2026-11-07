@@ -254,6 +254,7 @@ export class PrismaAdvertsRepository implements AdvertsRepository {
   ): Promise<AdvertDiscoveryIndexRecord[]> {
     const records = await this.prisma.advertDiscoveryIndex.findMany({
       where: {
+        ...(input.advertId ? { advertId: input.advertId } : {}),
         ...(input.countryCode ? { countryCode: input.countryCode } : {}),
         ...(input.industryCode ? { industryCode: input.industryCode } : {}),
         ...(input.role ? { role: input.role } : {}),
