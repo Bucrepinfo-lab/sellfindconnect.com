@@ -308,6 +308,57 @@ export class MetadataOnlyMediaModerationAdapter implements MediaModerationAdapte
   }
 }
 
+/** Reason recorded on media held for a human moderator because no automated moderation runs. */
+export const HUMAN_REVIEW_HOLD_REASON = 'AWAITING_HUMAN_REVIEW';
+export const HUMAN_REVIEW_HOLD_PROVIDER = 'human-review-hold';
+
+/**
+ * Fail-safe upload review used in production when no automated content
+ * moderation provider is configured: media is accepted but held as PENDING
+ * (not public) until a moderator approves it from the review queue.
+ */
+export class HoldForHumanReviewModerationAdapter implements MediaModerationAdapter {
+  review(_input: MediaAssetInput): MediaModerationResult {
+    return { allowed: true, moderationStatus: 'PENDING', moderationReason: HUMAN_REVIEW_HOLD_REASON };
+  }
+}
+
+/** CONTENT_MODERATION job processor that opens a human review case instead of auto-passing. */
+export class HoldForHumanReviewMediaJobProcessor implements MediaJobProcessorAdapter {
+  readonly name = HUMAN_REVIEW_HOLD_PROVIDER;
+
+  process(_input: MediaProcessingJob): MediaJobProcessorResult {
+    return {
+      ok: true,
+      result: { provider: HUMAN_REVIEW_HOLD_PROVIDER, verdict: 'held', reason: HUMAN_REVIEW_HOLD_REASON },
+    };
+  }
+}
+
+/**
+ * True when uploaded media must be held for a human: in production (or when
+ * MEDIA_CONTENT_MODERATION_PROVIDER=human) and no automated CONTENT_MODERATION
+ * processor (Sightengine or an HTTP endpoint) is configured.
+ */
+export function mustHoldMediaForHumanReview(
+  config: MediaAdapterConfigReader | undefined,
+  processors: MediaJobProcessorMap,
+): boolean {
+  const provider = normalizeOptionalConfigString(
+    config?.get('MEDIA_CONTENT_MODERATION_PROVIDER'),
+  )?.toLowerCase();
+  if (provider === 'human' || provider === 'manual' || provider === 'hold') {
+    return true;
+  }
+  const automated =
+    processors.CONTENT_MODERATION !== undefined &&
+    !(processors.CONTENT_MODERATION instanceof DevelopmentMediaJobProcessorAdapter);
+  if (automated) {
+    return false;
+  }
+  return normalizeOptionalConfigString(config?.get('NODE_ENV'))?.toLowerCase() === 'production';
+}
+
 export class DevelopmentMediaTransformAdapter implements MediaTransformAdapter {
   plan(input: MediaAsset): MediaTransformResult {
     if (input.kind === 'VIDEO') {
@@ -652,6 +703,11 @@ export function createConfiguredMediaAdapters(config?: MediaAdapterConfigReader)
     );
   }
   const storageDriver = resolveMediaStorageDriver(config);
+  const processors = createConfiguredMediaJobProcessors(config);
+  const holdForHumanReview = mustHoldMediaForHumanReview(config, processors);
+  if (holdForHumanReview) {
+    processors.CONTENT_MODERATION = new HoldForHumanReviewMediaJobProcessor();
+  }
   const storage =
     storageDriver === 's3'
       ? createS3CompatibleStorageAdapter(config)
@@ -662,10 +718,12 @@ export function createConfiguredMediaAdapters(config?: MediaAdapterConfigReader)
 
   return {
     storage,
-    moderation: new MetadataOnlyMediaModerationAdapter(),
+    moderation: holdForHumanReview
+      ? new HoldForHumanReviewModerationAdapter()
+      : new MetadataOnlyMediaModerationAdapter(),
     transforms: new DevelopmentMediaTransformAdapter(),
     jobs: new InMemoryMediaProcessingQueueAdapter(),
-    processors: createConfiguredMediaJobProcessors(config),
+    processors,
   };
 }
 
@@ -693,12 +751,20 @@ export async function createConfiguredMediaAdaptersAsync(
 }
 
 export function createDefaultMediaAdapters(): MediaAdapters {
+  // Fail safe: even the unwired default never auto-passes media in production.
+  const production = process.env.NODE_ENV === 'production';
+  const processors = createDevelopmentMediaJobProcessors();
+  if (production) {
+    processors.CONTENT_MODERATION = new HoldForHumanReviewMediaJobProcessor();
+  }
   return {
     storage: new DevelopmentMediaStorageAdapter(),
-    moderation: new MetadataOnlyMediaModerationAdapter(),
+    moderation: production
+      ? new HoldForHumanReviewModerationAdapter()
+      : new MetadataOnlyMediaModerationAdapter(),
     transforms: new DevelopmentMediaTransformAdapter(),
     jobs: new InMemoryMediaProcessingQueueAdapter(),
-    processors: createDevelopmentMediaJobProcessors(),
+    processors,
   };
 }
 

@@ -149,6 +149,16 @@ fail-close without credentials. Present `CLAMAV_SCAN_URL` or Sightengine keys
 overlay those processors without requiring the named provider flag. Scanner
 results store verdicts only; API secrets are not copied into job metadata.
 
+No automated moderation in production fails safe (07/11/26): when
+`NODE_ENV=production` and no CONTENT_MODERATION provider (Sightengine or an
+HTTP endpoint) is configured, every uploaded image/video is stored with
+`moderationStatus=PENDING` / `AWAITING_HUMAN_REVIEW` (tenants see "still being
+checked", the public never sees it) and the CONTENT_MODERATION job opens a
+MEDIUM review case. A moderator approves it with `RESTORED` or `DISMISSED` on
+`POST /v1/platform/media/reviews/:id/resolve`, which publishes it as `PASSED`;
+`CONFIRMED_BLOCK` / `ESCALATED` keep it hidden.
+`MEDIA_CONTENT_MODERATION_PROVIDER=human` forces the hold in any environment.
+
 CDN publication verification:
 
 ```text
