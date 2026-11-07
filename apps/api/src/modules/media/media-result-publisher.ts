@@ -147,6 +147,7 @@ function requiresMediaReviewCase(
 ): boolean {
   return (
     input.outcome === 'FAILED' ||
+    isHeldForHumanReview(input) ||
     patch.status === 'BLOCKED' ||
     patch.moderationStatus === 'BLOCKED' ||
     patch.transformStatus === 'FAILED'
@@ -159,7 +160,8 @@ function reviewCaseSeverity(input: MediaAssetResultPublicationInput): MediaRevie
   }
 
   if (input.job.type === 'CONTENT_MODERATION') {
-    return 'HIGH';
+    // A hold is not a detection: MEDIUM, so a moderator can approve it without a mistaken-classification note.
+    return isHeldForHumanReview(input) ? 'MEDIUM' : 'HIGH';
   }
 
   return 'MEDIUM';
@@ -257,7 +259,30 @@ function buildModerationPatch(
     };
   }
 
+  if (isHeldForHumanReviewVerdict(verdict)) {
+    // No automated moderation ran: keep the file out of public view and queue it for a moderator.
+    return {
+      moderationStatus: 'PENDING',
+      moderationReason: truncateReason(readString(result, 'reason') ?? 'AWAITING_HUMAN_REVIEW'),
+      updatedAt,
+    };
+  }
+
   return undefined;
+}
+
+function isHeldForHumanReviewVerdict(value: string | undefined): boolean {
+  return ['held', 'needs_review', 'review', 'pending_review'].includes(value ?? '');
+}
+
+function isHeldForHumanReview(input: MediaAssetResultPublicationInput): boolean {
+  return (
+    input.outcome === 'SUCCEEDED' &&
+    input.job.type === 'CONTENT_MODERATION' &&
+    isHeldForHumanReviewVerdict(
+      normalizeVerdict(readString(input.job.result ?? {}, 'verdict') ?? readString(input.job.result ?? {}, 'status')),
+    )
+  );
 }
 
 function buildTransformPatch(

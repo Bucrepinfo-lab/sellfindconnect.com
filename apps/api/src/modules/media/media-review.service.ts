@@ -27,6 +27,15 @@ import type {
 } from './dto/media-review.dto';
 import { InMemoryMediaReviewCaseRepository } from './in-memory-media-review-case.repository';
 import {
+  HUMAN_REVIEW_HOLD_PROVIDER,
+  HUMAN_REVIEW_HOLD_REASON,
+  type MediaProcessingJob,
+} from './media.adapters';
+import {
+  MEDIA_ASSET_RESULT_PUBLISHER,
+  type MediaAssetResultPublisherAdapter,
+} from './media-result-publisher';
+import {
   MEDIA_REVIEW_CASE_REPOSITORY,
   type MediaReviewCaseRecord,
   type MediaReviewCaseRepository,
@@ -39,6 +48,9 @@ export class MediaReviewService {
     @Inject(MEDIA_REVIEW_CASE_REPOSITORY)
     private readonly repository: MediaReviewCaseRepository = new InMemoryMediaReviewCaseRepository(),
     @Optional() private readonly auth?: AuthService,
+    @Optional()
+    @Inject(MEDIA_ASSET_RESULT_PUBLISHER)
+    private readonly publisher?: MediaAssetResultPublisherAdapter,
   ) {}
 
   async listCases(
@@ -122,6 +134,8 @@ export class MediaReviewService {
       throw new UnprocessableEntityException('Media review case is no longer open.');
     }
 
+    const releasedHeldMedia = await this.releaseHeldMedia(resolved);
+
     await this.auth?.recordTenantAudit({
       tenantId: resolved.tenantId,
       actorUserId: session.userId,
@@ -138,6 +152,7 @@ export class MediaReviewService {
         role: decision?.role ?? 'GLOBAL_MODERATOR_LEAD',
         notesProvided: Boolean(input.notes),
         mistakenClassification: Boolean(input.mistakenClassification),
+        releasedHeldMedia,
         ...(resolved.escalation ? toMediaEscalationAuditMetadata(resolved.escalation) : {}),
       },
     });
@@ -146,6 +161,46 @@ export class MediaReviewService {
       ...this.presentCase(resolved),
       reviewerRole: decision?.role,
     };
+  }
+
+  /**
+   * Media held only because no automated moderation provider runs is published
+   * when a moderator approves it (RESTORED or DISMISSED). Other resolutions keep
+   * it out of public view.
+   */
+  private async releaseHeldMedia(reviewCase: MediaReviewCaseRecord): Promise<boolean> {
+    const held =
+      reviewCase.jobType === 'CONTENT_MODERATION' &&
+      (reviewCase.reason === HUMAN_REVIEW_HOLD_REASON || reviewCase.provider === HUMAN_REVIEW_HOLD_PROVIDER);
+    if (!held || !this.publisher) {
+      return false;
+    }
+    if (reviewCase.resolution !== 'RESTORED' && reviewCase.resolution !== 'DISMISSED') {
+      return false;
+    }
+
+    const now = new Date().toISOString();
+    const publication = await this.publisher.publish({
+      outcome: 'SUCCEEDED',
+      occurredAt: now,
+      job: {
+        id: `human-review-${reviewCase.id}`,
+        type: 'CONTENT_MODERATION',
+        tenantId: reviewCase.tenantId,
+        mediaId: reviewCase.mediaId,
+        ownerType: reviewCase.ownerType as MediaProcessingJob['ownerType'],
+        ownerId: reviewCase.ownerId,
+        sourceUrl: '',
+        status: 'SUCCEEDED',
+        attempts: 1,
+        maxAttempts: 1,
+        availableAt: now,
+        requestedAt: now,
+        completedAt: now,
+        result: { provider: 'human-reviewer', verdict: 'approved' },
+      },
+    });
+    return publication.published;
   }
 
   async getCase(id: string, session: PlatformAccessSession) {

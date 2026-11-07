@@ -384,3 +384,9 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   `SPACES_*` settings are ignored with a boot warning (never a crash). The
   media escalation playbook's hosting abuse desk is now Fly.io
   (`mailto:abuse@fly.io`).
+- 2026-11-07: Media moderation fails safe. In production with no automated
+  content-moderation provider, uploaded images/videos are held as PENDING
+  (`AWAITING_HUMAN_REVIEW`, never public) and the CONTENT_MODERATION job opens
+  a MEDIUM review case in the moderator queue. Approving (RESTORED/DISMISSED)
+  publishes the file as PASSED; other resolutions keep it hidden. No paid
+  provider added.

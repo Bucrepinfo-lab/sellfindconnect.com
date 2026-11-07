@@ -671,3 +671,6 @@ Progress:
 17. Android app (TWA) hides subscription price and checkout, and the API
     refuses non-Play checkout from the app — **done 07/11/26** (Play payments
     policy). Next Android build: set the TWA start URL to `/?source=twa`.
+18. Media moderation fails safe without a provider (held for human review,
+    released on moderator approval) — **done 07/11/26**. Follow-up: a moderator
+    screen for `/v1/platform/media/reviews` in the staff console.
