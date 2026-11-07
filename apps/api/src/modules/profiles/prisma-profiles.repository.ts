@@ -110,6 +110,15 @@ export class PrismaProfilesRepository implements ProfilesRepository {
     });
   }
 
+  async listDrafts(tenantId: string): Promise<ProfileDraft[]> {
+    const drafts = await this.prisma.profileDraft.findMany({
+      where: { tenantId },
+      orderBy: { updatedAt: 'desc' },
+      take: 20,
+    });
+    return drafts.map((draft) => this.mapDraft(draft));
+  }
+
   async listDraftsPendingReview(tenantId: string): Promise<ProfileDraft[]> {
     const drafts = await this.prisma.profileDraft.findMany({
       where: { tenantId, status: ProfileStatus.PENDING_REVIEW },

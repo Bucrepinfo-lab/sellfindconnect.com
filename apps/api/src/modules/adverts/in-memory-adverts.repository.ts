@@ -127,6 +127,7 @@ export class InMemoryAdvertsRepository implements AdvertsRepository {
 
   listDiscoveryIndex(input: ListAdvertDiscoveryIndexInput = {}): AdvertDiscoveryIndexRecord[] {
     return Array.from(this.discoveryIndex.values())
+      .filter((record) => !input.advertId || record.advertId === input.advertId)
       .filter((record) => !input.countryCode || record.countryCode === input.countryCode)
       .filter((record) => !input.industryCode || record.industryCode === input.industryCode)
       .filter((record) => !input.role || record.role === input.role)

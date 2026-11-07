@@ -617,6 +617,30 @@ export class AdvertsService {
     };
   }
 
+  /**
+   * One discoverable advert for the public detail page. Only LIVE / RENEWAL_DUE /
+   * started SCHEDULED adverts in the discovery index are returned, with media a
+   * moderator has cleared; paused, archived, expired and unknown ids are 404.
+   */
+  async getPublicAdvert(id: string, now = new Date().toISOString()): Promise<PublicAdvertSearchResult> {
+    const advertId = id.trim();
+    const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const [entry] = uuidLike.test(advertId)
+      ? await this.repository.listDiscoveryIndex({
+          advertId,
+          statuses: ['LIVE', 'RENEWAL_DUE', 'SCHEDULED'],
+        })
+      : [];
+    const result =
+      entry && this.isDiscoveryEntryDiscoverable(entry, {}, now)
+        ? await this.rankPublicAdvert(entry, undefined, [], now)
+        : undefined;
+    if (!result) {
+      throw new NotFoundException('Advert not found.');
+    }
+    return result;
+  }
+
   async createSavedSearch(
     tenantId: string,
     input: CreateSavedAdvertSearchDto,

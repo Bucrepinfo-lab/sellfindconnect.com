@@ -15,6 +15,7 @@ export type ProfilePublishRecords = {
 export interface ProfilesRepository {
   createDraft(draft: ProfileDraft): RepositoryResult<void>;
   findDraft(tenantId: string, id: string): RepositoryResult<ProfileDraft | undefined>;
+  listDrafts(tenantId: string): RepositoryResult<ProfileDraft[]>;
   updateDraft(draft: ProfileDraft): RepositoryResult<void>;
   listDraftsPendingReview(tenantId: string): RepositoryResult<ProfileDraft[]>;
   listAllDraftsPendingReview(): RepositoryResult<ProfileDraft[]>;

@@ -397,3 +397,9 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   failing silently; `/account/delete` follows the shared session store, drops
   to the signed-out steps on a 401, explains an already-scheduled deletion,
   and shows dates as dd/mm/yy (also on Data and privacy).
+- 2026-11-07: API for the real business path. `GET /v1/profiles/drafts` lists
+  the tenant's own profile drafts; `GET /v1/public/adverts/:id` returns one
+  discoverable advert (LIVE/RENEWAL_DUE/started SCHEDULED, moderator-cleared
+  media only; paused, archived, expired or unknown ids are 404). Profile and
+  advert write routes now require `EDIT_PROFILE` / `MANAGE_LISTINGS` on the
+  server (`TenantPermissionGuard`): owners, admins and editors only.

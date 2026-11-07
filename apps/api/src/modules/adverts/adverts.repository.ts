@@ -55,6 +55,7 @@ export type AdvertDiscoveryIndexRecord = {
 };
 
 export type ListAdvertDiscoveryIndexInput = {
+  advertId?: string;
   countryCode?: string;
   industryCode?: string;
   role?: SupplyChainRole;

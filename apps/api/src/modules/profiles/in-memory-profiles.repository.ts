@@ -18,6 +18,12 @@ export class InMemoryProfilesRepository implements ProfilesRepository {
     return this.drafts.get(this.key(tenantId, id));
   }
 
+  listDrafts(tenantId: string): ProfileDraft[] {
+    return Array.from(this.drafts.values())
+      .filter((draft) => draft.tenantId === tenantId)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+
   updateDraft(draft: ProfileDraft): void {
     this.drafts.set(this.key(draft.tenantId, draft.id), draft);
   }
