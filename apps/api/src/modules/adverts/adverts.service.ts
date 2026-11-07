@@ -29,8 +29,9 @@ import {
 } from '@telpen/domain';
 import { randomUUID } from 'node:crypto';
 
-import type { AuthService } from '../auth/auth.service';
+import { AuthService } from '../auth/auth.service';
 import { AnalyticsService } from '../analytics/analytics.service';
+import { ProfilesService } from '../profiles/profiles.service';
 import {
   MEDIA_ADAPTERS,
   createDefaultMediaAdapters,
@@ -98,6 +99,7 @@ export class AdvertsService {
     @Inject(MEDIA_ADAPTERS)
     private readonly mediaAdapters: MediaAdapters = createDefaultMediaAdapters(),
     @Optional() private readonly analytics: AnalyticsService = new AnalyticsService(),
+    @Optional() private readonly profiles?: ProfilesService,
   ) {}
 
   async createAdvert(
@@ -120,6 +122,7 @@ export class AdvertsService {
     actorUserId?: string,
   ): Promise<AdvertDraft> {
     this.assertValidAdvert(input);
+    await this.assertOwnIdentity(tenantId, input);
 
     const now = new Date().toISOString();
     const draft: AdvertDraft = {
@@ -171,6 +174,7 @@ export class AdvertsService {
     if (existing.status !== 'DRAFT') {
       throw new UnprocessableEntityException('Published advert drafts cannot be edited.');
     }
+    await this.assertOwnIdentity(tenantId, input);
 
     const updated: AdvertDraft = {
       ...existing,
@@ -265,12 +269,19 @@ export class AdvertsService {
     input: PublishAdvertDraftDto,
     actorUserId?: string,
   ): Promise<AdvertPost> {
-    const draft = await this.getDraft(tenantId, id);
-    if (draft.status !== 'DRAFT') {
+    const stored = await this.getDraft(tenantId, id);
+    if (stored.status !== 'DRAFT') {
       throw new UnprocessableEntityException('Advert draft has already been published.');
     }
+    // The advert being replaced (edit of a live advert) must be this tenant's own
+    // and still live; checked before anything is published.
+    const replaced = input.replacesAdvertId
+      ? await this.getMutableAdvert(tenantId, input.replacesAdvertId)
+      : undefined;
 
     await this.requireCurrentTermsAcceptance(tenantId, actorUserId, input.acceptedTerms);
+    // Adverts always show the tenant's own current business identity.
+    const draft: AdvertDraft = { ...stored, ...(await this.ownIdentity(tenantId)) };
     this.assertValidAdvert(draft);
 
     const draftMedia = await this.repository.listMediaAssets(tenantId, 'ADVERT', draft.id);
@@ -330,6 +341,10 @@ export class AdvertsService {
       publishedMediaAssets,
     });
     await this.syncDiscoveryIndex(published);
+    if (replaced) {
+      // One listing per advert: the edited copy replaces the live original.
+      await this.archiveAdvert(tenantId, replaced.id, actorUserId);
+    }
     await this.auth?.recordTenantAudit({
       tenantId,
       actorUserId,
@@ -1245,6 +1260,53 @@ export class AdvertsService {
       scheduledFor: now,
       createdAt: now,
     };
+  }
+
+  /**
+   * The tenant's own live business identity, used for every advert it publishes.
+   * Undefined only when no profile service is wired (bare unit construction).
+   */
+  private async ownIdentity(
+    tenantId: string,
+  ): Promise<Pick<AdvertDraft, 'displayName' | 'industryCode' | 'role' | 'countryCode'> | undefined> {
+    if (!this.profiles) {
+      return undefined;
+    }
+    const profile = await this.profiles.getLiveProfile(tenantId).catch((error: unknown) => {
+      if (error instanceof NotFoundException) return undefined;
+      throw error;
+    });
+    if (!profile) {
+      throw new UnprocessableEntityException('Publish your business profile before creating adverts.');
+    }
+    return {
+      displayName: profile.displayName,
+      industryCode: profile.industryCode,
+      role: profile.role,
+      countryCode: profile.countryCode,
+    };
+  }
+
+  /** Rejects adverts that claim another business's name, industry, role or country. */
+  private async assertOwnIdentity(
+    tenantId: string,
+    input: Partial<Pick<AdvertDraft, 'displayName' | 'industryCode' | 'role' | 'countryCode'>>,
+  ): Promise<void> {
+    const identity = await this.ownIdentity(tenantId);
+    if (!identity) {
+      return;
+    }
+    const mismatched = (['displayName', 'industryCode', 'role', 'countryCode'] as const).filter(
+      (field) =>
+        input[field] !== undefined &&
+        String(input[field]).trim().toUpperCase() !== String(identity[field]).trim().toUpperCase(),
+    );
+    if (mismatched.length > 0) {
+      throw new UnprocessableEntityException({
+        message: 'Adverts must use your own published business profile.',
+        fields: mismatched,
+      });
+    }
   }
 
   private async getMutableAdvert(tenantId: string, id: string): Promise<AdvertPost> {

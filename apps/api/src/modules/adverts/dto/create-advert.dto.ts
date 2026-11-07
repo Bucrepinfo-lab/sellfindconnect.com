@@ -156,6 +156,15 @@ export class PublishAdvertDraftDto {
   @IsOptional()
   @IsISO8601()
   declare publishedAt?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Your own live advert that this draft replaces (edit flow). It is archived once the draft is live, so the listing never shows twice.',
+  })
+  @IsOptional()
+  @IsString()
+  @Length(2, 120)
+  declare replacesAdvertId?: string;
 }
 
 export class RenewAdvertDto {

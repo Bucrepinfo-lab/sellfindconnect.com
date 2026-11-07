@@ -5,6 +5,7 @@ import {
   countries,
   emptyAnalyticsTotals,
   evaluateSafetyText,
+  formatDayFirstDateTime,
   getCountry,
   industryCategories,
   operationalRegions,
@@ -183,6 +184,10 @@ export type PlatformAnalyticsHierarchyReport = {
     continentCode?: string;
     countryCode?: string;
     tenantId?: string;
+  };
+  /** Filters applied to the dataset, so totals, CSV and PDF state the same scope. */
+  filters: {
+    industryCode?: string;
   };
   generatedAt: string;
   periodStart: string;
@@ -385,6 +390,9 @@ export class AnalyticsService {
         continentCode: scope.resource.continentCode,
         countryCode: scope.resource.countryCode,
         tenantId: scope.tenantId,
+      },
+      filters: {
+        industryCode: query.industryCode,
       },
       generatedAt: new Date().toISOString(),
       periodStart: dataset.periodStart,
@@ -1147,10 +1155,15 @@ export class AnalyticsService {
       .slice(0, 10);
   }
 
+  /** Human-readable report dates: dd/mm/yy HH:mm Nairobi time (owner rule), never ISO. */
+  private displayDateTime(iso: string): string {
+    return `${formatDayFirstDateTime(iso)} EAT`;
+  }
+
   private tenantReportToPdfLines(report: TenantAnalyticsReport): string[] {
     return [
-      `Generated at: ${report.generatedAt}`,
-      `Period: ${report.periodStart} to ${report.periodEnd}`,
+      `Generated at: ${this.displayDateTime(report.generatedAt)}`,
+      `Period: ${this.displayDateTime(report.periodStart)} to ${this.displayDateTime(report.periodEnd)}`,
       `Tenant: ${report.tenantId}`,
       `Filters: country=${report.filters.countryCode ?? 'ALL'} industry=${report.filters.industryCode ?? 'ALL'}`,
       `Warehouse: dataSource=${report.warehouse.dataSource}; requested=${report.warehouse.requestedDataSource}; rollupRows=${report.warehouse.rollupRows}; fallback=${report.warehouse.fallbackReason ?? 'NONE'}`,
@@ -1168,10 +1181,10 @@ export class AnalyticsService {
 
   private hierarchyReportToPdfLines(report: PlatformAnalyticsHierarchyReport): string[] {
     return [
-      `Generated at: ${report.generatedAt}`,
-      `Period: ${report.periodStart} to ${report.periodEnd}`,
+      `Generated at: ${this.displayDateTime(report.generatedAt)}`,
+      `Period: ${this.displayDateTime(report.periodStart)} to ${this.displayDateTime(report.periodEnd)}`,
       `Scope: ${report.scope.scopeLevel} ${report.scope.label}`,
-      `Filters: region=${report.scope.regionCode ?? 'ALL'} continent=${report.scope.continentCode ?? 'ALL'} country=${report.scope.countryCode ?? 'ALL'} tenant=${report.scope.tenantId ?? 'ALL'}`,
+      `Filters: region=${report.scope.regionCode ?? 'ALL'} continent=${report.scope.continentCode ?? 'ALL'} country=${report.scope.countryCode ?? 'ALL'} tenant=${report.scope.tenantId ?? 'ALL'} industry=${report.filters.industryCode ?? 'ALL'}`,
       `Access: role=${report.access.role ?? 'UNSPECIFIED'} scope=${report.access.scopeLevel ?? 'UNSPECIFIED'} reason=${report.access.reason ?? 'UNSPECIFIED'}`,
       `Warehouse: dataSource=${report.warehouse.dataSource}; requested=${report.warehouse.requestedDataSource}; rollupRows=${report.warehouse.rollupRows}; fallback=${report.warehouse.fallbackReason ?? 'NONE'}`,
       `Privacy: raw event metadata included=${report.privacy.rawEventMetadataIncluded}; scope=${report.privacy.exportScope}; consent=${report.privacy.consentBasis}`,
@@ -1368,6 +1381,8 @@ export class AnalyticsService {
       ['period', 'periodStart', report.periodStart, '', ''],
       ['period', 'periodEnd', report.periodEnd, '', ''],
       ['period', 'generatedAt', report.generatedAt, '', ''],
+      ['filter', 'countryCode', report.filters.countryCode ?? 'ALL', '', ''],
+      ['filter', 'industryCode', report.filters.industryCode ?? 'ALL', '', ''],
       [
         'privacy',
         'rawEventMetadataIncluded',
@@ -1418,6 +1433,11 @@ export class AnalyticsService {
       ['period', 'periodEnd', report.periodEnd, '', ''],
       ['period', 'generatedAt', report.generatedAt, '', ''],
       ['period', 'eventCount', String(report.eventCount), '', ''],
+      ['filter', 'regionCode', report.scope.regionCode ?? 'ALL', '', ''],
+      ['filter', 'continentCode', report.scope.continentCode ?? 'ALL', '', ''],
+      ['filter', 'countryCode', report.scope.countryCode ?? 'ALL', '', ''],
+      ['filter', 'tenantId', report.scope.tenantId ?? 'ALL', '', ''],
+      ['filter', 'industryCode', report.filters.industryCode ?? 'ALL', '', ''],
       [
         'privacy',
         'rawEventMetadataIncluded',

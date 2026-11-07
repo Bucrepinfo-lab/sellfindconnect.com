@@ -1,7 +1,7 @@
 # Telpen Adverts Product Memory
 
 Date started: 2026-06-15
-Last updated: 2026-10-25
+Last updated: 2026-11-07
 Purpose: Persistent decision log and strategic memory for the Telpen Adverts multi-tenant advertising SaaS.
 
 This file must be updated whenever product strategy, pricing, compliance, architecture, market positioning, or execution decisions change.
@@ -429,3 +429,32 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   the email review login still works. Migration
   `20261107120000_add_phone_pin_sign_in` adds three tables (additive). Data
   safety: phone now required, email optional.
+- 2026-11-07: Portfolio audit carried over from Telpen Edu (owner, 07/11/26:
+  "find out and fix in other portfolios"). Least privilege is now enforced on
+  the server for every tenant write route, not only profile/adverts: leads
+  (`MANAGE_LEADS`; sending an inquiry `CHAT_WITH_LEADS`), conversations
+  (`CHAT_WITH_LEADS`; assignment and SLA runs `MANAGE_LEADS`), relationship
+  claims (`EDIT_PROFILE`), notification settings/dispatch (`MANAGE_TENANT`),
+  tenant analytics summary/report/export (`VIEW_ANALYTICS`), advert
+  lifecycle/reindex (`MANAGE_LISTINGS`) and saved-search alerts
+  (`MANAGE_LEADS`). The tenant route that rebuilt the platform-wide Source
+  Finder index is closed to every business role (staff use the internal
+  operations job). A spec fails if a new tenant write route names no
+  permission. Adverts are bound to the tenant's own live business profile:
+  the API rejects an advert or draft that claims another business's name,
+  industry, role or country, and stamps the current profile identity on
+  publish. Editing a live advert publishes the copy with `replacesAdvertId`;
+  the API checks the original is the tenant's own before publishing and
+  archives it in the same call, so a listing never shows twice; repeated
+  "Edit" clicks reuse the open copy and the drafts list shows each draft once.
+  AuthService is now a value import in the adverts, leads, relationships,
+  source-finder and UGC services: as a type-only import Nest injected nothing,
+  so stored-terms checks and tenant audit records on those paths were skipped
+  in production. One shared day-first formatter (`formatDayFirstDate`,
+  `formatDayFirstDateTime` in `@telpen/domain`, Nairobi clock) backs the web
+  `formatDmy`; the staff console trial date and analytics PDF dates use it
+  (dd/mm/yy, never device locale). Analytics CSV/PDF exports now state the
+  filters they were built with, and the hierarchy report carries its industry
+  filter. Home search keeps q/industry/role in the URL and drops unknown codes.
+  The staff analytics scope picker offers only the scopes the signed-in role
+  can reach.

@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 
+import { RequireTenantPermission } from '../../common/tenant-permission.guard';
 import { TenantAuthSession, TenantId } from '../tenant/tenant-context.decorator';
 import { TenantSessionGuard, type TenantSessionDecision } from '../tenant/tenant-session.guard';
 import {
@@ -26,6 +27,7 @@ export class RelationshipsController {
   constructor(private readonly relationships: RelationshipsService) {}
 
   @Post()
+  @RequireTenantPermission('EDIT_PROFILE')
   createClaim(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,
@@ -50,6 +52,7 @@ export class RelationshipsController {
   }
 
   @Post(':id/decide')
+  @RequireTenantPermission('EDIT_PROFILE')
   decideClaim(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,
@@ -60,6 +63,7 @@ export class RelationshipsController {
   }
 
   @Post(':id/remove')
+  @RequireTenantPermission('EDIT_PROFILE')
   removeClaim(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,

@@ -18,7 +18,7 @@ import {
 } from '@telpen/domain';
 import { randomUUID } from 'node:crypto';
 
-import type { AuthService } from '../auth/auth.service';
+import { AuthService } from '../auth/auth.service';
 import type {
   CreateRelationshipClaimDto,
   DecideRelationshipClaimDto,

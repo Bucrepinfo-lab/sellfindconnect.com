@@ -105,6 +105,7 @@ import {
   rankSourceFinderWithFullText,
   pilotSourceFinderRecords,
   prohibitedCategorySummaries,
+  reportScopeLevelsForRole,
   searchSourceFinderIndexDocuments,
   searchSourceFinderRecords,
   sourceFinderOutcomeActions,
@@ -144,6 +145,7 @@ import {
   type UserBlock,
   type UserContentReport,
 } from '@telpen/domain';
+import { formatDmy } from '../lib/dates';
 import { publicApiBaseUrl, readTenantSession, tenantSessionHeaders } from '../lib/public-api';
 import { clearSession, isStaffRole, saveSession, useStoredSession } from '../lib/use-session';
 import { SignUpForm } from './SignUpForm';
@@ -471,7 +473,12 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
   const [accessScopeLevel, setAccessScopeLevel] = useState<AccessScopeLevel>('COUNTRY');
   const [accessPermission, setAccessPermission] = useState<AccessPermission>('MANAGE_COUNTRY');
   const [accessMfaVerified, setAccessMfaVerified] = useState(true);
-  const [analyticsScopeLevel, setAnalyticsScopeLevel] = useState<AccessScopeLevel>('COUNTRY');
+  const [analyticsScopeChoice, setAnalyticsScopeLevel] = useState<AccessScopeLevel>('COUNTRY');
+  // Least privilege: offer only the report scopes this staff role can reach (global staff keep all).
+  const analyticsScopeOptions = reportScopeLevelsForRole(storedSession?.role);
+  const analyticsScopeLevel: AccessScopeLevel = analyticsScopeOptions.includes(analyticsScopeChoice)
+    ? analyticsScopeChoice
+    : (analyticsScopeOptions[0] ?? 'COUNTRY');
   const [analyticsExportFormat, setAnalyticsExportFormat] = useState<AnalyticsExportFormat>('CSV');
   const [analyticsDataSource, setAnalyticsDataSource] = useState<AnalyticsReportDataSource>('AUTO');
   const [platformEmail, setPlatformEmail] = useState('');
@@ -2480,11 +2487,7 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
               <FinanceRow label="Password score" value={`${ownerPasswordPolicy.score}%`} />
               <FinanceRow
                 label="Trial ends"
-                value={new Intl.DateTimeFormat(country.locale, {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                }).format(new Date(ownerTrial.trialEndsAt))}
+                value={formatDmy(ownerTrial.trialEndsAt)}
               />
               <WebOnlyCheckout>
                 <FinanceRow
@@ -3627,13 +3630,11 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
                     setAnalyticsScopeLevel(event.target.value as AccessScopeLevel);
                   }}
                 >
-                  {(['GLOBAL', 'REGIONAL', 'CONTINENT', 'COUNTRY', 'TENANT'] as const).map(
-                    (scopeOption) => (
-                      <option key={scopeOption} value={scopeOption}>
-                        {codeLabel(scopeOption)}
-                      </option>
-                    ),
-                  )}
+                  {analyticsScopeOptions.map((scopeOption) => (
+                    <option key={scopeOption} value={scopeOption}>
+                      {codeLabel(scopeOption)}
+                    </option>
+                  ))}
                 </select>
               </label>
               <label className="lead-select-row">

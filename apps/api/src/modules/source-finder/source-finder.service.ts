@@ -39,7 +39,7 @@ import {
 } from '@telpen/domain';
 import { randomUUID } from 'node:crypto';
 
-import type { AuthService } from '../auth/auth.service';
+import { AuthService } from '../auth/auth.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RelationshipsService } from '../relationships/relationships.service';
 import { UgcService } from '../ugc/ugc.service';
