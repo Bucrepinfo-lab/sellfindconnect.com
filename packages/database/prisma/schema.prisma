@@ -528,6 +528,8 @@ model AdvertDraft {
   website      String?   @db.VarChar(500)
   status       String    @default("DRAFT") @db.VarChar(40)
   publishedAt  DateTime?
+  /// The tenant's live advert this draft edits; publishing it archives that advert.
+  sourceAdvertId String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -535,6 +537,7 @@ model AdvertDraft {
 
   @@index([tenantId, status])
   @@index([countryCode, industryCode])
+  @@index([tenantId, sourceAdvertId])
 }
 
 model PublishedAdvert {

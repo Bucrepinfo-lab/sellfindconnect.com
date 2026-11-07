@@ -1355,6 +1355,11 @@ Permission requirements:
   identity.
 - User-facing dates are day-first (dd/mm/yy, Africa/Nairobi) whatever the
   device locale; exports state the filters they were built with.
+- Work is assigned only to members of the same tenant whose role can do it
+  (e.g. conversations to roles with chat permission), checked on the server.
+- Editing a live advert works on a draft linked to it (`sourceAdvertId`);
+  publishing the draft replaces the live advert, and every device resumes the
+  same draft. Auth emails show expiry times as dd/mm/yy HH:mm EAT.
 
 Implementation progress on 2026-06-18:
 

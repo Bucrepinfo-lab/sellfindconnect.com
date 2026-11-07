@@ -4,6 +4,7 @@ import {
   ResendAuthEmailSender,
   buildAuthEmailMessage,
   createAuthEmailSender,
+  displayEmailExpiry,
   resolveAuthEmailAppOrigin,
 } from './resend-email';
 
@@ -136,5 +137,31 @@ describe('auth email sender', () => {
     expect(() =>
       createAuthEmailSender({ AUTH_EMAIL_PROVIDER: 'resend', RESEND_API_KEY: 're_secret' }),
     ).toThrow('EMAIL_FROM is required when AUTH_EMAIL_PROVIDER=resend.');
+  });
+
+  it('shows expiry times day-first in Nairobi time (dd/mm/yy HH:mm EAT), not ISO', () => {
+    const cases = [
+      ['EMAIL_VERIFICATION', 'This link expires at 22/08/26 15:00 EAT.'],
+      ['PASSWORD_RESET', 'This link expires at 22/08/26 15:00 EAT.'],
+      ['TENANT_INVITE', 'This invite expires at 22/08/26 15:00 EAT.'],
+      ['MFA', 'It expires at 22/08/26 15:00 EAT. Do not share it.'],
+    ] as const;
+    for (const [purpose, line] of cases) {
+      const message = buildAuthEmailMessage({
+        purpose,
+        to: 'owner@example.com',
+        token: 'token-1',
+        code: '123456',
+        expiresAt: '2026-08-22T12:00:00.000Z',
+        idempotencyKey: `expiry-${purpose}`,
+      });
+      expect(message.text).toContain(line);
+      expect(message.text).not.toContain('2026-08-22T12:00:00.000Z');
+      expect(message.html).toContain('22/08/26 15:00 EAT');
+    }
+  });
+
+  it('keeps the raw value if an expiry cannot be read', () => {
+    expect(displayEmailExpiry('not-a-date')).toBe('not-a-date');
   });
 });

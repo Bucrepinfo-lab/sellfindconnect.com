@@ -458,3 +458,16 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   filter. Home search keeps q/industry/role in the URL and drops unknown codes.
   The staff analytics scope picker offers only the scopes the signed-in role
   can reach.
+- 2026-11-07: Owner-approved follow-ups to the portfolio audit (auth and
+  database touched for these items only). Conversations can only be assigned
+  (or opened assigned) to a member of the same tenant whose role can chat with
+  leads; the API checks membership through `AuthService.findTenantMembership`.
+  Sign-in, reset, invite and MFA emails show expiry times as dd/mm/yy HH:mm
+  EAT via the shared `formatDayFirstDateTime`; token expiry logic is
+  unchanged. Advert drafts gain a nullable `sourceAdvertId` (additive migration
+  `20261107180000_add_advert_draft_source_advert`). `POST /v1/adverts/:id/edit`
+  returns the open edit draft for that advert from any device or creates one
+  linked to it; publishing a linked draft archives the original in the same
+  call (or just goes live if the original was already removed). Drafts made
+  before the column keep the device-local fallback and the explicit
+  `replacesAdvertId` on publish.

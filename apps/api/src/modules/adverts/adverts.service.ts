@@ -243,6 +243,40 @@ export class AdvertsService {
     return duplicate;
   }
 
+  /**
+   * Start (or resume) editing one of the tenant's live adverts. Returns the open
+   * edit draft for that advert if one exists, on any device, so repeated "Edit"
+   * never makes another copy; otherwise creates one linked by sourceAdvertId.
+   * Publishing that draft archives the original in the same call.
+   */
+  async editAdvert(tenantId: string, id: string, actorUserId?: string): Promise<AdvertDraft> {
+    const source = await this.getMutableAdvert(tenantId, id);
+    const open = (await this.repository.listDrafts(tenantId)).find(
+      (draft) => draft.status === 'DRAFT' && draft.sourceAdvertId === source.id,
+    );
+    if (open) {
+      return open;
+    }
+
+    const draft = await this.createDuplicateDraft(tenantId, source, undefined, actorUserId, {
+      sourceAdvertId: source.id,
+    });
+    await this.copyAdvertMedia(tenantId, source.id, draft.id, 'READY_FOR_PREVIEW');
+    await this.auth?.recordTenantAudit({
+      tenantId,
+      actorUserId,
+      action: 'ADVERT_DUPLICATED_TO_DRAFT',
+      entityType: 'ADVERT_DRAFT',
+      entityId: draft.id,
+      metadata: {
+        sourceAdvertId: source.id,
+        sourceVersion: source.version,
+        edit: true,
+      },
+    });
+    return draft;
+  }
+
   async previewDraft(tenantId: string, id: string): Promise<AdvertDraftWithPreview> {
     const draft = await this.getDraft(tenantId, id);
     const media = presentTenantMediaAssets(
@@ -275,9 +309,14 @@ export class AdvertsService {
     }
     // The advert being replaced (edit of a live advert) must be this tenant's own
     // and still live; checked before anything is published.
+    // An explicit replacesAdvertId (older devices) must still be live, or nothing
+    // is published. A draft's own sourceAdvertId link archives the original if it
+    // is still live; if it was already removed the edit simply goes live.
     const replaced = input.replacesAdvertId
       ? await this.getMutableAdvert(tenantId, input.replacesAdvertId)
-      : undefined;
+      : stored.sourceAdvertId
+        ? await this.findLiveOwnAdvert(tenantId, stored.sourceAdvertId)
+        : undefined;
 
     await this.requireCurrentTermsAcceptance(tenantId, actorUserId, input.acceptedTerms);
     // Adverts always show the tenant's own current business identity.
@@ -296,8 +335,9 @@ export class AdvertsService {
     const now = new Date().toISOString();
     const publishedAt = input.publishedAt ?? draft.publishedAt ?? now;
     const lifecycle = calculateAdvertLifecycle(publishedAt, now);
+    const { sourceAdvertId: _editedAdvertId, ...draftFields } = draft;
     const published: AdvertPost = {
-      ...draft,
+      ...draftFields,
       id: randomUUID(),
       sourceDraftId: draft.id,
       status:
@@ -1063,10 +1103,13 @@ export class AdvertsService {
     source: AdvertDraft | AdvertPost,
     title: string | undefined,
     actorUserId: string | undefined,
+    edit?: { sourceAdvertId: string },
   ): Promise<AdvertDraft> {
     const now = new Date().toISOString();
     const draft: AdvertDraft = {
-      title: this.duplicateTitle(title ?? source.title),
+      // An edit keeps the live title; a plain duplicate is marked "Copy of".
+      title: edit ? source.title : this.duplicateTitle(title ?? source.title),
+      ...(edit ? { sourceAdvertId: edit.sourceAdvertId } : {}),
       displayName: source.displayName,
       industryCode: source.industryCode,
       role: source.role,
@@ -1307,6 +1350,11 @@ export class AdvertsService {
         fields: mismatched,
       });
     }
+  }
+
+  private async findLiveOwnAdvert(tenantId: string, id: string): Promise<AdvertPost | undefined> {
+    const advert = await this.repository.findPublishedAdvert(tenantId, id);
+    return advert && advert.status !== 'AUTO_DELETED' && advert.status !== 'ARCHIVED' ? advert : undefined;
   }
 
   private async getMutableAdvert(tenantId: string, id: string): Promise<AdvertPost> {

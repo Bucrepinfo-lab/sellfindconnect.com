@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { formatDayFirstDateTime } from '@telpen/domain';
 
 /**
  * Auth email delivery abstraction. Injected optionally into AuthService so unit
@@ -115,6 +116,9 @@ export function buildAuthEmailMessage(input: {
   const link = linkForPurpose(input.purpose, origin, input.token);
   const tenantName = input.tenantDisplayName?.trim() || 'a Telpen Adverts workspace';
 
+  // Owner rule: day-first, Nairobi time (dd/mm/yy HH:mm EAT). Display only;
+  // the token's real expiry (input.expiresAt) is unchanged.
+  const expiresAt = displayEmailExpiry(input.expiresAt);
   let subject = 'Telpen Adverts account message';
   let text = 'This message was sent from Telpen Adverts.';
 
@@ -124,7 +128,7 @@ export function buildAuthEmailMessage(input: {
       'Confirm your email for Telpen Adverts.',
       link ? `Open this link: ${link}` : undefined,
       input.token ? `Or paste this verification token: ${input.token}` : undefined,
-      `This link expires at ${input.expiresAt}.`,
+      `This link expires at ${expiresAt}.`,
       'If you did not create this account, you can ignore this email.',
     ]
       .filter(Boolean)
@@ -135,7 +139,7 @@ export function buildAuthEmailMessage(input: {
       'Use this message to reset your Telpen Adverts password.',
       link ? `Open this link: ${link}` : undefined,
       input.token ? `Or paste this reset token: ${input.token}` : undefined,
-      `This link expires at ${input.expiresAt}.`,
+      `This link expires at ${expiresAt}.`,
       'If you did not request a reset, you can ignore this email.',
     ]
       .filter(Boolean)
@@ -146,7 +150,7 @@ export function buildAuthEmailMessage(input: {
       `You were invited to join ${tenantName} on Telpen Adverts.`,
       link ? `Open this link to accept: ${link}` : undefined,
       input.token ? `Or paste this invite token: ${input.token}` : undefined,
-      `This invite expires at ${input.expiresAt}.`,
+      `This invite expires at ${expiresAt}.`,
     ]
       .filter(Boolean)
       .join('\n\n');
@@ -156,7 +160,7 @@ export function buildAuthEmailMessage(input: {
       input.code
         ? `${input.code} is your Telpen Adverts verification code.`
         : 'Your Telpen Adverts verification code was issued.',
-      `It expires at ${input.expiresAt}. Do not share it.`,
+      `It expires at ${expiresAt}. Do not share it.`,
     ].join('\n\n');
   }
 
@@ -259,4 +263,10 @@ export function createAuthEmailSender(
     return new ResendAuthEmailSender(env, fetchImpl);
   }
   return undefined;
+}
+
+/** dd/mm/yy HH:mm EAT for an ISO expiry; the raw value if it cannot be read. */
+export function displayEmailExpiry(iso: string): string {
+  const formatted = formatDayFirstDateTime(iso);
+  return formatted ? `${formatted} EAT` : iso;
 }

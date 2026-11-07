@@ -686,3 +686,11 @@ Progress:
     `formatDate` in `packages/domain/src/privacy.ts` is month-name based;
     advert drafts have no `sourceAdvertId` column (schema change) to tie an
     edit copy to its original across devices.
+20. Owner-approved follow-ups (07/11/26) — **done**: conversation assignee
+    must be a tenant member with chat permission; auth emails show expiry as
+    dd/mm/yy HH:mm EAT; advert drafts carry `sourceAdvertId` so an edit is
+    linked to its live advert on every device. Still open, for later:
+    - remove or switch to the shared formatter the unused `formatDate` in
+      `packages/domain/src/privacy.ts` (month-name format);
+    - keep the staff analytics filters (scope, industry, format, data source)
+      in the URL.

@@ -82,6 +82,7 @@ export class PrismaAdvertsRepository implements AdvertsRepository {
         website: draft.website ?? null,
         status: draft.status,
         publishedAt: draft.publishedAt ? new Date(draft.publishedAt) : null,
+        sourceAdvertId: draft.sourceAdvertId ?? null,
         updatedAt: new Date(draft.updatedAt),
       },
     });
@@ -366,6 +367,7 @@ export class PrismaAdvertsRepository implements AdvertsRepository {
       website: draft.website,
       status: draft.status,
       publishedAt: draft.publishedAt ? new Date(draft.publishedAt) : undefined,
+      sourceAdvertId: draft.sourceAdvertId,
       createdAt: new Date(draft.createdAt),
       updatedAt: new Date(draft.updatedAt),
     };
@@ -418,6 +420,7 @@ export class PrismaAdvertsRepository implements AdvertsRepository {
       email: draft.email ?? undefined,
       website: draft.website ?? undefined,
       status: this.mapDraftStatus(draft.status),
+      sourceAdvertId: draft.sourceAdvertId ?? undefined,
       createdAt: draft.createdAt.toISOString(),
       updatedAt: draft.updatedAt.toISOString(),
     };
