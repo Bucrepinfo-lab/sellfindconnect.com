@@ -50,13 +50,24 @@ type ProfileForm = {
   remoteAvailable: boolean;
 };
 
-type AdvertForm = { id?: string; title: string; description: string; replacesAdvertId?: string };
+type AdvertForm = {
+  id?: string;
+  title: string;
+  description: string;
+  /** The live advert this edit replaces. */
+  replacesAdvertId?: string;
+  /** Old draft with no server link (made before 07/11/26): send replacesAdvertId on publish. */
+  legacyReplace?: boolean;
+};
 
 type Notice = { tone: 'ok' | 'warn' | 'error'; text: string; terms?: boolean } | null;
 
 const EDITABLE_PROFILE = new Set(['DRAFT', 'PENDING_REVIEW', 'REJECTED']);
 
-/** Per-device memory of which live advert an open edit draft replaces (draft id → advert id). */
+/**
+ * Fallback for edit drafts made before drafts carried sourceAdvertId: this
+ * device's memory of which live advert an open edit draft replaces.
+ */
 const REPLACES_KEY = 'sfc:advert-edit-replaces';
 
 function readReplaces(): Record<string, string> {
@@ -373,7 +384,10 @@ export function BusinessManager() {
         method: 'POST',
         body: {
           acceptedTerms: true,
-          ...(advertForm.replacesAdvertId ? { replacesAdvertId: advertForm.replacesAdvertId } : {}),
+          // New drafts are linked on the server (sourceAdvertId); only old ones send the id.
+          ...(advertForm.legacyReplace && advertForm.replacesAdvertId
+            ? { replacesAdvertId: advertForm.replacesAdvertId }
+            : {}),
         },
       });
       rememberReplaces(saved.id, undefined);
@@ -383,35 +397,51 @@ export function BusinessManager() {
 
   const editLiveAdvert = (advert: LiveAdvert) =>
     run('edit-advert', async () => {
-      // Reuse an open copy of this advert instead of making another identical draft.
+      // An old unlinked copy kept on this device is reused as before.
       const replaces = readReplaces();
-      const open = advertDrafts.find((draft) => replaces[draft.id] === advert.id || isSameAdvertText(draft, advert));
-      let restored = open;
-      if (!restored) {
-        const copy = await apiRequest<AdvertDraft>(`/adverts/${advert.id}/duplicate`, { method: 'POST', body: {} });
-        restored = await apiRequest<AdvertDraft>(`/adverts/drafts/${copy.id}`, {
-          method: 'PATCH',
-          body: { title: advert.title },
+      const legacy = advertDrafts.find(
+        (draft) => !draft.sourceAdvertId && (replaces[draft.id] === advert.id || isSameAdvertText(draft, advert)),
+      );
+      if (legacy) {
+        rememberReplaces(legacy.id, advert.id);
+        setAdvertForm({
+          id: legacy.id,
+          title: legacy.title,
+          description: legacy.description,
+          replacesAdvertId: advert.id,
+          legacyReplace: true,
         });
+        return 'Make your changes, then publish to replace the live advert.';
       }
-      rememberReplaces(restored.id, advert.id);
+      // The server returns the open edit draft for this advert (from any device),
+      // or makes one linked to it.
+      const draft = await apiRequest<AdvertDraft>(`/adverts/${advert.id}/edit`, { method: 'POST', body: {} });
       setAdvertForm({
-        id: restored.id,
-        title: restored.title,
-        description: restored.description,
+        id: draft.id,
+        title: draft.title,
+        description: draft.description,
         replacesAdvertId: advert.id,
       });
       return 'Make your changes, then publish to replace the live advert.';
     });
 
   const continueDraft = (draft: AdvertDraft) => {
+    if (draft.sourceAdvertId) {
+      setAdvertForm({
+        id: draft.id,
+        title: draft.title,
+        description: draft.description,
+        replacesAdvertId: draft.sourceAdvertId,
+      });
+      return;
+    }
     const replacesAdvertId = readReplaces()[draft.id];
     const stillLive = replacesAdvertId && adverts.some((advert) => advert.id === replacesAdvertId);
     setAdvertForm({
       id: draft.id,
       title: draft.title,
       description: draft.description,
-      ...(stillLive ? { replacesAdvertId } : {}),
+      ...(stillLive ? { replacesAdvertId, legacyReplace: true } : {}),
     });
   };
 

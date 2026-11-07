@@ -89,6 +89,8 @@ export type AdvertDraftInput = ProfileDraftInput & {
 export type AdvertDraft = AdvertDraftInput & {
   id: string;
   tenantId: string;
+  /** The tenant's live advert this draft edits; publishing archives it. */
+  sourceAdvertId?: string;
   status: AdvertDraftStatus;
   createdAt: string;
   updatedAt: string;

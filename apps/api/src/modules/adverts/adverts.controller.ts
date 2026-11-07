@@ -243,6 +243,16 @@ export class AdvertsController {
     return this.adverts.duplicateAdvert(tenantId, id, body, session.userId);
   }
 
+  @Post(':id/edit')
+  @RequireTenantPermission('MANAGE_LISTINGS')
+  editAdvert(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Param('id') id: string,
+  ) {
+    return this.adverts.editAdvert(tenantId, id, session.userId);
+  }
+
   @Post(':id/renew')
   @RequireTenantPermission('MANAGE_LISTINGS')
   renewAdvert(
