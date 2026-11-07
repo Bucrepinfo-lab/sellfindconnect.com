@@ -75,3 +75,6 @@ export function WebOnlyCheckout({ children, inApp = null }: { children: ReactNod
   if (context === 'app') return <>{inApp}</>;
   return null;
 }
+
+/** Web-only content: preview panels that are not offered inside the Android app. */
+export const WebOnly = WebOnlyCheckout;
