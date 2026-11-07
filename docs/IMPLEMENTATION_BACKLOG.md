@@ -667,3 +667,6 @@ Progress:
     `health-audit-guard` on `fix/health-audit-*` PRs). Follow-ups for the owner:
     a scheduled live health audit against `/v1/health`, and a review of the
     `*/15` scheduled-jobs cron cost (rule 12).
+17. Android app (TWA) hides subscription price and checkout, and the API
+    refuses non-Play checkout from the app — **done 07/11/26** (Play payments
+    policy). Next Android build: set the TWA start URL to `/?source=twa`.

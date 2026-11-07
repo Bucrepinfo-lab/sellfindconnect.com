@@ -3,6 +3,7 @@ import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { SELL_QUICK_STARTS, FIND_QUICK_INDUSTRIES, safeInternalRedirect } from "@telpen/domain";
 import type { OnboardingIntent } from "@telpen/domain";
+import { WebOnlyCheckout } from "../../lib/app-context";
 import { publicApiBaseUrl } from "../../lib/public-api";
 
 type Step = "INTENT"|"SELL_ROLE"|"FIND_INDUSTRY"|"LAUNCHING";
@@ -84,7 +85,9 @@ export default function OnboardingPage() {
               <span className="ob__card-cta">Start searching →</span>
             </button>
           </div>
-          <p className="ob__reassure">Free for 30 days · No card required · Cancel anytime</p>
+          <WebOnlyCheckout>
+            <p className="ob__reassure">Free for 30 days · No card required · Cancel anytime</p>
+          </WebOnlyCheckout>
           <p className="ob__legal">
             By continuing you accept the{' '}
             <a href="/terms">Terms</a>,{' '}

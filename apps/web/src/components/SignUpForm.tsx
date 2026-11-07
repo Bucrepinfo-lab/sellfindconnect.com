@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { countries, industryCategories, supplyChainRoles } from '@telpen/domain';
 
+import { WebOnlyCheckout } from '../lib/app-context';
+
 type RegisterPayload = {
   session: {
     token?: string;
@@ -118,7 +120,9 @@ export function SignUpForm({
       <div className="panel-heading tight">
         <h2>Create your business account</h2>
       </div>
-      <p className="form-note">The first month is free. No card needed.</p>
+      <WebOnlyCheckout>
+        <p className="form-note">The first month is free. No card needed.</p>
+      </WebOnlyCheckout>
       <label className="field compact-field">
         <span>Business name</span>
         <input

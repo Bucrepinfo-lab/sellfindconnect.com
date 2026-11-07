@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 
+import { AndroidAppCheckoutGuard } from '../../common/android-app-checkout.guard';
 import { TenantAuthSession, TenantId } from '../tenant/tenant-context.decorator';
 import { TenantSessionGuard, type TenantSessionDecision } from '../tenant/tenant-session.guard';
 import {
@@ -286,6 +287,7 @@ export class FinanceController {
   }
 
   @Post('payment-invoices/pay')
+  @UseGuards(AndroidAppCheckoutGuard)
   payInvoice(
     @TenantId() tenantId: string,
     @TenantAuthSession() session: TenantSessionDecision,

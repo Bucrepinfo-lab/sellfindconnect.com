@@ -366,3 +366,14 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   Server-side Play purchase-token verification (`PAYMENT_PROVIDER=play`) is
   opt-in and off by default. The PR's placeholder icons, `deploy/twa` and
   Play listing pack were dropped as superseded by #64/#65.
+- 2026-11-07: Hid every subscription price / checkout / payment entry point
+  inside the Google Play Android app (TWA). Detection lives in
+  `packages/domain/src/android-app-context.ts`: launch referrer
+  `android-app://com.sellfindconnect.app`, a `?source=twa` start flag, a
+  per-tab sessionStorage flag (never a cookie: a TWA shares Chrome's cookie
+  jar), and Android + `display-mode: standalone` as a fail-safe hint. The web
+  hides those blocks while the context is unknown, so they never flash in the
+  app. Inside the app API calls carry `x-sfc-client: android-twa`, and
+  `AndroidAppCheckoutGuard` refuses `POST /v1/payments/checkout` and any
+  non-`WALLET` (non-Play Billing) `POST /v1/finance/payment-invoices/pay` with
+  403. Web and browser users keep checkout.
