@@ -23,6 +23,7 @@ import {
   mediaPolicy,
   presentTenantMediaAsset,
   presentTenantMediaAssets,
+  roleHasPermission,
   ConversationRealtimeError,
   pilotSourceFinderRecords,
   recordConversationTyping,
@@ -98,6 +99,9 @@ export class ConversationsService {
     await this.requireCurrentTerms(tenantId, input.acceptedTerms, actorUserId);
     this.assertSafe(input, 'Conversation contains blocked content.');
     await this.requireUnblockedSource(tenantId, input.sourceRecordId);
+    if (input.assigneeUserId) {
+      await this.requireTenantAssignee(tenantId, input.assigneeUserId);
+    }
 
     const source = this.getSourceResult(input.sourceRecordId, input.query);
     const intelligence = buildLeadConversionIntelligence(source);
@@ -604,6 +608,7 @@ export class ConversationsService {
 
     const conversation = await this.requireConversation(tenantId, conversationId);
     await this.requireUnblockedSource(tenantId, conversation.sourceRecordId);
+    await this.requireTenantAssignee(tenantId, input.assigneeUserId);
     const now = new Date().toISOString();
     const updated: ConversationRecord = {
       ...conversation,
@@ -627,6 +632,23 @@ export class ConversationsService {
       updated,
       await this.repository.listMessages(tenantId, conversationId),
     );
+  }
+
+  /**
+   * Conversations are only ever assigned to a member of the same tenant whose
+   * role can chat with leads (least privilege, enforced on the server).
+   */
+  private async requireTenantAssignee(tenantId: string, assigneeUserId: string): Promise<void> {
+    if (!this.auth) {
+      return;
+    }
+    const membership = await this.auth.findTenantMembership(tenantId, assigneeUserId.trim());
+    if (!membership) {
+      throw new UnprocessableEntityException('You can only assign conversations to people in your business.');
+    }
+    if (!roleHasPermission(membership.role, 'CHAT_WITH_LEADS')) {
+      throw new UnprocessableEntityException('That person’s role cannot handle conversations.');
+    }
   }
 
   async updateStatus(tenantId: string, conversationId: string, input: UpdateConversationStatusDto) {

@@ -1174,6 +1174,20 @@ export class AuthService {
     };
   }
 
+  /**
+   * The user's membership in this tenant, or undefined when they are not a
+   * member. Used to refuse assigning tenant work to someone outside the tenant.
+   */
+  async findTenantMembership(
+    tenantId: string,
+    userId: string,
+  ): Promise<{ userId: string; tenantId: string; role: TenantMembershipRecord['role'] } | undefined> {
+    const membership = await this.repository.findMembershipForUserAndTenant(userId, tenantId);
+    return membership
+      ? { userId: membership.userId, tenantId: membership.tenantId, role: membership.role }
+      : undefined;
+  }
+
   async checkTenantSession(input: CheckTenantSessionDto) {
     const session = await this.requireSession(input.sessionToken);
     const allowed = session.tenantId === input.tenantId;
