@@ -147,7 +147,8 @@ import {
 import { publicApiBaseUrl, readTenantSession, tenantSessionHeaders } from '../lib/public-api';
 import { clearSession, isStaffRole, saveSession, useStoredSession } from '../lib/use-session';
 import { SignUpForm } from './SignUpForm';
-import { WebOnlyCheckout } from '../lib/app-context';
+import { WebOnly, WebOnlyCheckout, useClientAppContext } from '../lib/app-context';
+import { BusinessManager } from './BusinessManager';
 import { useHomeWorkspaceLanding } from '../lib/use-home-workspace-landing';
 
 const tenantId = '11111111-1111-4111-8111-111111111111';
@@ -401,6 +402,10 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
   const showMember = area === 'member' && signedIn;
   const showAdmin = area === 'admin' && signedIn && isStaff;
   const needsSignIn = area !== 'public' && !signedIn;
+  // Inside the Android app a signed-in business sees only the real business tools
+  // (BusinessManager); the preview panels below are web-only.
+  const appContext = useClientAppContext();
+  const hideDemoInApp = showMember && appContext !== 'web';
   const landing = useHomeWorkspaceLanding();
   const [authModeChoice, setAuthMode] = useState<'sign-in' | 'sign-up' | null>(null);
   const signupRequested = useSyncExternalStore(
@@ -616,13 +621,6 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
   const queryExpansion = expandDiscoveryQuery(query);
   const canPublish =
     safetyDecision.allowed && termsAccepted && !liveTermsGate?.requiresReacceptance;
-  const publishBlockReason = !safetyDecision.allowed
-    ? 'Publishing is disabled because the draft contains prohibited content'
-    : liveTermsGate?.requiresReacceptance
-      ? 'Publishing is disabled until current policy versions are re-accepted'
-      : !termsAccepted
-        ? 'Publishing is disabled until the advertiser accepts the terms'
-        : 'Publish draft';
 
   const graphRecords = attachApprovedRelationshipClaims(
     pilotSourceFinderRecords,
@@ -1666,14 +1664,19 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
           ) : null}
           {area === 'member' ? (
             <>
-              <a className="nav-item active" href="#source-finder">
+              <Link className="nav-item" href="/">
                 <Search size={18} />
                 <span>Find businesses</span>
+              </Link>
+              <a className="nav-item active" href="#business">
+                <Building2 size={18} />
+                <span>Business profile</span>
               </a>
-              <a className="nav-item" href="#advertiser-setup">
+              <a className="nav-item" href="#adverts">
                 <Send size={18} />
                 <span>My adverts</span>
               </a>
+              <WebOnly>
               <a className="nav-item" href="#leads">
                 <Inbox size={18} />
                 <span>Leads</span>
@@ -1686,6 +1689,7 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
                 <Link2 size={18} />
                 <span>Connections</span>
               </a>
+              </WebOnly>
               <Link className="nav-item" href="/account/privacy-settings">
                 <UserCheck size={18} />
                 <span>Account</span>
@@ -1801,16 +1805,9 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
               <span>Tenant {tenantId.slice(0, 8)}</span>
             </div>
           </div>
-          <div className="top-actions">
-            <button className="icon-button" title="Notifications">
-              <Bell size={18} />
-            </button>
-            <button className="primary-button" disabled={!canPublish} title={publishBlockReason}>
-              <Send size={16} />
-              Publish Draft
-            </button>
-          </div>
         </header>
+
+        <BusinessManager />
 
         {onboardingLanding ? (
           <div className="onboarding-landing-banner" role="status">
@@ -1820,7 +1817,7 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
           </div>
         ) : null}
 
-        <section className="metric-grid" aria-label="Performance metrics">
+        <section className={hideDemoInApp ? 'metric-grid app-hidden' : 'metric-grid'} aria-label="Performance metrics">
           <Metric label="Views" value={formatNumber(totals.views)} icon={<Eye size={18} />} />
           <Metric
             label="Clicks"
@@ -1847,7 +1844,12 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
           </>
         ) : null}
 
-        <section className={area === 'admin' ? 'work-grid area-admin' : area === 'public' ? 'work-grid area-public' : 'work-grid'}>
+        <section
+          className={
+            (area === 'admin' ? 'work-grid area-admin' : area === 'public' ? 'work-grid area-public' : 'work-grid') +
+            (hideDemoInApp ? ' app-hidden' : '')
+          }
+        >
           {showPublic || showMember ? (
           <div
             className={
@@ -2206,8 +2208,8 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
                     New here?{' '}
                     <button className="text-link" type="button" onClick={() => setAuthMode('sign-up')}>
                       Create a business account
-                    </button>{' '}
-                    — the first month is free.
+                    </button>
+                    <WebOnlyCheckout> — the first month is free.</WebOnlyCheckout>
                   </p>
                 ) : null}
               </section>

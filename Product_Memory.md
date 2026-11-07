@@ -406,3 +406,11 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   Requesting account deletion now takes the business's adverts out of search
   straight away (as the deletion page promises), and only the account owner
   (`MANAGE_ACCESS`) can request or cancel deletion of the business account.
+- 2026-11-07: Real business path in the web/PWA. The dashboard leads with
+  `BusinessManager` (create/edit/publish the business profile with contacts,
+  service area and logo; create, publish, edit, unpublish, republish and
+  delete adverts; terms re-accept on a stale gate). The home page searches
+  real published adverts (`GET /v1/public/adverts/search`) and "Open" goes to
+  `/listing/[id]` (contact by call/WhatsApp/email/website, report, block).
+  Inside the Android app the preview/demo panels and their no-op buttons are
+  hidden; the dead "Publish Draft" and notifications buttons are gone.
