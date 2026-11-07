@@ -7,6 +7,8 @@ import {
   countries,
   evaluateSafetyFields,
   industryCategories,
+  isSameAdvertText,
+  uniqueAdvertDrafts,
   supplyChainRoles,
   type AdvertDraft,
   type AdvertPost,
@@ -53,6 +55,30 @@ type AdvertForm = { id?: string; title: string; description: string; replacesAdv
 type Notice = { tone: 'ok' | 'warn' | 'error'; text: string; terms?: boolean } | null;
 
 const EDITABLE_PROFILE = new Set(['DRAFT', 'PENDING_REVIEW', 'REJECTED']);
+
+/** Per-device memory of which live advert an open edit draft replaces (draft id → advert id). */
+const REPLACES_KEY = 'sfc:advert-edit-replaces';
+
+function readReplaces(): Record<string, string> {
+  try {
+    const raw = window.localStorage.getItem(REPLACES_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function rememberReplaces(draftId: string, advertId: string | undefined) {
+  try {
+    const next = readReplaces();
+    if (advertId) next[draftId] = advertId;
+    else delete next[draftId];
+    window.localStorage.setItem(REPLACES_KEY, JSON.stringify(next));
+  } catch {
+    // Storage can be blocked (private mode); the edit still works this session.
+  }
+}
 
 const emptyProfile: ProfileForm = {
   displayName: '',
@@ -164,7 +190,7 @@ async function fetchBusiness(): Promise<BusinessData> {
     live,
     editable,
     draftMedia,
-    advertDrafts: aDrafts.filter((draft) => draft.status === 'DRAFT'),
+    advertDrafts: uniqueAdvertDrafts(aDrafts.filter((draft) => draft.status === 'DRAFT')),
     adverts: aLive,
   };
 }
@@ -341,21 +367,34 @@ export function BusinessManager() {
       if (!advertForm) return;
       const saved = await saveAdvertDraft(advertForm);
       setAdvertForm({ ...advertForm, id: saved.id });
-      await apiRequest(`/adverts/drafts/${saved.id}/publish`, { method: 'POST', body: { acceptedTerms: true } });
-      if (advertForm.replacesAdvertId) {
-        await apiRequest(`/adverts/${advertForm.replacesAdvertId}/archive`, { method: 'POST' });
-      }
+      // The server archives the replaced advert in the same call (and refuses one
+      // that is not ours), so an edit never leaves the listing showing twice.
+      await apiRequest(`/adverts/drafts/${saved.id}/publish`, {
+        method: 'POST',
+        body: {
+          acceptedTerms: true,
+          ...(advertForm.replacesAdvertId ? { replacesAdvertId: advertForm.replacesAdvertId } : {}),
+        },
+      });
+      rememberReplaces(saved.id, undefined);
       setAdvertForm(null);
       return 'Your advert is live. Buyers can now find it in search.';
     });
 
   const editLiveAdvert = (advert: LiveAdvert) =>
     run('edit-advert', async () => {
-      const copy = await apiRequest<AdvertDraft>(`/adverts/${advert.id}/duplicate`, { method: 'POST', body: {} });
-      const restored = await apiRequest<AdvertDraft>(`/adverts/drafts/${copy.id}`, {
-        method: 'PATCH',
-        body: { title: advert.title },
-      });
+      // Reuse an open copy of this advert instead of making another identical draft.
+      const replaces = readReplaces();
+      const open = advertDrafts.find((draft) => replaces[draft.id] === advert.id || isSameAdvertText(draft, advert));
+      let restored = open;
+      if (!restored) {
+        const copy = await apiRequest<AdvertDraft>(`/adverts/${advert.id}/duplicate`, { method: 'POST', body: {} });
+        restored = await apiRequest<AdvertDraft>(`/adverts/drafts/${copy.id}`, {
+          method: 'PATCH',
+          body: { title: advert.title },
+        });
+      }
+      rememberReplaces(restored.id, advert.id);
       setAdvertForm({
         id: restored.id,
         title: restored.title,
@@ -364,6 +403,17 @@ export function BusinessManager() {
       });
       return 'Make your changes, then publish to replace the live advert.';
     });
+
+  const continueDraft = (draft: AdvertDraft) => {
+    const replacesAdvertId = readReplaces()[draft.id];
+    const stillLive = replacesAdvertId && adverts.some((advert) => advert.id === replacesAdvertId);
+    setAdvertForm({
+      id: draft.id,
+      title: draft.title,
+      description: draft.description,
+      ...(stillLive ? { replacesAdvertId } : {}),
+    });
+  };
 
   const pauseAdvert = (advert: LiveAdvert) =>
     run('pause', async () => {
@@ -659,7 +709,7 @@ export function BusinessManager() {
                     <button
                       className="secondary-button"
                       type="button"
-                      onClick={() => setAdvertForm({ id: draft.id, title: draft.title, description: draft.description })}
+                      onClick={() => continueDraft(draft)}
                     >
                       Continue editing
                     </button>
