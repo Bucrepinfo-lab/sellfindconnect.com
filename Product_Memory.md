@@ -390,3 +390,10 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   a MEDIUM review case in the moderator queue. Approving (RESTORED/DISMISSED)
   publishes the file as PASSED; other resolutions keep it hidden. No paid
   provider added.
+- 2026-11-07: Play reviewer sweep. Home sidebar now links Privacy and Delete
+  account without sign-in; the hero's "free for the first month" line is
+  hidden in the Android app; Report/Block explain why they are disabled when
+  signed out and confirm (or show the API error) after sending instead of
+  failing silently; `/account/delete` follows the shared session store, drops
+  to the signed-out steps on a 401, explains an already-scheduled deletion,
+  and shows dates as dd/mm/yy (also on Data and privacy).
