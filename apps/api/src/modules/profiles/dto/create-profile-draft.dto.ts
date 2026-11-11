@@ -65,6 +65,30 @@ export class ProfileServiceAreaDto {
   @IsString({ each: true })
   @Length(2, 2, { each: true })
   declare operatingCountries?: string[];
+
+  @ApiPropertyOptional({ example: 'Mombasa' })
+  @IsOptional()
+  @IsString()
+  @Length(2, 80)
+  declare county?: string;
+
+  @ApiPropertyOptional({ example: 'Nyali' })
+  @IsOptional()
+  @IsString()
+  @Length(2, 80)
+  declare constituency?: string;
+
+  @ApiPropertyOptional({ example: 'Kongowea' })
+  @IsOptional()
+  @IsString()
+  @Length(2, 80)
+  declare ward?: string;
+
+  @ApiPropertyOptional({ example: 'Kongowea Market' })
+  @IsOptional()
+  @IsString()
+  @Length(2, 120)
+  declare landmark?: string;
 }
 
 export class CreateProfileDraftDto {

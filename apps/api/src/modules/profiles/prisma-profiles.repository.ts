@@ -467,6 +467,10 @@ export class PrismaProfilesRepository implements ProfilesRepository {
       remoteAvailable:
         typeof value.remoteAvailable === 'boolean' ? value.remoteAvailable : undefined,
       operatingCountries: this.mapStringArray(value.operatingCountries),
+      county: typeof value.county === 'string' ? value.county : undefined,
+      constituency: typeof value.constituency === 'string' ? value.constituency : undefined,
+      ward: typeof value.ward === 'string' ? value.ward : undefined,
+      landmark: typeof value.landmark === 'string' ? value.landmark : undefined,
     };
   }
 

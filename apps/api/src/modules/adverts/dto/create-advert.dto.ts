@@ -236,6 +236,24 @@ export class PublicAdvertSearchDto {
   @IsIn(supplyChainRoles)
   declare role?: (typeof supplyChainRoles)[number];
 
+  @ApiPropertyOptional({ example: 'Mombasa', description: 'Kenya county (official name).' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  declare county?: string;
+
+  @ApiPropertyOptional({ example: 'Nyali' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  declare constituency?: string;
+
+  @ApiPropertyOptional({ example: 'Kongowea' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  declare ward?: string;
+
   @ApiPropertyOptional({ example: 20, minimum: 1, maximum: 100 })
   @IsOptional()
   @Type(() => Number)

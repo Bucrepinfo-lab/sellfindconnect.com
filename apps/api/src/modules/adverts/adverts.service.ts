@@ -16,14 +16,17 @@ import {
   inferDesiredDiscoveryRoles,
   industryCategories,
   mediaPolicy,
+  normalizeKenyaPlace,
   presentTenantMediaAsset,
   presentTenantMediaAssets,
   scoreDiscoveryVector,
+  textMentionsKenyaPlace,
   type AnalyticsEvent,
   type AnalyticsEventType,
   type AdvertDraft,
   type AdvertPost,
   type DiscoveryRelationshipSignal,
+  type KenyaPlaceSelection,
   type MediaAsset,
   type PresentedMediaAsset,
 } from '@telpen/domain';
@@ -80,7 +83,16 @@ type AdvertPostWithMedia = AdvertPost & {
   daysLive: number;
   daysRemaining: number;
 };
+/** Where the advertising business is, from its live profile (public, no contact details). */
+type PublicAdvertLocation = {
+  county?: string;
+  constituency?: string;
+  ward?: string;
+  landmark?: string;
+};
+
 type PublicAdvertSearchResult = AdvertPostWithMedia & {
+  location?: PublicAdvertLocation;
   rankScore: number;
   rankReasons: string[];
   boosted: boolean;
@@ -636,7 +648,10 @@ export class AdvertsService {
 
   async searchPublicAdverts(input: PublicAdvertSearchDto = {}): Promise<{
     query?: string;
-    filters: Pick<PublicAdvertSearchDto, 'countryCode' | 'industryCode' | 'role'>;
+    filters: Pick<
+      PublicAdvertSearchDto,
+      'countryCode' | 'industryCode' | 'role' | 'county' | 'constituency' | 'ward'
+    >;
     results: PublicAdvertSearchResult[];
   }> {
     this.assertValidPublicSearch(input);
@@ -656,6 +671,14 @@ export class AdvertsService {
     const ranked = await Promise.all(
       candidates.map(async (entry) => this.rankPublicAdvert(entry, query, terms, now)),
     );
+    const place = normalizeKenyaPlace({
+      county: input.county,
+      constituency: input.constituency,
+      ward: input.ward,
+    });
+    const located = await this.withLocations(
+      ranked.filter((result): result is PublicAdvertSearchResult => Boolean(result)),
+    );
 
     return {
       query,
@@ -663,9 +686,10 @@ export class AdvertsService {
         countryCode: input.countryCode,
         industryCode: input.industryCode,
         role: input.role,
+        ...place,
       },
-      results: ranked
-        .filter((result): result is PublicAdvertSearchResult => Boolean(result))
+      results: located
+        .filter((result) => this.isInPlace(result, place))
         .filter(
           (result) =>
             !terms.length ||
@@ -705,7 +729,8 @@ export class AdvertsService {
     if (!result) {
       throw new NotFoundException('Advert not found.');
     }
-    return result;
+    const [located] = await this.withLocations([result]);
+    return located ?? result;
   }
 
   async createSavedSearch(
@@ -1303,6 +1328,60 @@ export class AdvertsService {
       scheduledFor: now,
       createdAt: now,
     };
+  }
+
+  /** Attach each business's public location (one profile lookup per business). */
+  private async withLocations(
+    results: PublicAdvertSearchResult[],
+  ): Promise<PublicAdvertSearchResult[]> {
+    const profiles = this.profiles;
+    if (!profiles || results.length === 0) return results;
+    const places = new Map<string, Promise<PublicAdvertLocation | undefined>>();
+    const lookup = (tenantId: string) => {
+      let pending = places.get(tenantId);
+      if (!pending) {
+        pending = profiles
+          .getLivePlace(tenantId)
+          .then((area) => {
+            if (!area) return undefined;
+            const location: PublicAdvertLocation = {
+              ...(area.county ? { county: area.county } : {}),
+              ...(area.constituency ? { constituency: area.constituency } : {}),
+              ...(area.ward ? { ward: area.ward } : {}),
+              ...(area.landmark ? { landmark: area.landmark } : {}),
+            };
+            return Object.keys(location).length ? location : undefined;
+          })
+          .catch(() => undefined);
+        places.set(tenantId, pending);
+      }
+      return pending;
+    };
+    return Promise.all(
+      results.map(async (result) => {
+        const location = await lookup(result.tenantId);
+        return location ? { ...result, location } : result;
+      }),
+    );
+  }
+
+  /**
+   * Area filter. A business that set its county is matched on it exactly
+   * (and on constituency and ward when asked). A business that has not set
+   * one yet still appears when its advert text names the place.
+   */
+  private isInPlace(result: PublicAdvertSearchResult, place: KenyaPlaceSelection): boolean {
+    if (!place.county) return true;
+    const location = result.location;
+    if (location?.county) {
+      const same = (left?: string, right?: string) =>
+        (left ?? '').trim().toLowerCase() === (right ?? '').trim().toLowerCase();
+      if (!same(location.county, place.county)) return false;
+      if (place.constituency && !same(location.constituency, place.constituency)) return false;
+      if (place.ward && !same(location.ward, place.ward)) return false;
+      return true;
+    }
+    return textMentionsKenyaPlace(`${result.title} ${result.displayName} ${result.description}`, place);
   }
 
   /**

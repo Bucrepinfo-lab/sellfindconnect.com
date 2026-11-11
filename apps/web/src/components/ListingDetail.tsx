@@ -3,14 +3,16 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
-import { ugcReportReasons } from '@telpen/domain';
+import { ugcReportReasons, kenyaPlaceLabel } from '@telpen/domain';
 
 import { ApiError, apiRequest, isTermsError } from '../lib/api-client';
 import { formatDmy } from '../lib/dates';
 import { codeLabel, industryLabel } from '../lib/labels';
 import { useStoredSession } from '../lib/use-session';
 import type { PublicAdvert } from './LiveSearch';
+import { ShareBar } from './ShareBar';
 import '../styles/business.css';
+import '../styles/home.css';
 
 type Load = { status: 'loading' } | { status: 'missing' } | { status: 'error'; message: string } | { status: 'ok'; advert: PublicAdvert };
 
@@ -156,6 +158,11 @@ function ListingBody(props: {
         <p className="biz-sub">
           {advert.displayName} · {industryLabel(advert.industryCode)} · listed {formatDmy(advert.publishedAt)}
         </p>
+        {advert.location?.county ? (
+          <p className="result-card__place" style={{ margin: '0 0 12px' }}>
+            {[advert.location.landmark, kenyaPlaceLabel(advert.location)].filter(Boolean).join(' · ')}
+          </p>
+        ) : null}
         {images.length ? (
           <div className="biz-media">
             {images.map((item) => (
@@ -193,6 +200,13 @@ function ListingBody(props: {
         ) : (
           <p className="biz-sub">This business has not added contact details yet.</p>
         )}
+        <div style={{ marginTop: 12 }}>
+          <ShareBar
+            label="Share this listing"
+            title={advert.title}
+            text={`${advert.title} by ${advert.displayName} on SellFindConnect:`}
+          />
+        </div>
       </article>
 
       <section className="biz-card" style={{ marginTop: 16 }} aria-label="Report or block">

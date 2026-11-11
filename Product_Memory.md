@@ -471,3 +471,36 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   call (or just goes live if the original was already removed). Drafts made
   before the column keep the device-local fallback and the explicit
   `replacesAdvertId` on publish.
+- 2026-11-11: Owner request (11/11/26): research competitors' user complaints
+  and restructure the public home around them. Findings and plan are in
+  `docs/MVP_RESTRUCTURE_RESEARCH.md`. Shipped: Kenya places (47 counties, 290
+  constituencies, 1,450 wards, Legal Notice 14 of 2012) and a starter list of
+  well-known markets, malls and chains in `@telpen/domain`; listing badges
+  (Featured, New, photos, days-left) and sorts (Best match, Newest, Ending
+  soon); a new public home (logo mark, search hero with county, role and
+  industry chips, collapsed "More filters" with constituency and ward, result
+  cards, markets, "Why", "How it works", seller band, share and copy link on
+  home and listings). The area filter matches place names in listing text
+  until listings carry a structured location. Home copy states only what the
+  product does; the onboarding "thousands of verified suppliers" line is
+  removed. Not done, awaiting owner approval: structured location (database),
+  ratings and reviews (database, policy), public view counts, GPS, new app
+  icons.
+- 2026-11-11: Owner asked (11/11/26) for a logo that describes the slogan and
+  works for a global market, not a Kenyan niche, and does not look like a
+  snake. New mark: a price tag (Sell it) seen through a magnifying glass (Find
+  it), whose handle joins a second point (Connect). Green #1d4f45, gold
+  #e0b040, white. Replaces the S-curve mark. Master art and the Play listing
+  icon are in `docs/brand/`; web/PWA icons regenerated in
+  `apps/web/public/icons/`. The Play app icon changes only with the next .aab.
+- 2026-11-11: Owner (11/11/26) asked to fix two caveats of the home
+  restructure. (1) Area search is now exact: a business sets county,
+  constituency, ward and nearest landmark on its profile ("Where buyers find
+  you"), stored in the existing `serviceArea` JSON (no migration). Kenyan
+  places are saved with official spellings; an unknown county is refused.
+  `GET /v1/public/adverts/search` takes `county`, `constituency`, `ward`,
+  matches the set location exactly, and falls back to the advert text for
+  businesses that have not set one; results and the listing page carry
+  `location`. (2) The home pricing promise no longer commits to "no sales
+  calls" or "one flat price": it says searching is free, the monthly listing
+  fee is shown before paying, and extras are optional and priced upfront.

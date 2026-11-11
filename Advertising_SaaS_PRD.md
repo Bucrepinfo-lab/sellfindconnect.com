@@ -1755,6 +1755,15 @@ Exit criteria:
 
 - Measurable improvement in match acceptance, inquiry response, and qualified leads.
 
+### Public home restructure (11/11/26)
+
+The public home leads with search (what, county), then role and industry
+chips, result cards with real-data badges, well-known markets, the reasons to
+trust the service, how it works and a seller call to action with sharing.
+Area filters use Kenya's 47 counties, 290 constituencies and 1,450 wards.
+Research, the pains addressed and the follow-ups that need owner approval are
+in `docs/MVP_RESTRUCTURE_RESEARCH.md`.
+
 ## 14. Success Metrics
 
 North-star metric:
