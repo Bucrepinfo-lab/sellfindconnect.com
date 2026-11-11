@@ -1640,6 +1640,31 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
     );
   };
 
+  /** Hide a reported review, then close the report as resolved. */
+  const hideReportedReview = async (reportId: string, reviewId: string, reason: string) => {
+    const sessionToken = platformSessionToken.trim();
+    if (moderatorQueueStatus !== 'LIVE' || !sessionToken) {
+      return;
+    }
+    try {
+      const response = await fetch(
+        `${publicApiBaseUrl.replace(/\/$/, '')}/platform/reviews/${encodeURIComponent(reviewId)}/hide`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-session-token': sessionToken },
+          body: JSON.stringify({ reason: `Reported: ${codeLabel(reason)}` }),
+        },
+      );
+      if (!response.ok) {
+        setModeratorQueueError(await readApiError(response, 'Could not hide review'));
+        return;
+      }
+      await resolveModeratorReport(reportId, 'RESOLVED');
+    } catch (error) {
+      setModeratorQueueError(error instanceof Error ? error.message : 'Could not hide review');
+    }
+  };
+
   return (
     <main className="app-shell">
       <aside className="sidebar" aria-label={area === 'admin' ? 'Staff navigation' : area === 'member' ? 'Business navigation' : 'Site navigation'}>
@@ -2624,6 +2649,17 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
                       </div>
                       {item.open ? (
                         <div className="moderator-row-actions">
+                          {item.targetType === 'REVIEW' && moderatorQueueStatus === 'LIVE' ? (
+                            <button
+                              className="secondary-button"
+                              type="button"
+                              onClick={() => {
+                                void hideReportedReview(item.id, item.targetId, item.reason);
+                              }}
+                            >
+                              Hide review
+                            </button>
+                          ) : null}
                           {ugcReportResolutions.map((resolution) => (
                             <button
                               key={resolution}

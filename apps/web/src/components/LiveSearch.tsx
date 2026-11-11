@@ -1,6 +1,6 @@
 'use client';
 
-import { BadgeCheck, Clock, Eye, LocateFixed, MapPin, Search, Sparkles } from 'lucide-react';
+import { BadgeCheck, Clock, Eye, LocateFixed, MapPin, Search, Sparkles, Star } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
@@ -48,6 +48,8 @@ export type PublicAdvert = {
   matchedTerms?: string[];
   /** Anonymous public counts over the last 90 days. */
   stats?: { views: number; enquiries: number };
+  /** Visible review average and count for the business, when it has reviews. */
+  rating?: { average: number | null; count: number };
   /** Where the business is, from its profile (absent until it sets one). */
   location?: { county?: string; constituency?: string; ward?: string; landmark?: string };
   media?: Array<{ id: string; sourceUrl: string; cdnUrl?: string; thumbnailUrl?: string; altText?: string; kind?: string }>;
@@ -183,6 +185,13 @@ function ResultCard({ result, now }: { result: PublicAdvert; now: Date | undefin
             {result.displayName} · {codeLabel(result.role)}
           </span>
           <span className="result-card__meta">{industryLabel(result.industryCode)}</span>
+          {result.rating && result.rating.count > 0 && result.rating.average !== null ? (
+            <span className="result-card__rating" aria-label={`Rated ${result.rating.average.toFixed(1)} out of 5 from ${result.rating.count} reviews`}>
+              <Star size={13} aria-hidden="true" />
+              {result.rating.average.toFixed(1)}
+              <span className="result-card__rating-count">({result.rating.count})</span>
+            </span>
+          ) : null}
           {result.stats && (result.stats.views > 0 || result.stats.enquiries > 0) ? (
             <span className="result-card__stats">
               <Eye size={13} aria-hidden="true" />

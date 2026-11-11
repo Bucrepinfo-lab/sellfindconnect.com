@@ -1764,6 +1764,16 @@ Area filters use Kenya's 47 counties, 290 constituencies and 1,450 wards.
 Research, the pains addressed and the follow-ups that need owner approval are
 in `docs/MVP_RESTRUCTURE_RESEARCH.md`.
 
+### Ratings and reviews (11/11/26)
+
+Businesses rate other businesses they have dealt with: 1–5 stars and an
+optional comment, one review per reviewing business, editable or withdrawn by
+its writer. Writing needs a signed-in, MFA-verified session and current terms;
+comments pass the zero-tolerance safety check; a business cannot review
+itself. The public sees the average, count, breakdown and comments with no
+reviewer identity. Any signed-in user can report a review; moderators hide or
+restore it (never delete), and a hidden review stays hidden when edited.
+
 ## 14. Success Metrics
 
 North-star metric:

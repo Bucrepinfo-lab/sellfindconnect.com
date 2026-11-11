@@ -643,7 +643,9 @@ Progress:
 - [x] Kenya counties, constituencies, wards and landmark starter list in domain.
 - [x] New public home, result cards, badges, sorts, share.
 - [x] Structured location on the business profile (county, constituency, ward, landmark; `serviceArea` JSON, no migration); public search filters on it.
-- [ ] Ratings and reviews with moderation (owner approval: database, policy).
+- [x] Ratings and reviews with moderation (owner-approved 11/11/26): `BusinessReview`
+  table, one review per reviewing business, safety-checked comments, REVIEW
+  reports, moderator hide/restore, stars on search cards and the listing page.
 - [x] Public view and enquiry counts; "Most viewed" and "Most asked" sorts.
 - [x] "Use my location" county suggestion, worked out on the device.
 - [x] New mark, app icons and Play listing icon (`docs/brand/`); onboarding "why" points.

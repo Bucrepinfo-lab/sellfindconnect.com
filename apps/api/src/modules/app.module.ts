@@ -19,6 +19,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { PrivacyModule } from './privacy/privacy.module';
 import { ProfilesModule } from './profiles/profiles.module';
 import { RelationshipsModule } from './relationships/relationships.module';
+import { ReviewsModule } from './reviews/reviews.module';
 import { SafetyModule } from './safety/safety.module';
 import { SourceFinderModule } from './source-finder/source-finder.module';
 import { UgcModule } from './ugc/ugc.module';
@@ -44,6 +45,7 @@ import { UgcModule } from './ugc/ugc.module';
     FinanceModule,
     SourceFinderModule,
     UgcModule,
+    ReviewsModule,
     LeadsModule,
     ConversationsModule,
     NotificationsModule,
