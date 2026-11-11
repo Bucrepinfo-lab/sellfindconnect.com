@@ -1365,3 +1365,24 @@ a.nav-item:focus-visible,
 .sign-up-form .terms-actions {
   flex-wrap: wrap;
 }
+
+/* SellFindConnect's own icon set (components/SfcIcon.tsx) */
+.sfc-icon {
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.sfc-icon__accent {
+  stroke: var(--icon-accent, #c99a2e);
+}
+
+.sfc-icon__accent-fill {
+  fill: var(--icon-accent, #c99a2e);
+  stroke: none;
+}
+
+.home-hero,
+.chip.is-active,
+.ob {
+  --icon-accent: #e0b040;
+}

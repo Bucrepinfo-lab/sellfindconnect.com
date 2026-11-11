@@ -243,6 +243,9 @@
   font-size: 0.92rem;
   font-weight: 600;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .chip.is-active {
