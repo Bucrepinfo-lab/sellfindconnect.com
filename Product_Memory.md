@@ -515,3 +515,7 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   county headquarters coordinates (`nearestKenyaCounty`); nothing is sent.
   Onboarding shows three "why" points. Ratings and reviews follow in a
   separate PR (new table, moderation).
+- 2026-11-11: Owner decision (11/11/26): deploys are automatic. Deploy API
+  (Fly.io) runs when CI passes on a push to main, checking out the exact
+  commit CI tested; Deploy Web runs when Deploy API succeeds, on the same
+  commit. Both keep their health checks and can still be run by hand.

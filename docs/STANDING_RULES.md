@@ -45,6 +45,8 @@ pass. Fix the code, or escalate.
 - Name the exact screens a human should retest (and at 375 px phone width).
 - Update `Product_Memory.md` (plus the PRD and `docs/IMPLEMENTATION_BACKLOG.md`, per CLAUDE.md) in the same change.
 - The owner authorises merges and manual deploys unless a written rule delegates it.
+  Delegated 11/11/26 (owner): production deploys run automatically after CI
+  passes on main (Deploy API, then Deploy Web, each health-checked).
 
 ## 6. Money is human-authorised only
 Agents and automation prepare, propose and reconcile; they never move money,
