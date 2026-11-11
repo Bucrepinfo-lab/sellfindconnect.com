@@ -6,8 +6,12 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   countries,
   evaluateSafetyFields,
+  findKenyaConstituency,
+  findKenyaCounty,
   industryCategories,
   isSameAdvertText,
+  kenyaCounties,
+  kenyaLandmarksInCounty,
   uniqueAdvertDrafts,
   supplyChainRoles,
   type AdvertDraft,
@@ -48,6 +52,10 @@ type ProfileForm = {
   primaryCity: string;
   regions: string;
   remoteAvailable: boolean;
+  county: string;
+  constituency: string;
+  ward: string;
+  landmark: string;
 };
 
 type AdvertForm = {
@@ -105,6 +113,10 @@ const emptyProfile: ProfileForm = {
   primaryCity: '',
   regions: '',
   remoteAvailable: false,
+  county: '',
+  constituency: '',
+  ward: '',
+  landmark: '',
 };
 
 function profileToForm(source: ProfileDraft | PublishedProfile): ProfileForm {
@@ -122,6 +134,10 @@ function profileToForm(source: ProfileDraft | PublishedProfile): ProfileForm {
     primaryCity: source.serviceArea?.primaryCity ?? '',
     regions: (source.serviceArea?.regions ?? []).join(', '),
     remoteAvailable: Boolean(source.serviceArea?.remoteAvailable),
+    county: source.serviceArea?.county ?? '',
+    constituency: source.serviceArea?.constituency ?? '',
+    ward: source.serviceArea?.ward ?? '',
+    landmark: source.serviceArea?.landmark ?? '',
   };
 }
 
@@ -142,6 +158,10 @@ function profilePayload(form: ProfileForm) {
     ...(form.primaryCity.trim().length >= 2 ? { primaryCity: form.primaryCity.trim() } : {}),
     ...(regions.length ? { regions } : {}),
     ...(form.remoteAvailable ? { remoteAvailable: true } : {}),
+    ...(form.county ? { county: form.county } : {}),
+    ...(form.county && form.constituency ? { constituency: form.constituency } : {}),
+    ...(form.county && form.constituency && form.ward ? { ward: form.ward } : {}),
+    ...(form.landmark.trim().length >= 2 ? { landmark: form.landmark.trim().slice(0, 120) } : {}),
   };
   const optional: Record<string, string> = {
     phone: form.phone.trim(),
@@ -611,6 +631,72 @@ export function BusinessManager() {
               <label className="biz-field">
                 <span>Website</span>
                 <input value={profileForm.website} onChange={set('website')} inputMode="url" placeholder="example.co.ke" />
+              </label>
+            </div>
+            <h3>Where buyers find you</h3>
+            <p className="biz-sub">Buyers who search your county, constituency or ward will see your business.</p>
+            <div className="biz-grid two">
+              <label className="biz-field">
+                <span>County</span>
+                <select
+                  value={profileForm.county}
+                  onChange={(event) =>
+                    setProfileForm((current) => ({ ...current, county: event.target.value, constituency: '', ward: '' }))
+                  }
+                >
+                  <option value="">Choose your county</option>
+                  {kenyaCounties
+                    .slice()
+                    .sort((left, right) => left.name.localeCompare(right.name))
+                    .map((item) => (
+                      <option key={item.code} value={item.name}>
+                        {item.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label className="biz-field">
+                <span>Constituency</span>
+                <select
+                  value={profileForm.constituency}
+                  disabled={!profileForm.county}
+                  onChange={(event) =>
+                    setProfileForm((current) => ({ ...current, constituency: event.target.value, ward: '' }))
+                  }
+                >
+                  <option value="">{profileForm.county ? 'Choose your constituency' : 'Choose a county first'}</option>
+                  {(findKenyaCounty(profileForm.county)?.constituencies ?? []).map((item) => (
+                    <option key={item.name} value={item.name}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="biz-field">
+                <span>Ward</span>
+                <select value={profileForm.ward} disabled={!profileForm.constituency} onChange={set('ward')}>
+                  <option value="">{profileForm.constituency ? 'Choose your ward' : 'Choose a constituency first'}</option>
+                  {(findKenyaConstituency(profileForm.county, profileForm.constituency)?.wards ?? []).map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="biz-field">
+                <span>Nearest market, mall or landmark</span>
+                <input
+                  value={profileForm.landmark}
+                  onChange={set('landmark')}
+                  maxLength={120}
+                  list="landmark-options"
+                  placeholder="e.g. Kongowea Market"
+                />
+                <datalist id="landmark-options">
+                  {kenyaLandmarksInCounty(profileForm.county).map((item) => (
+                    <option key={item.name} value={item.name} />
+                  ))}
+                </datalist>
               </label>
             </div>
             <h3>Where you serve</h3>

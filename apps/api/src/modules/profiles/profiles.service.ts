@@ -10,15 +10,18 @@ import {
   evaluateMediaAssetInput,
   evaluateMediaUploadPreparationInput,
   evaluateSafetyFields,
+  evaluateSafetyText,
   getCountry,
   industryCategories,
   mediaPolicy,
+  normalizeKenyaPlace,
   presentTenantMediaAsset,
   presentTenantMediaAssets,
   type MediaAsset,
   type PresentedMediaAsset,
   type ProfileDraft,
   type ProfileReviewReason,
+  type ProfileServiceArea,
   type PublishedProfile,
   type TenantAccessRole,
 } from '@telpen/domain';
@@ -89,6 +92,7 @@ export class ProfilesService {
     const now = new Date().toISOString();
     const draft: ProfileDraft = {
       ...input,
+      serviceArea: this.withOfficialPlace(input.countryCode, input.serviceArea),
       id: randomUUID(),
       tenantId,
       status: 'DRAFT',
@@ -109,11 +113,15 @@ export class ProfilesService {
     const existing = await this.getDraft(tenantId, id);
     const now = new Date().toISOString();
     const reviewBaseline = await this.reviewBaseline(tenantId, existing);
-    const updatedCandidate: ProfileDraft = {
+    const merged: ProfileDraft = {
       ...existing,
       ...this.onlyDefined(input),
       updatedAt: now,
       status: 'DRAFT',
+    };
+    const updatedCandidate: ProfileDraft = {
+      ...merged,
+      serviceArea: this.withOfficialPlace(merged.countryCode, merged.serviceArea),
     };
 
     this.assertValidProfile(updatedCandidate);
@@ -312,6 +320,10 @@ export class ProfilesService {
           radiusKm: draft.serviceArea?.radiusKm ?? null,
           remoteAvailable: draft.serviceArea?.remoteAvailable ?? false,
           operatingCountries: draft.serviceArea?.operatingCountries ?? [draft.countryCode],
+          county: draft.serviceArea?.county ?? null,
+          constituency: draft.serviceArea?.constituency ?? null,
+          ward: draft.serviceArea?.ward ?? null,
+          landmark: draft.serviceArea?.landmark ?? null,
         },
       },
     };
@@ -638,6 +650,15 @@ export class ProfilesService {
     };
   }
 
+  /**
+   * Where a business says it is (county, constituency, ward, landmark), from
+   * its live profile. Used by public search; no media or contact details.
+   */
+  async getLivePlace(tenantId: string): Promise<ProfileServiceArea | undefined> {
+    const profile = await this.repository.findLiveProfile(tenantId);
+    return profile?.serviceArea;
+  }
+
   async listPublishedProfiles(tenantId: string): Promise<PublishedProfile[]> {
     const profiles = await this.repository.listPublishedProfiles(tenantId);
     return profiles
@@ -670,9 +691,44 @@ export class ProfilesService {
       draft.serviceArea?.radiusKm,
       draft.serviceArea?.remoteAvailable,
       draft.serviceArea?.operatingCountries?.length ? draft.serviceArea.operatingCountries : undefined,
+      draft.serviceArea?.county,
     ];
     const completed = fields.filter(Boolean).length;
     return Math.round((completed / fields.length) * 100);
+  }
+
+  /**
+   * Kenyan locations are stored with official spellings; a county that is not
+   * one of the 47 is refused, and a constituency or ward that is not inside
+   * the one above it is dropped. The landmark is free text, safety-checked.
+   */
+  private withOfficialPlace(
+    countryCode: string,
+    area: ProfileServiceArea | undefined,
+  ): ProfileServiceArea | undefined {
+    if (!area) return area;
+    const { county, constituency, ward, landmark, ...rest } = area;
+    const cleanLandmark = landmark?.trim() ? landmark.trim().slice(0, 120) : undefined;
+    if (cleanLandmark && !evaluateSafetyText(cleanLandmark).allowed) {
+      throw new UnprocessableEntityException('This landmark matches a zero-tolerance blocked category.');
+    }
+    if (!county?.trim()) {
+      return { ...rest, ...(cleanLandmark ? { landmark: cleanLandmark } : {}) };
+    }
+    if (countryCode.toUpperCase() !== 'KE') {
+      return {
+        ...rest,
+        county: county.trim(),
+        ...(constituency?.trim() ? { constituency: constituency.trim() } : {}),
+        ...(ward?.trim() ? { ward: ward.trim() } : {}),
+        ...(cleanLandmark ? { landmark: cleanLandmark } : {}),
+      };
+    }
+    const place = normalizeKenyaPlace({ county, constituency, ward });
+    if (!place.county) {
+      throw new UnprocessableEntityException('Choose your county from the list of Kenya\'s 47 counties.');
+    }
+    return { ...rest, ...place, ...(cleanLandmark ? { landmark: cleanLandmark } : {}) };
   }
 
   private async nextVersion(tenantId: string): Promise<number> {

@@ -28,8 +28,8 @@ const REASONS = [
   },
   {
     icon: ShieldCheck,
-    title: 'One flat price, no sales calls',
-    text: 'Listing costs the same small amount for every business, and searching is free. We do not phone you to sell upgrades.',
+    title: 'Clear prices, shown upfront',
+    text: 'Searching is always free. Listing your business has one monthly fee, shown before you pay. Any extra is optional and priced before you choose it.',
     webOnly: true,
   },
   {

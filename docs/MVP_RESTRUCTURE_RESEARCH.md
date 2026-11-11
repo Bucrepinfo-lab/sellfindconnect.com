@@ -21,10 +21,10 @@ find the pains to bridge, and restructure the home page and offer around them.
 | Pain users describe elsewhere | What SellFindConnect does | State |
 | --- | --- | --- |
 | Paying for leads that are fake or sold to many sellers | Buyers contact the business directly by call or WhatsApp; enquiries are never sold | Live; now said on the home page |
-| Upsell calls, changing packages, surprise charges | One flat price for every business; searching is free | Live; now said on the home page (web only, Play rules) |
+| Upsell calls, changing packages, surprise charges | Searching is free; one monthly listing fee shown before paying; any extra is optional and priced upfront | Live; now said on the home page (web only, Play rules) |
 | Anyone can pose as a seller | One-time code before publishing; photos checked before they show; Report and Block on every listing | Live; now said on the home page |
 | "Verified" badges that mean nothing | We only state what we actually check. The "thousands of verified suppliers" line in onboarding is removed | Fixed in this change |
-| Results from the wrong place | County, constituency and ward filters; well-known markets as shortcuts | This change (text match; see next steps) |
+| Results from the wrong place | Businesses set county, constituency, ward and nearest landmark on their profile; search filters on it exactly, falling back to the advert text for businesses that have not set it yet | This change |
 | Cluttered, tiring pages | Search first; six role chips; eight industry chips; everything else under "More filters"; policy note collapsed | This change |
 | Dead ends | Skeleton while loading; an empty state that offers "Clear all filters" and "List your business here" | This change |
 | No proof a seller delivers | Ratings and reviews from people who contacted the business | Next step: needs a database table and moderation, so owner approval |
@@ -54,8 +54,8 @@ find the pains to bridge, and restructure the home page and offer around them.
 
 ## Next steps (need the owner's yes: they touch protected areas)
 
-1. Structured location on profiles and adverts (county, constituency, ward,
-   landmark) so the area filter is exact. Database change.
+1. Done 11/11/26: structured location on the business profile (stored in the
+   existing `serviceArea` JSON, no migration).
 2. Ratings and reviews with moderation and report. Database and policy change.
 3. Public view and enquiry counts, then "Most viewed" and "Most asked" sorts.
    API change only.

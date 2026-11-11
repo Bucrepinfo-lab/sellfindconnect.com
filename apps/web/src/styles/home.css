@@ -693,3 +693,13 @@
 .home-footer {
   justify-content: center;
 }
+
+.result-card__place {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--green);
+  overflow-wrap: anywhere;
+}

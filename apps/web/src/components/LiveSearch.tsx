@@ -1,6 +1,6 @@
 'use client';
 
-import { BadgeCheck, Clock, Search, Sparkles } from 'lucide-react';
+import { BadgeCheck, Clock, MapPin, Search, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
@@ -18,7 +18,6 @@ import {
   normalizeKenyaPlace,
   sortListings,
   supplyChainRoles,
-  textMentionsKenyaPlace,
   type ListingBadge,
   type ListingSortMode,
 } from '@telpen/domain';
@@ -45,6 +44,8 @@ export type PublicAdvert = {
   expiresAt: string;
   boosted?: boolean;
   matchedTerms?: string[];
+  /** Where the business is, from its profile (absent until it sets one). */
+  location?: { county?: string; constituency?: string; ward?: string; landmark?: string };
   media?: Array<{ id: string; sourceUrl: string; cdnUrl?: string; thumbnailUrl?: string; altText?: string; kind?: string }>;
 };
 
@@ -79,12 +80,16 @@ async function runSearch(filters: SearchFilters): Promise<SearchState> {
   if (q && !evaluateSafetyText(q).allowed) {
     return { status: 'error', results: [], message: PROHIBITED };
   }
-  // Area is narrowed on this device (listings have no structured location yet),
-  // so ask for the widest page the API allows whenever an area is chosen.
-  const params = new URLSearchParams({ countryCode: 'KE', limit: filters.county ? '100' : '30' });
+  const params = new URLSearchParams({ countryCode: 'KE', limit: '30' });
   if (q) params.set('q', q.slice(0, 160));
   if (filters.industry) params.set('industryCode', filters.industry);
   if (filters.role) params.set('role', filters.role);
+  // The API matches a business's set location exactly, and falls back to the
+  // advert text for businesses that have not set one yet.
+  const place = normalizeKenyaPlace(filters);
+  if (place.county) params.set('county', place.county);
+  if (place.constituency) params.set('constituency', place.constituency);
+  if (place.ward) params.set('ward', place.ward);
   try {
     const payload = await apiRequest<{ results: PublicAdvert[] }>(`/public/adverts/search?${params.toString()}`, {
       auth: false,
@@ -139,6 +144,9 @@ function ResultCard({ result, now }: { result: PublicAdvert; now: Date | undefin
   const cover = images[0];
   const badges = listingBadges({ ...result, media: images }, now);
   const summary = result.description.length > 150 ? `${result.description.slice(0, 147)}…` : result.description;
+  const where = result.location?.county
+    ? [result.location.landmark, kenyaPlaceLabel(result.location)].filter(Boolean).join(' · ')
+    : '';
   return (
     <li className="result-card">
       <Link href={`/listing/${result.id}`} className="result-card__link" aria-label={`Open ${result.title}`}>
@@ -171,6 +179,12 @@ function ResultCard({ result, now }: { result: PublicAdvert; now: Date | undefin
             {result.displayName} · {codeLabel(result.role)}
           </span>
           <span className="result-card__meta">{industryLabel(result.industryCode)}</span>
+          {where ? (
+            <span className="result-card__place">
+              <MapPin size={13} aria-hidden="true" />
+              {where}
+            </span>
+          ) : null}
           <span className="result-card__summary">{summary}</span>
         </div>
       </Link>
@@ -226,10 +240,19 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
 
   const { q: initialQ, industry: initialIndustry, role: initialRole } = initial;
   const initialCounty = initialPlace.county ?? '';
+  const initialConstituency = initialPlace.constituency ?? '';
+  const initialWard = initialPlace.ward ?? '';
   useEffect(() => {
     // First search on load, using filters from the URL (onboarding or a shared link).
     let cancelled = false;
-    runSearch({ q: initialQ, industry: initialIndustry, role: initialRole, county: initialCounty }).then((next) => {
+    runSearch({
+      q: initialQ,
+      industry: initialIndustry,
+      role: initialRole,
+      county: initialCounty,
+      constituency: initialConstituency,
+      ward: initialWard,
+    }).then((next) => {
       if (cancelled) return;
       setNow(new Date());
       setState(next);
@@ -237,7 +260,7 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
     return () => {
       cancelled = true;
     };
-  }, [initialQ, initialIndustry, initialRole, initialCounty]);
+  }, [initialQ, initialIndustry, initialRole, initialCounty, initialConstituency, initialWard]);
 
   const signedIn = Boolean(session);
   useEffect(() => {
@@ -254,14 +277,9 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
     const allowed = state.results.filter(
       (result) => !blockedTenants.includes(result.tenantId) && !blockedTenants.includes(result.id),
     );
-    const inArea = place.county
-      ? allowed.filter((result) =>
-          textMentionsKenyaPlace(`${result.title} ${result.displayName} ${result.description}`, place),
-        )
-      : allowed;
-    const withPhotos = photosOnly ? inArea.filter((result) => (result.media?.length ?? 0) > 0) : inArea;
+    const withPhotos = photosOnly ? allowed.filter((result) => (result.media?.length ?? 0) > 0) : allowed;
     return sortListings(withPhotos, sort);
-  }, [state.results, blockedTenants, place, photosOnly, sort]);
+  }, [state.results, blockedTenants, photosOnly, sort]);
 
   const constituencies = findKenyaCounty(county)?.constituencies ?? [];
   const wards = findKenyaConstituency(county, constituency)?.wards ?? [];
@@ -425,7 +443,7 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
                 onChange={(event) => {
                   setConstituency(event.target.value);
                   setWard('');
-                  writeFiltersToUrl({ q: query, industry, role, county, constituency: event.target.value, ward: '', sort });
+                  void apply({ constituency: event.target.value, ward: '' });
                 }}
               >
                 <option value="">{county ? 'Whole county' : 'Pick a county first'}</option>
@@ -443,7 +461,7 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
                 disabled={!constituency}
                 onChange={(event) => {
                   setWard(event.target.value);
-                  writeFiltersToUrl({ q: query, industry, role, county, constituency, ward: event.target.value, sort });
+                  void apply({ ward: event.target.value });
                 }}
               >
                 <option value="">{constituency ? 'Whole constituency' : 'Pick a constituency first'}</option>
@@ -466,7 +484,7 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
             {state.status === 'loading'
               ? 'Searching…'
               : state.status === 'done'
-                ? `${visible.length} ${visible.length === 1 ? 'business' : 'businesses'}${place.county ? ` mentioning ${kenyaPlaceLabel(place)}` : ''}`
+                ? `${visible.length} ${visible.length === 1 ? 'business' : 'businesses'}${place.county ? ` in ${kenyaPlaceLabel(place)}` : ''}`
                 : ''}
           </p>
           <div className="sort-tabs" role="group" aria-label="Sort results">
@@ -495,7 +513,7 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
               <strong>No business matches yet.</strong>
               <p>
                 {place.county
-                  ? `No listing mentions ${kenyaPlaceLabel(place)} for this search. Try the whole county or all of Kenya.`
+                  ? `No business in ${kenyaPlaceLabel(place)} matches yet. Try the whole county or all of Kenya.`
                   : 'Try fewer words or a different industry.'}
               </p>
               <div className="biz-actions">

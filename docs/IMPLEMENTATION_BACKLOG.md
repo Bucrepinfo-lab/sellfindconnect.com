@@ -642,7 +642,7 @@ Progress:
 
 - [x] Kenya counties, constituencies, wards and landmark starter list in domain.
 - [x] New public home, result cards, badges, sorts, share.
-- [ ] Structured location on profiles and adverts (owner approval: database).
+- [x] Structured location on the business profile (county, constituency, ward, landmark; `serviceArea` JSON, no migration); public search filters on it.
 - [ ] Ratings and reviews with moderation (owner approval: database, policy).
 - [ ] Public view and enquiry counts; "Most viewed" and "Most asked" sorts.
 - [ ] "Use my location" county picker (Play Data safety update).

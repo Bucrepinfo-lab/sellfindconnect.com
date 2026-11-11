@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
-import { ugcReportReasons } from '@telpen/domain';
+import { ugcReportReasons, kenyaPlaceLabel } from '@telpen/domain';
 
 import { ApiError, apiRequest, isTermsError } from '../lib/api-client';
 import { formatDmy } from '../lib/dates';
@@ -158,6 +158,11 @@ function ListingBody(props: {
         <p className="biz-sub">
           {advert.displayName} · {industryLabel(advert.industryCode)} · listed {formatDmy(advert.publishedAt)}
         </p>
+        {advert.location?.county ? (
+          <p className="result-card__place" style={{ margin: '0 0 12px' }}>
+            {[advert.location.landmark, kenyaPlaceLabel(advert.location)].filter(Boolean).join(' · ')}
+          </p>
+        ) : null}
         {images.length ? (
           <div className="biz-media">
             {images.map((item) => (

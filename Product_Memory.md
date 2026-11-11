@@ -493,3 +493,14 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   #e0b040, white. Replaces the S-curve mark. Master art and the Play listing
   icon are in `docs/brand/`; web/PWA icons regenerated in
   `apps/web/public/icons/`. The Play app icon changes only with the next .aab.
+- 2026-11-11: Owner (11/11/26) asked to fix two caveats of the home
+  restructure. (1) Area search is now exact: a business sets county,
+  constituency, ward and nearest landmark on its profile ("Where buyers find
+  you"), stored in the existing `serviceArea` JSON (no migration). Kenyan
+  places are saved with official spellings; an unknown county is refused.
+  `GET /v1/public/adverts/search` takes `county`, `constituency`, `ward`,
+  matches the set location exactly, and falls back to the advert text for
+  businesses that have not set one; results and the listing page carry
+  `location`. (2) The home pricing promise no longer commits to "no sales
+  calls" or "one flat price": it says searching is free, the monthly listing
+  fee is shown before paying, and extras are optional and priced upfront.
