@@ -3,8 +3,8 @@ import {
   ADVERT_DRAFT_MODEL,
   advertDraftPrompt,
   parseAdvertDraft,
-  type AdvertDraft,
-  type AdvertDraftInput,
+  type AdvertCopy,
+  type AdvertCopyInput,
 } from '@telpen/domain';
 
 /**
@@ -17,11 +17,11 @@ import {
 
 export const ADVERT_DRAFTER = Symbol('ADVERT_DRAFTER');
 
-export type AdvertDrafterResult = AdvertDraft & { inputTokens: number; outputTokens: number };
+export type AdvertDrafterResult = AdvertCopy & { inputTokens: number; outputTokens: number };
 
 export interface AdvertDrafter {
   readonly provider: string;
-  draft(input: AdvertDraftInput): Promise<AdvertDrafterResult | undefined>;
+  draft(input: AdvertCopyInput): Promise<AdvertDrafterResult | undefined>;
 }
 
 type ConfigReader = { get(key: string): string | undefined };
@@ -71,7 +71,7 @@ export class AnthropicAdvertDrafter implements AdvertDrafter {
     private readonly fetchImpl: FetchLike = fetch,
   ) {}
 
-  async draft(input: AdvertDraftInput): Promise<AdvertDrafterResult | undefined> {
+  async draft(input: AdvertCopyInput): Promise<AdvertDrafterResult | undefined> {
     try {
       const response = await this.fetchImpl(ANTHROPIC_MESSAGES_URL, {
         method: 'POST',

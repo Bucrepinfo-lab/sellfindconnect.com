@@ -26,7 +26,7 @@ export const ADVERT_DRAFT_DESCRIPTION_MAX = 600;
 export const MONTHLY_AI_ADVERT_DRAFTS = 5;
 export const ADVERT_DRAFT_AUDIT_ACTION = 'ADVERT_DESCRIPTION_DRAFTED';
 
-export type AdvertDraftInput = {
+export type AdvertCopyInput = {
   /** What the advert is about, in the business's words (title so far). */
   title?: string;
   /** Free notes: products, prices, delivery, hours. */
@@ -37,7 +37,7 @@ export type AdvertDraftInput = {
   place?: string;
 };
 
-export type AdvertDraft = { title: string; description: string };
+export type AdvertCopy = { title: string; description: string };
 
 function clean(value: string | undefined, max: number): string {
   if (!value) return '';
@@ -47,7 +47,7 @@ function clean(value: string | undefined, max: number): string {
 }
 
 /** Plain, factual copy from the details given. Never adds claims. */
-export function templateAdvertDraft(input: AdvertDraftInput): AdvertDraft {
+export function templateAdvertDraft(input: AdvertCopyInput): AdvertCopy {
   const business = clean(input.businessName, 80) || 'Our business';
   const role = clean(input.roleLabel, 40).toLowerCase();
   const industry = clean(input.industryLabel, 80).toLowerCase();
@@ -65,7 +65,7 @@ export function templateAdvertDraft(input: AdvertDraftInput): AdvertDraft {
   return { title, description: clean(parts.join(' '), ADVERT_DRAFT_DESCRIPTION_MAX) };
 }
 
-export function advertDraftPrompt(input: AdvertDraftInput): string {
+export function advertDraftPrompt(input: AdvertCopyInput): string {
   return [
     'You write short, clear advert copy for a business directory in Kenya.',
     'Rules:',
@@ -97,7 +97,7 @@ const contactPattern = /(\+?\d[\d\s-]{7,}\d)|([\w.+-]+@[\w-]+\.[\w.]+)|(https?:\
  * capped, no contact details, and cleared by the zero-tolerance safety core.
  * Returns null on anything else so the caller uses the template.
  */
-export function parseAdvertDraft(text: string): AdvertDraft | null {
+export function parseAdvertDraft(text: string): AdvertCopy | null {
   if (!text) return null;
   let raw = text.trim();
   if (!raw.startsWith('{')) {

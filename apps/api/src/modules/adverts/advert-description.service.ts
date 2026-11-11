@@ -8,7 +8,7 @@ import {
   kenyaPlaceLabel,
   MONTHLY_AI_ADVERT_DRAFTS,
   templateAdvertDraft,
-  type AdvertDraftInput,
+  type AdvertCopyInput,
 } from '@telpen/domain';
 
 import { AuthService } from '../auth/auth.service';
@@ -61,7 +61,7 @@ export class AdvertDescriptionService {
     const profile = await this.profiles?.getLiveProfile(tenantId).catch(() => undefined);
     const industry = industryCategories.find((item) => item.code === profile?.industryCode);
     const area = profile?.serviceArea;
-    const input: AdvertDraftInput = {
+    const input: AdvertCopyInput = {
       title: body.title,
       notes: body.notes,
       businessName: profile?.displayName ?? 'Our business',
