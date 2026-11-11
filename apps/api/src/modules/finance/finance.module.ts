@@ -1,4 +1,4 @@
-﻿import { Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { requireDatabaseUrl, resolvePersistenceMode } from '../../persistence';

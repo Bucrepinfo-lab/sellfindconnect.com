@@ -1,4 +1,4 @@
-﻿export type OnboardingIntent = "SELL"|"FIND"|"BOTH";
+export type OnboardingIntent = "SELL"|"FIND"|"BOTH";
 export type OnboardingStep = "INTENT"|"PROFILE"|"ADVERT"|"SEARCH"|"COMPLETE";
 
 export const SELL_QUICK_STARTS = [
