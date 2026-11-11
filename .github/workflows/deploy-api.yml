@@ -9,10 +9,16 @@ name: Deploy API (Fly.io)
 # Required repo secret: FLY_API_TOKEN — a deploy token scoped to the API app:
 #   fly tokens create deploy -a sellfindconnect-api
 #
-# Manual only (Actions → Deploy API (Fly.io) → Run workflow); production
-# deploys stay a deliberate human action.
+# Automatic (owner decision 11/11/26): runs after CI passes on a push to
+# main, deploying exactly the commit CI tested. Also runnable by hand
+# (Actions → Deploy API (Fly.io) → Run workflow). Deploy Web follows once
+# this succeeds, so the site never calls API routes that are not live yet.
 
 on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -22,6 +28,11 @@ concurrency:
 jobs:
   deploy:
     name: Deploy sellfindconnect-api
+    # From CI only when it passed on a push to main (not a pull request).
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
     env:
       FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
@@ -33,6 +44,9 @@ jobs:
           exit 1
 
       - uses: actions/checkout@v4
+        with:
+          # The exact commit CI passed, not whatever main points to now.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - uses: superfly/flyctl-actions/setup-flyctl@master
 
