@@ -1,21 +1,24 @@
 /**
- * SellFindConnect mark: two businesses (the dots) joined by one S-shaped
- * route, with the maize dot marking the match that was found. Inline SVG so
- * it stays sharp at any size and costs no extra request.
+ * SellFindConnect mark. A price tag (Sell it) seen through a magnifying glass
+ * (Find it), whose handle joins a second point (Connect). Universal symbols,
+ * two colours, no text inside the mark, so it reads in any market and at
+ * browser-tab size. Inline SVG: sharp at any size, no extra request.
+ * Source file: docs/brand/sellfindconnect-mark.svg.
  */
 export function BrandMark({ size = 36 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 48 48" role="img" aria-label="SellFindConnect" focusable="false">
-      <rect width="48" height="48" rx="12" fill="#1d4f45" />
-      <path
-        d="M32 16c-1.9-2.8-4.8-4.3-8.4-4.3-4.9 0-8.2 2.6-8.2 6.4 0 3.9 3.1 5.3 7.9 6.2 4.7.9 8.1 2.4 8.1 6.4 0 3.8-3.4 6.6-8.5 6.6-3.7 0-6.7-1.4-8.7-4.1"
-        fill="none"
-        stroke="#ffffff"
-        strokeWidth="3.6"
-        strokeLinecap="round"
-      />
-      <circle cx="33.5" cy="14.5" r="4.4" fill="#e0b040" stroke="#1d4f45" strokeWidth="1.8" />
-      <circle cx="14" cy="34.5" r="3.2" fill="#ffffff" />
+    <svg width={size} height={size} viewBox="0 0 64 64" role="img" aria-label="SellFindConnect" focusable="false">
+      <rect width="64" height="64" rx="15" fill="#1d4f45"/>
+      <circle cx="27" cy="27" r="15.5" fill="#ffffff"/>
+      <circle cx="27" cy="27" r="15.5" fill="none" stroke="#e0b040" strokeWidth="3"/>
+      <g transform="translate(27 27) scale(1.22) translate(-27 -27) rotate(-45 27 27) translate(-1 0)">
+      <path d="M17.5 22.5h13.3l5.7 4.5-5.7 4.5H17.5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2z" fill="#1d4f45"/>
+      <circle cx="31" cy="27" r="1.9" fill="#ffffff"/>
+      </g>
+      <path d="M38.6 38.6l7.2 7.2" stroke="#ffffff" strokeWidth="5.5" strokeLinecap="round"/>
+      <path d="M45.8 45.8L53 38.4" stroke="#e0b040" strokeWidth="2.4" strokeLinecap="round"/>
+      <circle cx="47" cy="47" r="5.2" fill="#e0b040"/>
+      <circle cx="53.5" cy="37.5" r="3.6" fill="#ffffff" stroke="#e0b040" strokeWidth="2.2"/>
     </svg>
   );
 }

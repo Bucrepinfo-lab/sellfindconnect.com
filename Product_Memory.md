@@ -486,3 +486,10 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   removed. Not done, awaiting owner approval: structured location (database),
   ratings and reviews (database, policy), public view counts, GPS, new app
   icons.
+- 2026-11-11: Owner asked (11/11/26) for a logo that describes the slogan and
+  works for a global market, not a Kenyan niche, and does not look like a
+  snake. New mark: a price tag (Sell it) seen through a magnifying glass (Find
+  it), whose handle joins a second point (Connect). Green #1d4f45, gold
+  #e0b040, white. Replaces the S-curve mark. Master art and the Play listing
+  icon are in `docs/brand/`; web/PWA icons regenerated in
+  `apps/web/public/icons/`. The Play app icon changes only with the next .aab.
