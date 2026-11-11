@@ -23,7 +23,9 @@ import {
 import { ApiError, apiRequest, isTermsError } from '../lib/api-client';
 import { formatDmy } from '../lib/dates';
 import { advertStatusLabel, codeLabel, industryLabel } from '../lib/labels';
+import type { PreparedPhoto } from '../lib/prepare-photo';
 import { publicApiBaseUrl, readTenantSession } from '../lib/public-api';
+import { PhotoPreview } from './PhotoPreview';
 import '../styles/business.css';
 
 type MediaItem = {
@@ -229,6 +231,7 @@ async function fetchBusiness(): Promise<BusinessData> {
 export function BusinessManager() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
+  const [pendingLogo, setPendingLogo] = useState<File | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
   const [liveProfile, setLiveProfile] = useState<LiveProfile | null>(null);
   const [profileDraft, setProfileDraft] = useState<ProfileDraft | null>(null);
@@ -326,8 +329,9 @@ export function BusinessManager() {
       return 'Your business profile is live.';
     });
 
-  const uploadLogo = (file: File) =>
+  const uploadLogo = (photo: PreparedPhoto) =>
     run('logo', async () => {
+      const file = photo.file;
       const draft = profileDraft ?? (await saveProfileDraft());
       const meta = { fileName: file.name.slice(0, 120) || 'logo', mimeType: file.type || 'image/jpeg', fileSizeBytes: file.size };
       const { upload } = await apiRequest<{
@@ -344,6 +348,8 @@ export function BusinessManager() {
         method: 'POST',
         body: {
           ...meta,
+          width: photo.width,
+          height: photo.height,
           sourceUrl: upload.publicUrl,
           storageProvider: upload.provider,
           objectKey: upload.objectKey,
@@ -732,10 +738,24 @@ export function BusinessManager() {
                 onChange={(event) => {
                   const file = event.target.files?.[0];
                   event.target.value = '';
-                  if (file) void uploadLogo(file);
+                  if (file) setPendingLogo(file);
                 }}
               />
             </label>
+            {pendingLogo ? (
+              <PhotoPreview
+                file={pendingLogo}
+                noun="logo"
+                logo
+                keepPng
+                improveByDefault={false}
+                busy={busy === 'logo'}
+                onUse={(photo) => {
+                  void uploadLogo(photo).then(() => setPendingLogo(null));
+                }}
+                onCancel={() => setPendingLogo(null)}
+              />
+            ) : null}
             <p className="biz-sub" style={{ marginTop: 10 }}>
               Publishing confirms you accept the current <Link href="/terms">Terms</Link> and{' '}
               <Link href="/community">Community standards</Link>.

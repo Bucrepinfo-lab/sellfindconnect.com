@@ -536,6 +536,13 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   accent each) instead of emoji and stock icons; role and industry chips carry
   icons. Sheet in `docs/brand/icon-sheet.png`. The staff console keeps its
   existing icons.
+- 2026-11-11: Owner request (11/11/26): improved photo filters with a preview
+  before posting. Shared rules in `photo-filters.ts`: screening on every
+  upload section (type/name match, minimum size, shape, repeats) and an
+  on-device tidy-up (rotate, scale to 1600 px, gentle levels and colour).
+  The logo upload now shows "Preview before posting". AI-written item
+  descriptions are not built yet: they need a paid provider key and the
+  owner's decision on a cost cap, given the locked subscription price.
 - 2026-11-11: Owner request (11/11/26): project audit and clean-up. Removed
   dead code that nothing loaded (`apps/api/src/modules/search`,
   `apps/api/src/modules/prisma`), the archived Railway runbook, and the
