@@ -536,3 +536,14 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   accent each) instead of emoji and stock icons; role and industry chips carry
   icons. Sheet in `docs/brand/icon-sheet.png`. The staff console keeps its
   existing icons.
+- 2026-11-11: Owner request (11/11/26): project audit and clean-up. Removed
+  dead code that nothing loaded (`apps/api/src/modules/search`,
+  `apps/api/src/modules/prisma`), the archived Railway runbook, and the
+  duplicate Play icon; `docs/store-assets/app-icon-512.png` is now the current
+  mark. Stripped UTF-8 byte-order marks from 18 files. Bug fix: the service
+  worker cache moved to `sfc-shell-v2` so installed apps stop serving the old
+  logo icons from cache. Left as they are: `packages/config` (empty workspace
+  kept so the lockfile stays valid), country flag characters in
+  `geography.ts` (data), the staff console's icons, and the Play feature
+  graphic and screenshots, which still show the old look and need the owner
+  to re-upload once new ones are taken.

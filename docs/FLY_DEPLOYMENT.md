@@ -128,4 +128,4 @@ DigitalOcean was dropped by the owner (07/11/26); its App Platform spec,
 runbook and `SPACES_*` storage aliases were removed. Fly.io is the only host.
 
 Railway temporary URLs and `adverts.telpen.net` are archived. They are not a
-fallback or recovery path. See `docs/GIT_RAILWAY_RUNBOOK.md`.
+fallback or recovery path; the archived Railway runbook was removed on 11/11/26.
