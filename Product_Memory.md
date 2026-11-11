@@ -530,3 +530,9 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   Search cards show the average and count; the listing page shows the
   breakdown, the list and the write form. New table `BusinessReview`
   (additive migration `20261111160000_add_business_reviews`).
+- 2026-11-11: Owner request (11/11/26): "make icons real and original". Public
+  screens (home, search cards, listing, reviews, share, onboarding) now use
+  the product's own icon set, `SfcIcon` (38 icons, logo language, one gold
+  accent each) instead of emoji and stock icons; role and industry chips carry
+  icons. Sheet in `docs/brand/icon-sheet.png`. The staff console keeps its
+  existing icons.

@@ -5,6 +5,7 @@ import { SELL_QUICK_STARTS, FIND_QUICK_INDUSTRIES, safeInternalRedirect } from "
 import type { OnboardingIntent } from "@telpen/domain";
 import { WebOnlyCheckout } from "../../lib/app-context";
 import { publicApiBaseUrl } from "../../lib/public-api";
+import { SfcIcon, industryIconName, roleIconName } from "../../components/SfcIcon";
 
 type Step = "INTENT"|"SELL_ROLE"|"FIND_INDUSTRY"|"LAUNCHING";
 
@@ -73,13 +74,13 @@ export default function OnboardingPage() {
           <p className="ob__sub">Pick one — you can do both later.</p>
           <div className="ob__split">
             <button className="ob__card ob__card--sell" onClick={() => pickIntent("SELL")} aria-label="I want to sell or advertise">
-              <span className="ob__card-icon" aria-hidden="true">📢</span>
+              <span className="ob__card-icon" aria-hidden="true"><SfcIcon name="sell" size={34} /></span>
               <span className="ob__card-title">Sell / Advertise</span>
               <span className="ob__card-desc">Publish your business profile and adverts so buyers find you</span>
               <span className="ob__card-cta">Publish in 60 seconds →</span>
             </button>
             <button className="ob__card ob__card--find" onClick={() => pickIntent("FIND")} aria-label="I want to find a supplier or partner">
-              <span className="ob__card-icon" aria-hidden="true">🔍</span>
+              <span className="ob__card-icon" aria-hidden="true"><SfcIcon name="find" size={34} /></span>
               <span className="ob__card-title">Find / Source</span>
               <span className="ob__card-desc">Search suppliers, distributors and partners in all 47 counties, then contact them directly</span>
               <span className="ob__card-cta">Start searching →</span>
@@ -87,14 +88,17 @@ export default function OnboardingPage() {
           </div>
           <ul className="ob__why" aria-label="Why SellFindConnect">
             <li>
+              <SfcIcon name="direct" size={22} />
               <strong>Talk to the business directly</strong>
               <span>Call or WhatsApp from the listing. We never sell your enquiry.</span>
             </li>
             <li>
+              <SfcIcon name="checked" size={22} />
               <strong>Checked accounts</strong>
               <span>Every business confirms its account, and photos are checked before they show.</span>
             </li>
             <li>
+              <SfcIcon name="pin" size={22} />
               <strong>Search by place</strong>
               <span>Find businesses by county, constituency, ward or a market you know.</span>
             </li>
@@ -121,7 +125,7 @@ export default function OnboardingPage() {
           <div className="ob__roles" role="list">
             {SELL_QUICK_STARTS.map(r => (
               <button key={r.role} className={"ob__role" + (selectedRole === r.role ? " ob__role--selected" : "")} onClick={() => launchSell(r.role)} role="listitem" aria-pressed={selectedRole === r.role}>
-                <span className="ob__role-icon" aria-hidden="true">{r.icon}</span>
+                <span className="ob__role-icon" aria-hidden="true"><SfcIcon name={roleIconName(r.role)} size={26} /></span>
                 <span className="ob__role-body"><span className="ob__role-title">{r.title}</span><span className="ob__role-desc">{r.desc}</span></span>
                 <span className="ob__role-arrow" aria-hidden="true">→</span>
               </button>
@@ -143,7 +147,7 @@ export default function OnboardingPage() {
           <div className="ob__industries" role="list">
             {FIND_QUICK_INDUSTRIES.map(ind => (
               <button key={ind.code} className={"ob__industry" + (selectedIndustry === ind.code ? " ob__industry--selected" : "")} onClick={() => setSelectedIndustry(selectedIndustry === ind.code ? "" : ind.code)} role="listitem" aria-pressed={selectedIndustry === ind.code}>
-                <span aria-hidden="true">{ind.icon}</span><span>{ind.label}</span>
+                <span className="ob__industry-icon" aria-hidden="true"><SfcIcon name={industryIconName(ind.catalogCode)} size={26} /></span><span>{ind.label}</span>
               </button>
             ))}
           </div>

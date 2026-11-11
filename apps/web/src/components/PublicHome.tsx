@@ -1,12 +1,12 @@
 'use client';
 
-import { BadgeCheck, Flag, Handshake, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 
 import { WebOnlyCheckout } from '../lib/app-context';
 import { useStoredSession } from '../lib/use-session';
 import { BrandLogo } from './BrandLogo';
 import { LiveSearch, type SearchFilters } from './LiveSearch';
+import { SfcIcon, type SfcIconName } from './SfcIcon';
 import { ShareBar } from './ShareBar';
 import '../styles/business.css';
 import '../styles/home.css';
@@ -15,25 +15,25 @@ import '../styles/home.css';
  * Each reason answers a complaint people make about other directories and
  * marketplaces, and each one describes something this product already does.
  */
-const REASONS = [
+const REASONS: Array<{ icon: SfcIconName; title: string; text: string; webOnly?: boolean }> = [
   {
-    icon: Handshake,
+    icon: 'direct',
     title: 'You talk to the business itself',
     text: 'Call or WhatsApp the number on the listing. We do not sit in the middle, take a cut of your deal or sell your enquiry to anyone else.',
   },
   {
-    icon: BadgeCheck,
+    icon: 'checked',
     title: 'A checked account behind every listing',
     text: 'A business confirms its account with a one-time code before it can publish, and its photos are checked before they show.',
   },
   {
-    icon: ShieldCheck,
+    icon: 'price',
     title: 'Clear prices, shown upfront',
     text: 'Searching is always free. Listing your business has one monthly fee, shown before you pay. Any extra is optional and priced before you choose it.',
     webOnly: true,
   },
   {
-    icon: Flag,
+    icon: 'report',
     title: 'Report it, block it, gone',
     text: 'Every listing has Report and Block. Scams, fakes and prohibited goods are removed, and a business you block stays hidden from you.',
   },
@@ -81,11 +81,10 @@ export function PublicHome({ initial }: { initial: SearchFilters }) {
         <h2 id="why-heading">Why businesses use SellFindConnect</h2>
         <ul className="reason-list">
           {REASONS.map((reason) => {
-            const Icon = reason.icon;
             const item = (
               <li key={reason.title} className="reason">
                 <span className="reason__icon" aria-hidden="true">
-                  <Icon size={22} />
+                  <SfcIcon name={reason.icon} size={24} />
                 </span>
                 <div>
                   <h3>{reason.title}</h3>

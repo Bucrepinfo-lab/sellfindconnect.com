@@ -13,3 +13,12 @@ no flags or local imagery, no text inside the mark.
 Colours: forest green `#1d4f45`, gold `#e0b040`, white `#ffffff`.
 The Android app (TWA) icon changes only with a new `.aab` built from these
 icons; the website and installed PWA pick them up on deploy.
+
+## Icon set (11/11/26)
+
+`apps/web/src/components/SfcIcon.tsx` holds SellFindConnect's own icons: 38
+drawn for this product on a 24px grid, in the mark's language (rounded 1.8px
+strokes in the text colour, one gold accent per icon). Public screens use
+these instead of emoji or a stock icon library, so they look the same on every
+device. Preview: `icon-sheet.png`. Add a new icon in that file only; keep one
+accent and the same stroke.

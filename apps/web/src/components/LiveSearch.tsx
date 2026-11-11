@@ -1,6 +1,5 @@
 'use client';
 
-import { BadgeCheck, Clock, Eye, LocateFixed, MapPin, Search, Sparkles, Star } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
@@ -26,6 +25,7 @@ import {
 
 import { ApiError, apiRequest } from '../lib/api-client';
 import { codeLabel, industryLabel } from '../lib/labels';
+import { SfcIcon, industryIconName, roleIconName } from './SfcIcon';
 import { useStoredSession } from '../lib/use-session';
 import '../styles/business.css';
 import '../styles/home.css';
@@ -139,9 +139,9 @@ function writeFiltersToUrl(filters: SearchFilters) {
 }
 
 function badgeIcon(badge: ListingBadge) {
-  if (badge.kind === 'FEATURED') return <Sparkles size={13} aria-hidden="true" />;
-  if (badge.kind === 'ENDING') return <Clock size={13} aria-hidden="true" />;
-  if (badge.kind === 'NEW') return <BadgeCheck size={13} aria-hidden="true" />;
+  if (badge.kind === 'FEATURED') return <SfcIcon name="featured" size={13} />;
+  if (badge.kind === 'ENDING') return <SfcIcon name="clock" size={13} />;
+  if (badge.kind === 'NEW') return <SfcIcon name="fresh" size={13} />;
   return null;
 }
 
@@ -187,21 +187,21 @@ function ResultCard({ result, now }: { result: PublicAdvert; now: Date | undefin
           <span className="result-card__meta">{industryLabel(result.industryCode)}</span>
           {result.rating && result.rating.count > 0 && result.rating.average !== null ? (
             <span className="result-card__rating" aria-label={`Rated ${result.rating.average.toFixed(1)} out of 5 from ${result.rating.count} reviews`}>
-              <Star size={13} aria-hidden="true" />
+              <SfcIcon name="star" size={13} solid />
               {result.rating.average.toFixed(1)}
               <span className="result-card__rating-count">({result.rating.count})</span>
             </span>
           ) : null}
           {result.stats && (result.stats.views > 0 || result.stats.enquiries > 0) ? (
             <span className="result-card__stats">
-              <Eye size={13} aria-hidden="true" />
+              <SfcIcon name="eye" size={13} />
               {formatPublicCount(result.stats.views, 'view', 'views')}
               {result.stats.enquiries > 0 ? ` · ${formatPublicCount(result.stats.enquiries, 'enquiry', 'enquiries')}` : ''}
             </span>
           ) : null}
           {where ? (
             <span className="result-card__place">
-              <MapPin size={13} aria-hidden="true" />
+              <SfcIcon name="pin" size={13} />
               {where}
             </span>
           ) : null}
@@ -396,13 +396,13 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
             </select>
           </label>
           <button className="hero-search__go" type="submit" disabled={state.status === 'loading'}>
-            <Search size={18} aria-hidden="true" />
+            <SfcIcon name="find" size={18} />
             {state.status === 'loading' ? 'Searching…' : 'Search'}
           </button>
         </form>
         <div className="hero-locate">
           <button type="button" className="hero-locate__button" onClick={useMyLocation} disabled={locating === 'busy'}>
-            <LocateFixed size={16} aria-hidden="true" />
+            <SfcIcon name="locate" size={16} />
             {locating === 'busy' ? 'Finding your county…' : 'Use my location'}
           </button>
           <span className="hero-locate__note" aria-live="polite">
@@ -428,6 +428,7 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
                   void apply({ role: next });
                 }}
               >
+                <SfcIcon name={roleIconName(item.role)} size={16} />
                 {item.label}
               </button>
             );
@@ -452,6 +453,7 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
                   void apply({ industry: next });
                 }}
               >
+                <SfcIcon name={industryIconName(item.code)} size={16} />
                 {item.name.split(',')[0]}
               </button>
             );
@@ -561,6 +563,7 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
                   writeFiltersToUrl({ q: query, industry, role, county, constituency, ward, sort: item.mode });
                 }}
               >
+                <SfcIcon name={roleIconName(item.role)} size={16} />
                 {item.label}
               </button>
             ))}

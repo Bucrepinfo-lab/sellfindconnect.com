@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { Star } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import {
@@ -15,6 +14,7 @@ import {
 import { ApiError, apiRequest, isTermsError } from '../lib/api-client';
 import { formatDmy } from '../lib/dates';
 import { codeLabel } from '../lib/labels';
+import { SfcIcon } from './SfcIcon';
 
 type ReviewsPayload = { summary: BusinessRatingSummary; reviews: PublicBusinessReview[] };
 type OwnReview = { id: string; tenantId: string; rating: number; comment?: string; status: 'VISIBLE' | 'HIDDEN' };
@@ -26,7 +26,7 @@ export function Stars({ value, size = 16 }: { value: number; size?: number }) {
   return (
     <span className="stars" aria-hidden="true">
       {[1, 2, 3, 4, 5].map((n) => (
-        <Star key={n} size={size} className={n <= Math.round(value) ? 'stars__on' : 'stars__off'} />
+        <SfcIcon key={n} name="star" solid size={size} className={n <= Math.round(value) ? 'stars__on' : 'stars__off'} />
       ))}
     </span>
   );
@@ -259,7 +259,7 @@ export function BusinessReviews(props: { tenantId: string; businessName: string;
                   checked={rating === n}
                   onChange={() => setRating(n)}
                 />
-                <Star size={28} className={n <= rating ? 'stars__on' : 'stars__off'} aria-hidden="true" />
+                <SfcIcon name="star" solid size={28} className={n <= rating ? 'stars__on' : 'stars__off'} />
                 <span className="sr-only">
                   {n} star{n === 1 ? '' : 's'}, {ratingWords[n]}
                 </span>

@@ -62,3 +62,7 @@
 .ob__why strong{font-family:var(--font-display);font-size:.98rem;color:var(--text);}
 .ob__why span{font-size:.84rem;color:var(--dim);line-height:1.45;}
 @media (max-width:640px){.ob__why{grid-template-columns:1fr;}}
+.ob__card-icon,.ob__role-icon,.ob__industry-icon{display:inline-flex;color:var(--text);}
+.ob__card--sell .ob__card-icon{color:var(--sell);}
+.ob__card--find .ob__card-icon{color:var(--find);}
+.ob__why .sfc-icon{color:var(--signal);}

@@ -1,7 +1,8 @@
 'use client';
 
-import { Link2, Send } from 'lucide-react';
 import { useState } from 'react';
+
+import { SfcIcon } from './SfcIcon';
 
 /**
  * Share the current page: the phone's own share sheet where there is one,
@@ -39,10 +40,10 @@ export function ShareBar({ title, text, label = 'Share' }: { title: string; text
   return (
     <div className="share-bar" role="group" aria-label={label}>
       <button type="button" className="secondary-button" onClick={() => void nativeShare()}>
-        <Send size={16} aria-hidden="true" /> {label}
+        <SfcIcon name="share" size={16} /> {label}
       </button>
       <button type="button" className="secondary-button" onClick={() => void copyLink()} aria-live="polite">
-        <Link2 size={16} aria-hidden="true" /> {copied ? 'Link copied' : 'Copy link'}
+        <SfcIcon name="link" size={16} /> {copied ? 'Link copied' : 'Copy link'}
       </button>
     </div>
   );
