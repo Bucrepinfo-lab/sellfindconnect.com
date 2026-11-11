@@ -65,3 +65,4 @@ export * from './payments';
 export * from './product-audit';
 export * from './totp';
 export * from './ugc-moderation';
+export * from './ai-capability';
