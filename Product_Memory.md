@@ -471,3 +471,18 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   call (or just goes live if the original was already removed). Drafts made
   before the column keep the device-local fallback and the explicit
   `replacesAdvertId` on publish.
+- 2026-11-11: Added a provider-neutral AI-capability metering + spend-cap core
+  to `@telpen/domain` (`ai-capability.ts`), the first safe foundation for
+  metered AI add-ons across the portfolio. Pure, framework-free, no secrets,
+  moves no money: `evaluateAiSpend` decides ALLOW/DENY under a per-tenant
+  period spend cap and fails closed on any missing/mismatched/malformed input
+  (no cap, no snapshot, tenant/currency/period mismatch, capability not in the
+  tenant allow-list, projected spend over the cap); `priceAiUnits` prices usage
+  at a margin markup in basis points (integer minor units) so the add-on raises
+  margin. A `AiUsageMeterAdapter` port keeps the real usage/cost source behind
+  an adapter; the default `DevInMemoryAiUsageMeter` needs no vendor keys so the
+  no-secrets build is unchanged. 23 colocated vitest cases. NOT wired into the
+  API, finance/billing, or any provider yet — provider wiring (env-var-named
+  adapter + API key) and invoice integration are separate, human-authorised
+  changes gated by the finance module's APPROVED-tax-profile path. No repo
+  deployed; opened as a draft PR for owner review.
