@@ -1774,6 +1774,15 @@ itself. The public sees the average, count, breakdown and comments with no
 reviewer identity. Any signed-in user can report a review; moderators hide or
 restore it (never delete), and a hidden review stays hidden when edited.
 
+### "Write it for me" advert drafts (11/11/26)
+
+On the advert form, a business can ask for a draft title and description
+written from its own details. A free template always works; an optional AI
+overlay rephrases only the facts given, never adds prices, claims or contact
+details, is re-screened by the safety core, and is capped per business per
+month so it stays well inside the subscription price. The business edits the
+draft before publishing.
+
 ## 14. Success Metrics
 
 North-star metric:

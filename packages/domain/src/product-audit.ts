@@ -43,6 +43,7 @@ export const productAuditActions = [
   'BUSINESS_REVIEW_WITHDRAWN',
   'BUSINESS_REVIEW_HIDDEN',
   'BUSINESS_REVIEW_RESTORED',
+  'ADVERT_DESCRIPTION_DRAFTED',
 ] as const;
 
 export type ProductAuditAction = (typeof productAuditActions)[number];
@@ -200,6 +201,8 @@ export function describeProductAuditAction(action: string): string {
       return 'Business review hidden';
     case 'BUSINESS_REVIEW_RESTORED':
       return 'Business review restored';
+    case 'ADVERT_DESCRIPTION_DRAFTED':
+      return 'Advert description drafted';
     default:
       return action.replaceAll('_', ' ').toLowerCase();
   }

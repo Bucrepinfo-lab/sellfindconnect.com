@@ -531,3 +531,17 @@ export class CreateAdvertMediaDto {
   @Type(() => AdvertMediaCdnVariantDto)
   declare variants?: AdvertMediaCdnVariantDto[];
 }
+
+export class DraftAdvertDescriptionDto {
+  @ApiPropertyOptional({ example: 'Fresh sukuma wiki and cabbages', maxLength: 160 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  declare title?: string;
+
+  @ApiPropertyOptional({ example: 'Daily harvest, sold by the crate', maxLength: 600 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(600)
+  declare notes?: string;
+}

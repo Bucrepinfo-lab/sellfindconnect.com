@@ -5,12 +5,14 @@ import { ApiHeader, ApiTags } from '@nestjs/swagger';
 import { RequireTenantPermission } from '../../common/tenant-permission.guard';
 import { TenantAuthSession, TenantId } from '../tenant/tenant-context.decorator';
 import { TenantSessionGuard, type TenantSessionDecision } from '../tenant/tenant-session.guard';
+import { AdvertDescriptionService } from './advert-description.service';
 import { AdvertsService } from './adverts.service';
 import {
   BoostAdvertDto,
   CreateAdvertDto,
   CreateAdvertMediaDto,
   CreateSavedAdvertSearchDto,
+  DraftAdvertDescriptionDto,
   DuplicateAdvertDto,
   PrepareAdvertMediaUploadDto,
   PublicAdvertSearchDto,
@@ -36,7 +38,21 @@ import {
 @UseGuards(TenantSessionGuard)
 @Controller('adverts')
 export class AdvertsController {
-  constructor(private readonly adverts: AdvertsService) {}
+  constructor(
+    private readonly adverts: AdvertsService,
+    private readonly descriptions: AdvertDescriptionService,
+  ) {}
+
+  /** "Write it for me": a draft title and description; the business edits before publishing. */
+  @Post('description-draft')
+  @RequireTenantPermission('MANAGE_LISTINGS')
+  draftDescription(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Body() body: DraftAdvertDescriptionDto,
+  ) {
+    return this.descriptions.draft(tenantId, session.userId, body);
+  }
 
   @Post()
   @RequireTenantPermission('MANAGE_LISTINGS')

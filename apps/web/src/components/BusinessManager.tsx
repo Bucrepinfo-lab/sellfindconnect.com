@@ -377,6 +377,37 @@ export function BusinessManager() {
     };
   };
 
+  /** "Write it for me": a draft from the title and notes; nothing is published. */
+  const draftAdvert = async () => {
+    if (!advertForm) return;
+    const form = advertForm;
+    setBusy('draft-advert');
+    setNotice(null);
+    try {
+      const draft = await apiRequest<{ title: string; description: string; usedModel: boolean; aiDraftsLeft: number }>(
+        '/adverts/description-draft',
+        {
+          method: 'POST',
+          body: {
+            ...(form.title.trim() ? { title: form.title.trim().slice(0, 160) } : {}),
+            ...(form.description.trim() ? { notes: form.description.trim().slice(0, 600) } : {}),
+          },
+        },
+      );
+      setAdvertForm({ ...form, title: form.title.trim() ? form.title : draft.title, description: draft.description });
+      setNotice({
+        tone: 'ok',
+        text: draft.usedModel
+          ? `Written with AI from your details. Check it before you publish. ${draft.aiDraftsLeft} AI ${draft.aiDraftsLeft === 1 ? 'draft' : 'drafts'} left this month.`
+          : 'Written from your details. Check it before you publish.',
+      });
+    } catch (error) {
+      setNotice({ tone: 'error', text: errorText(error), terms: isTermsError(error) });
+    } finally {
+      setBusy('');
+    }
+  };
+
   const saveAdvertDraft = async (form: AdvertForm): Promise<AdvertDraft> => {
     const base = advertBase();
     if (!base) throw new Error('Publish your business profile first.');
@@ -809,6 +840,19 @@ export function BusinessManager() {
                 required
               />
             </label>
+            <div className="biz-actions" style={{ marginTop: 8 }}>
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={Boolean(busy) || (!advertForm.title.trim() && !advertForm.description.trim())}
+                onClick={() => void draftAdvert()}
+              >
+                {busy === 'draft-advert' ? 'Writing…' : 'Write it for me'}
+              </button>
+              <span className="biz-sub" style={{ alignSelf: 'center' }}>
+                Type a few words first, such as what you sell. You can edit the result.
+              </span>
+            </div>
             <p className="biz-sub" style={{ marginTop: 10 }}>
               Shown as {liveProfile.displayName} with your profile contacts. Publishing confirms you accept the current{' '}
               <Link href="/terms">Terms</Link>.
