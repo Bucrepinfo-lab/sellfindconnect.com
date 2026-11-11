@@ -1,4 +1,4 @@
-﻿# SellFindConnect - Project Summary
+# SellFindConnect - Project Summary
 Date: 2026-08-22 | Status: Core product coded; Fly.io live; hosted Prisma + scheduled jobs operational
 
 ## What it is

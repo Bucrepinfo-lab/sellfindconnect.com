@@ -1,4 +1,4 @@
-﻿import type { NotificationChannel } from './notifications';
+import type { NotificationChannel } from './notifications';
 
 export type DeliveryStatus = 'SENT' | 'FAILED' | 'SUPPRESSED';
 

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { SELL_QUICK_STARTS, FIND_QUICK_INDUSTRIES, safeInternalRedirect } from "@telpen/domain";

@@ -5,7 +5,7 @@ joins a second point (Connect). Chosen for a global market: universal symbols,
 no flags or local imagery, no text inside the mark.
 
 - `sellfindconnect-mark.svg`: master artwork (64 x 64 grid).
-- `play-icon-512.png`: square, full-bleed 512 x 512 for the Play Store listing
+- `../store-assets/app-icon-512.png`: square, full-bleed 512 x 512 for the Play Store listing
   (Play rounds the corners itself).
 - Web/PWA icons live in `apps/web/public/icons/` (192, 512, maskable 512 with
   the mark inside the safe zone, Apple touch 180).
