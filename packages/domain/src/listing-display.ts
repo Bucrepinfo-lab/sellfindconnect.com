@@ -3,11 +3,13 @@
  * left" countdown and the sort order. Pure and clock-injected so web and API
  * agree and tests are stable. Every badge comes from real listing data.
  */
-export type ListingSortMode = 'BEST' | 'NEWEST' | 'ENDING_SOON';
+export type ListingSortMode = 'BEST' | 'NEWEST' | 'MOST_VIEWED' | 'MOST_ASKED' | 'ENDING_SOON';
 
 export const listingSortModes: Array<{ mode: ListingSortMode; label: string }> = [
   { mode: 'BEST', label: 'Best match' },
   { mode: 'NEWEST', label: 'Newest' },
+  { mode: 'MOST_VIEWED', label: 'Most viewed' },
+  { mode: 'MOST_ASKED', label: 'Most asked' },
   { mode: 'ENDING_SOON', label: 'Ending soon' },
 ];
 
@@ -16,6 +18,7 @@ export type ListingForDisplay = {
   expiresAt: string;
   boosted?: boolean;
   media?: ReadonlyArray<unknown>;
+  stats?: { views: number; enquiries: number };
 };
 
 export type ListingBadgeKind = 'FEATURED' | 'NEW' | 'PHOTOS' | 'ENDING';
@@ -67,13 +70,23 @@ export function listingBadges(listing: ListingForDisplay, now: Date | string = n
 
 /**
  * BEST keeps the order the search returned (already ranked). NEWEST puts the
- * latest first; ENDING_SOON the nearest end date first. Bad dates go last.
+ * latest first; MOST_VIEWED and MOST_ASKED the highest public view or
+ * enquiry count first; ENDING_SOON the nearest end date first. Bad dates go last.
  * Returns a new array.
  */
 export function sortListings<T extends ListingForDisplay>(listings: ReadonlyArray<T>, mode: ListingSortMode): T[] {
   const copy = [...listings];
   if (mode === 'NEWEST') {
     return copy.sort((left, right) => (time(right.publishedAt) ?? -Infinity) - (time(left.publishedAt) ?? -Infinity));
+  }
+  if (mode === 'MOST_VIEWED' || mode === 'MOST_ASKED') {
+    const count = (item: ListingForDisplay) =>
+      (mode === 'MOST_VIEWED' ? item.stats?.views : item.stats?.enquiries) ?? 0;
+    // Stable: ties keep the best-match order.
+    return copy
+      .map((item, index) => ({ item, index }))
+      .sort((left, right) => count(right.item) - count(left.item) || left.index - right.index)
+      .map(({ item }) => item);
   }
   if (mode === 'ENDING_SOON') {
     return copy.sort((left, right) => (time(left.expiresAt) ?? Infinity) - (time(right.expiresAt) ?? Infinity));

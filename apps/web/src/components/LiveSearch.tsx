@@ -1,12 +1,13 @@
 'use client';
 
-import { BadgeCheck, Clock, MapPin, Search, Sparkles } from 'lucide-react';
+import { BadgeCheck, Clock, Eye, LocateFixed, MapPin, Search, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import {
   evaluateSafetyText,
   findKenyaConstituency,
+  formatPublicCount,
   findKenyaCounty,
   industryCategories,
   kenyaCounties,
@@ -15,6 +16,7 @@ import {
   kenyaPlaceLabel,
   listingBadges,
   listingSortModes,
+  nearestKenyaCounty,
   normalizeKenyaPlace,
   sortListings,
   supplyChainRoles,
@@ -44,6 +46,8 @@ export type PublicAdvert = {
   expiresAt: string;
   boosted?: boolean;
   matchedTerms?: string[];
+  /** Anonymous public counts over the last 90 days. */
+  stats?: { views: number; enquiries: number };
   /** Where the business is, from its profile (absent until it sets one). */
   location?: { county?: string; constituency?: string; ward?: string; landmark?: string };
   media?: Array<{ id: string; sourceUrl: string; cdnUrl?: string; thumbnailUrl?: string; altText?: string; kind?: string }>;
@@ -179,6 +183,13 @@ function ResultCard({ result, now }: { result: PublicAdvert; now: Date | undefin
             {result.displayName} · {codeLabel(result.role)}
           </span>
           <span className="result-card__meta">{industryLabel(result.industryCode)}</span>
+          {result.stats && (result.stats.views > 0 || result.stats.enquiries > 0) ? (
+            <span className="result-card__stats">
+              <Eye size={13} aria-hidden="true" />
+              {formatPublicCount(result.stats.views, 'view', 'views')}
+              {result.stats.enquiries > 0 ? ` · ${formatPublicCount(result.stats.enquiries, 'enquiry', 'enquiries')}` : ''}
+            </span>
+          ) : null}
           {where ? (
             <span className="result-card__place">
               <MapPin size={13} aria-hidden="true" />
@@ -226,6 +237,7 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
   const [photosOnly, setPhotosOnly] = useState(false);
   const [state, setState] = useState<SearchState>({ status: 'loading', results: [] });
   const [blockedTenants, setBlockedTenants] = useState<string[]>([]);
+  const [locating, setLocating] = useState<'idle' | 'busy' | 'done' | 'denied' | 'outside' | 'unavailable'>('idle');
   // One clock reading per result set keeps badges stable while the list is on screen.
   const [now, setNow] = useState<Date | undefined>(undefined);
 
@@ -290,6 +302,34 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
   const moreFiltersInUse = [industry && !industryCategories.slice(0, 8).some((item) => item.code === industry), constituency, ward, photosOnly, role && !QUICK_ROLES.some((item) => item.role === role)].filter(Boolean).length;
   const anyFilter = Boolean(query.trim() || industry || role || county || photosOnly);
 
+  /**
+   * Suggest the county from the phone's position. The position stays on the
+   * device: only the county name is used, for this search.
+   */
+  const useMyLocation = () => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setLocating('unavailable');
+      return;
+    }
+    setLocating('busy');
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const found = nearestKenyaCounty(position.coords.latitude, position.coords.longitude);
+        if (!found) {
+          setLocating('outside');
+          return;
+        }
+        setLocating('done');
+        setCounty(found.name);
+        setConstituency('');
+        setWard('');
+        void apply({ county: found.name, constituency: '', ward: '' });
+      },
+      (error) => setLocating(error.code === error.PERMISSION_DENIED ? 'denied' : 'unavailable'),
+      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 10 * 60_000 },
+    );
+  };
+
   const clearAll = () => {
     setQuery('');
     setIndustry('');
@@ -351,6 +391,19 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
             {state.status === 'loading' ? 'Searching…' : 'Search'}
           </button>
         </form>
+        <div className="hero-locate">
+          <button type="button" className="hero-locate__button" onClick={useMyLocation} disabled={locating === 'busy'}>
+            <LocateFixed size={16} aria-hidden="true" />
+            {locating === 'busy' ? 'Finding your county…' : 'Use my location'}
+          </button>
+          <span className="hero-locate__note" aria-live="polite">
+            {locating === 'done' && county ? `Showing ${county}. Change the county if this is not right.` : null}
+            {locating === 'denied' ? 'Location is off for this site. Pick your county instead.' : null}
+            {locating === 'outside' ? 'You seem to be outside Kenya. Pick a county to search.' : null}
+            {locating === 'unavailable' ? 'Could not get your location. Pick your county instead.' : null}
+            {locating === 'idle' ? 'Your position stays on your phone; only the county is used.' : null}
+          </span>
+        </div>
         <div className="chip-row" role="group" aria-label="Who are you looking for?">
           {QUICK_ROLES.map((item) => {
             const active = role === item.role;

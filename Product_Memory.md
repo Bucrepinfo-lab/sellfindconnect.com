@@ -504,3 +504,14 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   `location`. (2) The home pricing promise no longer commits to "no sales
   calls" or "one flat price": it says searching is free, the monthly listing
   fee is shown before paying, and extras are optional and priced upfront.
+- 2026-11-11: Owner approved the logo and home page (PR #82 merged) and asked
+  to fix the remaining follow-ups. Added: anonymous public listing counts
+  (`POST /v1/public/adverts/:id/events`, VIEW or INQUIRY, always 204; one
+  count per visitor per listing per 30 minutes, 60 events a minute cap; the
+  visitor key is a SHA-256 of IP and user agent held in memory only) recorded
+  as LISTING analytics events with consent NOT_REQUIRED; search results and
+  the listing page carry `stats` (last 90 days); web sorts "Most viewed" and
+  "Most asked". "Use my location" suggests the county on the device from
+  county headquarters coordinates (`nearestKenyaCounty`); nothing is sent.
+  Onboarding shows three "why" points. Ratings and reviews follow in a
+  separate PR (new table, moderation).

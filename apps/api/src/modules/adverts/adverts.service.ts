@@ -17,6 +17,8 @@ import {
   industryCategories,
   mediaPolicy,
   normalizeKenyaPlace,
+  PUBLIC_LISTING_STATS_DAYS,
+  PublicListingEventGate,
   presentTenantMediaAsset,
   presentTenantMediaAssets,
   scoreDiscoveryVector,
@@ -27,10 +29,12 @@ import {
   type AdvertPost,
   type DiscoveryRelationshipSignal,
   type KenyaPlaceSelection,
+  type PublicListingEventType,
+  type PublicListingStats,
   type MediaAsset,
   type PresentedMediaAsset,
 } from '@telpen/domain';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import { AuthService } from '../auth/auth.service';
 import { AnalyticsService } from '../analytics/analytics.service';
@@ -93,6 +97,8 @@ type PublicAdvertLocation = {
 
 type PublicAdvertSearchResult = AdvertPostWithMedia & {
   location?: PublicAdvertLocation;
+  /** Anonymous public counts over the last PUBLIC_LISTING_STATS_DAYS days. */
+  stats?: PublicListingStats;
   rankScore: number;
   rankReasons: string[];
   boosted: boolean;
@@ -102,6 +108,8 @@ type PublicAdvertSearchResult = AdvertPostWithMedia & {
 
 @Injectable()
 export class AdvertsService {
+  /** Drops repeat public counts; keys are hashed and held in memory only. */
+  private readonly publicEventGate = new PublicListingEventGate();
   constructor(
     @Optional()
     @Inject(ADVERTS_REPOSITORY)
@@ -676,8 +684,9 @@ export class AdvertsService {
       constituency: input.constituency,
       ward: input.ward,
     });
-    const located = await this.withLocations(
-      ranked.filter((result): result is PublicAdvertSearchResult => Boolean(result)),
+    const located = await this.withPublicStats(
+      await this.withLocations(ranked.filter((result): result is PublicAdvertSearchResult => Boolean(result))),
+      now,
     );
 
     return {
@@ -729,8 +738,42 @@ export class AdvertsService {
     if (!result) {
       throw new NotFoundException('Advert not found.');
     }
-    const [located] = await this.withLocations([result]);
+    const [located] = await this.withPublicStats(await this.withLocations([result]), now);
     return located ?? result;
+  }
+
+  /**
+   * Count an anonymous public view or contact tap on a discoverable listing.
+   * Unknown or hidden listings and repeats from the same visitor are ignored
+   * without an error, so the endpoint reveals nothing.
+   */
+  async recordPublicListingEvent(
+    id: string,
+    eventType: PublicListingEventType,
+    visitor: string,
+  ): Promise<void> {
+    const visitorKey = createHash('sha256').update(visitor).digest('hex').slice(0, 32);
+    if (!this.publicEventGate.allow(visitorKey, id, eventType)) return;
+    const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const now = new Date().toISOString();
+    const [advert] = uuidLike.test(id.trim())
+      ? await this.repository.listDiscoveryIndex({
+          advertId: id.trim(),
+          statuses: ['LIVE', 'RENEWAL_DUE', 'SCHEDULED'],
+        })
+      : [];
+    if (!advert || !this.isDiscoveryEntryDiscoverable(advert, {}, now)) return;
+    await this.analytics
+      .recordEvent(advert.tenantId, {
+        eventType,
+        entityType: 'LISTING',
+        entityId: advert.advertId,
+        countryCode: advert.countryCode,
+        industryCode: advert.industryCode,
+        consentState: 'NOT_REQUIRED',
+        metadata: { surface: 'public_listing' },
+      })
+      .catch(() => undefined);
   }
 
   async createSavedSearch(
@@ -1328,6 +1371,33 @@ export class AdvertsService {
       scheduledFor: now,
       createdAt: now,
     };
+  }
+
+  /** Attach anonymous public view and enquiry counts (one query per business). */
+  private async withPublicStats(
+    results: PublicAdvertSearchResult[],
+    now: string,
+  ): Promise<PublicAdvertSearchResult[]> {
+    if (results.length === 0) return results;
+    const to = new Date(Date.parse(now) || Date.now()).toISOString();
+    const from = new Date(Date.parse(to) - PUBLIC_LISTING_STATS_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    const byTenant = new Map<string, Promise<Map<string, PublicListingStats>>>();
+    const countsFor = (tenantId: string) => {
+      let pending = byTenant.get(tenantId);
+      if (!pending) {
+        pending = this.analytics
+          .countPublicListingEvents(tenantId, from, to)
+          .catch(() => new Map<string, PublicListingStats>());
+        byTenant.set(tenantId, pending);
+      }
+      return pending;
+    };
+    return Promise.all(
+      results.map(async (result) => ({
+        ...result,
+        stats: (await countsFor(result.tenantId)).get(result.id) ?? { views: 0, enquiries: 0 },
+      })),
+    );
   }
 
   /** Attach each business's public location (one profile lookup per business). */

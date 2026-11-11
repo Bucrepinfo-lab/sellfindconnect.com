@@ -28,7 +28,7 @@ find the pains to bridge, and restructure the home page and offer around them.
 | Cluttered, tiring pages | Search first; six role chips; eight industry chips; everything else under "More filters"; policy note collapsed | This change |
 | Dead ends | Skeleton while loading; an empty state that offers "Clear all filters" and "List your business here" | This change |
 | No proof a seller delivers | Ratings and reviews from people who contacted the business | Next step: needs a database table and moderation, so owner approval |
-| No sign of how active a listing is | Views and enquiry counts on listings; "Most viewed" and "Most asked" sorting | Next step: needs a public count from the analytics the API already records |
+| No sign of how active a listing is | Anonymous view and enquiry counts (last 90 days) on cards and listings; "Most viewed" and "Most asked" sorts | Done 11/11/26 |
 | Hard to spread by word of mouth | Share and Copy link on the home page and every listing (phone share sheet, WhatsApp fallback) | This change |
 
 ## What we deliberately do not copy
@@ -57,12 +57,16 @@ find the pains to bridge, and restructure the home page and offer around them.
 1. Done 11/11/26: structured location on the business profile (stored in the
    existing `serviceArea` JSON, no migration).
 2. Ratings and reviews with moderation and report. Database and policy change.
-3. Public view and enquiry counts, then "Most viewed" and "Most asked" sorts.
-   API change only.
-4. "Use my location" to pick the county from GPS. Needs a location permission
-   and a Play Data safety update.
-5. App icons and Play listing art regenerated from the new mark, once the mark
-   is approved.
+3. Done 11/11/26: anonymous public view and enquiry counts, "Most viewed" and
+   "Most asked" sorts. Counted once per visitor per listing per 30 minutes;
+   the visitor key is hashed and held in memory only, never stored.
+4. Done 11/11/26: "Use my location" suggests the county from the phone's
+   position, worked out on the device from county headquarters coordinates.
+   The position is never sent, so Play Data safety needs no new location
+   declaration (data processed only on the device is not "collected").
+5. Done 11/11/26: new mark, web/PWA icons and Play listing icon
+   (`docs/brand/`). The Android app icon changes with the next .aab.
+6. Done 11/11/26: onboarding "why" points under the Sell and Find choices.
 
 ## Sources
 

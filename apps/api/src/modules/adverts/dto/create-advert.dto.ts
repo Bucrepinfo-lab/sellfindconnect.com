@@ -5,11 +5,13 @@ import {
   mediaPolicy,
   mediaTransformStatuses,
   mediaVisibilityStates,
+  publicListingEventTypes,
   supplyChainRoles,
   type AnalyticsEventType,
   type ConsentState,
   type MediaTransformStatus,
   type MediaVisibility,
+  type PublicListingEventType,
 } from '@telpen/domain';
 import { Type } from 'class-transformer';
 import {
@@ -321,6 +323,12 @@ export class RunSavedAdvertSearchAlertsDto {
   @Min(1)
   @Max(20)
   declare limit?: number;
+}
+
+export class RecordPublicListingEventDto {
+  @ApiProperty({ enum: publicListingEventTypes, example: 'VIEW' })
+  @IsIn(publicListingEventTypes)
+  declare eventType: PublicListingEventType;
 }
 
 export class RecordAdvertDiscoveryEventDto {
