@@ -554,3 +554,12 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   `geography.ts` (data), the staff console's icons, and the Play feature
   graphic and screenshots, which still show the old look and need the owner
   to re-upload once new ones are taken.
+- 2026-11-11: Owner decision (11/11/26): "Write it for me" advert drafts, same
+  design as HarvestHub's "Enhance listing". A free template from the
+  business's own details always works; the AI overlay (cheapest Anthropic
+  tier, `ADVERT_DRAFT_PROVIDER=anthropic` + `ANTHROPIC_API_KEY`) is off until
+  set, re-screens output (safety core, no contact details), and is capped at
+  `ADVERT_AI_DRAFTS_PER_MONTH` (default 5) per business per Nairobi month,
+  counted from `ADVERT_DESCRIPTION_DRAFTED` audit records. Five drafts cost a
+  small fraction of the 10-unit monthly price. Nothing is published until the
+  business presses Publish.

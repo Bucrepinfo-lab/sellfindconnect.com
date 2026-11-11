@@ -7,6 +7,8 @@ import { AuthModule } from '../auth/auth.module';
 import { MediaModule } from '../media/media.module';
 import { ProfilesModule } from '../profiles/profiles.module';
 import { ReviewsModule } from '../reviews/reviews.module';
+import { AdvertDescriptionService } from './advert-description.service';
+import { ADVERT_DRAFTER, createConfiguredAdvertDrafter } from './advert-drafter';
 import { AdvertsController, PublicAdvertsController } from './adverts.controller';
 import { ADVERTS_REPOSITORY } from './adverts.repository';
 import { AdvertsService } from './adverts.service';
@@ -38,6 +40,12 @@ import { InMemoryAdvertsRepository } from './in-memory-adverts.repository';
       },
     },
     AdvertsService,
+    {
+      provide: ADVERT_DRAFTER,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => createConfiguredAdvertDrafter(config) ?? null,
+    },
+    AdvertDescriptionService,
   ],
   exports: [AdvertsService],
 })
