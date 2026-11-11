@@ -11,6 +11,7 @@ import { recordListingEvent } from '../lib/public-api';
 import { codeLabel, industryLabel } from '../lib/labels';
 import { useStoredSession } from '../lib/use-session';
 import type { PublicAdvert } from './LiveSearch';
+import { BusinessReviews } from './BusinessReviews';
 import { ShareBar } from './ShareBar';
 import '../styles/business.css';
 import '../styles/home.css';
@@ -217,6 +218,13 @@ function ListingBody(props: {
           />
         </div>
       </article>
+
+      <BusinessReviews
+        tenantId={advert.tenantId}
+        businessName={advert.displayName}
+        own={props.own}
+        signedIn={props.signedIn}
+      />
 
       <section className="biz-card" style={{ marginTop: 16 }} aria-label="Report or block">
         {props.own ? (

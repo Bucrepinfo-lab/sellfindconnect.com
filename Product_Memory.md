@@ -519,3 +519,14 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   (Fly.io) runs when CI passes on a push to main, checking out the exact
   commit CI tested; Deploy Web runs when Deploy API succeeds, on the same
   commit. Both keep their health checks and can still be run by hand.
+- 2026-11-11: Owner decision (11/11/26): ratings and reviews. A signed-in,
+  MFA-verified business with current terms can rate another business 1–5
+  stars with an optional comment (600 characters, zero-tolerance checked);
+  one review per reviewing business per business, editable or withdrawable by
+  its writer; self-reviews are refused and the business must have a live
+  profile. Public views carry no reviewer identity. Anyone signed in can
+  report a review (UGC target `REVIEW`); moderators hide or restore it at
+  `/v1/platform/reviews` (hidden, never deleted; editing never un-hides).
+  Search cards show the average and count; the listing page shows the
+  breakdown, the list and the write form. New table `BusinessReview`
+  (additive migration `20261111160000_add_business_reviews`).

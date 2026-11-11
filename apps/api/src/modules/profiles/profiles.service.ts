@@ -659,6 +659,11 @@ export class ProfilesService {
     return profile?.serviceArea;
   }
 
+  /** Whether a business currently has a live public profile (used before accepting a review). */
+  async hasLiveProfile(tenantId: string): Promise<boolean> {
+    return Boolean(await this.repository.findLiveProfile(tenantId));
+  }
+
   async listPublishedProfiles(tenantId: string): Promise<PublishedProfile[]> {
     const profiles = await this.repository.listPublishedProfiles(tenantId);
     return profiles

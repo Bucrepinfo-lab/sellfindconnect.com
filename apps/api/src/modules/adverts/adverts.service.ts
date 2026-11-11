@@ -39,6 +39,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { AuthService } from '../auth/auth.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { ProfilesService } from '../profiles/profiles.service';
+import { ReviewsService } from '../reviews/reviews.service';
 import {
   MEDIA_ADAPTERS,
   createDefaultMediaAdapters,
@@ -99,6 +100,8 @@ type PublicAdvertSearchResult = AdvertPostWithMedia & {
   location?: PublicAdvertLocation;
   /** Anonymous public counts over the last PUBLIC_LISTING_STATS_DAYS days. */
   stats?: PublicListingStats;
+  /** The business's visible review average and count, when it has reviews. */
+  rating?: { average: number | null; count: number };
   rankScore: number;
   rankReasons: string[];
   boosted: boolean;
@@ -120,6 +123,7 @@ export class AdvertsService {
     private readonly mediaAdapters: MediaAdapters = createDefaultMediaAdapters(),
     @Optional() private readonly analytics: AnalyticsService = new AnalyticsService(),
     @Optional() private readonly profiles?: ProfilesService,
+    @Optional() private readonly reviews?: ReviewsService,
   ) {}
 
   async createAdvert(
@@ -1373,7 +1377,7 @@ export class AdvertsService {
     };
   }
 
-  /** Attach anonymous public view and enquiry counts (one query per business). */
+  /** Attach anonymous view/enquiry counts (one query per business) and review summaries (one query). */
   private async withPublicStats(
     results: PublicAdvertSearchResult[],
     now: string,
@@ -1392,11 +1396,20 @@ export class AdvertsService {
       }
       return pending;
     };
+    const ratings = this.reviews
+      ? await this.reviews
+          .summariesFor(results.map((result) => result.tenantId))
+          .catch(() => undefined)
+      : undefined;
     return Promise.all(
-      results.map(async (result) => ({
-        ...result,
-        stats: (await countsFor(result.tenantId)).get(result.id) ?? { views: 0, enquiries: 0 },
-      })),
+      results.map(async (result) => {
+        const rating = ratings?.get(result.tenantId);
+        return {
+          ...result,
+          stats: (await countsFor(result.tenantId)).get(result.id) ?? { views: 0, enquiries: 0 },
+          ...(rating ? { rating } : {}),
+        };
+      }),
     );
   }
 
