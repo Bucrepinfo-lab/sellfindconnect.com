@@ -154,7 +154,7 @@ export function summarizeBusinessReviews(reviews: readonly BusinessReview[]): Bu
     if (review.status !== 'VISIBLE') continue;
     const index = review.rating - 1;
     if (index < 0 || index > 4) continue;
-    distribution[index] += 1;
+    distribution[index] = (distribution[index] ?? 0) + 1;
     total += review.rating;
     count += 1;
   }
