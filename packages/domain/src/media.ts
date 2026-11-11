@@ -1,3 +1,5 @@
+import { screenPhoto } from './photo-filters';
+
 export const mediaAssetKinds = ['IMAGE', 'VIDEO'] as const;
 
 export type MediaAssetKind = (typeof mediaAssetKinds)[number];
@@ -118,6 +120,22 @@ export function detectMediaKind(mimeType: string): MediaAssetKind | undefined {
   return undefined;
 }
 
+/**
+ * Photo screening shared by every upload section (profile, advert, chat).
+ * Blocked words are left to the zero-tolerance metadata check that follows.
+ */
+function photoScreenReasons(input: {
+  fileName: string;
+  mimeType: string;
+  fileSizeBytes: number;
+  width?: number;
+  height?: number;
+  caption?: string;
+}): string[] {
+  // A profile logo is attached with the caption "Logo" and may be smaller.
+  return screenPhoto(input, [], { logo: input.caption === 'Logo' }).reasons.filter((reason) => reason !== 'UNSAFE_PHOTO_TEXT');
+}
+
 export function evaluateMediaAssetInput(input: MediaAssetInput): MediaPolicyDecision {
   const reasons: string[] = [];
   const kind = detectMediaKind(input.mimeType);
@@ -132,6 +150,10 @@ export function evaluateMediaAssetInput(input: MediaAssetInput): MediaPolicyDeci
     reasons.push('IMAGE_TOO_LARGE');
   } else if (kind === 'VIDEO' && input.fileSizeBytes > mediaPolicy.maxVideoBytes) {
     reasons.push('VIDEO_TOO_LARGE');
+  }
+
+  if (kind === 'IMAGE') {
+    reasons.push(...photoScreenReasons(input));
   }
 
   if (kind === 'VIDEO') {
@@ -170,6 +192,10 @@ export function evaluateMediaUploadPreparationInput(
     reasons.push('IMAGE_TOO_LARGE');
   } else if (kind === 'VIDEO' && input.fileSizeBytes > mediaPolicy.maxVideoBytes) {
     reasons.push('VIDEO_TOO_LARGE');
+  }
+
+  if (kind === 'IMAGE') {
+    reasons.push(...photoScreenReasons(input));
   }
 
   return reasons.length > 0
