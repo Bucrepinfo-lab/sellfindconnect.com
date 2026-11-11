@@ -563,7 +563,6 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
                   writeFiltersToUrl({ q: query, industry, role, county, constituency, ward, sort: item.mode });
                 }}
               >
-                <SfcIcon name={roleIconName(item.role)} size={16} />
                 {item.label}
               </button>
             ))}
