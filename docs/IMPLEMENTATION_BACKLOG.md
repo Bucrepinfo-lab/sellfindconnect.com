@@ -644,9 +644,9 @@ Progress:
 - [x] New public home, result cards, badges, sorts, share.
 - [x] Structured location on the business profile (county, constituency, ward, landmark; `serviceArea` JSON, no migration); public search filters on it.
 - [ ] Ratings and reviews with moderation (owner approval: database, policy).
-- [ ] Public view and enquiry counts; "Most viewed" and "Most asked" sorts.
-- [ ] "Use my location" county picker (Play Data safety update).
-- [ ] Regenerate app icons and Play art from the new mark once approved.
+- [x] Public view and enquiry counts; "Most viewed" and "Most asked" sorts.
+- [x] "Use my location" county suggestion, worked out on the device.
+- [x] New mark, app icons and Play listing icon (`docs/brand/`); onboarding "why" points.
 
 ## Immediate Sprint
 

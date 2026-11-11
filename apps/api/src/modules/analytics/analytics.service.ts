@@ -231,6 +231,28 @@ export class AnalyticsService {
     @Optional() private readonly auth?: AuthService,
   ) {}
 
+  /**
+   * Public counts per listing for one business: VIEW and INQUIRY events on
+   * LISTING entities since `from`. Returns listing id -> counts.
+   */
+  async countPublicListingEvents(
+    tenantId: string,
+    from: string,
+    to: string,
+  ): Promise<Map<string, { views: number; enquiries: number }>> {
+    const events = await this.repository.listEvents({ tenantId, from, to });
+    const counts = new Map<string, { views: number; enquiries: number }>();
+    for (const event of events) {
+      if (event.entityType !== 'LISTING') continue;
+      if (event.eventType !== 'VIEW' && event.eventType !== 'INQUIRY') continue;
+      const current = counts.get(event.entityId) ?? { views: 0, enquiries: 0 };
+      if (event.eventType === 'VIEW') current.views += 1;
+      else current.enquiries += 1;
+      counts.set(event.entityId, current);
+    }
+    return counts;
+  }
+
   async recordEvent(tenantId: string, input: CreateAnalyticsEventDto): Promise<AnalyticsEvent> {
     const country = getCountry(input.countryCode);
     if (!country) {

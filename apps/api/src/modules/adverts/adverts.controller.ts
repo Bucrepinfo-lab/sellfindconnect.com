@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import type { Request } from 'express';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 
 import { RequireTenantPermission } from '../../common/tenant-permission.guard';
@@ -15,6 +16,7 @@ import {
   PublicAdvertSearchDto,
   PublishAdvertDraftDto,
   RecordAdvertDiscoveryEventDto,
+  RecordPublicListingEventDto,
   RenewAdvertDto,
   RunAdvertLifecycleDto,
   RunSavedAdvertSearchAlertsDto,
@@ -295,5 +297,17 @@ export class PublicAdvertsController {
   @Get(':id')
   getOne(@Param('id') id: string) {
     return this.adverts.getPublicAdvert(id);
+  }
+
+  /** Anonymous view / contact-tap counter. Always 204; repeats are dropped quietly. */
+  @Post(':id/events')
+  @HttpCode(204)
+  async recordEvent(@Param('id') id: string, @Body() body: RecordPublicListingEventDto, @Req() request: Request) {
+    const visitor =
+      request.header('fly-client-ip') ??
+      request.header('x-forwarded-for')?.split(',')[0]?.trim() ??
+      request.ip ??
+      'unknown';
+    await this.adverts.recordPublicListingEvent(id, body.eventType, `${visitor}|${request.header('user-agent') ?? ''}`);
   }
 }

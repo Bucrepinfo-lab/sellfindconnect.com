@@ -85,6 +85,20 @@ export default function OnboardingPage() {
               <span className="ob__card-cta">Start searching →</span>
             </button>
           </div>
+          <ul className="ob__why" aria-label="Why SellFindConnect">
+            <li>
+              <strong>Talk to the business directly</strong>
+              <span>Call or WhatsApp from the listing. We never sell your enquiry.</span>
+            </li>
+            <li>
+              <strong>Checked accounts</strong>
+              <span>Every business confirms its account, and photos are checked before they show.</span>
+            </li>
+            <li>
+              <strong>Search by place</strong>
+              <span>Find businesses by county, constituency, ward or a market you know.</span>
+            </li>
+          </ul>
           <WebOnlyCheckout>
             <p className="ob__reassure">Free for 30 days · No card required · Cancel anytime</p>
           </WebOnlyCheckout>

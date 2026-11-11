@@ -57,6 +57,16 @@ describe('listing display', () => {
     expect(input.map((item) => item.id)).toEqual(['a', 'b', 'c']);
   });
 
+  it('sorts by public views and enquiries, keeping best-match order on ties', () => {
+    const a = { id: 'a', publishedAt: NOW, expiresAt: NOW, stats: { views: 5, enquiries: 0 } };
+    const b = { id: 'b', publishedAt: NOW, expiresAt: NOW, stats: { views: 40, enquiries: 2 } };
+    const c = { id: 'c', publishedAt: NOW, expiresAt: NOW };
+    const d = { id: 'd', publishedAt: NOW, expiresAt: NOW, stats: { views: 5, enquiries: 9 } };
+    expect(sortListings([a, b, c, d], 'MOST_VIEWED').map((item) => item.id)).toEqual(['b', 'a', 'd', 'c']);
+    expect(sortListings([a, b, c, d], 'MOST_ASKED').map((item) => item.id)).toEqual(['d', 'b', 'a', 'c']);
+    expect(parseListingSortMode('most-viewed')).toBe('MOST_VIEWED');
+  });
+
   it('falls back to best match for an unknown sort', () => {
     expect(parseListingSortMode('newest')).toBe('NEWEST');
     expect(parseListingSortMode('ending-soon')).toBe('ENDING_SOON');
