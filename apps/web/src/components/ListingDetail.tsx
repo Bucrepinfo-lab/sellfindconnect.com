@@ -10,7 +10,9 @@ import { formatDmy } from '../lib/dates';
 import { codeLabel, industryLabel } from '../lib/labels';
 import { useStoredSession } from '../lib/use-session';
 import type { PublicAdvert } from './LiveSearch';
+import { ShareBar } from './ShareBar';
 import '../styles/business.css';
+import '../styles/home.css';
 
 type Load = { status: 'loading' } | { status: 'missing' } | { status: 'error'; message: string } | { status: 'ok'; advert: PublicAdvert };
 
@@ -193,6 +195,13 @@ function ListingBody(props: {
         ) : (
           <p className="biz-sub">This business has not added contact details yet.</p>
         )}
+        <div style={{ marginTop: 12 }}>
+          <ShareBar
+            label="Share this listing"
+            title={advert.title}
+            text={`${advert.title} by ${advert.displayName} on SellFindConnect:`}
+          />
+        </div>
       </article>
 
       <section className="biz-card" style={{ marginTop: 16 }} aria-label="Report or block">

@@ -81,7 +81,7 @@ export default function OnboardingPage() {
             <button className="ob__card ob__card--find" onClick={() => pickIntent("FIND")} aria-label="I want to find a supplier or partner">
               <span className="ob__card-icon" aria-hidden="true">🔍</span>
               <span className="ob__card-title">Find / Source</span>
-              <span className="ob__card-desc">Search thousands of verified suppliers, distributors and partners</span>
+              <span className="ob__card-desc">Search suppliers, distributors and partners in all 47 counties, then contact them directly</span>
               <span className="ob__card-cta">Start searching →</span>
             </button>
           </div>

@@ -1,52 +1,145 @@
 'use client';
 
+import { BadgeCheck, Flag, Handshake, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 
 import { WebOnlyCheckout } from '../lib/app-context';
 import { useStoredSession } from '../lib/use-session';
+import { BrandLogo } from './BrandLogo';
 import { LiveSearch, type SearchFilters } from './LiveSearch';
+import { ShareBar } from './ShareBar';
 import '../styles/business.css';
+import '../styles/home.css';
 
-/** Public home: real search over published adverts, plus the policies. Nothing role-specific. */
+/**
+ * Each reason answers a complaint people make about other directories and
+ * marketplaces, and each one describes something this product already does.
+ */
+const REASONS = [
+  {
+    icon: Handshake,
+    title: 'You talk to the business itself',
+    text: 'Call or WhatsApp the number on the listing. We do not sit in the middle, take a cut of your deal or sell your enquiry to anyone else.',
+  },
+  {
+    icon: BadgeCheck,
+    title: 'A checked account behind every listing',
+    text: 'A business confirms its account with a one-time code before it can publish, and its photos are checked before they show.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'One flat price, no sales calls',
+    text: 'Listing costs the same small amount for every business, and searching is free. We do not phone you to sell upgrades.',
+    webOnly: true,
+  },
+  {
+    icon: Flag,
+    title: 'Report it, block it, gone',
+    text: 'Every listing has Report and Block. Scams, fakes and prohibited goods are removed, and a business you block stays hidden from you.',
+  },
+];
+
+const STEPS = [
+  { title: 'Search', text: 'Type what you need and pick your county.' },
+  { title: 'Compare', text: 'Open listings to see photos, what they offer and where they are.' },
+  { title: 'Connect', text: 'Call or WhatsApp the business directly and agree your own terms.' },
+];
+
+/** Public home: real search over published adverts, the reasons to trust it and the policies. */
 export function PublicHome({ initial }: { initial: SearchFilters }) {
   const session = useStoredSession();
   return (
-    <main className="biz-page">
-      <nav className="biz-topnav" aria-label="Site navigation">
-        <strong style={{ color: 'var(--green)' }}>SellFindConnect</strong>
-        <span style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+    <main className="home">
+      <nav className="home-nav" aria-label="Site navigation">
+        <Link href="/" className="home-nav__brand" aria-label="SellFindConnect home">
+          <BrandLogo />
+        </Link>
+        <span className="home-nav__links">
           {session ? (
-            <Link href="/dashboard">Your business</Link>
+            <Link className="home-nav__cta" href="/dashboard">
+              Your business
+            </Link>
           ) : (
             <>
               <Link href="/dashboard">Sign in</Link>
-              <Link href="/dashboard?signup=1">List your business</Link>
+              <Link className="home-nav__cta" href="/dashboard?signup=1">
+                List your business
+              </Link>
             </>
           )}
         </span>
       </nav>
 
-      <header style={{ margin: '8px 0 16px' }}>
-        <p className="biz-pill">Kenya&apos;s business-to-business directory</p>
-        <h1 style={{ margin: '10px 0 6px' }}>Find the supplier, buyer or transporter your business needs.</h1>
-        <p className="biz-sub">
-          Search businesses across every link of the supply chain and contact them directly.
-          <WebOnlyCheckout> Listing your business is free for the first month.</WebOnlyCheckout>
-        </p>
-      </header>
+      <LiveSearch initial={initial}>
+        <header className="home-hero__heading">
+          <h1>Find who sells it, buys it or moves it, anywhere in Kenya.</h1>
+          <p>Suppliers, wholesalers, transporters and service providers in all 47 counties. Search free, then contact them directly.</p>
+        </header>
+      </LiveSearch>
 
-      <LiveSearch initial={initial} />
+      <section className="home-section" aria-labelledby="why-heading">
+        <h2 id="why-heading">Why businesses use SellFindConnect</h2>
+        <ul className="reason-list">
+          {REASONS.map((reason) => {
+            const Icon = reason.icon;
+            const item = (
+              <li key={reason.title} className="reason">
+                <span className="reason__icon" aria-hidden="true">
+                  <Icon size={22} />
+                </span>
+                <div>
+                  <h3>{reason.title}</h3>
+                  <p>{reason.text}</p>
+                </div>
+              </li>
+            );
+            return reason.webOnly ? <WebOnlyCheckout key={reason.title}>{item}</WebOnlyCheckout> : item;
+          })}
+        </ul>
+      </section>
 
-      <section className="biz-card" style={{ marginTop: 16 }} id="zero-tolerance">
-        <h2>What we never allow</h2>
+      <section className="home-section" aria-labelledby="how-heading">
+        <h2 id="how-heading">How it works</h2>
+        <ol className="step-list">
+          {STEPS.map((step) => (
+            <li key={step.title}>
+              <h3>{step.title}</h3>
+              <p>{step.text}</p>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section className="sell-band" aria-labelledby="sell-heading">
+        <div>
+          <h2 id="sell-heading">Selling something? Be found where buyers are searching.</h2>
+          <p>
+            Put up your business with photos, what you offer and where you are. It takes a few minutes on your phone.
+            <WebOnlyCheckout> Your first month is free.</WebOnlyCheckout>
+          </p>
+        </div>
+        <div className="sell-band__actions">
+          <Link className="sell-band__cta" href={session ? '/dashboard/adverts/new' : '/dashboard?signup=1'}>
+            {session ? 'Post an advert' : 'List your business'}
+          </Link>
+          <ShareBar
+            label="Tell a business"
+            title="SellFindConnect"
+            text="Find suppliers, buyers and transporters across Kenya on SellFindConnect."
+          />
+        </div>
+      </section>
+
+      <details className="home-section safety-note" id="zero-tolerance">
+        <summary>What we never allow</summary>
         <p className="biz-sub">
           Illegal goods, weapons, drugs, exploitation, scams and other prohibited content are removed and reported. Every
           listing can be reported, and every business can be blocked.
         </p>
         <Link href="/prohibited">Read the prohibited content policy</Link>
-      </section>
+      </details>
 
-      <footer className="biz-footer">
+      <footer className="biz-footer home-footer">
         <Link href="/terms">Terms</Link>
         <Link href="/privacy">Privacy</Link>
         <Link href="/community">Community standards</Link>

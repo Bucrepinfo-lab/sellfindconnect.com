@@ -471,3 +471,18 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   call (or just goes live if the original was already removed). Drafts made
   before the column keep the device-local fallback and the explicit
   `replacesAdvertId` on publish.
+- 2026-11-11: Owner request (11/11/26): research competitors' user complaints
+  and restructure the public home around them. Findings and plan are in
+  `docs/MVP_RESTRUCTURE_RESEARCH.md`. Shipped: Kenya places (47 counties, 290
+  constituencies, 1,450 wards, Legal Notice 14 of 2012) and a starter list of
+  well-known markets, malls and chains in `@telpen/domain`; listing badges
+  (Featured, New, photos, days-left) and sorts (Best match, Newest, Ending
+  soon); a new public home (logo mark, search hero with county, role and
+  industry chips, collapsed "More filters" with constituency and ward, result
+  cards, markets, "Why", "How it works", seller band, share and copy link on
+  home and listings). The area filter matches place names in listing text
+  until listings carry a structured location. Home copy states only what the
+  product does; the onboarding "thousands of verified suppliers" line is
+  removed. Not done, awaiting owner approval: structured location (database),
+  ratings and reviews (database, policy), public view counts, GPS, new app
+  icons.
