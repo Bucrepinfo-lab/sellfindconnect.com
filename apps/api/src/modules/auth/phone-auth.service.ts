@@ -4,6 +4,7 @@ import {
   HttpStatus,
   Inject,
   Injectable,
+  Logger,
   Optional,
   ServiceUnavailableException,
   UnauthorizedException,
@@ -23,6 +24,24 @@ import {
   type TrustedDeviceRecord,
 } from './phone-auth.repository';
 import { SlidingWindowLimiter } from './rate-limiter';
+
+/**
+ * Why an SMS failed, for the server log only: the provider's own error or
+ * per-recipient status (e.g. InsufficientBalance, InvalidSenderId). Never
+ * includes keys, the code or the full phone number.
+ */
+export function smsFailureReason(raw: unknown): string {
+  if (!raw || typeof raw !== 'object') return 'no provider response';
+  const value = raw as {
+    error?: unknown;
+    SMSMessageData?: { Message?: unknown; Recipients?: { status?: unknown; statusCode?: unknown }[] };
+  };
+  if (typeof value.error === 'string') return value.error;
+  const recipient = value.SMSMessageData?.Recipients?.[0];
+  if (recipient) return `${String(recipient.status ?? 'unknown')} (${String(recipient.statusCode ?? '?')})`;
+  if (typeof value.SMSMessageData?.Message === 'string') return value.SMSMessageData.Message.slice(0, 160);
+  return 'unexpected provider response';
+}
 
 export const SMS_CODE_TTL_MS = 5 * 60 * 1000;
 export const SMS_CODE_MAX_ATTEMPTS = 5;
@@ -60,6 +79,7 @@ function smsRequired(code: 'SMS_REQUIRED' | 'PIN_LOCKED' | 'PIN_NOT_SET', messag
  */
 @Injectable()
 export class PhoneAuthService {
+  private readonly logger = new Logger(PhoneAuthService.name);
   private readonly codeRequestsByIp = new SlidingWindowLimiter(10, 10 * 60 * 1000);
   private readonly codeChecksByIp = new SlidingWindowLimiter(30, 10 * 60 * 1000);
   private readonly pinChecksByIp = new SlidingWindowLimiter(30, 10 * 60 * 1000);
@@ -117,6 +137,11 @@ export class PhoneAuthService {
           .sendSms(phone, `${code} is your SellFindConnect code. It expires in 5 minutes. Never share it.`)
           .catch(() => ({ ok: false, raw: undefined }))
       : { ok: false, raw: undefined };
+    if (!delivery.ok) {
+      this.logger.warn(
+        `SMS code not delivered to ${this.maskPhone(phone)}: ${smsFailureReason(delivery.raw)}`,
+      );
+    }
     if (!delivery.ok && this.isProduction()) {
       throw new ServiceUnavailableException('We could not send the SMS right now. Try again shortly.');
     }
