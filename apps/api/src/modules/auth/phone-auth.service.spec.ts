@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AuthService } from './auth.service';
 import { InMemoryAuthRepository } from './in-memory-auth.repository';
 import { InMemoryPhoneAuthRepository } from './in-memory-phone-auth.repository';
-import { PhoneAuthService } from './phone-auth.service';
+import { PhoneAuthService, smsFailureReason } from './phone-auth.service';
 
 const ip = '203.0.113.7';
 const details = {
@@ -197,5 +197,16 @@ describe('PhoneAuthService', () => {
       result: { status: 'SIGNED_IN' },
     });
     await expect(phone.verifyCode('0700111223', '246810', '192.0.2.99')).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+});
+
+describe('smsFailureReason', () => {
+  it('names the provider reason without keys or numbers', () => {
+    expect(smsFailureReason({ error: 'africastalking_not_configured' })).toBe('africastalking_not_configured');
+    expect(
+      smsFailureReason({ SMSMessageData: { Recipients: [{ status: 'InsufficientBalance', statusCode: 405 }] } }),
+    ).toBe('InsufficientBalance (405)');
+    expect(smsFailureReason({ SMSMessageData: { Message: 'InvalidSenderId', Recipients: [] } })).toBe('InvalidSenderId');
+    expect(smsFailureReason(undefined)).toBe('no provider response');
   });
 });
