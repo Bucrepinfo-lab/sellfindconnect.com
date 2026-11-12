@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { countries, industryCategories, supplyChainRoles } from '@telpen/domain';
+import { countries, evaluatePasswordPolicy, industryCategories, supplyChainRoles } from '@telpen/domain';
 
 import { WebOnlyCheckout } from '../lib/app-context';
 
@@ -36,7 +36,12 @@ function roleLabel(role: string) {
 async function readError(response: Response) {
   const body = await response.text();
   try {
-    const parsed = JSON.parse(body) as { message?: string | string[] };
+    const parsed = JSON.parse(body) as { message?: string | string[]; passwordPolicy?: { missing?: string[] } };
+    // Say exactly what the password still needs (owner 12/11/26: the bare
+    // "does not meet the security policy" gave no clue).
+    if (parsed.passwordPolicy?.missing?.length) {
+      return `Password still needs: ${parsed.passwordPolicy.missing.join(' ')}`;
+    }
     if (Array.isArray(parsed.message)) return parsed.message.join(', ');
     if (parsed.message) return parsed.message;
   } catch {
@@ -66,12 +71,13 @@ export function SignUpForm({
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
+  const passwordCheck = evaluatePasswordPolicy(password);
 
   const ready =
     businessName.trim().length >= 2 &&
     displayName.trim().length >= 2 &&
     email.includes('@') &&
-    password.length >= 8 &&
+    passwordCheck.allowed &&
     acceptedTerms &&
     !pending;
 
@@ -140,13 +146,19 @@ export function SignUpForm({
         <input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} />
       </label>
       <label className="field compact-field">
-        <span>Password (at least 8 characters)</span>
+        <span>Password (12+ characters, with upper and lower case, a number and a symbol)</span>
         <input
           type="password"
           autoComplete="new-password"
           value={password}
+          aria-describedby="signup-password-help"
           onChange={(event) => setPassword(event.target.value)}
         />
+        {password && !passwordCheck.allowed ? (
+          <small id="signup-password-help" className="biz-sub" aria-live="polite">
+            Still needed: {passwordCheck.missing?.join(' ')}
+          </small>
+        ) : null}
       </label>
       <label className="field compact-field">
         <span>Phone (optional)</span>
