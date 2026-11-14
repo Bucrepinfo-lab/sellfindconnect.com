@@ -563,3 +563,6 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   counted from `ADVERT_DESCRIPTION_DRAFTED` audit records. Five drafts cost a
   small fraction of the 10-unit monthly price. Nothing is published until the
   business presses Publish.
+
+## 14/11/26 — SMS is transactional only (TELPEN sender)
+- Owner: the "TELPEN" Africa's Talking sender ID was applied for transactional use only. `smsTransactionalEvents` / `smsAllowedFor` in `packages/domain/src/notifications.ts`: the delivery plan drops SMS for any event type not on the list (today: Source Finder opportunity matches), even with consent; promotion reaches subscribed members in-app (and email/push where agreed). Tests in notifications.test.ts.
