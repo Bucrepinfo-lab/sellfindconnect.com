@@ -1,5 +1,5 @@
 import { kenyaCountyHeadquarters } from './kenya-county-locator';
-import { findKenyaCounty } from './kenya-places';
+import { findKenyaCounty, normalizeKenyaPlace } from './kenya-places';
 
 /**
  * "Nearest first" for the Source Finder, without storing anyone's position.
@@ -10,6 +10,11 @@ import { findKenyaCounty } from './kenya-places';
  * and each business's county. It answers "who is closest to me" across the
  * whole country instead of stopping at a county line, and turns an empty
  * county into "here are the nearest counties that have it".
+ *
+ * Inside a county the hierarchy is the precision: same ward, then same
+ * constituency, then the rest of the county, then other counties by distance
+ * (16/11/26). A county is often 50-100 km across, so "same county" alone
+ * ranks a shop next door level with one at the far end.
  */
 
 export type BusinessPlace = { county?: string; constituency?: string; ward?: string; landmark?: string };
@@ -87,3 +92,57 @@ export function businessDirectionsUrl(place: BusinessPlace | undefined): string 
     .filter((part): part is string => Boolean(part));
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(parts.join(', '))}`;
 }
+
+/** How close a business is to the searcher's place: 0 same ward … 3 another county, 4 unknown. */
+export type PlaceTier = 0 | 1 | 2 | 3 | 4;
+export type PlaceProximity = { tier: PlaceTier; distanceKm: number | undefined };
+
+/**
+ * Compare two places with official spellings (case and spacing ignored).
+ * A ward only counts inside the same constituency, a constituency inside
+ * the same county.
+ */
+export function placeProximity(from: BusinessPlace, to: BusinessPlace | undefined): PlaceProximity {
+  const a = normalizeKenyaPlace(from);
+  const b = normalizeKenyaPlace(to ?? {});
+  const distanceKm = countyDistanceKm(a.county, b.county);
+  if (distanceKm === undefined) return { tier: 4, distanceKm };
+  if (distanceKm > 0) return { tier: 3, distanceKm };
+  if (a.constituency && a.constituency === b.constituency) {
+    return { tier: a.ward && a.ward === b.ward ? 0 : 1, distanceKm };
+  }
+  return { tier: 2, distanceKm };
+}
+
+/**
+ * Nearest first from the searcher's place: same ward, same constituency,
+ * rest of the county, then other counties by distance, unknown places last.
+ * Ties keep the incoming (best-match) order. Returns a new array.
+ */
+export function sortByNearestPlace<T extends { location?: BusinessPlace }>(
+  listings: ReadonlyArray<T>,
+  from: BusinessPlace,
+): Array<T & PlaceProximity> {
+  return listings
+    .map((item, index) => ({ item, index, ...placeProximity(from, item.location) }))
+    .sort(
+      (left, right) =>
+        left.tier - right.tier ||
+        (left.distanceKm ?? Infinity) - (right.distanceKm ?? Infinity) ||
+        left.index - right.index,
+    )
+    .map(({ item, tier, distanceKm }) => ({ ...item, tier, distanceKm }));
+}
+
+/**
+ * "In Kongowea ward" / "In Nyali constituency" / "In Mombasa" /
+ * "About 15 km from Mombasa", named from the searcher's place.
+ */
+export function placeProximityLabel(proximity: PlaceProximity, from: BusinessPlace): string | undefined {
+  const a = normalizeKenyaPlace(from);
+  if (!a.county) return undefined;
+  if (proximity.tier === 0 && a.ward) return `In ${a.ward} ward`;
+  if (proximity.tier === 1 && a.constituency) return `In ${a.constituency} constituency`;
+  return nearbyDistanceLabel(proximity.distanceKm, a.county);
+}
+
