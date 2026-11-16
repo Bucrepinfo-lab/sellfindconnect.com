@@ -353,11 +353,15 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
       (result) => !blockedTenants.includes(result.tenantId) && !blockedTenants.includes(result.id),
     );
     const withPhotos = photosOnly ? allowed.filter((result) => (result.media?.length ?? 0) > 0) : allowed;
-    if (sort === 'NEAREST' && nearFrom) return sortByNearestPlace(withPhotos, nearFrom);
-    const sorted = sort === 'NEAREST' ? withPhotos : sortListings(withPhotos, sort);
+    const sorted: PublicAdvert[] =
+      sort === 'NEAREST' && nearFrom
+        ? sortByNearestPlace(withPhotos, nearFrom)
+        : sort === 'NEAREST'
+          ? withPhotos
+          : sortListings(withPhotos, sort);
     return sorted.map((result) => ({
       ...result,
-      ...(nearFrom ? placeProximity(nearFrom, result.location) : {}),
+      proximity: nearFrom ? placeProximity(nearFrom, result.location) : undefined,
     }));
   }, [state.results, blockedTenants, photosOnly, sort, nearFrom]);
   const nearestCounties = useMemo(() => (county ? countiesByDistance(county).slice(0, 3) : []), [county]);
@@ -707,7 +711,7 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
                   key={result.id}
                   result={result}
                   now={now}
-                  proximity={'tier' in result ? { tier: result.tier, distanceKm: result.distanceKm } : undefined}
+                  proximity={result.proximity}
                   nearFrom={nearFrom}
                 />
               ))}
