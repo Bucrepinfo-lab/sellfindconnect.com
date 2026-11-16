@@ -618,6 +618,17 @@ Implementation progress on 2026-06-20:
   search handling, restored-search controls, and previewable alert candidates.
 - Remaining hardening: native mobile saved-search screens are out of scope.
 
+Nearest first (16/11/26):
+
+- Results can be ordered nearest first from the searcher's county (from "Use
+  my location", worked out on the phone, or the county searched). Each card
+  shows the county-level distance ("About 15 km from Nairobi") and a
+  Directions link built from the business's public place only.
+- An empty county names the nearest counties and widens to all of Kenya,
+  closest first, instead of ending the search.
+- Next (needs a database change, owner approval): a business map pin for
+  exact distance and a results map.
+
 ### 7.6 Precision Matching and Link Intelligence
 
 This is the flagship feature.

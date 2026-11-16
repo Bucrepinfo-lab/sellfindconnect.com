@@ -4,6 +4,9 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import {
+  businessDirectionsUrl,
+  countiesByDistance,
+  countyDistanceKm,
   evaluateSafetyText,
   findKenyaConstituency,
   formatPublicCount,
@@ -16,7 +19,9 @@ import {
   listingBadges,
   listingSortModes,
   nearestKenyaCounty,
+  nearbyDistanceLabel,
   normalizeKenyaPlace,
+  sortByNearestCounty,
   sortListings,
   supplyChainRoles,
   type ListingBadge,
@@ -145,7 +150,20 @@ function badgeIcon(badge: ListingBadge) {
   return null;
 }
 
-function ResultCard({ result, now }: { result: PublicAdvert; now: Date | undefined }) {
+function ResultCard({
+  result,
+  now,
+  distanceKm,
+  nearFrom,
+}: {
+  result: PublicAdvert;
+  now: Date | undefined;
+  /** County-to-county distance from `nearFrom`; undefined when unknown. */
+  distanceKm?: number;
+  nearFrom: string;
+}) {
+  const distance = nearbyDistanceLabel(distanceKm, nearFrom);
+  const directions = businessDirectionsUrl(result.location);
   const images = (result.media ?? []).filter((item) => !item.kind || item.kind === 'IMAGE');
   const cover = images[0];
   const badges = listingBadges({ ...result, media: images }, now);
@@ -208,6 +226,22 @@ function ResultCard({ result, now }: { result: PublicAdvert; now: Date | undefin
           <span className="result-card__summary">{summary}</span>
         </div>
       </Link>
+      {distance || directions ? (
+        <div className="result-card__near">
+          {distance ? (
+            <span className="result-card__distance">
+              <SfcIcon name="locate" size={13} />
+              {distance}
+            </span>
+          ) : null}
+          {directions ? (
+            <a className="result-card__directions" href={directions} target="_blank" rel="noopener noreferrer">
+              <SfcIcon name="pin" size={13} />
+              Directions
+            </a>
+          ) : null}
+        </div>
+      ) : null}
     </li>
   );
 }
@@ -242,7 +276,10 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
   const [county, setCounty] = useState(initialPlace.county ?? '');
   const [constituency, setConstituency] = useState(initialPlace.constituency ?? '');
   const [ward, setWard] = useState(initialPlace.ward ?? '');
-  const [sort, setSort] = useState<ListingSortMode>(initial.sort ?? 'BEST');
+  // NEAREST is ordered on the page (county-to-county distance), so it never goes to the API or the URL.
+  const [sort, setSort] = useState<ListingSortMode | 'NEAREST'>(initial.sort ?? 'BEST');
+  // The searcher's own county: from "Use my location", or kept when they widen an empty county.
+  const [myCounty, setMyCounty] = useState('');
   const [photosOnly, setPhotosOnly] = useState(false);
   const [state, setState] = useState<SearchState>({ status: 'loading', results: [] });
   const [blockedTenants, setBlockedTenants] = useState<string[]>([]);
@@ -251,7 +288,16 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
   const [now, setNow] = useState<Date | undefined>(undefined);
 
   const apply = async (next: Partial<SearchFilters> = {}) => {
-    const filters: SearchFilters = { q: query, industry, role, county, constituency, ward, sort, ...next };
+    const filters: SearchFilters = {
+      q: query,
+      industry,
+      role,
+      county,
+      constituency,
+      ward,
+      sort: sort === 'NEAREST' ? 'BEST' : sort,
+      ...next,
+    };
     setState((current) => ({ ...current, status: 'loading' }));
     writeFiltersToUrl(filters);
     const result = await runSearch(filters);
@@ -294,13 +340,21 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
   }, [signedIn]);
 
   const place = useMemo(() => normalizeKenyaPlace({ county, constituency, ward }), [county, constituency, ward]);
+  // Distances are measured from the searcher's county, or the county being searched.
+  const nearFrom = myCounty || county;
   const visible = useMemo(() => {
     const allowed = state.results.filter(
       (result) => !blockedTenants.includes(result.tenantId) && !blockedTenants.includes(result.id),
     );
     const withPhotos = photosOnly ? allowed.filter((result) => (result.media?.length ?? 0) > 0) : allowed;
-    return sortListings(withPhotos, sort);
-  }, [state.results, blockedTenants, photosOnly, sort]);
+    if (sort === 'NEAREST' && nearFrom) return sortByNearestCounty(withPhotos, nearFrom);
+    const sorted = sort === 'NEAREST' ? withPhotos : sortListings(withPhotos, sort);
+    return sorted.map((result) => ({
+      ...result,
+      distanceKm: nearFrom ? countyDistanceKm(nearFrom, result.location?.county) : undefined,
+    }));
+  }, [state.results, blockedTenants, photosOnly, sort, nearFrom]);
+  const nearestCounties = useMemo(() => (county ? countiesByDistance(county).slice(0, 3) : []), [county]);
 
   const constituencies = findKenyaCounty(county)?.constituencies ?? [];
   const wards = findKenyaConstituency(county, constituency)?.wards ?? [];
@@ -329,6 +383,7 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
           return;
         }
         setLocating('done');
+        setMyCounty(found.name);
         setCounty(found.name);
         setConstituency('');
         setWard('');
@@ -348,6 +403,7 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
     setWard('');
     setPhotosOnly(false);
     setSort('BEST');
+    setMyCounty('');
     void apply({ q: '', industry: '', role: '', county: '', constituency: '', ward: '', sort: 'BEST' });
   };
 
@@ -552,6 +608,19 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
                 : ''}
           </p>
           <div className="sort-tabs" role="group" aria-label="Sort results">
+            {nearFrom ? (
+              <button
+                type="button"
+                aria-pressed={sort === 'NEAREST'}
+                className={`sort-tab${sort === 'NEAREST' ? ' is-active' : ''}`}
+                onClick={() => {
+                  setSort('NEAREST');
+                  writeFiltersToUrl({ q: query, industry, role, county, constituency, ward, sort: 'BEST' });
+                }}
+              >
+                Nearest
+              </button>
+            ) : null}
             {listingSortModes.map((item) => (
               <button
                 key={item.mode}
@@ -577,10 +646,31 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
               <strong>No business matches yet.</strong>
               <p>
                 {place.county
-                  ? `No business in ${kenyaPlaceLabel(place)} matches yet. Try the whole county or all of Kenya.`
+                  ? `No business in ${kenyaPlaceLabel(place)} matches yet.${
+                      nearestCounties.length
+                        ? ` The nearest counties are ${nearestCounties.map((item) => item.county).join(', ')}.`
+                        : ''
+                    }`
                   : 'Try fewer words or a different industry.'}
               </p>
               <div className="biz-actions">
+                {place.county ? (
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={() => {
+                      // Search all of Kenya, closest to this county first.
+                      setMyCounty(myCounty || county);
+                      setCounty('');
+                      setConstituency('');
+                      setWard('');
+                      setSort('NEAREST');
+                      void apply({ county: '', constituency: '', ward: '', sort: 'BEST' });
+                    }}
+                  >
+                    Show the nearest businesses
+                  </button>
+                ) : null}
                 {anyFilter ? (
                   <button type="button" className="secondary-button" onClick={clearAll}>
                     Clear all filters
@@ -595,7 +685,7 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
           {visible.length ? (
             <ul className={`result-grid${state.status === 'loading' ? ' is-refreshing' : ''}`}>
               {visible.map((result) => (
-                <ResultCard key={result.id} result={result} now={now} />
+                <ResultCard key={result.id} result={result} now={now} distanceKm={result.distanceKm} nearFrom={nearFrom} />
               ))}
             </ul>
           ) : null}

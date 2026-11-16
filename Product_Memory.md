@@ -1,7 +1,7 @@
 # Telpen Adverts Product Memory
 
 Date started: 2026-06-15
-Last updated: 2026-11-07
+Last updated: 2026-11-16
 Purpose: Persistent decision log and strategic memory for the Telpen Adverts multi-tenant advertising SaaS.
 
 This file must be updated whenever product strategy, pricing, compliance, architecture, market positioning, or execution decisions change.
@@ -581,3 +581,9 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   adapter + API key) and invoice integration are separate, human-authorised
   changes gated by the finance module's APPROVED-tax-profile path. No repo
   deployed; opened as a draft PR for owner review.
+
+## 16/11/26 — Source Finder: nearest first, distance and directions (owner request)
+- Owner asked to study a "find it near me" stock app (Dawascope) and do better where it fits. Businesses keep county / constituency / ward / landmark (no coordinates, no schema change), so distance is county-headquarters to county-headquarters: `packages/domain/src/kenya-nearby.ts` (`countyDistanceKm`, `countiesByDistance`, `sortByNearestCounty`, `nearbyDistanceLabel`, `businessDirectionsUrl`; vitest in `kenya-nearby.test.ts`).
+- Web Source Finder: a "Nearest" sort (from the searcher's county from "Use my location", or the county searched), "In Nairobi" / "About 15 km from Nairobi" on each card, and a Directions link built from the business's public place only (the searcher's position never goes into a link). An empty county is no longer a dead end: it names the three nearest counties and "Show the nearest businesses" searches all of Kenya closest first.
+- Exact metre-level distance needs a business map pin (a new profile field) — a database change, so it is escalated to the owner rather than done here.
+

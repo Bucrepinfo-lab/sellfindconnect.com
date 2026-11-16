@@ -649,6 +649,8 @@ Progress:
 - [x] Public view and enquiry counts; "Most viewed" and "Most asked" sorts.
 - [x] "Use my location" county suggestion, worked out on the device.
 - [x] New mark, app icons and Play listing icon (`docs/brand/`); onboarding "why" points.
+- [x] Nearest-first Source Finder: county-to-county distance on cards, Directions link, empty county widens to the nearest counties (16/11/26, `kenya-nearby.ts`).
+- [ ] Business map pin (lat/lng on the profile) for metre-level distance and a results map — needs owner approval (database change).
 
 ## Immediate Sprint
 

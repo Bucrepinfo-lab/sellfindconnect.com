@@ -715,6 +715,39 @@
   color: var(--muted);
 }
 
+/* Distance from the searcher's county and a Directions link (outside the card link). */
+.result-card__near {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+  font-size: 0.8rem;
+}
+
+.result-card__distance {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+}
+
+.result-card__directions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.result-card__directions:hover,
+.result-card__directions:focus-visible {
+  text-decoration: underline;
+}
+
 .sort-tabs {
   max-width: 100%;
   overflow-x: auto;
