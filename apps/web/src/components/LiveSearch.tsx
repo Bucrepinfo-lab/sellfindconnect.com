@@ -6,7 +6,6 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   businessDirectionsUrl,
   countiesByDistance,
-  countyDistanceKm,
   evaluateSafetyText,
   findKenyaConstituency,
   formatPublicCount,
@@ -19,9 +18,12 @@ import {
   listingBadges,
   listingSortModes,
   nearestKenyaCounty,
-  nearbyDistanceLabel,
+  placeProximity,
+  placeProximityLabel,
   normalizeKenyaPlace,
-  sortByNearestCounty,
+  sortByNearestPlace,
+  type BusinessPlace,
+  type PlaceProximity,
   sortListings,
   supplyChainRoles,
   type ListingBadge,
@@ -153,16 +155,16 @@ function badgeIcon(badge: ListingBadge) {
 function ResultCard({
   result,
   now,
-  distanceKm,
+  proximity,
   nearFrom,
 }: {
   result: PublicAdvert;
   now: Date | undefined;
-  /** County-to-county distance from `nearFrom`; undefined when unknown. */
-  distanceKm?: number;
-  nearFrom: string;
+  /** How close the business is to `nearFrom` (ward, constituency, county, km). */
+  proximity: PlaceProximity | undefined;
+  nearFrom: BusinessPlace | undefined;
 }) {
-  const distance = nearbyDistanceLabel(distanceKm, nearFrom);
+  const distance = proximity && nearFrom ? placeProximityLabel(proximity, nearFrom) : undefined;
   const directions = businessDirectionsUrl(result.location);
   const images = (result.media ?? []).filter((item) => !item.kind || item.kind === 'IMAGE');
   const cover = images[0];
@@ -276,10 +278,11 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
   const [county, setCounty] = useState(initialPlace.county ?? '');
   const [constituency, setConstituency] = useState(initialPlace.constituency ?? '');
   const [ward, setWard] = useState(initialPlace.ward ?? '');
-  // NEAREST is ordered on the page (county-to-county distance), so it never goes to the API or the URL.
+  // NEAREST is ordered on the page (ward, constituency, county, then km), so it never goes to the API or the URL.
   const [sort, setSort] = useState<ListingSortMode | 'NEAREST'>(initial.sort ?? 'BEST');
-  // The searcher's own county: from "Use my location", or kept when they widen an empty county.
-  const [myCounty, setMyCounty] = useState('');
+  // The searcher's own place: the county from "Use my location", or the place they
+  // searched, kept when they widen an empty ward / constituency / county.
+  const [myPlace, setMyPlace] = useState<BusinessPlace | undefined>(undefined);
   const [photosOnly, setPhotosOnly] = useState(false);
   const [state, setState] = useState<SearchState>({ status: 'loading', results: [] });
   const [blockedTenants, setBlockedTenants] = useState<string[]>([]);
@@ -340,21 +343,26 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
   }, [signedIn]);
 
   const place = useMemo(() => normalizeKenyaPlace({ county, constituency, ward }), [county, constituency, ward]);
-  // Distances are measured from the searcher's county, or the county being searched.
-  const nearFrom = myCounty || county;
+  // Nearness is measured from the searcher's own place, or the place being searched.
+  const nearFrom = useMemo<BusinessPlace | undefined>(
+    () => (myPlace?.county ? myPlace : place.county ? place : undefined),
+    [myPlace, place],
+  );
   const visible = useMemo(() => {
     const allowed = state.results.filter(
       (result) => !blockedTenants.includes(result.tenantId) && !blockedTenants.includes(result.id),
     );
     const withPhotos = photosOnly ? allowed.filter((result) => (result.media?.length ?? 0) > 0) : allowed;
-    if (sort === 'NEAREST' && nearFrom) return sortByNearestCounty(withPhotos, nearFrom);
+    if (sort === 'NEAREST' && nearFrom) return sortByNearestPlace(withPhotos, nearFrom);
     const sorted = sort === 'NEAREST' ? withPhotos : sortListings(withPhotos, sort);
     return sorted.map((result) => ({
       ...result,
-      distanceKm: nearFrom ? countyDistanceKm(nearFrom, result.location?.county) : undefined,
+      ...(nearFrom ? placeProximity(nearFrom, result.location) : {}),
     }));
   }, [state.results, blockedTenants, photosOnly, sort, nearFrom]);
   const nearestCounties = useMemo(() => (county ? countiesByDistance(county).slice(0, 3) : []), [county]);
+  // An empty ward or constituency widens to the whole county first; an empty county to all of Kenya.
+  const widenWithinCounty = Boolean(place.constituency);
 
   const constituencies = findKenyaCounty(county)?.constituencies ?? [];
   const wards = findKenyaConstituency(county, constituency)?.wards ?? [];
@@ -383,7 +391,7 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
           return;
         }
         setLocating('done');
-        setMyCounty(found.name);
+        setMyPlace({ county: found.name });
         setCounty(found.name);
         setConstituency('');
         setWard('');
@@ -403,7 +411,7 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
     setWard('');
     setPhotosOnly(false);
     setSort('BEST');
-    setMyCounty('');
+    setMyPlace(undefined);
     void apply({ q: '', industry: '', role: '', county: '', constituency: '', ward: '', sort: 'BEST' });
   };
 
@@ -462,7 +470,9 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
             {locating === 'busy' ? 'Finding your county…' : 'Use my location'}
           </button>
           <span className="hero-locate__note" aria-live="polite">
-            {locating === 'done' && county ? `Showing ${county}. Change the county if this is not right.` : null}
+            {locating === 'done' && county
+              ? `Showing ${county}. Change it if this is not right, or pick your constituency under More filters for the closest businesses first.`
+              : null}
             {locating === 'denied' ? 'Location is off for this site. Pick your county instead.' : null}
             {locating === 'outside' ? 'You seem to be outside Kenya. Pick a county to search.' : null}
             {locating === 'unavailable' ? 'Could not get your location. Pick your county instead.' : null}
@@ -647,9 +657,11 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
               <p>
                 {place.county
                   ? `No business in ${kenyaPlaceLabel(place)} matches yet.${
-                      nearestCounties.length
-                        ? ` The nearest counties are ${nearestCounties.map((item) => item.county).join(', ')}.`
-                        : ''
+                      widenWithinCounty
+                        ? ` See the rest of ${place.county}, closest to ${place.ward ?? place.constituency} first.`
+                        : nearestCounties.length
+                          ? ` The nearest counties are ${nearestCounties.map((item) => item.county).join(', ')}.`
+                          : ''
                     }`
                   : 'Try fewer words or a different industry.'}
               </p>
@@ -659,16 +671,22 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
                     type="button"
                     className="primary-button"
                     onClick={() => {
-                      // Search all of Kenya, closest to this county first.
-                      setMyCounty(myCounty || county);
-                      setCounty('');
+                      // Keep where the searcher is, widen one level, closest first:
+                      // ward/constituency -> whole county; county -> all of Kenya.
+                      // The picked constituency/ward is more precise than a GPS county.
+                      setMyPlace(place.constituency || !myPlace?.county ? place : myPlace);
                       setConstituency('');
                       setWard('');
                       setSort('NEAREST');
+                      if (widenWithinCounty) {
+                        void apply({ constituency: '', ward: '', sort: 'BEST' });
+                        return;
+                      }
+                      setCounty('');
                       void apply({ county: '', constituency: '', ward: '', sort: 'BEST' });
                     }}
                   >
-                    Show the nearest businesses
+                    {widenWithinCounty ? `Show the nearest in ${place.county}` : 'Show the nearest businesses'}
                   </button>
                 ) : null}
                 {anyFilter ? (
@@ -685,7 +703,13 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
           {visible.length ? (
             <ul className={`result-grid${state.status === 'loading' ? ' is-refreshing' : ''}`}>
               {visible.map((result) => (
-                <ResultCard key={result.id} result={result} now={now} distanceKm={result.distanceKm} nearFrom={nearFrom} />
+                <ResultCard
+                  key={result.id}
+                  result={result}
+                  now={now}
+                  proximity={'tier' in result ? { tier: result.tier, distanceKm: result.distanceKm } : undefined}
+                  nearFrom={nearFrom}
+                />
               ))}
             </ul>
           ) : null}

@@ -5,7 +5,10 @@ import {
   countiesByDistance,
   countyDistanceKm,
   nearbyDistanceLabel,
+  placeProximity,
+  placeProximityLabel,
   sortByNearestCounty,
+  sortByNearestPlace,
 } from './kenya-nearby';
 
 describe('county-to-county distance', () => {
@@ -66,3 +69,55 @@ describe('labels and directions', () => {
     expect(businessDirectionsUrl(undefined)).toBeUndefined();
   });
 });
+
+describe('constituency and ward precision', () => {
+  const me = { county: 'Mombasa', constituency: 'Nyali', ward: 'Kongowea' };
+
+  it('tiers: same ward, same constituency, same county, other county, unknown', () => {
+    expect(placeProximity(me, { county: 'mombasa', constituency: 'NYALI', ward: 'kongowea' }).tier).toBe(0);
+    expect(placeProximity(me, { county: 'Mombasa', constituency: 'Nyali', ward: 'Frere Town' }).tier).toBe(1);
+    expect(placeProximity(me, { county: 'Mombasa', constituency: 'Kisauni' }).tier).toBe(2);
+    expect(placeProximity(me, { county: 'Kilifi' }).tier).toBe(3);
+    expect(placeProximity(me, undefined).tier).toBe(4);
+  });
+
+  it('a ward name only counts inside the same constituency', () => {
+    // Searcher without a ward: same constituency is tier 1, never 0.
+    expect(placeProximity({ county: 'Mombasa', constituency: 'Nyali' }, { county: 'Mombasa', constituency: 'Nyali', ward: 'Kongowea' }).tier).toBe(1);
+  });
+
+  it('ranks the shop next door above one across the county, ties keep best match', () => {
+    const rows = [
+      { id: 'kilifi', location: { county: 'Kilifi' } },
+      { id: 'kisauni', location: { county: 'Mombasa', constituency: 'Kisauni' } },
+      { id: 'nyali-other', location: { county: 'Mombasa', constituency: 'Nyali', ward: 'Frere Town' } },
+      { id: 'none' },
+      { id: 'next-door', location: { county: 'Mombasa', constituency: 'Nyali', ward: 'Kongowea' } },
+      { id: 'county-only', location: { county: 'Mombasa' } },
+    ];
+    expect(sortByNearestPlace(rows, me).map((row) => row.id)).toEqual([
+      'next-door',
+      'nyali-other',
+      'kisauni',
+      'county-only',
+      'kilifi',
+      'none',
+    ]);
+    // County-only sort keeps all Mombasa rows level (the old behaviour).
+    expect(sortByNearestCounty(rows, 'Mombasa').slice(0, 4).map((row) => row.id)).toEqual([
+      'kisauni',
+      'nyali-other',
+      'next-door',
+      'county-only',
+    ]);
+  });
+
+  it('labels name the most specific shared place', () => {
+    expect(placeProximityLabel({ tier: 0, distanceKm: 0 }, me)).toBe('In Kongowea ward');
+    expect(placeProximityLabel({ tier: 1, distanceKm: 0 }, me)).toBe('In Nyali constituency');
+    expect(placeProximityLabel({ tier: 2, distanceKm: 0 }, me)).toBe('In Mombasa');
+    expect(placeProximityLabel({ tier: 3, distanceKm: 61 }, me)).toBe('About 60 km from Mombasa');
+    expect(placeProximityLabel({ tier: 4, distanceKm: undefined }, me)).toBeUndefined();
+  });
+});
+

@@ -650,6 +650,8 @@ Progress:
 - [x] "Use my location" county suggestion, worked out on the device.
 - [x] New mark, app icons and Play listing icon (`docs/brand/`); onboarding "why" points.
 - [x] Nearest-first Source Finder: county-to-county distance on cards, Directions link, empty county widens to the nearest counties (16/11/26, `kenya-nearby.ts`).
+- [x] Constituency and ward precision in nearest-first ranking and labels; empty ward/constituency widens to the county (16/11/26).
+- [ ] Constituency suggestion from GPS (needs official constituency centre points, e.g. IEBC data, verified before use).
 - [ ] Business map pin (lat/lng on the profile) for metre-level distance and a results map — needs owner approval (database change).
 
 ## Immediate Sprint

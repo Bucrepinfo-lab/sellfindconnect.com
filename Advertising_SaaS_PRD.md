@@ -626,6 +626,10 @@ Nearest first (16/11/26):
   Directions link built from the business's public place only.
 - An empty county names the nearest counties and widens to all of Kenya,
   closest first, instead of ending the search.
+- Within a county the ranking uses the hierarchy: same ward, then same
+  constituency, then the rest of the county, then other counties by
+  distance. Cards say "In Kongowea ward" / "In Nyali constituency". An empty
+  ward or constituency widens to the whole county, closest first.
 - Next (needs a database change, owner approval): a business map pin for
   exact distance and a results map.
 
