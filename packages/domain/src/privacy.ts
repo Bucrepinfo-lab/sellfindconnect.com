@@ -1,4 +1,4 @@
-﻿export type DeletionStatus = 'NONE' | 'REQUESTED' | 'PROCESSING' | 'COMPLETED' | 'CANCELLED';
+export type DeletionStatus = 'NONE' | 'REQUESTED' | 'PROCESSING' | 'COMPLETED' | 'CANCELLED';
 export type DataCategory = 'PROFILE' | 'ADVERTS' | 'CONVERSATIONS' | 'ANALYTICS' | 'BILLING' | 'MEDIA' | 'AUTH_LOGS';
 
 export interface DeletionRequest {

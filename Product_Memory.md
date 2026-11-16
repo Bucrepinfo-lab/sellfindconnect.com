@@ -471,6 +471,101 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
   call (or just goes live if the original was already removed). Drafts made
   before the column keep the device-local fallback and the explicit
   `replacesAdvertId` on publish.
+- 2026-11-11: Owner request (11/11/26): research competitors' user complaints
+  and restructure the public home around them. Findings and plan are in
+  `docs/MVP_RESTRUCTURE_RESEARCH.md`. Shipped: Kenya places (47 counties, 290
+  constituencies, 1,450 wards, Legal Notice 14 of 2012) and a starter list of
+  well-known markets, malls and chains in `@telpen/domain`; listing badges
+  (Featured, New, photos, days-left) and sorts (Best match, Newest, Ending
+  soon); a new public home (logo mark, search hero with county, role and
+  industry chips, collapsed "More filters" with constituency and ward, result
+  cards, markets, "Why", "How it works", seller band, share and copy link on
+  home and listings). The area filter matches place names in listing text
+  until listings carry a structured location. Home copy states only what the
+  product does; the onboarding "thousands of verified suppliers" line is
+  removed. Not done, awaiting owner approval: structured location (database),
+  ratings and reviews (database, policy), public view counts, GPS, new app
+  icons.
+- 2026-11-11: Owner asked (11/11/26) for a logo that describes the slogan and
+  works for a global market, not a Kenyan niche, and does not look like a
+  snake. New mark: a price tag (Sell it) seen through a magnifying glass (Find
+  it), whose handle joins a second point (Connect). Green #1d4f45, gold
+  #e0b040, white. Replaces the S-curve mark. Master art and the Play listing
+  icon are in `docs/brand/`; web/PWA icons regenerated in
+  `apps/web/public/icons/`. The Play app icon changes only with the next .aab.
+- 2026-11-11: Owner (11/11/26) asked to fix two caveats of the home
+  restructure. (1) Area search is now exact: a business sets county,
+  constituency, ward and nearest landmark on its profile ("Where buyers find
+  you"), stored in the existing `serviceArea` JSON (no migration). Kenyan
+  places are saved with official spellings; an unknown county is refused.
+  `GET /v1/public/adverts/search` takes `county`, `constituency`, `ward`,
+  matches the set location exactly, and falls back to the advert text for
+  businesses that have not set one; results and the listing page carry
+  `location`. (2) The home pricing promise no longer commits to "no sales
+  calls" or "one flat price": it says searching is free, the monthly listing
+  fee is shown before paying, and extras are optional and priced upfront.
+- 2026-11-11: Owner approved the logo and home page (PR #82 merged) and asked
+  to fix the remaining follow-ups. Added: anonymous public listing counts
+  (`POST /v1/public/adverts/:id/events`, VIEW or INQUIRY, always 204; one
+  count per visitor per listing per 30 minutes, 60 events a minute cap; the
+  visitor key is a SHA-256 of IP and user agent held in memory only) recorded
+  as LISTING analytics events with consent NOT_REQUIRED; search results and
+  the listing page carry `stats` (last 90 days); web sorts "Most viewed" and
+  "Most asked". "Use my location" suggests the county on the device from
+  county headquarters coordinates (`nearestKenyaCounty`); nothing is sent.
+  Onboarding shows three "why" points. Ratings and reviews follow in a
+  separate PR (new table, moderation).
+- 2026-11-11: Owner decision (11/11/26): deploys are automatic. Deploy API
+  (Fly.io) runs when CI passes on a push to main, checking out the exact
+  commit CI tested; Deploy Web runs when Deploy API succeeds, on the same
+  commit. Both keep their health checks and can still be run by hand.
+- 2026-11-11: Owner decision (11/11/26): ratings and reviews. A signed-in,
+  MFA-verified business with current terms can rate another business 1–5
+  stars with an optional comment (600 characters, zero-tolerance checked);
+  one review per reviewing business per business, editable or withdrawable by
+  its writer; self-reviews are refused and the business must have a live
+  profile. Public views carry no reviewer identity. Anyone signed in can
+  report a review (UGC target `REVIEW`); moderators hide or restore it at
+  `/v1/platform/reviews` (hidden, never deleted; editing never un-hides).
+  Search cards show the average and count; the listing page shows the
+  breakdown, the list and the write form. New table `BusinessReview`
+  (additive migration `20261111160000_add_business_reviews`).
+- 2026-11-11: Owner request (11/11/26): "make icons real and original". Public
+  screens (home, search cards, listing, reviews, share, onboarding) now use
+  the product's own icon set, `SfcIcon` (38 icons, logo language, one gold
+  accent each) instead of emoji and stock icons; role and industry chips carry
+  icons. Sheet in `docs/brand/icon-sheet.png`. The staff console keeps its
+  existing icons.
+- 2026-11-11: Owner request (11/11/26): improved photo filters with a preview
+  before posting. Shared rules in `photo-filters.ts`: screening on every
+  upload section (type/name match, minimum size, shape, repeats) and an
+  on-device tidy-up (rotate, scale to 1600 px, gentle levels and colour).
+  The logo upload now shows "Preview before posting". AI-written item
+  descriptions are not built yet: they need a paid provider key and the
+  owner's decision on a cost cap, given the locked subscription price.
+- 2026-11-11: Owner request (11/11/26): project audit and clean-up. Removed
+  dead code that nothing loaded (`apps/api/src/modules/search`,
+  `apps/api/src/modules/prisma`), the archived Railway runbook, and the
+  duplicate Play icon; `docs/store-assets/app-icon-512.png` is now the current
+  mark. Stripped UTF-8 byte-order marks from 18 files. Bug fix: the service
+  worker cache moved to `sfc-shell-v2` so installed apps stop serving the old
+  logo icons from cache. Left as they are: `packages/config` (empty workspace
+  kept so the lockfile stays valid), country flag characters in
+  `geography.ts` (data), the staff console's icons, and the Play feature
+  graphic and screenshots, which still show the old look and need the owner
+  to re-upload once new ones are taken.
+- 2026-11-11: Owner decision (11/11/26): "Write it for me" advert drafts, same
+  design as HarvestHub's "Enhance listing". A free template from the
+  business's own details always works; the AI overlay (cheapest Anthropic
+  tier, `ADVERT_DRAFT_PROVIDER=anthropic` + `ANTHROPIC_API_KEY`) is off until
+  set, re-screens output (safety core, no contact details), and is capped at
+  `ADVERT_AI_DRAFTS_PER_MONTH` (default 5) per business per Nairobi month,
+  counted from `ADVERT_DESCRIPTION_DRAFTED` audit records. Five drafts cost a
+  small fraction of the 10-unit monthly price. Nothing is published until the
+  business presses Publish.
+
+## 14/11/26 — SMS is transactional only (TELPEN sender)
+- Owner: the "TELPEN" Africa's Talking sender ID was applied for transactional use only. `smsTransactionalEvents` / `smsAllowedFor` in `packages/domain/src/notifications.ts`: the delivery plan drops SMS for any event type not on the list (today: Source Finder opportunity matches), even with consent; promotion reaches subscribed members in-app (and email/push where agreed). Tests in notifications.test.ts.
 - 2026-11-11: Added a provider-neutral AI-capability metering + spend-cap core
   to `@telpen/domain` (`ai-capability.ts`), the first safe foundation for
   metered AI add-ons across the portfolio. Pure, framework-free, no secrets,

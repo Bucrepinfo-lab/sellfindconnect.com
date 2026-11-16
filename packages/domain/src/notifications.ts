@@ -19,6 +19,31 @@ export const notificationEventTypes = [
 
 export type NotificationEventType = (typeof notificationEventTypes)[number];
 
+/**
+ * SMS is transactional only (owner 14/11/26): the "TELPEN" sender ID is
+ * approved for transactional messages — security, the person's own account,
+ * subscription, adverts and conversations. Opportunity matches and anything
+ * promotional reach subscribed members in the app (and by email/push where
+ * they agreed), never by SMS. An event type not listed here never uses SMS.
+ */
+export const smsTransactionalEvents: readonly NotificationEventType[] = [
+  'ADVERT_RENEWAL_DAY_35',
+  'ADVERT_RENEWAL_DAY_39',
+  'ADVERT_AUTO_DELETE',
+  'CONVERSATION_NEW',
+  'CONVERSATION_MESSAGE',
+  'CONVERSATION_ASSIGNMENT',
+  'CONVERSATION_SLA_DUE_SOON',
+  'CONVERSATION_SLA_BREACHED',
+  'FINANCE_REMITTANCE_ALERT',
+  'SUBSCRIPTION_TRIAL_ENDING',
+  'SECURITY_ALERT',
+];
+
+export function smsAllowedFor(eventType: NotificationEventType): boolean {
+  return smsTransactionalEvents.includes(eventType);
+}
+
 export type NotificationSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
 export type NotificationConsentState = 'GRANTED' | 'DENIED' | 'REQUIRED' | 'NOT_REQUIRED';
@@ -78,6 +103,10 @@ export function buildNotificationDeliveryPlan(
   const suppressedChannels: NotificationDeliveryPlan['suppressedChannels'] = [];
 
   for (const channel of candidateChannels) {
+    if (channel === 'SMS' && !smsAllowedFor(input.eventType)) {
+      suppressedChannels.push({ channel, reason: 'SMS is for transactional messages only.' });
+      continue;
+    }
     const preference = getPreference(input.recipient.preferences, channel);
     if (!preference.enabled) {
       suppressedChannels.push({ channel, reason: 'Recipient disabled this channel.' });

@@ -7,6 +7,7 @@ export const ugcReportTargetTypes = [
   'USER',
   'CONVERSATION',
   'MEDIA',
+  'REVIEW',
 ] as const;
 
 export type UgcReportTargetType = (typeof ugcReportTargetTypes)[number];

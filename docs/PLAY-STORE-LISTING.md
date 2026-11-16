@@ -68,9 +68,9 @@ which is not built yet (see `docs/PLAY_STORE.md`).
 
 | Asset | File |
 | --- | --- |
-| App icon 512×512 | `docs/store-assets/app-icon-512.png` |
+| App icon 512×512 (new mark, 11/11/26) | `docs/store-assets/app-icon-512.png` |
 | Feature graphic 1024×500 | `docs/store-assets/feature-graphic-1024x500.png` |
-| Phone screenshots 1080×1920 (9:16) — uploaded 15/10/26 | `docs/store-assets/screenshot-1-home.png`, `screenshot-2-results.png`, `screenshot-3-signup.png` |
+| Phone screenshots 1080×1920 (9:16) — new look, put in the draft listing 11/11/26 | `docs/store-assets/screenshot-1-search.png`, `screenshot-2-trust.png`, `screenshot-3-start.png` |
 
 Play rejects screenshots that are not 16:9 or 9:16.
 

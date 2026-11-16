@@ -4,6 +4,7 @@ import {
   buildNotificationDeliveryPlan,
   defaultFallbackChannels,
   defaultNotificationPreferences,
+  smsAllowedFor,
 } from './notifications';
 
 describe('notification delivery policy', () => {
@@ -48,5 +49,32 @@ describe('notification delivery policy', () => {
     expect(defaultFallbackChannels('LOW')).toEqual(['EMAIL']);
     expect(defaultFallbackChannels('HIGH')).toEqual(['EMAIL', 'PUSH', 'SMS']);
     expect(defaultFallbackChannels('CRITICAL')).toEqual(['EMAIL', 'PUSH', 'SMS', 'WHATSAPP']);
+  });
+});
+
+describe('SMS is transactional only (owner 14/11/26)', () => {
+  const smsOn = defaultNotificationPreferences.map((p) =>
+    p.channel === 'SMS' ? { ...p, enabled: true, consentState: 'GRANTED' as const } : p,
+  );
+  const plan = (eventType: Parameters<typeof buildNotificationDeliveryPlan>[0]['eventType']) =>
+    buildNotificationDeliveryPlan({
+      eventType,
+      severity: 'CRITICAL',
+      title: 't',
+      message: 'm',
+      recipient: { countryCode: 'KE', locale: 'en-KE', timezone: 'Africa/Nairobi', preferences: smsOn },
+    });
+
+  it('a security alert may go by SMS when the person agreed', () => {
+    expect(smsAllowedFor('SECURITY_ALERT')).toBe(true);
+    expect(plan('SECURITY_ALERT').selectedChannels).toContain('SMS');
+  });
+
+  it('an opportunity match never goes by SMS, even with consent', () => {
+    expect(smsAllowedFor('SOURCE_FINDER_OPPORTUNITY')).toBe(false);
+    const p = plan('SOURCE_FINDER_OPPORTUNITY');
+    expect(p.selectedChannels).not.toContain('SMS');
+    expect(p.selectedChannels).toContain('IN_APP');
+    expect(p.suppressedChannels).toContainEqual({ channel: 'SMS', reason: 'SMS is for transactional messages only.' });
   });
 });

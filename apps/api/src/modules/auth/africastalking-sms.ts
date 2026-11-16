@@ -53,7 +53,14 @@ export class AfricasTalkingSmsSender implements SmsSender {
       body,
     });
 
-    const raw: unknown = await response.json().catch(() => ({}));
+    const text = await response.text().catch(() => '');
+    let raw: unknown;
+    try {
+      raw = JSON.parse(text);
+    } catch {
+      // Africa's Talking answers auth and account errors in plain text.
+      raw = { error: `HTTP ${response.status}: ${text.slice(0, 160) || 'empty response'}` };
+    }
     const recipients =
       (raw as { SMSMessageData?: { Recipients?: { statusCode?: number; status?: string }[] } })
         ?.SMSMessageData?.Recipients ?? [];

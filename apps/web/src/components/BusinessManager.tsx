@@ -6,8 +6,12 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   countries,
   evaluateSafetyFields,
+  findKenyaConstituency,
+  findKenyaCounty,
   industryCategories,
   isSameAdvertText,
+  kenyaCounties,
+  kenyaLandmarksInCounty,
   uniqueAdvertDrafts,
   supplyChainRoles,
   type AdvertDraft,
@@ -19,7 +23,9 @@ import {
 import { ApiError, apiRequest, isTermsError } from '../lib/api-client';
 import { formatDmy } from '../lib/dates';
 import { advertStatusLabel, codeLabel, industryLabel } from '../lib/labels';
+import type { PreparedPhoto } from '../lib/prepare-photo';
 import { publicApiBaseUrl, readTenantSession } from '../lib/public-api';
+import { PhotoPreview } from './PhotoPreview';
 import '../styles/business.css';
 
 type MediaItem = {
@@ -48,6 +54,10 @@ type ProfileForm = {
   primaryCity: string;
   regions: string;
   remoteAvailable: boolean;
+  county: string;
+  constituency: string;
+  ward: string;
+  landmark: string;
 };
 
 type AdvertForm = {
@@ -105,6 +115,10 @@ const emptyProfile: ProfileForm = {
   primaryCity: '',
   regions: '',
   remoteAvailable: false,
+  county: '',
+  constituency: '',
+  ward: '',
+  landmark: '',
 };
 
 function profileToForm(source: ProfileDraft | PublishedProfile): ProfileForm {
@@ -122,6 +136,10 @@ function profileToForm(source: ProfileDraft | PublishedProfile): ProfileForm {
     primaryCity: source.serviceArea?.primaryCity ?? '',
     regions: (source.serviceArea?.regions ?? []).join(', '),
     remoteAvailable: Boolean(source.serviceArea?.remoteAvailable),
+    county: source.serviceArea?.county ?? '',
+    constituency: source.serviceArea?.constituency ?? '',
+    ward: source.serviceArea?.ward ?? '',
+    landmark: source.serviceArea?.landmark ?? '',
   };
 }
 
@@ -142,6 +160,10 @@ function profilePayload(form: ProfileForm) {
     ...(form.primaryCity.trim().length >= 2 ? { primaryCity: form.primaryCity.trim() } : {}),
     ...(regions.length ? { regions } : {}),
     ...(form.remoteAvailable ? { remoteAvailable: true } : {}),
+    ...(form.county ? { county: form.county } : {}),
+    ...(form.county && form.constituency ? { constituency: form.constituency } : {}),
+    ...(form.county && form.constituency && form.ward ? { ward: form.ward } : {}),
+    ...(form.landmark.trim().length >= 2 ? { landmark: form.landmark.trim().slice(0, 120) } : {}),
   };
   const optional: Record<string, string> = {
     phone: form.phone.trim(),
@@ -209,6 +231,7 @@ async function fetchBusiness(): Promise<BusinessData> {
 export function BusinessManager() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
+  const [pendingLogo, setPendingLogo] = useState<File | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
   const [liveProfile, setLiveProfile] = useState<LiveProfile | null>(null);
   const [profileDraft, setProfileDraft] = useState<ProfileDraft | null>(null);
@@ -306,8 +329,9 @@ export function BusinessManager() {
       return 'Your business profile is live.';
     });
 
-  const uploadLogo = (file: File) =>
+  const uploadLogo = (photo: PreparedPhoto) =>
     run('logo', async () => {
+      const file = photo.file;
       const draft = profileDraft ?? (await saveProfileDraft());
       const meta = { fileName: file.name.slice(0, 120) || 'logo', mimeType: file.type || 'image/jpeg', fileSizeBytes: file.size };
       const { upload } = await apiRequest<{
@@ -324,6 +348,8 @@ export function BusinessManager() {
         method: 'POST',
         body: {
           ...meta,
+          width: photo.width,
+          height: photo.height,
           sourceUrl: upload.publicUrl,
           storageProvider: upload.provider,
           objectKey: upload.objectKey,
@@ -349,6 +375,37 @@ export function BusinessManager() {
       ...(source.email ? { email: source.email } : {}),
       ...(source.website ? { website: source.website } : {}),
     };
+  };
+
+  /** "Write it for me": a draft from the title and notes; nothing is published. */
+  const draftAdvert = async () => {
+    if (!advertForm) return;
+    const form = advertForm;
+    setBusy('draft-advert');
+    setNotice(null);
+    try {
+      const draft = await apiRequest<{ title: string; description: string; usedModel: boolean; aiDraftsLeft: number }>(
+        '/adverts/description-draft',
+        {
+          method: 'POST',
+          body: {
+            ...(form.title.trim() ? { title: form.title.trim().slice(0, 160) } : {}),
+            ...(form.description.trim() ? { notes: form.description.trim().slice(0, 600) } : {}),
+          },
+        },
+      );
+      setAdvertForm({ ...form, title: form.title.trim() ? form.title : draft.title, description: draft.description });
+      setNotice({
+        tone: 'ok',
+        text: draft.usedModel
+          ? `Written with AI from your details. Check it before you publish. ${draft.aiDraftsLeft} AI ${draft.aiDraftsLeft === 1 ? 'draft' : 'drafts'} left this month.`
+          : 'Written from your details. Check it before you publish.',
+      });
+    } catch (error) {
+      setNotice({ tone: 'error', text: errorText(error), terms: isTermsError(error) });
+    } finally {
+      setBusy('');
+    }
   };
 
   const saveAdvertDraft = async (form: AdvertForm): Promise<AdvertDraft> => {
@@ -613,6 +670,72 @@ export function BusinessManager() {
                 <input value={profileForm.website} onChange={set('website')} inputMode="url" placeholder="example.co.ke" />
               </label>
             </div>
+            <h3>Where buyers find you</h3>
+            <p className="biz-sub">Buyers who search your county, constituency or ward will see your business.</p>
+            <div className="biz-grid two">
+              <label className="biz-field">
+                <span>County</span>
+                <select
+                  value={profileForm.county}
+                  onChange={(event) =>
+                    setProfileForm((current) => ({ ...current, county: event.target.value, constituency: '', ward: '' }))
+                  }
+                >
+                  <option value="">Choose your county</option>
+                  {kenyaCounties
+                    .slice()
+                    .sort((left, right) => left.name.localeCompare(right.name))
+                    .map((item) => (
+                      <option key={item.code} value={item.name}>
+                        {item.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label className="biz-field">
+                <span>Constituency</span>
+                <select
+                  value={profileForm.constituency}
+                  disabled={!profileForm.county}
+                  onChange={(event) =>
+                    setProfileForm((current) => ({ ...current, constituency: event.target.value, ward: '' }))
+                  }
+                >
+                  <option value="">{profileForm.county ? 'Choose your constituency' : 'Choose a county first'}</option>
+                  {(findKenyaCounty(profileForm.county)?.constituencies ?? []).map((item) => (
+                    <option key={item.name} value={item.name}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="biz-field">
+                <span>Ward</span>
+                <select value={profileForm.ward} disabled={!profileForm.constituency} onChange={set('ward')}>
+                  <option value="">{profileForm.constituency ? 'Choose your ward' : 'Choose a constituency first'}</option>
+                  {(findKenyaConstituency(profileForm.county, profileForm.constituency)?.wards ?? []).map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="biz-field">
+                <span>Nearest market, mall or landmark</span>
+                <input
+                  value={profileForm.landmark}
+                  onChange={set('landmark')}
+                  maxLength={120}
+                  list="landmark-options"
+                  placeholder="e.g. Kongowea Market"
+                />
+                <datalist id="landmark-options">
+                  {kenyaLandmarksInCounty(profileForm.county).map((item) => (
+                    <option key={item.name} value={item.name} />
+                  ))}
+                </datalist>
+              </label>
+            </div>
             <h3>Where you serve</h3>
             <div className="biz-grid two">
               <label className="biz-field">
@@ -646,10 +769,24 @@ export function BusinessManager() {
                 onChange={(event) => {
                   const file = event.target.files?.[0];
                   event.target.value = '';
-                  if (file) void uploadLogo(file);
+                  if (file) setPendingLogo(file);
                 }}
               />
             </label>
+            {pendingLogo ? (
+              <PhotoPreview
+                file={pendingLogo}
+                noun="logo"
+                logo
+                keepPng
+                improveByDefault={false}
+                busy={busy === 'logo'}
+                onUse={(photo) => {
+                  void uploadLogo(photo).then(() => setPendingLogo(null));
+                }}
+                onCancel={() => setPendingLogo(null)}
+              />
+            ) : null}
             <p className="biz-sub" style={{ marginTop: 10 }}>
               Publishing confirms you accept the current <Link href="/terms">Terms</Link> and{' '}
               <Link href="/community">Community standards</Link>.
@@ -703,6 +840,19 @@ export function BusinessManager() {
                 required
               />
             </label>
+            <div className="biz-actions" style={{ marginTop: 8 }}>
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={Boolean(busy) || (!advertForm.title.trim() && !advertForm.description.trim())}
+                onClick={() => void draftAdvert()}
+              >
+                {busy === 'draft-advert' ? 'Writing…' : 'Write it for me'}
+              </button>
+              <span className="biz-sub" style={{ alignSelf: 'center' }}>
+                Type a few words first, such as what you sell. You can edit the result.
+              </span>
+            </div>
             <p className="biz-sub" style={{ marginTop: 10 }}>
               Shown as {liveProfile.displayName} with your profile contacts. Publishing confirms you accept the current{' '}
               <Link href="/terms">Terms</Link>.

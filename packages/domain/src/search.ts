@@ -1,4 +1,4 @@
-﻿export type SearchMode = "FTS"|"SEMANTIC"|"HYBRID";
+export type SearchMode = "FTS"|"SEMANTIC"|"HYBRID";
 
 export interface SearchQuery {
   text: string; countryCode?: string; industryCode?: string; role?: string;

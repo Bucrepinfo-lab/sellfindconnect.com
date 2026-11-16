@@ -298,3 +298,25 @@ Request controls:
 - `jobTypes`: optional subset of media job types.
 - `retryAfterSeconds`: retry backoff for transient provider failures.
 - `now`: optional scheduler timestamp for deterministic runs/tests.
+
+## Photo filters (11/11/26)
+
+`packages/domain/src/photo-filters.ts` holds the rules, shared by the browser
+and the API:
+
+- Screening, on every upload section (profile, advert, chat) through
+  `evaluateMediaAssetInput` / `evaluateMediaUploadPreparationInput`: file name
+  must match the type, no risky double extensions or path characters, shortest
+  side at least 400 px (120 px for a logo), no strips beyond 3:1. Blocked words
+  stay with the zero-tolerance metadata check. The browser also refuses repeats.
+- Look, on the device before upload (`apps/web/src/lib/prepare-photo.ts`):
+  turned the right way up, scaled to 1600 px on the longest side, and an
+  optional gentle levels and colour tidy-up (gain capped at 1.25, +8% colour).
+  It never adds or removes content.
+- Preview before posting (`PhotoPreview`): the person sees the photo exactly as
+  it will be posted, the checks, and the tidy-up switch; nothing uploads until
+  they tap Post. Moderator review still applies afterwards.
+
+Not built: AI-written item descriptions from a photo. It needs a paid AI
+provider key and the owner's decision on cost caps and on sending photos to
+that provider.

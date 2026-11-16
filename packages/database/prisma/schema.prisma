@@ -279,6 +279,7 @@ model Tenant {
   termsAcceptanceEvidence      TermsAcceptanceEvidence[]
   userContentReports           UserContentReport[]
   userBlocks                   UserBlock[]
+  businessReviews              BusinessReview[]
 
   @@index([countryCode])
   @@index([status])
@@ -1503,4 +1504,24 @@ model TrustedDevice {
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, revokedAt])
+}
+
+/// Ratings and reviews of a business by another business (owner-approved 11/11/26).
+/// One per reviewing business per business; moderators hide, never delete.
+model BusinessReview {
+  id               String   @id @default(uuid())
+  tenantId         String
+  reviewerTenantId String   @db.VarChar(120)
+  reviewerUserId   String
+  rating           Int
+  comment          String?  @db.VarChar(600)
+  status           String   @db.VarChar(20)
+  hiddenReason     String?  @db.VarChar(200)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, reviewerTenantId])
+  @@index([tenantId, status, updatedAt])
+  @@index([status, updatedAt])
 }

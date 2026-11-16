@@ -1,20 +1,24 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import type { Request } from 'express';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 
 import { RequireTenantPermission } from '../../common/tenant-permission.guard';
 import { TenantAuthSession, TenantId } from '../tenant/tenant-context.decorator';
 import { TenantSessionGuard, type TenantSessionDecision } from '../tenant/tenant-session.guard';
+import { AdvertDescriptionService } from './advert-description.service';
 import { AdvertsService } from './adverts.service';
 import {
   BoostAdvertDto,
   CreateAdvertDto,
   CreateAdvertMediaDto,
   CreateSavedAdvertSearchDto,
+  DraftAdvertDescriptionDto,
   DuplicateAdvertDto,
   PrepareAdvertMediaUploadDto,
   PublicAdvertSearchDto,
   PublishAdvertDraftDto,
   RecordAdvertDiscoveryEventDto,
+  RecordPublicListingEventDto,
   RenewAdvertDto,
   RunAdvertLifecycleDto,
   RunSavedAdvertSearchAlertsDto,
@@ -34,7 +38,21 @@ import {
 @UseGuards(TenantSessionGuard)
 @Controller('adverts')
 export class AdvertsController {
-  constructor(private readonly adverts: AdvertsService) {}
+  constructor(
+    private readonly adverts: AdvertsService,
+    private readonly descriptions: AdvertDescriptionService,
+  ) {}
+
+  /** "Write it for me": a draft title and description; the business edits before publishing. */
+  @Post('description-draft')
+  @RequireTenantPermission('MANAGE_LISTINGS')
+  draftDescription(
+    @TenantId() tenantId: string,
+    @TenantAuthSession() session: TenantSessionDecision,
+    @Body() body: DraftAdvertDescriptionDto,
+  ) {
+    return this.descriptions.draft(tenantId, session.userId, body);
+  }
 
   @Post()
   @RequireTenantPermission('MANAGE_LISTINGS')
@@ -295,5 +313,17 @@ export class PublicAdvertsController {
   @Get(':id')
   getOne(@Param('id') id: string) {
     return this.adverts.getPublicAdvert(id);
+  }
+
+  /** Anonymous view / contact-tap counter. Always 204; repeats are dropped quietly. */
+  @Post(':id/events')
+  @HttpCode(204)
+  async recordEvent(@Param('id') id: string, @Body() body: RecordPublicListingEventDto, @Req() request: Request) {
+    const visitor =
+      request.header('fly-client-ip') ??
+      request.header('x-forwarded-for')?.split(',')[0]?.trim() ??
+      request.ip ??
+      'unknown';
+    await this.adverts.recordPublicListingEvent(id, body.eventType, `${visitor}|${request.header('user-agent') ?? ''}`);
   }
 }

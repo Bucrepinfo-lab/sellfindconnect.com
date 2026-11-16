@@ -5,11 +5,13 @@ import {
   mediaPolicy,
   mediaTransformStatuses,
   mediaVisibilityStates,
+  publicListingEventTypes,
   supplyChainRoles,
   type AnalyticsEventType,
   type ConsentState,
   type MediaTransformStatus,
   type MediaVisibility,
+  type PublicListingEventType,
 } from '@telpen/domain';
 import { Type } from 'class-transformer';
 import {
@@ -236,6 +238,24 @@ export class PublicAdvertSearchDto {
   @IsIn(supplyChainRoles)
   declare role?: (typeof supplyChainRoles)[number];
 
+  @ApiPropertyOptional({ example: 'Mombasa', description: 'Kenya county (official name).' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  declare county?: string;
+
+  @ApiPropertyOptional({ example: 'Nyali' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  declare constituency?: string;
+
+  @ApiPropertyOptional({ example: 'Kongowea' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  declare ward?: string;
+
   @ApiPropertyOptional({ example: 20, minimum: 1, maximum: 100 })
   @IsOptional()
   @Type(() => Number)
@@ -303,6 +323,12 @@ export class RunSavedAdvertSearchAlertsDto {
   @Min(1)
   @Max(20)
   declare limit?: number;
+}
+
+export class RecordPublicListingEventDto {
+  @ApiProperty({ enum: publicListingEventTypes, example: 'VIEW' })
+  @IsIn(publicListingEventTypes)
+  declare eventType: PublicListingEventType;
 }
 
 export class RecordAdvertDiscoveryEventDto {
@@ -504,4 +530,18 @@ export class CreateAdvertMediaDto {
   @ValidateNested({ each: true })
   @Type(() => AdvertMediaCdnVariantDto)
   declare variants?: AdvertMediaCdnVariantDto[];
+}
+
+export class DraftAdvertDescriptionDto {
+  @ApiPropertyOptional({ example: 'Fresh sukuma wiki and cabbages', maxLength: 160 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  declare title?: string;
+
+  @ApiPropertyOptional({ example: 'Daily harvest, sold by the crate', maxLength: 600 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(600)
+  declare notes?: string;
 }

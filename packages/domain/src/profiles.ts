@@ -23,6 +23,12 @@ export type ProfileServiceArea = {
   radiusKm?: number;
   remoteAvailable?: boolean;
   operatingCountries?: string[];
+  /** Kenya: official county, constituency and ward names (see kenya-places). */
+  county?: string;
+  constituency?: string;
+  ward?: string;
+  /** A well-known market, mall, street or building near the business. */
+  landmark?: string;
 };
 
 export type ProfileDraftInput = {

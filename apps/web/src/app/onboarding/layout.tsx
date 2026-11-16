@@ -1,4 +1,4 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 export const metadata: Metadata = { title: "Get started — SellFindConnect", description: "Publish your first advert or find your first supplier in seconds." };
 export default function OnboardingLayout({ children }: { children: React.ReactNode }) {
   return (

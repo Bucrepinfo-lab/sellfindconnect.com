@@ -1,6 +1,6 @@
 /* SellFindConnect service worker: network first, offline page when the
    network is down. API calls and non-GET requests are never cached. */
-const CACHE = 'sfc-shell-v1';
+const CACHE = 'sfc-shell-v2';
 const OFFLINE_URL = '/offline.html';
 const SHELL = [OFFLINE_URL, '/icons/icon-192.png', '/icons/icon-512.png'];
 

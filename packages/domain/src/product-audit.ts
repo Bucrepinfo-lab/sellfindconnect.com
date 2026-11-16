@@ -39,6 +39,11 @@ export const productAuditActions = [
   'USER_CONTENT_REPORT_RESOLVED',
   'TERMS_ACCEPTANCE_LOOKED_UP',
   'TERMS_REACCEPTED',
+  'BUSINESS_REVIEW_WRITTEN',
+  'BUSINESS_REVIEW_WITHDRAWN',
+  'BUSINESS_REVIEW_HIDDEN',
+  'BUSINESS_REVIEW_RESTORED',
+  'ADVERT_DESCRIPTION_DRAFTED',
 ] as const;
 
 export type ProductAuditAction = (typeof productAuditActions)[number];
@@ -188,6 +193,16 @@ export function describeProductAuditAction(action: string): string {
       return 'Terms acceptance looked up';
     case 'TERMS_REACCEPTED':
       return 'Terms re-accepted';
+    case 'BUSINESS_REVIEW_WRITTEN':
+      return 'Business review written';
+    case 'BUSINESS_REVIEW_WITHDRAWN':
+      return 'Business review withdrawn';
+    case 'BUSINESS_REVIEW_HIDDEN':
+      return 'Business review hidden';
+    case 'BUSINESS_REVIEW_RESTORED':
+      return 'Business review restored';
+    case 'ADVERT_DESCRIPTION_DRAFTED':
+      return 'Advert description drafted';
     default:
       return action.replaceAll('_', ' ').toLowerCase();
   }

@@ -3,14 +3,18 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
-import { ugcReportReasons } from '@telpen/domain';
+import { formatPublicCount, kenyaPlaceLabel, ugcReportReasons } from '@telpen/domain';
 
 import { ApiError, apiRequest, isTermsError } from '../lib/api-client';
 import { formatDmy } from '../lib/dates';
+import { recordListingEvent } from '../lib/public-api';
 import { codeLabel, industryLabel } from '../lib/labels';
 import { useStoredSession } from '../lib/use-session';
 import type { PublicAdvert } from './LiveSearch';
+import { BusinessReviews } from './BusinessReviews';
+import { ShareBar } from './ShareBar';
 import '../styles/business.css';
+import '../styles/home.css';
 
 type Load = { status: 'loading' } | { status: 'missing' } | { status: 'error'; message: string } | { status: 'ok'; advert: PublicAdvert };
 
@@ -33,7 +37,9 @@ export function ListingDetail({ id }: { id: string }) {
     let cancelled = false;
     apiRequest<PublicAdvert>(`/public/adverts/${encodeURIComponent(id)}`, { auth: false })
       .then((advert) => {
-        if (!cancelled) setLoad({ status: 'ok', advert });
+        if (cancelled) return;
+        setLoad({ status: 'ok', advert });
+        recordListingEvent(advert.id, 'VIEW');
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -156,6 +162,17 @@ function ListingBody(props: {
         <p className="biz-sub">
           {advert.displayName} · {industryLabel(advert.industryCode)} · listed {formatDmy(advert.publishedAt)}
         </p>
+        {advert.stats && (advert.stats.views > 0 || advert.stats.enquiries > 0) ? (
+          <p className="biz-sub" style={{ marginTop: -6 }}>
+            {formatPublicCount(advert.stats.views, 'view', 'views')} ·{' '}
+            {formatPublicCount(advert.stats.enquiries, 'enquiry', 'enquiries')} in the last 90 days
+          </p>
+        ) : null}
+        {advert.location?.county ? (
+          <p className="result-card__place" style={{ margin: '0 0 12px' }}>
+            {[advert.location.landmark, kenyaPlaceLabel(advert.location)].filter(Boolean).join(' · ')}
+          </p>
+        ) : null}
         {images.length ? (
           <div className="biz-media">
             {images.map((item) => (
@@ -170,22 +187,22 @@ function ListingBody(props: {
         {advert.phone || advert.email || advert.website ? (
           <div className="biz-actions">
             {advert.phone ? (
-              <a className="primary-button" href={`tel:${advert.phone.replace(/\s/g, '')}`}>
+              <a onClick={() => recordListingEvent(advert.id, 'INQUIRY')} className="primary-button" href={`tel:${advert.phone.replace(/\s/g, '')}`}>
                 Call
               </a>
             ) : null}
             {advert.phone ? (
-              <a className="secondary-button" href={whatsappLink(advert.phone)} target="_blank" rel="noopener noreferrer">
+              <a onClick={() => recordListingEvent(advert.id, 'INQUIRY')} className="secondary-button" href={whatsappLink(advert.phone)} target="_blank" rel="noopener noreferrer">
                 WhatsApp
               </a>
             ) : null}
             {advert.email ? (
-              <a className="secondary-button" href={`mailto:${advert.email}?subject=${encodeURIComponent(`Enquiry: ${advert.title}`)}`}>
+              <a onClick={() => recordListingEvent(advert.id, 'INQUIRY')} className="secondary-button" href={`mailto:${advert.email}?subject=${encodeURIComponent(`Enquiry: ${advert.title}`)}`}>
                 Email
               </a>
             ) : null}
             {advert.website ? (
-              <a className="secondary-button" href={advert.website} target="_blank" rel="noopener noreferrer nofollow">
+              <a onClick={() => recordListingEvent(advert.id, 'INQUIRY')} className="secondary-button" href={advert.website} target="_blank" rel="noopener noreferrer nofollow">
                 Website
               </a>
             ) : null}
@@ -193,7 +210,21 @@ function ListingBody(props: {
         ) : (
           <p className="biz-sub">This business has not added contact details yet.</p>
         )}
+        <div style={{ marginTop: 12 }}>
+          <ShareBar
+            label="Share this listing"
+            title={advert.title}
+            text={`${advert.title} by ${advert.displayName} on SellFindConnect:`}
+          />
+        </div>
       </article>
+
+      <BusinessReviews
+        tenantId={advert.tenantId}
+        businessName={advert.displayName}
+        own={props.own}
+        signedIn={props.signedIn}
+      />
 
       <section className="biz-card" style={{ marginTop: 16 }} aria-label="Report or block">
         {props.own ? (

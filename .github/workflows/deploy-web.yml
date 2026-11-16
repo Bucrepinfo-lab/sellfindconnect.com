@@ -9,10 +9,14 @@ name: Deploy Web (Fly.io)
 #   fly tokens create deploy -a sellfindconnect-web
 # (The API's FLY_API_TOKEN is scoped to sellfindconnect-api and cannot deploy this app.)
 #
-# Manual only (Actions → Deploy Web (Fly.io) → Run workflow); production
-# deploys stay a deliberate human action.
+# Automatic (owner decision 11/11/26): runs after Deploy API (Fly.io)
+# succeeds, deploying the same commit, so the site and API stay in step.
+# Also runnable by hand (Actions → Deploy Web (Fly.io) → Run workflow).
 
 on:
+  workflow_run:
+    workflows: ['Deploy API (Fly.io)']
+    types: [completed]
   workflow_dispatch:
 
 concurrency:
@@ -22,6 +26,9 @@ concurrency:
 jobs:
   deploy:
     name: Deploy sellfindconnect-web
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     env:
       FLY_API_TOKEN: ${{ secrets.FLY_WEB_API_TOKEN }}
@@ -33,6 +40,8 @@ jobs:
           exit 1
 
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - uses: superfly/flyctl-actions/setup-flyctl@master
 

@@ -39,3 +39,21 @@ export function tenantSessionHeaders(): HeadersInit {
 }
 
 export const ROLE_STORAGE_KEY = 'sfc.role';
+
+/**
+ * Count an anonymous public view or contact tap on a listing. Fire and
+ * forget: it never blocks the page and failures are ignored.
+ */
+export function recordListingEvent(advertId: string, eventType: 'VIEW' | 'INQUIRY'): void {
+  if (typeof window === 'undefined' || !advertId) return;
+  try {
+    void fetch(`${publicApiBaseUrl}/public/adverts/${encodeURIComponent(advertId)}/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventType }),
+      keepalive: true,
+    }).catch(() => undefined);
+  } catch {
+    // Counting is best effort.
+  }
+}
