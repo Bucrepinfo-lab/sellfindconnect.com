@@ -70,6 +70,7 @@ export * from './kenya-landmarks';
 export * from './listing-display';
 export * from './public-listing-stats';
 export * from './kenya-county-locator';
+export * from './kenya-nearby';
 export * from './business-reviews';
 export * from './photo-filters';
 export * from './advert-description-draft';
