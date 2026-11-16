@@ -73,3 +73,4 @@ export * from './kenya-county-locator';
 export * from './business-reviews';
 export * from './photo-filters';
 export * from './advert-description-draft';
+export * from './ai-capability';
