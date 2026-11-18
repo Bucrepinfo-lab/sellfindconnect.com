@@ -65,7 +65,8 @@ STK (Africa's Talking) + Stripe. Rates from the finance module; Stripe Tax is a
 **rate engine only** (`TAX_RATE_PROVIDER=stripe_tax`, enabled after Kenya is
 registered; iTax / the agent files). EU OSS later. **Never** enable
 Paddle / Lemon Squeezy / Dodo or any merchant-of-record checkout. Pricing:
-first month free, then 10 local-currency units/month.
+first month free, then Basic KES 499/month (4,990/year) or Pro KES 1,499/month
+(14,990/year), founding price locked — `packages/domain/src/subscription-pricing.ts`.
 
 ## Guardrails — prepare, don't move money
 - The finance role **analyses and prepares**; filing, remittance, and refunds

@@ -33,7 +33,7 @@ user push an STK prompt to someone else's phone.
 
 ## Payments policy (digital goods)
 
-The tenant SaaS fee (first month free, then 10 local-currency units / month) is a
+The tenant SaaS fee (first month free, then KES 499 / month Basic) is a
 **digital subscription**.
 
 | Surface | Allowed rail for the SaaS subscription |

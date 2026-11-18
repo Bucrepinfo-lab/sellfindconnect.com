@@ -484,7 +484,7 @@ Progress:
 ## Epic 8: Subscription, Finance, and Tax
 
 - Implement first-month-free subscription state machine.
-- Configure country-local 10-unit pricing with fallback approval.
+- Configure country-local pricing with fallback approval (Kenya done 18/11/26: Basic 499 / Pro 1,499; other countries indicative). Next: Pro entitlements (media limit, Source Finder priority, RFQs) and a plan choice at checkout.
 - Integrate payment adapter.
 - Build invoice, receipt, refund, chargeback, and dunning workflows.
 - Build country tax profile and effective-dated rules.

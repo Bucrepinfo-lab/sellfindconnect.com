@@ -36,7 +36,8 @@ export const countries: Country[] = [
     currencyName: 'Kenyan shilling',
     locale: 'en-KE',
     timezone: 'Africa/Nairobi',
-    monthlySubscriptionAmount: 10,
+    // Basic plan, founding price (owner decision 18/11/26); see subscription-pricing.ts.
+    monthlySubscriptionAmount: 499,
     pilot: true,
   },
 ];

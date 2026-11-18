@@ -22,7 +22,7 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 
 The key differentiator is not only advertising visibility. The platform's main promise is high-precision linking: helping the advertiser find the most likely buyers or partners, and helping users find the most credible source, supplier, producer, or provider for an item or service, with built-in real-time messaging to complete the connection.
 
-The first month is free. Starting in month two, subscribers pay 10 units of the subscriber country's local currency per month. In countries whose currency is denominated in shillings, this is displayed as 10 local shillings. In countries using another currency name, it is displayed as 10 units of that country's official local currency, subject to tax, app-store pricing tiers, and payment-provider minimums.
+The first month is free. Starting in month two, subscribers pay (owner decision 18/11/26) **Basic KES 499 a month or KES 4,990 a year** paid ahead, or **Pro KES 1,499 a month or KES 14,990 a year** (more media, Source Finder priority, RFQs). A year ahead costs 10 months' price. Subscribers who start in the first 12 months after launch keep this founding price for as long as they stay subscribed. Other countries are priced near the same value in their own currency and stay indicative until approved, subject to tax, app-store pricing tiers, and payment-provider minimums. (Superseded rule: 10 units of local currency per month.)
 
 ## 2. Product Goals
 
@@ -1001,7 +1001,7 @@ Implementation progress on 2026-06-20:
 Requirements:
 
 - First month free for eligible new tenant accounts.
-- From second month onward, charge 10 units of the subscriber country's official local currency per month. Countries using shilling-denominated currencies display this as 10 local shillings.
+- From second month onward, charge the plan price in the subscriber country's currency: Kenya Basic KES 499/month (KES 4,990/year), Pro KES 1,499/month (KES 14,990/year); founding price locked for subscribers who start in the first 12 months (`packages/domain/src/subscription-pricing.ts`).
 - Pricing must be localized by country, currency, tax rules, app-store pricing rules, and payment provider support.
 - The pricing table must store local currency code, display name, flag/country, tax handling, payment-provider minimums, app-store tier mapping, and any legally required local disclosure.
 - Web payments should support cards, mobile money where available, bank transfer where practical, and local wallets over time.
@@ -1627,7 +1627,7 @@ Out of MVP:
 Deliverables:
 
 - Validate target countries for first launch.
-- Confirm launch-country pricing rows for the approved rule: first month free, then 10 units of the subscriber country's local currency per month.
+- Confirm launch-country pricing rows for the approved rule: first month free, then Kenya Basic KES 499 / Pro KES 1,499 a month (year = 10 months); other countries' indicative rows need approval.
 - Select initial industries and subcategories.
 - Finalize the global zero-tolerance blocked-category policy and launch-country prohibited keyword/synonym libraries.
 - Select MVP vendor/tool choices for search, chat, analytics, payments, media, moderation, notifications, and observability.

@@ -9,6 +9,7 @@ export * from './kenya-tax-profile';
 export * from './tax-operating-model';
 export * from './stripe-tax-rate';
 export * from './geography';
+export * from './subscription-pricing';
 export * from './dates';
 export * from './advert-drafts';
 export * from './report-scopes';

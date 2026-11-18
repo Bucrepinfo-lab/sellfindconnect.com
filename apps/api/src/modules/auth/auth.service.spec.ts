@@ -25,7 +25,7 @@ describe('AuthService', () => {
 
     expect(result.user.email).toBe('owner@example.com');
     expect(result.tenant.status).toBe('TRIAL_ACTIVE');
-    expect(result.tenant.monthlyAmount).toBe(10);
+    expect(result.tenant.monthlyAmount).toBe(499);
     expect(result.membership.role).toBe('OWNER');
     expect(result.termsAcceptance.termsVersion).toContain('terms-');
     expect(result.session.mfaRequired).toBe(true);

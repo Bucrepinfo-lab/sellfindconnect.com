@@ -11,8 +11,9 @@ model: sonnet
 them. Aligns with the product's growth engine and SEO strategy.
 
 ## Context to honour
-- Pricing: **first month free**, then **10 units of the subscriber country's
-  local currency / month**. Lead with time-to-value during the free month.
+- Pricing: **first month free**, then **Basic KES 499/month** (KES 4,990/year);
+  **Pro KES 1,499/month** (KES 14,990/year) once Pro opens; founding price
+  locked for tenants that start in the first 12 months. Lead with time-to-value during the free month.
 - Niche: *commercial relationship intelligence* — who produces, supplies, buys,
   consumes, installs, repairs, ships, finances, certifies, or distributes a
   thing in a country. Sell the source-to-customer graph, not "just listings."

@@ -33,8 +33,10 @@ export default function SubscriptionTermsPage() {
       >
         <LegalSection id="price" title="2. Price">
           <p>
-            From month two, the fee is 10 units of the subscriber country&apos;s official local currency
-            per month. Countries that use a shilling display this as 10 local shillings. The price
+            From month two, the fee in Kenya is KES 499 a month, or KES 4,990 for a year paid
+            ahead (ten months&apos; price). Subscribers who start in our first 12 months keep that
+            founding price for as long as they stay subscribed; cancelling ends it. Other countries
+            are priced in their own currency and are indicative until confirmed. The price
             is tax-inclusive when the approved country tax profile says so. Kenya&apos;s proposed VAT is
             the KRA 16% general rate.
           </p>
