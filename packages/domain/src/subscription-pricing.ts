@@ -82,10 +82,11 @@ export function parsePriceOverrides(raw: string | undefined): Record<string, { b
   const out: Record<string, { basic: number; pro: number }> = {};
   for (const part of (raw ?? '').split(',')) {
     const m = part.trim().match(/^([A-Z]{2}):(\d+(?:\.\d+)?)\/(\d+(?:\.\d+)?)$/);
-    if (!m) continue;
-    const basic = Number(m[2]);
-    const pro = Number(m[3]);
-    if (basic > 0 && pro > 0) out[m[1]] = { basic, pro };
+    const [, code, a, b] = m ?? [];
+    if (!code || !a || !b) continue;
+    const basic = Number(a);
+    const pro = Number(b);
+    if (basic > 0 && pro > 0) out[code] = { basic, pro };
   }
   return out;
 }
