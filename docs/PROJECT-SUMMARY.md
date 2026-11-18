@@ -10,7 +10,7 @@ Live host: Fly.io Frankfurt (`fly.web.toml`, `fly.api.toml`) — see `docs/FLY_D
 Play constraints: `docs/PLAY_STORE.md` (native Android out of scope)
 
 ## Pricing (locked)
-First month free. From month two, 10 units of the subscriber country's local currency / month, with documented floors for weak currencies.
+First month free. From month two, Basic KES 499/month (KES 4,990/year) or Pro KES 1,499/month (KES 14,990/year), founding price locked; other countries indicative (owner decision 18/11/26).
 Payment identity: the verified **login phone is the STK Push phone**. Checkout does not accept a different number.
 Web/PWA rails: Stripe and/or Africa's Talking M-Pesa. A Google Play APK would need Play Billing for the SaaS subscription.
 

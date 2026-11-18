@@ -16,7 +16,7 @@ import {
   type TermsAcceptanceEvidence as PrismaTermsAcceptanceEvidence,
   type User,
 } from '@prisma/client';
-import type { TermsAcceptanceEvidence } from '@telpen/domain';
+import { quoteSubscription, type TermsAcceptanceEvidence } from '@telpen/domain';
 
 import type {
   AccessAssignmentRecord,
@@ -585,7 +585,15 @@ export class PrismaAuthRepository implements AuthRepository {
       trialStartedAt: trialStartedAt.toISOString(),
       trialEndsAt: trialEndsAt.toISOString(),
       nextBillingAt: nextBillingAt.toISOString(),
-      monthlyAmount: this.decimalToNumber(tenant.country.monthlySubscriptionAmount),
+      // The price comes from the domain price list (founding price kept while
+      // subscribed), not the country table's old seeded amount.
+      monthlyAmount:
+        quoteSubscription({
+          countryCode: tenant.countryCode,
+          startedAt: trialStartedAt,
+          status: tenant.status,
+          env: process.env,
+        })?.monthlyAmount ?? this.decimalToNumber(tenant.country.monthlySubscriptionAmount),
       currencyCode: tenant.country.currencyCode,
       createdAt: tenant.createdAt.toISOString(),
     };

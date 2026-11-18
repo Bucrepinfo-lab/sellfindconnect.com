@@ -53,7 +53,7 @@ file,remit,lock,corrections}`, `POST/GET /finance/invoices|receipts|refunds`,
   agent files). Never enable Paddle / Lemon Squeezy / Dodo
   (`docs/GROUP_TAX_OPERATING_MODEL.md`).
 - Every paid transaction produces a tax snapshot + ledger entry.
-- Pricing: first month free, then 10 local-currency units/month.
+- Pricing: first month free, then Basic KES 499/month (4,990/year), Pro KES 1,499/month (14,990/year); founding price locked (`subscription-pricing.ts`).
 - The agent **analyses and prepares**; it never moves money autonomously —
   filing, remittance, and refunds require owner approval.
 

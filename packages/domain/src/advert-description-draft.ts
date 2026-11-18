@@ -21,7 +21,7 @@ export const ADVERT_DRAFT_DESCRIPTION_MAX = 600;
 /**
  * AI drafts per business per calendar month. At roughly 1,000 input and 300
  * output tokens on the cheapest tier, five drafts cost a small fraction of
- * the 10-unit monthly price. Template drafts are free and unlimited.
+ * the KES 499 Basic monthly price. Template drafts are free and unlimited.
  */
 export const MONTHLY_AI_ADVERT_DRAFTS = 5;
 export const ADVERT_DRAFT_AUDIT_ACTION = 'ADVERT_DESCRIPTION_DRAFTED';

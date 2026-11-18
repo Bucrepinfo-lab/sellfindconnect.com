@@ -6,8 +6,9 @@ Finder lets a searcher find who produces / supplies / buys / consumes / installs
 / repairs / ships / finances / certifies / distributes an item or service in a
 country. Advertisers build rich profiles + media listings; a precision-matching
 engine with explainable reason codes + in-app chat/RFQ closes the loop.
-Business model: first month free, then 10 units of the subscriber country's
-local currency / month. Kenya-first (M-Pesa STK via Africa's Talking + Stripe).
+Business model: first month free, then Basic KES 499/month (KES 4,990/year) or
+Pro KES 1,499/month (KES 14,990/year), founding price locked
+(`packages/domain/src/subscription-pricing.ts`, owner decision 18/11/26). Kenya-first (M-Pesa STK via Africa's Talking + Stripe).
 
 ## Repo map (npm-workspaces monorepo, scope `@telpen/*`)
 - `apps/web` — Next.js 16 / React 19 web + PWA (`@telpen/web`).

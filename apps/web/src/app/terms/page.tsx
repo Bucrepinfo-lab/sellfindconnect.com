@@ -39,8 +39,8 @@ export default function TermsOfServicePage() {
       </LegalSection>
       <LegalSection id="subscription" title="4. Subscription and tax">
         <p>
-          The first month is free. From month two, the fee is 10 units of the subscriber country&apos;s
-          official local currency per month. Telpen Systems Ltd stays the merchant of record. We
+          The first month is free. From month two, the fee in Kenya is KES 499 a month or KES 4,990
+          a year paid ahead, with the founding price kept while you stay subscribed. Telpen Systems Ltd stays the merchant of record. We
           do not use Paddle, Lemon Squeezy, or other merchant-of-record checkouts. Kenya VAT is
           calculated from the finance module (and Stripe Tax as a rate engine when enabled). We
           file on KRA iTax or through one Kenyan tax representative. Paid checkout stays blocked
