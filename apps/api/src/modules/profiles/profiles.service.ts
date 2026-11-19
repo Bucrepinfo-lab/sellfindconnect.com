@@ -351,7 +351,7 @@ export class ProfilesService {
     const draft = await this.getDraft(tenantId, id);
     const existingMedia = await this.repository.listMediaAssets(tenantId, 'PROFILE_DRAFT', draft.id);
 
-    const mediaLimit = await this.mediaLimit(input.tenantId);
+    const mediaLimit = await this.mediaLimit(tenantId);
     if (existingMedia.length >= mediaLimit) {
       throw new UnprocessableEntityException(
         `A profile can display a maximum of ${mediaLimit} media items on your plan.`,
@@ -419,7 +419,7 @@ export class ProfilesService {
     const draft = await this.getDraft(tenantId, id);
     const existingMedia = await this.repository.listMediaAssets(tenantId, 'PROFILE_DRAFT', draft.id);
 
-    const mediaLimit = await this.mediaLimit(input.tenantId);
+    const mediaLimit = await this.mediaLimit(tenantId);
     if (existingMedia.length >= mediaLimit) {
       throw new UnprocessableEntityException(
         `A profile can display a maximum of ${mediaLimit} media items on your plan.`,
