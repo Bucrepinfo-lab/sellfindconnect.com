@@ -42,6 +42,25 @@ export class PaymentsController {
     return this.payments.requestPayout(sessionToken, body);
   }
 
+  /** pawaPay deposit callbacks (mobile money). Re-read from pawaPay before anything is applied. */
+  @Post('pawapay/callback')
+  async pawapayCallback(@Req() request: RawBodyRequest<Request>) {
+    const result = await this.payments.handlePawapayCallback(request.rawBody?.toString('utf8') ?? '');
+    if (!result.ok) throw new HttpException({ error: 'not enabled' }, 404);
+    return result;
+  }
+
+  /** Paystack webhooks (bank transfer, USSD, EFT). Signed; re-verified with Paystack. */
+  @Post('paystack/webhook')
+  async paystackWebhook(
+    @Req() request: RawBodyRequest<Request>,
+    @Headers('x-paystack-signature') signature: string | undefined,
+  ) {
+    const result = await this.payments.handlePaystackWebhook(request.rawBody?.toString('utf8') ?? '', signature);
+    if (!result.ok) throw new HttpException({ error: 'unauthorized' }, 401);
+    return result;
+  }
+
   /** Paddle notifications (card sales). Signature-checked on the raw body. */
   @Post('paddle/webhook')
   async paddleWebhook(

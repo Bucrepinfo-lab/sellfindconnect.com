@@ -455,3 +455,103 @@ describe('PaymentsService Paddle card sales', () => {
     }
   });
 });
+
+describe('PaymentsService local ways to pay (owner standing order 19/11/26)', () => {
+  function localService(countryCode = 'UG') {
+    const plans: string[] = [];
+    const repository = new InMemoryPaymentsRepository();
+    const service = new PaymentsService(
+      {
+        getSession: async () => ({
+          session: { userId: 'user-1', tenantId, role: 'OWNER' },
+          user: { phone: '+256700000001', phoneVerifiedAt: '2026-10-01T00:00:00.000Z' },
+          tenant: { countryCode, trialStartedAt: '2026-11-01T00:00:00.000Z', status: 'TRIAL_ACTIVE' },
+        }),
+        hasCurrentTermsAcceptance: async () => true,
+        recordTenantAudit: async () => undefined,
+        setTenantPlan: async (_tenantId: string, plan: string) => {
+          plans.push(plan);
+        },
+      } as unknown as AuthService,
+      repository,
+    );
+    return { service, repository, plans };
+  }
+
+  it('keeps a local way closed until the owner approves that country price', async () => {
+    vi.stubEnv('PAWAPAY_ENABLED', 'true');
+    vi.stubEnv('PAWAPAY_API_TOKEN', 'tok');
+    try {
+      const { service } = localService('UG');
+      const options = await service.getSubscriptionOptions('session-token');
+      expect(options.rails).not.toContain('MOBILE_MONEY');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('a pawaPay callback changes the plan only after pawaPay confirms the full amount, once', async () => {
+    vi.stubEnv('PAWAPAY_ENABLED', 'true');
+    vi.stubEnv('PAWAPAY_API_TOKEN', 'tok');
+    let reply: unknown = { data: { depositId: 'dep-1', status: 'COMPLETED', amount: '42000', currency: 'UGX' } };
+    vi.stubGlobal('fetch', async () => ({ ok: true, json: async () => reply }));
+    try {
+      const { service, repository, plans } = localService('UG');
+      const now = new Date().toISOString();
+      await repository.createPaymentTxn({
+        id: 'txn-1',
+        provider: 'pawapay',
+        kind: 'CHECKOUT',
+        status: 'PENDING',
+        providerTxnId: 'dep-1',
+        phone: '+256700000001',
+        amount: 42000,
+        currency: 'UGX',
+        tenantId,
+        metadata: { purpose: 'SUBSCRIPTION', plan: 'PRO', period: 'MONTH' },
+        createdAt: now,
+        updatedAt: now,
+      });
+      await service.handlePawapayCallback('{"depositId":"dep-1","status":"COMPLETED"}');
+      await service.handlePawapayCallback('{"depositId":"dep-1","status":"COMPLETED"}');
+      expect(plans).toEqual(['PRO']);
+
+      // A short payment unlocks nothing.
+      await repository.createPaymentTxn({
+        id: 'txn-2',
+        provider: 'pawapay',
+        kind: 'CHECKOUT',
+        status: 'PENDING',
+        providerTxnId: 'dep-2',
+        phone: '+256700000001',
+        amount: 42000,
+        currency: 'UGX',
+        tenantId,
+        metadata: { purpose: 'SUBSCRIPTION', plan: 'PRO', period: 'MONTH' },
+        createdAt: now,
+        updatedAt: now,
+      });
+      reply = { data: { depositId: 'dep-2', status: 'COMPLETED', amount: '100', currency: 'UGX' } };
+      await service.handlePawapayCallback('{"depositId":"dep-2"}');
+      expect(plans).toEqual(['PRO']);
+      expect((await repository.findPaymentTxnByProviderTxnId('dep-2'))?.status).toBe('FAILED');
+    } finally {
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('a Paystack webhook needs a valid signature', async () => {
+    vi.stubEnv('PAYSTACK_ENABLED', 'true');
+    vi.stubEnv('PAYSTACK_SECRET_KEY', 'sk_test');
+    try {
+      const { service } = localService('NG');
+      const body = '{"event":"charge.success","data":{"reference":"txn-x"}}';
+      await expect(service.handlePaystackWebhook(body, 'bad')).resolves.toEqual({ ok: false });
+      const sig = createHmac('sha512', 'sk_test').update(body).digest('hex');
+      await expect(service.handlePaystackWebhook(body, sig)).resolves.toEqual({ ok: true, status: 'ignored' });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+});
