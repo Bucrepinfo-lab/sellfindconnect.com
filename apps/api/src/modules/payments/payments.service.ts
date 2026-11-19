@@ -10,7 +10,7 @@ import {
   paddlePublicConfig,
   paidPlanFromPaddleEvent,
   quoteSubscription,
-  subscriptionRail,
+  subscriptionRails,
   verifyPaddleSignature,
   type SubscriptionRail,
   type PaddlePublicConfig,
@@ -57,8 +57,10 @@ export type SubscriptionOption = {
 export type SubscriptionOptions = {
   currentPlan: SubscriptionPlan;
   currencyCode: string | null;
-  /** How this tenant pays: Paddle first wherever it sells, else M-Pesa in Kenya, else not yet. */
+  /** The leading way to pay here: M-Pesa in Kenya, else Paddle where it sells, else NONE. */
   rail: SubscriptionRail;
+  /** Every way to pay here, best first. */
+  rails: SubscriptionRail[];
   payable: boolean;
   plans: SubscriptionOption[];
   /** Paddle card checkout (Paddle is the seller and remits the tax), or null when off. */
@@ -118,10 +120,9 @@ export class PaymentsService {
     let amount = input.amount;
     let subscription: { plan: SubscriptionPlan; period: BillingPeriod } | undefined;
     if (input.plan) {
-      // Owner rule 19/11/26: where Paddle sells (Kenya included) the plan is
-      // paid by card through Paddle, which remits the tax; M-Pesa is only for
-      // where Paddle can't serve or while Paddle is off.
-      if (this.railFor(context.tenant as SessionTenant) === 'PADDLE') {
+      // Owner rules 19/11/26: M-Pesa where it is the leading local method
+      // (Kenya); elsewhere plans are paid by card through Paddle.
+      if (!this.railsFor(context.tenant as SessionTenant).includes('MPESA')) {
         return { ok: false, reason: 'use_card' };
       }
       const quote = this.payableQuote(context.tenant, input.plan, input.period ?? 'MONTH');
@@ -239,13 +240,15 @@ export class PaymentsService {
   async getSubscriptionOptions(sessionToken: string): Promise<SubscriptionOptions> {
     const context = await this.auth.getSession(sessionToken);
     const tenant = context.tenant as SessionTenant;
-    const rail = this.railFor(tenant);
+    const rails = this.railsFor(tenant);
+    const rail: SubscriptionRail = rails[0] ?? 'NONE';
+    const mpesa = rails.includes('MPESA');
     const plans: SubscriptionOption[] = [];
     let currencyCode: string | null = null;
     for (const plan of ['BASIC', 'PRO'] as const) {
-      const month = rail === 'MPESA' ? this.payableQuote(tenant, plan, 'MONTH') : undefined;
-      const year = rail === 'MPESA' ? this.payableQuote(tenant, plan, 'YEAR') : undefined;
-      if (rail === 'MPESA' && (!month || !year)) continue;
+      const month = mpesa ? this.payableQuote(tenant, plan, 'MONTH') : undefined;
+      const year = mpesa ? this.payableQuote(tenant, plan, 'YEAR') : undefined;
+      if (mpesa && (!month || !year)) continue;
       if (month) currencyCode = month.currencyCode;
       plans.push({
         plan,
@@ -257,20 +260,21 @@ export class PaymentsService {
         locked: month?.locked ?? false,
       });
     }
-    const card = rail === 'PADDLE' ? paddlePublicConfig(paddleConfig(process.env)) : null;
+    const card = rails.includes('PADDLE') ? paddlePublicConfig(paddleConfig(process.env)) : null;
     return {
       currentPlan: normalizePlan(tenant?.plan),
       currencyCode,
       rail,
-      payable: rail !== 'NONE' && plans.length > 0,
+      rails,
+      payable: rails.length > 0 && plans.length > 0,
       plans,
       card: card ? { ...card, customData: { tenantId: context.session.tenantId } } : null,
     };
   }
 
-  /** Paddle first wherever it sells (Kenya included), else M-Pesa in Kenya, else none yet. */
-  private railFor(tenant: SessionTenant): SubscriptionRail {
-    return subscriptionRail({ country: tenant?.countryCode, paddleOn: paddleConfig(process.env) !== null });
+  /** Ways to pay here, best first: M-Pesa in Kenya, then Paddle wherever it sells. */
+  private railsFor(tenant: SessionTenant): SubscriptionRail[] {
+    return subscriptionRails({ country: tenant?.countryCode, paddleOn: paddleConfig(process.env) !== null });
   }
 
   /**

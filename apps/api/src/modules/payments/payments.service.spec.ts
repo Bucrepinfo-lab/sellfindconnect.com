@@ -341,7 +341,7 @@ describe('PaymentsService subscription checkout', () => {
     expect(options.rail).toBe('MPESA');
   });
 
-  it('with Paddle on, a Kenyan tenant pays by card and M-Pesa plan checkout is refused (owner 19/11/26)', async () => {
+  it('with Paddle on, Kenya keeps M-Pesa first and offers the card second (owner 19/11/26)', async () => {
     const paddle = {
       PADDLE_ENABLED: 'true',
       PADDLE_CLIENT_TOKEN: 'test_client',
@@ -354,15 +354,23 @@ describe('PaymentsService subscription checkout', () => {
     for (const [key, value] of Object.entries(paddle)) vi.stubEnv(key, value);
     try {
       const { service, charges } = subscriptionService();
-      await expect(service.requestCheckout('session-token', { plan: 'PRO' })).resolves.toEqual({
+      await expect(service.requestCheckout('session-token', { plan: 'PRO' })).resolves.toMatchObject({ ok: true });
+      expect(charges).toEqual([1499]);
+      const options = await service.getSubscriptionOptions('session-token');
+      expect(options).toMatchObject({ rail: 'MPESA', rails: ['MPESA', 'PADDLE'], payable: true });
+      expect(options.card?.priceIds.PRO.MONTH).toBe('pri_pm');
+      expect(JSON.stringify(options)).not.toContain('whsec');
+
+      // Outside Kenya, where Paddle sells, the plan is paid by card only.
+      const abroad = subscriptionService('NG');
+      await expect(abroad.service.requestCheckout('session-token', { plan: 'PRO' })).resolves.toEqual({
         ok: false,
         reason: 'use_card',
       });
-      expect(charges).toEqual([]);
-      const options = await service.getSubscriptionOptions('session-token');
-      expect(options).toMatchObject({ rail: 'PADDLE', payable: true });
-      expect(options.card?.priceIds.PRO.MONTH).toBe('pri_pm');
-      expect(JSON.stringify(options)).not.toContain('whsec');
+      await expect(abroad.service.getSubscriptionOptions('session-token')).resolves.toMatchObject({
+        rail: 'PADDLE',
+        rails: ['PADDLE'],
+      });
     } finally {
       vi.unstubAllEnvs();
     }

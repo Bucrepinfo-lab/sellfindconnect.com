@@ -28,6 +28,7 @@ type PlanOptions = {
   currentPlan: 'BASIC' | 'PRO';
   currencyCode: string | null;
   rail: 'PADDLE' | 'MPESA' | 'NONE';
+  rails: Array<'PADDLE' | 'MPESA'>;
   payable: boolean;
   plans: PlanOption[];
   card: CardCheckout | null;
@@ -81,10 +82,10 @@ const reasonText: Record<Exclude<CheckoutResult, { ok: true }>['reason'], string
 };
 
 /**
- * Basic or Pro. Owner rule 19/11/26: by card through Paddle wherever Paddle
- * sells (Kenya included; Paddle handles the tax), otherwise by M-Pesa on the
- * signed-in phone. The server picks the way and changes the plan only after
- * the payment is confirmed.
+ * Basic or Pro. Owner rules 19/11/26: M-Pesa leads in Kenya (the way most
+ * people pay), with "pay by card" through Paddle second; elsewhere Paddle,
+ * which handles the tax. The server decides the ways and changes the plan only
+ * after the payment is confirmed.
  */
 export function PlanCard() {
   const [options, setOptions] = useState<PlanOptions | null>(null);
@@ -108,8 +109,8 @@ export function PlanCard() {
 
   if (!options?.payable) return null;
   const currency = options.currencyCode ?? '';
-  const card = options.rail === 'PADDLE' ? options.card : null;
-  const mpesa = options.rail === 'MPESA';
+  const card = options.rails.includes('PADDLE') ? options.card : null;
+  const mpesa = options.rails.includes('MPESA');
 
   const payByCard = async (option: PlanOption) => {
     if (!card) return;
@@ -216,7 +217,7 @@ export function PlanCard() {
               ) : null}
               {card ? (
                 <button
-                  className={option.plan === 'PRO' ? 'primary-button' : 'secondary-button'}
+                  className={!mpesa && option.plan === 'PRO' ? 'primary-button' : 'secondary-button'}
                   type="button"
                   disabled={Boolean(busy)}
                   onClick={() => void payByCard(option)}

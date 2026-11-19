@@ -1,23 +1,23 @@
 import { describe, expect, it } from 'vitest';
 
-import { PADDLE_BLOCKED_COUNTRIES, paddleSellsIn, subscriptionRail } from './payment-rails';
+import { PADDLE_BLOCKED_COUNTRIES, paddleSellsIn, subscriptionRail, subscriptionRails } from './payment-rails';
 
-describe('payment rail by country (owner rule 19/11/26)', () => {
-  it('Paddle first wherever it sells, Kenya included', () => {
-    expect(subscriptionRail({ country: 'KE', paddleOn: true })).toBe('PADDLE');
-    expect(subscriptionRail({ country: 'ng', paddleOn: true })).toBe('PADDLE');
+describe('payment rails by country (owner rules 19/11/26)', () => {
+  it('Kenya: M-Pesa leads, Paddle second for card payers', () => {
+    expect(subscriptionRails({ country: 'KE', paddleOn: true })).toEqual(['MPESA', 'PADDLE']);
+    expect(subscriptionRail({ country: 'KE', paddleOn: true })).toBe('MPESA');
+    expect(subscriptionRails({ country: 'KE', paddleOn: false })).toEqual(['MPESA']);
+  });
+
+  it('Paddle leads where no local method can be charged', () => {
+    expect(subscriptionRails({ country: 'ng', paddleOn: true })).toEqual(['PADDLE']);
     expect(subscriptionRail({ country: 'US', paddleOn: true })).toBe('PADDLE');
   });
 
-  it('M-Pesa in Kenya while Paddle is off', () => {
-    expect(subscriptionRail({ country: 'KE', paddleOn: false })).toBe('MPESA');
-  });
-
-  it('no rail where Paddle is blocked and M-Pesa is not available', () => {
+  it('no way to pay yet where Paddle is blocked and no local method is available', () => {
     expect(subscriptionRail({ country: 'SO', paddleOn: true })).toBe('NONE');
-    expect(subscriptionRail({ country: 'ZW', paddleOn: true })).toBe('NONE');
     expect(subscriptionRail({ country: 'UG', paddleOn: false })).toBe('NONE');
-    expect(subscriptionRail({ country: '', paddleOn: true })).toBe('NONE');
+    expect(subscriptionRails({ country: '', paddleOn: true })).toEqual([]);
   });
 
   it('carries Paddle\'s blocked list, African countries included', () => {

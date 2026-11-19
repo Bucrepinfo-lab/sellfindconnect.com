@@ -43,9 +43,10 @@ Keep `packages/domain` tests green: it is the safety and finance core. Database:
   in `packages/domain/src/safety.ts`. Fail closed on safety/moderation paths.
 - **Tenant isolation.** Tenant routes require `x-tenant-id` + `x-session-token`
   with MFA (`apps/api/src/modules/tenant/tenant-session.guard.ts`).
-- **Finance/legal gates.** Paddle first wherever it sells, Kenya included
-  (`subscriptionRail`); Paddle is merchant of record and remits the tax.
-  M-Pesa only where Paddle can't sell or while Paddle is off; M-Pesa is a direct sale with no VAT until the
+- **Finance/legal gates.** M-Pesa leads in Kenya (the most convenient local
+  method), Paddle second there and first wherever else it sells
+  (`subscriptionRails`); Paddle is merchant of record and remits the tax.
+  M-Pesa is a direct sale with no VAT until the
   company is VAT-registered, after which (`SELLER_VAT_REGISTERED=true`) M-Pesa
   needs an APPROVED Kenya tax profile (`approvedBy` set by a human). Owner
   decision 19/11/26, `docs/GROUP_TAX_OPERATING_MODEL.md`. No

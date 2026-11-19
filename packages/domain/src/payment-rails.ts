@@ -1,21 +1,19 @@
 /**
- * Which way a customer pays for the subscription, by country (owner rule
- * 19/11/26):
+ * Which ways a customer can pay for the subscription, by country, best first
+ * (owner rules 19/11/26):
  *
- * 1. Paddle wherever Paddle sells, Kenya included. Paddle is the merchant of
- *    record: it charges the tax and remits it to the country's tax authority
- *    before the money reaches us, so there is no tax work on our side.
- * 2. Where Paddle does not sell, another merchant of record that remits the
+ * 1. Where one local method is the most convenient for most people AND we can
+ *    charge it, it leads. Kenya: M-Pesa holds 89.1% of 53.4 million mobile
+ *    money subscriptions (Communications Authority of Kenya, Q3 FY 2025/26,
+ *    March 2026); most Kenyans pay by M-Pesa, not by card. M-Pesa is a direct
+ *    sale with no VAT until the company is VAT-registered.
+ * 2. Paddle wherever Paddle sells: first where no such local method can be
+ *    charged, and second (for card payers) where one leads. Paddle is the
+ *    merchant of record and remits the tax before the money reaches us.
+ * 3. Where Paddle does not sell: another merchant of record that remits the
  *    tax. Checked 19/11/26: none takes M-Pesa or African mobile money (Dodo
- *    Payments lists cards, wallets and a few Asian/European methods only), and
- *    the countries Paddle blocks are blocked by the others for the same
- *    sanctions and risk reasons. So there is no such option today.
- * 3. Otherwise the most popular local method: M-Pesa in Kenya (the one we can
- *    charge, through Africa's Talking). M-Pesa is a direct sale with no VAT
- *    until the company is VAT-registered.
- *
- * While Paddle is switched off (keys not set, or the Paddle account still in
- * review), M-Pesa stays the way to pay in Kenya.
+ *    Payments lists cards, wallets and some Asian/European methods only), and
+ *    they block the same sanctioned countries. None to add today.
  */
 
 /**
@@ -54,14 +52,27 @@ export function paddleSellsIn(country: string | null | undefined): boolean {
   return code.length === 2 && !PADDLE_BLOCKED_COUNTRIES.has(code);
 }
 
-/** Countries where we can charge M-Pesa by STK today (Africa's Talking). */
+/**
+ * Countries whose most convenient local method we can charge today, and so
+ * lead with it: Kenya, M-Pesa by STK (Africa's Talking).
+ */
 export const MPESA_COUNTRIES: ReadonlySet<string> = new Set(['KE']);
 
 export type SubscriptionRail = 'PADDLE' | 'MPESA' | 'NONE';
 
-export function subscriptionRail(input: { country: string | null | undefined; paddleOn: boolean }): SubscriptionRail {
+/** Every way to pay here, best first; empty when there is none yet. */
+export function subscriptionRails(input: {
+  country: string | null | undefined;
+  paddleOn: boolean;
+}): Array<Exclude<SubscriptionRail, 'NONE'>> {
   const code = (input.country ?? '').trim().toUpperCase();
-  if (input.paddleOn && paddleSellsIn(code)) return 'PADDLE';
-  if (MPESA_COUNTRIES.has(code)) return 'MPESA';
-  return 'NONE';
+  const rails: Array<Exclude<SubscriptionRail, 'NONE'>> = [];
+  if (MPESA_COUNTRIES.has(code)) rails.push('MPESA');
+  if (input.paddleOn && paddleSellsIn(code)) rails.push('PADDLE');
+  return rails;
+}
+
+/** The leading way to pay here, or NONE. */
+export function subscriptionRail(input: { country: string | null | undefined; paddleOn: boolean }): SubscriptionRail {
+  return subscriptionRails(input)[0] ?? 'NONE';
 }
