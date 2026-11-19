@@ -557,6 +557,43 @@ describe('AdvertsService', () => {
     });
   });
 
+  it('lets a Pro tenant show twenty media items per advert', async () => {
+    const service = new AdvertsService(undefined, {
+      hasCurrentTermsAcceptance: async () => true,
+      recordTenantAudit: async () => undefined,
+      tenantPlan: async () => 'PRO' as const,
+    } as unknown as AuthService);
+    const advert = await service.createAdvert(tenantId, {
+      title: 'Fresh vegetable supply',
+      displayName: 'Nairobi Fresh Produce',
+      industryCode: 'AGRICULTURE',
+      role: 'SUPPLIER',
+      description: 'We supply fresh vegetables to hotels and retailers in Nairobi.',
+      countryCode: 'KE',
+      publishedAt: '2026-06-01T00:00:00.000Z',
+    });
+
+    for (let index = 0; index < mediaPolicy.maxItemsPerOwnerTopPlan; index += 1) {
+      await service.addAdvertMedia(tenantId, advert.id, {
+        sourceUrl: `https://cdn.example.test/pro-stall-${index}.jpg`,
+        fileName: `pro-stall-${index}.jpg`,
+        mimeType: 'image/jpeg',
+        fileSizeBytes: 800_000,
+      });
+    }
+
+    await expect(
+      service.addAdvertMedia(tenantId, advert.id, {
+        sourceUrl: 'https://cdn.example.test/pro-stall-extra.jpg',
+        fileName: 'pro-stall-extra.jpg',
+        mimeType: 'image/jpeg',
+        fileSizeBytes: 800_000,
+      }),
+    ).rejects.toThrow('maximum of 20');
+    const adverts = await service.listAdverts(tenantId);
+    expect(adverts[0]?.mediaSlots).toEqual({ used: 20, max: 20, remaining: 0 });
+  });
+
   it('creates one renewal alert on day 35 and does not duplicate it', async () => {
     const { service } = await createService();
 

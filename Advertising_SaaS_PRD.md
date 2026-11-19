@@ -22,7 +22,7 @@ Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS fo
 
 The key differentiator is not only advertising visibility. The platform's main promise is high-precision linking: helping the advertiser find the most likely buyers or partners, and helping users find the most credible source, supplier, producer, or provider for an item or service, with built-in real-time messaging to complete the connection.
 
-The first month is free. Starting in month two, subscribers pay (owner decision 18/11/26) **Basic KES 499 a month or KES 4,990 a year** paid ahead, or **Pro KES 1,499 a month or KES 14,990 a year** (more media, Source Finder priority, RFQs). A year ahead costs 10 months' price. Subscribers who start in the first 12 months after launch keep this founding price for as long as they stay subscribed. Other countries are priced near the same value in their own currency and stay indicative until approved, subject to tax, app-store pricing tiers, and payment-provider minimums. (Superseded rule: 10 units of local currency per month.)
+The first month is free. Starting in month two, subscribers pay (owner decision 18/11/26) **Basic KES 499 a month or KES 4,990 a year** paid ahead, or **Pro KES 1,499 a month or KES 14,990 a year**. What each plan unlocks (decided 19/11/26): Basic shows up to 10 photos or videos per listing; Pro shows up to 20 and gets Source Finder priority. RFQs are on every plan: buyers send them free and every advertiser can receive and answer them. A year ahead costs 10 months' price. Subscribers who start in the first 12 months after launch keep this founding price for as long as they stay subscribed. Other countries are priced near the same value in their own currency and stay indicative until approved, subject to tax, app-store pricing tiers, and payment-provider minimums. (Superseded rule: 10 units of local currency per month.)
 
 ## 2. Product Goals
 
@@ -1001,7 +1001,7 @@ Implementation progress on 2026-06-20:
 Requirements:
 
 - First month free for eligible new tenant accounts.
-- From second month onward, charge the plan price in the subscriber country's currency: Kenya Basic KES 499/month (KES 4,990/year), Pro KES 1,499/month (KES 14,990/year); founding price locked for subscribers who start in the first 12 months (`packages/domain/src/subscription-pricing.ts`).
+- From second month onward, charge the plan price in the subscriber country's currency: Kenya Basic KES 499/month (KES 4,990/year), Pro KES 1,499/month (KES 14,990/year); founding price locked for subscribers who start in the first 12 months (`packages/domain/src/subscription-pricing.ts`). Plan entitlements: `planEntitlements` (Basic 10 media per listing, Pro 20; RFQs on both; Pro Source Finder priority); the plan is stored on `Tenant.subscriptionPlan` (default BASIC).
 - Pricing must be localized by country, currency, tax rules, app-store pricing rules, and payment provider support.
 - The pricing table must store local currency code, display name, flag/country, tax handling, payment-provider minimums, app-store tier mapping, and any legally required local disclosure.
 - Web payments should support cards, mobile money where available, bank transfer where practical, and local wallets over time.

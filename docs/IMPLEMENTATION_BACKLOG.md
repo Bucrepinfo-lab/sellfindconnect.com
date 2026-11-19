@@ -484,7 +484,7 @@ Progress:
 ## Epic 8: Subscription, Finance, and Tax
 
 - Implement first-month-free subscription state machine.
-- Configure country-local pricing with fallback approval (Kenya done 18/11/26: Basic 499 / Pro 1,499; other countries indicative). Next: Pro entitlements (media limit, Source Finder priority, RFQs) and a plan choice at checkout.
+- Configure country-local pricing with fallback approval (Kenya done 18/11/26: Basic 499 / Pro 1,499; other countries indicative). Pro media entitlement done 19/11/26 (Basic 10 / Pro 20 per listing, enforced in the API from `Tenant.subscriptionPlan`; RFQs stay on every plan). Next: a plan choice at checkout that sets the plan after payment (payments area, owner approval), and Source Finder priority as an honest, labelled tie-breaker.
 - Integrate payment adapter.
 - Build invoice, receipt, refund, chargeback, and dunning workflows.
 - Build country tax profile and effective-dated rules.

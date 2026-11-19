@@ -2,8 +2,17 @@
  * SellFindConnect subscription prices (owner decision 18/11/26).
  *
  * - Basic: KES 499 a month, or KES 4,990 a year paid ahead.
- * - Pro (more media, Source Finder priority, RFQs): KES 1,499 a month, or
- *   KES 14,990 a year. A year ahead = 10 months' price.
+ * - Pro: KES 1,499 a month, or KES 14,990 a year. A year ahead = 10 months' price.
+ * - What each plan unlocks (owner asked Claude to decide, 19/11/26):
+ *   - Media per listing: Basic 10 (what every tenant has today, so nobody
+ *     loses anything), Pro 20.
+ *   - RFQs: on every plan. Buyers send RFQs free and every advertiser can
+ *     receive and answer them. Charging buyers, or hiding RFQs from Basic
+ *     sellers, would leave buyers unanswered and break the match → chat/RFQ
+ *     loop the product sells (B2B norm: Alibaba buyers post RFQs free; sellers
+ *     pay for reach, not for the right to answer).
+ *   - Source Finder priority: Pro only. Not yet applied to ranking: the
+ *     matcher's reason codes must stay honest, so it needs its own change.
  * - The first month is free (calculateTrialSubscription).
  * - Prices include tax (the Kenya tax profile treats the fee as tax-inclusive).
  * - Founding price lock: a tenant that starts in the first 12 months after
@@ -17,6 +26,7 @@
  */
 
 import type { TenantSubscriptionStatus } from './auth-tenancy';
+import { mediaPolicy } from './media';
 
 /** A year paid ahead costs this many months' price. */
 export const YEAR_PLAN_MONTHS_PAID = 10;
@@ -27,9 +37,38 @@ export type SubscriptionPlan = 'BASIC' | 'PRO';
 export type BillingPeriod = 'MONTH' | 'YEAR';
 
 export const SUBSCRIPTION_PLANS: Record<SubscriptionPlan, { name: string; summary: string }> = {
-  BASIC: { name: 'Basic', summary: 'Profile, listings with media, Source Finder, in-app chat.' },
-  PRO: { name: 'Pro', summary: 'More media per listing, Source Finder priority, RFQs.' },
+  BASIC: {
+    name: 'Basic',
+    summary: 'Profile, listings with up to 10 photos or videos each, Source Finder, in-app chat and RFQs.',
+  },
+  PRO: {
+    name: 'Pro',
+    summary: 'Everything in Basic, up to 20 photos or videos per listing, and Source Finder priority.',
+  },
 };
+
+export type PlanEntitlements = {
+  /** Photos/videos one listing (profile or advert) can show. */
+  maxMediaPerListing: number;
+  /** Placed ahead of equal matches in the Source Finder (not applied yet). */
+  sourceFinderPriority: boolean;
+  /** Receive and answer RFQs. On every plan: buyers are never blocked. */
+  rfqs: true;
+};
+
+export const PLAN_ENTITLEMENTS: Record<SubscriptionPlan, PlanEntitlements> = {
+  BASIC: { maxMediaPerListing: mediaPolicy.maxItemsPerOwner, sourceFinderPriority: false, rfqs: true },
+  PRO: { maxMediaPerListing: mediaPolicy.maxItemsPerOwnerTopPlan, sourceFinderPriority: true, rfqs: true },
+};
+
+/** A stored plan value, or BASIC for anything missing or unknown (fail closed to the lower plan). */
+export function normalizePlan(plan: string | null | undefined): SubscriptionPlan {
+  return plan?.trim().toUpperCase() === 'PRO' ? 'PRO' : 'BASIC';
+}
+
+export function planEntitlements(plan: string | null | undefined): PlanEntitlements {
+  return PLAN_ENTITLEMENTS[normalizePlan(plan)];
+}
 
 export type PlanPriceList = {
   country: string;

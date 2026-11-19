@@ -5,7 +5,9 @@ import {
   YEAR_PLAN_MONTHS_PAID,
   formatPlanPrice,
   isFoundingSubscriber,
+  normalizePlan,
   parsePriceOverrides,
+  planEntitlements,
   quoteSubscription,
 } from './subscription-pricing';
 
@@ -59,5 +61,17 @@ describe('subscription pricing (owner decision 18/11/26)', () => {
   it('formats prices the way people say them', () => {
     expect(formatPlanPrice(14990, 'KES')).toBe('KES 14,990');
     expect(formatPlanPrice(3.99, 'USD')).toBe('USD 3.99');
+  });
+
+  it('plan entitlements: Basic 10 media, Pro 20, RFQs on both', () => {
+    expect(planEntitlements('BASIC')).toEqual({ maxMediaPerListing: 10, sourceFinderPriority: false, rfqs: true });
+    expect(planEntitlements('PRO')).toEqual({ maxMediaPerListing: 20, sourceFinderPriority: true, rfqs: true });
+  });
+
+  it('an unknown or missing plan falls back to Basic', () => {
+    expect(normalizePlan(undefined)).toBe('BASIC');
+    expect(normalizePlan('gold')).toBe('BASIC');
+    expect(normalizePlan(' pro ')).toBe('PRO');
+    expect(planEntitlements(null).maxMediaPerListing).toBe(10);
   });
 });

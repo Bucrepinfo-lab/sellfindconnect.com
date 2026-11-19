@@ -16,7 +16,7 @@ import {
   type TermsAcceptanceEvidence as PrismaTermsAcceptanceEvidence,
   type User,
 } from '@prisma/client';
-import { quoteSubscription, type TermsAcceptanceEvidence } from '@telpen/domain';
+import { normalizePlan, quoteSubscription, type TermsAcceptanceEvidence } from '@telpen/domain';
 
 import type {
   AccessAssignmentRecord,
@@ -595,6 +595,7 @@ export class PrismaAuthRepository implements AuthRepository {
           env: process.env,
         })?.monthlyAmount ?? this.decimalToNumber(tenant.country.monthlySubscriptionAmount),
       currencyCode: tenant.country.currencyCode,
+      plan: normalizePlan(tenant.subscriptionPlan),
       createdAt: tenant.createdAt.toISOString(),
     };
   }

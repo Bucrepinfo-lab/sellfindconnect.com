@@ -24,6 +24,7 @@ import {
   type ProfileServiceArea,
   type PublishedProfile,
   type TenantAccessRole,
+  planEntitlements,
 } from '@telpen/domain';
 import { randomUUID } from 'node:crypto';
 
@@ -304,7 +305,7 @@ export class ProfilesService {
         reviewedAt: draft.reviewedAt ?? null,
         reviewNote: draft.reviewNote ?? null,
         media,
-        mediaSlots: this.mediaSlots(media),
+        mediaSlots: this.mediaSlots(media, await this.mediaLimit(tenantId)),
         publicContacts: {
           phone: draft.phone ?? null,
           whatsapp: draft.whatsapp ?? null,
@@ -350,9 +351,10 @@ export class ProfilesService {
     const draft = await this.getDraft(tenantId, id);
     const existingMedia = await this.repository.listMediaAssets(tenantId, 'PROFILE_DRAFT', draft.id);
 
-    if (existingMedia.length >= mediaPolicy.maxItemsPerOwner) {
+    const mediaLimit = await this.mediaLimit(input.tenantId);
+    if (existingMedia.length >= mediaLimit) {
       throw new UnprocessableEntityException(
-        `A profile can display a maximum of ${mediaPolicy.maxItemsPerOwner} media items.`,
+        `A profile can display a maximum of ${mediaLimit} media items on your plan.`,
       );
     }
 
@@ -398,7 +400,7 @@ export class ProfilesService {
 
     return {
       upload,
-      mediaSlots: this.mediaSlots(existingMedia),
+      mediaSlots: this.mediaSlots(existingMedia, mediaLimit),
       expiresAt: upload.expiresAt,
     };
   }
@@ -417,13 +419,14 @@ export class ProfilesService {
     const draft = await this.getDraft(tenantId, id);
     const existingMedia = await this.repository.listMediaAssets(tenantId, 'PROFILE_DRAFT', draft.id);
 
-    if (existingMedia.length >= mediaPolicy.maxItemsPerOwner) {
+    const mediaLimit = await this.mediaLimit(input.tenantId);
+    if (existingMedia.length >= mediaLimit) {
       throw new UnprocessableEntityException(
-        `A profile can display a maximum of ${mediaPolicy.maxItemsPerOwner} media items.`,
+        `A profile can display a maximum of ${mediaLimit} media items on your plan.`,
       );
     }
 
-    const displayOrder = input.displayOrder ?? this.nextMediaDisplayOrder(existingMedia);
+    const displayOrder = input.displayOrder ?? this.nextMediaDisplayOrder(existingMedia, mediaLimit);
     if (existingMedia.some((asset) => asset.displayOrder === displayOrder)) {
       throw new UnprocessableEntityException('This profile media display position is already used.');
     }
@@ -440,7 +443,7 @@ export class ProfilesService {
       displayOrder,
       visibility,
     };
-    const mediaDecision = evaluateMediaAssetInput(mediaInput);
+    const mediaDecision = evaluateMediaAssetInput(mediaInput, mediaLimit);
     if (!mediaDecision.allowed) {
       throw new UnprocessableEntityException({
         message: 'Profile media metadata violates media policy.',
@@ -514,7 +517,7 @@ export class ProfilesService {
 
     return {
       media: presentTenantMediaAsset(media),
-      mediaSlots: this.mediaSlots([...existingMedia, media]),
+      mediaSlots: this.mediaSlots([...existingMedia, media], mediaLimit),
       processingJobs,
     };
   }
@@ -646,7 +649,7 @@ export class ProfilesService {
       ...profile,
       daysLive: this.daysBetween(profile.publishedAt, new Date().toISOString()),
       media,
-      mediaSlots: this.mediaSlots(media),
+      mediaSlots: this.mediaSlots(media, await this.mediaLimit(tenantId)),
     };
   }
 
@@ -855,17 +858,22 @@ export class ProfilesService {
     };
   }
 
-  private mediaSlots(media: MediaAsset[]): MediaSlots {
+  /** Media items one listing may show on the tenant's plan (Basic 10, Pro 20). */
+  private async mediaLimit(tenantId: string): Promise<number> {
+    return planEntitlements(await this.auth?.tenantPlan(tenantId)).maxMediaPerListing;
+  }
+
+  private mediaSlots(media: MediaAsset[], max: number = mediaPolicy.maxItemsPerOwner): MediaSlots {
     return {
       used: media.length,
-      max: mediaPolicy.maxItemsPerOwner,
-      remaining: Math.max(0, mediaPolicy.maxItemsPerOwner - media.length),
+      max,
+      remaining: Math.max(0, max - media.length),
     };
   }
 
-  private nextMediaDisplayOrder(media: MediaAsset[]): number {
+  private nextMediaDisplayOrder(media: MediaAsset[], max: number = mediaPolicy.maxItemsPerOwner): number {
     const usedOrders = new Set(media.map((asset) => asset.displayOrder));
-    for (let index = 0; index < mediaPolicy.maxItemsPerOwner; index += 1) {
+    for (let index = 0; index < max; index += 1) {
       if (!usedOrders.has(index)) {
         return index;
       }
