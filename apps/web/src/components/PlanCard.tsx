@@ -11,8 +11,9 @@ type PlanOption = {
   name: string;
   summary: string;
   maxMediaPerListing: number;
-  monthly: number;
-  yearly: number;
+  /** M-Pesa price; null when the plan is paid by card (the price shows at Paddle's checkout). */
+  monthly: number | null;
+  yearly: number | null;
   locked: boolean;
 };
 
@@ -26,6 +27,7 @@ type CardCheckout = {
 type PlanOptions = {
   currentPlan: 'BASIC' | 'PRO';
   currencyCode: string | null;
+  rail: 'PADDLE' | 'MPESA' | 'NONE';
   payable: boolean;
   plans: PlanOption[];
   card: CardCheckout | null;
@@ -66,20 +68,23 @@ function loadPaddle(card: CardCheckout): Promise<PaddleJs> {
 
 type CheckoutResult =
   | { ok: true; txnId: string }
-  | { ok: false; reason: 'no_phone' | 'invalid_amount' | 'no_price' | 'provider_error' | 'tax_profile' | 'terms' };
+  | { ok: false; reason: 'no_phone' | 'invalid_amount' | 'no_price' | 'use_card' | 'provider_error' | 'tax_profile' | 'terms' };
 
 const reasonText: Record<Exclude<CheckoutResult, { ok: true }>['reason'], string> = {
   tax_profile: 'M-Pesa payments are paused for a tax update. Try again later or pay by card.',
   terms: 'Accept the current terms first, then choose your plan again.',
   no_phone: 'Sign in with your M-Pesa phone number first. M-Pesa asks that phone to pay.',
   no_price: 'Plans are not available in your country yet.',
+  use_card: 'Plans are paid by card here. Use the card button.',
   invalid_amount: 'That price could not be charged. Try again later.',
   provider_error: 'M-Pesa did not take the request. Try again in a minute.',
 };
 
 /**
- * Basic or Pro, paid by M-Pesa on the signed-in phone. The server sets the
- * price and changes the plan only after M-Pesa confirms the payment.
+ * Basic or Pro. Owner rule 19/11/26: by card through Paddle wherever Paddle
+ * sells (Kenya included; Paddle handles the tax), otherwise by M-Pesa on the
+ * signed-in phone. The server picks the way and changes the plan only after
+ * the payment is confirmed.
  */
 export function PlanCard() {
   const [options, setOptions] = useState<PlanOptions | null>(null);
@@ -101,9 +106,10 @@ export function PlanCard() {
     };
   }, []);
 
-  if (!options?.payable || !options.currencyCode) return null;
-  const currency = options.currencyCode;
-  const card = options.card;
+  if (!options?.payable) return null;
+  const currency = options.currencyCode ?? '';
+  const card = options.rail === 'PADDLE' ? options.card : null;
+  const mpesa = options.rail === 'MPESA';
 
   const payByCard = async (option: PlanOption) => {
     if (!card) return;
@@ -131,7 +137,8 @@ export function PlanCard() {
         method: 'POST',
         body: { plan: option.plan, period },
       });
-      const price = formatPlanPrice(period === 'YEAR' ? option.yearly : option.monthly, currency);
+      const amount = period === 'YEAR' ? option.yearly : option.monthly;
+      const price = amount === null ? option.name : formatPlanPrice(amount, currency);
       setNote(
         result.ok
           ? {
@@ -183,34 +190,38 @@ export function PlanCard() {
       <ul className="biz-plans">
         {options.plans.map((option) => {
           const price = period === 'YEAR' ? option.yearly : option.monthly;
+          const priceText = price === null ? '' : ` · ${formatPlanPrice(price, currency)} ${period === 'YEAR' ? 'a year' : 'a month'}`;
           const isCurrent = option.plan === options.currentPlan;
           return (
             <li key={option.plan} className="biz-plan">
               <h3>
-                {option.name} · {formatPlanPrice(price, currency)} {period === 'YEAR' ? 'a year' : 'a month'}
+                {option.name}
+                {priceText}
               </h3>
               <p className="biz-sub">{option.summary}</p>
               {option.locked ? <p className="biz-sub">Founding price: kept for as long as you stay subscribed.</p> : null}
-              <button
-                className={option.plan === 'PRO' ? 'primary-button' : 'secondary-button'}
-                type="button"
-                disabled={Boolean(busy)}
-                onClick={() => void choose(option)}
-              >
-                {busy === option.plan
-                  ? 'Asking M-Pesa…'
-                  : isCurrent
-                    ? `Pay for ${option.name} by M-Pesa`
-                    : `Switch to ${option.name} by M-Pesa`}
-              </button>
+              {mpesa ? (
+                <button
+                  className={option.plan === 'PRO' ? 'primary-button' : 'secondary-button'}
+                  type="button"
+                  disabled={Boolean(busy)}
+                  onClick={() => void choose(option)}
+                >
+                  {busy === option.plan
+                    ? 'Asking M-Pesa…'
+                    : isCurrent
+                      ? `Pay for ${option.name} by M-Pesa`
+                      : `Switch to ${option.name} by M-Pesa`}
+                </button>
+              ) : null}
               {card ? (
                 <button
-                  className="secondary-button"
+                  className={option.plan === 'PRO' ? 'primary-button' : 'secondary-button'}
                   type="button"
                   disabled={Boolean(busy)}
                   onClick={() => void payByCard(option)}
                 >
-                  {busy === `card-${option.plan}` ? 'Opening card checkout…' : 'Pay by card'}
+                  {busy === `card-${option.plan}` ? 'Opening card checkout…' : isCurrent ? `Pay for ${option.name} by card` : `Switch to ${option.name} by card`}
                 </button>
               ) : null}
             </li>

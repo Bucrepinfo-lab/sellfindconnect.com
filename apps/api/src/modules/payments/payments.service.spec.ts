@@ -338,6 +338,40 @@ describe('PaymentsService subscription checkout', () => {
       ['BASIC', 499, 4990, 10],
       ['PRO', 1499, 14990, 20],
     ]);
+    expect(options.rail).toBe('MPESA');
+  });
+
+  it('with Paddle on, a Kenyan tenant pays by card and M-Pesa plan checkout is refused (owner 19/11/26)', async () => {
+    const paddle = {
+      PADDLE_ENABLED: 'true',
+      PADDLE_CLIENT_TOKEN: 'test_client',
+      PADDLE_WEBHOOK_SECRET: 'whsec',
+      PADDLE_PRICE_BASIC_MONTH: 'pri_bm',
+      PADDLE_PRICE_BASIC_YEAR: 'pri_by',
+      PADDLE_PRICE_PRO_MONTH: 'pri_pm',
+      PADDLE_PRICE_PRO_YEAR: 'pri_py',
+    };
+    for (const [key, value] of Object.entries(paddle)) vi.stubEnv(key, value);
+    try {
+      const { service, charges } = subscriptionService();
+      await expect(service.requestCheckout('session-token', { plan: 'PRO' })).resolves.toEqual({
+        ok: false,
+        reason: 'use_card',
+      });
+      expect(charges).toEqual([]);
+      const options = await service.getSubscriptionOptions('session-token');
+      expect(options).toMatchObject({ rail: 'PADDLE', payable: true });
+      expect(options.card?.priceIds.PRO.MONTH).toBe('pri_pm');
+      expect(JSON.stringify(options)).not.toContain('whsec');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('where Paddle is blocked and there is no M-Pesa, nothing is payable yet', async () => {
+    const { service } = subscriptionService('SO');
+    const options = await service.getSubscriptionOptions('session-token');
+    expect(options).toMatchObject({ rail: 'NONE', payable: false, card: null });
   });
 });
 
