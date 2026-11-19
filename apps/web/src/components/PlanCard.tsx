@@ -27,8 +27,9 @@ type CardCheckout = {
 type PlanOptions = {
   currentPlan: 'BASIC' | 'PRO';
   currencyCode: string | null;
-  rail: 'PADDLE' | 'MPESA' | 'NONE';
-  rails: Array<'PADDLE' | 'MPESA'>;
+  rail: 'PADDLE' | 'MPESA' | 'MOBILE_MONEY' | 'BANK_TRANSFER' | 'NONE';
+  rails: Array<'PADDLE' | 'MPESA' | 'MOBILE_MONEY' | 'BANK_TRANSFER'>;
+  localMethod: string | null;
   payable: boolean;
   plans: PlanOption[];
   card: CardCheckout | null;
@@ -68,17 +69,17 @@ function loadPaddle(card: CardCheckout): Promise<PaddleJs> {
 }
 
 type CheckoutResult =
-  | { ok: true; txnId: string }
+  | { ok: true; txnId: string; redirectUrl?: string }
   | { ok: false; reason: 'no_phone' | 'invalid_amount' | 'no_price' | 'use_card' | 'provider_error' | 'tax_profile' | 'terms' };
 
 const reasonText: Record<Exclude<CheckoutResult, { ok: true }>['reason'], string> = {
   tax_profile: 'M-Pesa payments are paused for a tax update. Try again later or pay by card.',
   terms: 'Accept the current terms first, then choose your plan again.',
-  no_phone: 'Sign in with your M-Pesa phone number first. M-Pesa asks that phone to pay.',
+  no_phone: 'Add and verify your mobile money phone number first. The payment prompt goes to that phone.',
   no_price: 'Plans are not available in your country yet.',
   use_card: 'Plans are paid by card here. Use the card button.',
   invalid_amount: 'That price could not be charged. Try again later.',
-  provider_error: 'M-Pesa did not take the request. Try again in a minute.',
+  provider_error: 'The payment could not start. Try again in a minute.',
 };
 
 /**
@@ -110,7 +111,9 @@ export function PlanCard() {
   if (!options?.payable) return null;
   const currency = options.currencyCode ?? '';
   const card = options.rails.includes('PADDLE') ? options.card : null;
-  const mpesa = options.rails.includes('MPESA');
+  // The way most people in this country pay leads (owner standing order 19/11/26).
+  const mpesa = options.rails.some((rail) => rail !== 'PADDLE');
+  const localName = options.localMethod ?? 'M-Pesa';
 
   const payByCard = async (option: PlanOption) => {
     if (!card) return;
@@ -140,11 +143,15 @@ export function PlanCard() {
       });
       const amount = period === 'YEAR' ? option.yearly : option.monthly;
       const price = amount === null ? option.name : formatPlanPrice(amount, currency);
+      if (result.ok && result.redirectUrl) {
+        window.location.assign(result.redirectUrl);
+        return;
+      }
       setNote(
         result.ok
           ? {
               tone: 'ok',
-              text: `Check your phone: M-Pesa is asking you to pay ${price} for ${option.name}. Your plan changes as soon as the payment goes through.`,
+              text: `Check your phone: ${localName} is asking you to pay ${price} for ${option.name}. Your plan changes as soon as the payment goes through.`,
             }
           : { tone: 'error', text: reasonText[result.reason] },
       );
@@ -209,10 +216,10 @@ export function PlanCard() {
                   onClick={() => void choose(option)}
                 >
                   {busy === option.plan
-                    ? 'Asking M-Pesa…'
+                    ? 'Starting payment…'
                     : isCurrent
-                      ? `Pay for ${option.name} by M-Pesa`
-                      : `Switch to ${option.name} by M-Pesa`}
+                      ? `Pay for ${option.name} by ${localName}`
+                      : `Switch to ${option.name} by ${localName}`}
                 </button>
               ) : null}
               {card ? (

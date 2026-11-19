@@ -5,18 +5,29 @@ Paddle that do an auto remittance of the tax"; choice: Paddle for cards plus
 M-Pesa direct). It replaces the 2026-08-22 "stay merchant of record, Paddle
 forbidden" model, kept below for history. Not legal advice.
 
-## Which way a customer pays (owner rules 19/11/26, final)
+## Which way a customer pays (owner standing order 19/11/26)
 
-1. **The most convenient local method leads where we can charge it.**
-   Kenya: M-Pesa (89.1% of 53.4 million mobile money subscriptions, CA Kenya
-   Q3 FY 2025/26). M-Pesa is a direct sale with no VAT until the company is
-   VAT-registered.
-2. **Paddle wherever it sells**: second for card payers where a local method
-   leads (Kenya), and first everywhere else. Paddle deducts and remits the tax
-   before the money reaches us.
-3. **Where Paddle does not sell**, another merchant of record that remits the
-   tax. Checked 19/11/26: none takes M-Pesa or African mobile money, and they
-   block the same sanctioned countries. None to add today.
+**Always lead with the way most people in that country pay, so no subscriber
+is lost. The card never leads; it comes later, and a card payment goes
+through Paddle (it takes the payment and remits the VAT).** This holds in
+every country, developed ones included.
+
+| Country | Leads with | Through |
+|---|---|---|
+| Kenya | M-Pesa (89.1% of 53.4m mobile money subscriptions, CA Kenya Mar 2026) | Africa's Talking STK |
+| Uganda, Tanzania, Rwanda, Ghana, Zambia, Malawi, Mozambique, Cameroon, Côte d'Ivoire, Senegal, Benin, Burkina Faso, Congo, Gabon, Sierra Leone | Mobile money (MTN MoMo, Airtel Money, Orange Money, M-Pesa TZ, Wave and others) | pawaPay |
+| Nigeria | Bank transfer and USSD | Paystack |
+| South Africa | Instant EFT | Paystack |
+| Everywhere else | Paddle's checkout, which shows each country's popular methods (PayPal, iDEAL, Pix, UPI and others) beside cards | Paddle |
+
+Card penetration is under 30% in most of sub-Saharan Africa. A local way
+opens in a country only when its provider is switched on and the owner has
+approved that country's price. Local methods are direct sales by Telpen
+Systems Ltd: the VAT is ours (Uganda, Tanzania, Zimbabwe and Senegal tax
+foreign online services from the first sale; South Africa from ZAR 1m, Nigeria
+from about USD 25k, Ghana from GHS 200k a year). The owner accepted this on
+19/11/26. Code: `packages/domain/src/payment-rails.ts`,
+`apps/api/src/modules/payments/local-providers.ts`.
 
 Paddle's blocked countries (help centre, read 19/11/26): Afghanistan,
 Antarctica, Belarus, Burma, Central African Republic, Cuba, DR Congo, Haiti,

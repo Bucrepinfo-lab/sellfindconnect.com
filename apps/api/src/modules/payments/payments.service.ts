@@ -10,6 +10,7 @@ import {
   paddlePublicConfig,
   paidPlanFromPaddleEvent,
   quoteSubscription,
+  localMethodFor,
   subscriptionRails,
   verifyPaddleSignature,
   type SubscriptionRail,
@@ -29,12 +30,25 @@ import {
   type AtPaymentsProvider,
 } from './africastalking-payments';
 import { InMemoryPaymentsRepository } from './in-memory-payments.repository';
+import {
+  localPaymentCovers,
+  pawapayCallbackDepositId,
+  pawapayCheck,
+  pawapayDeposit,
+  pawapayOn,
+  paystackEventReference,
+  paystackInitialize,
+  paystackOn,
+  paystackVerify,
+  verifyPaystackSignature,
+  type LocalStatus,
+} from './local-providers';
 import type { PaymentTxnRecord } from './payments.records';
 import { PAYMENTS_REPOSITORY, type PaymentsRepository } from './payments.repository';
 import type { CheckoutDto, PayoutDto } from './dto/payments.dto';
 
 export type CheckoutResult =
-  | { ok: true; txnId: string; providerTxnId: string | null }
+  | { ok: true; txnId: string; providerTxnId: string | null; redirectUrl?: string }
   | {
       ok: false;
       reason: 'no_phone' | 'invalid_amount' | 'no_price' | 'use_card' | 'provider_error' | 'tax_profile' | 'terms';
@@ -57,8 +71,10 @@ export type SubscriptionOption = {
 export type SubscriptionOptions = {
   currentPlan: SubscriptionPlan;
   currencyCode: string | null;
-  /** The leading way to pay here: M-Pesa in Kenya, else Paddle where it sells, else NONE. */
+  /** The leading way to pay here: the way most people pay in the country, else Paddle, else NONE. */
   rail: SubscriptionRail;
+  /** Name of the local way (e.g. "M-Pesa", "MTN MoMo or Airtel Money"), when it leads. */
+  localMethod: string | null;
   /** Every way to pay here, best first. */
   rails: SubscriptionRail[];
   payable: boolean;
@@ -110,6 +126,15 @@ export class PaymentsService {
    */
   async requestCheckout(sessionToken: string, input: CheckoutDto): Promise<CheckoutResult> {
     const context = await this.auth.getSession(sessionToken); // throws 401 if invalid
+    // Owner standing order 19/11/26: the way most people in the country pay
+    // leads. Mobile money (pawaPay) and bank transfer/USSD/EFT (Paystack) go
+    // through their own flow; M-Pesa continues below.
+    if (input.plan) {
+      const lead = this.railsFor(context.tenant as SessionTenant).find((rail) => rail !== 'PADDLE');
+      if (lead === 'MOBILE_MONEY' || lead === 'BANK_TRANSFER') {
+        return this.startLocalCheckout(context, lead, input.plan, input.period ?? 'MONTH');
+      }
+    }
     // Only an OTP-verified login phone is a payer; an unverified profile phone never gets STK.
     const phone = context.user?.phoneVerifiedAt ? context.user.phone?.trim() : undefined;
     if (!phone) {
@@ -243,13 +268,13 @@ export class PaymentsService {
     const tenant = context.tenant as SessionTenant;
     const rails = this.railsFor(tenant);
     const rail: SubscriptionRail = rails[0] ?? 'NONE';
-    const mpesa = rails.includes('MPESA');
+    const local = rails.some((r) => r !== 'PADDLE');
     const plans: SubscriptionOption[] = [];
     let currencyCode: string | null = null;
     for (const plan of ['BASIC', 'PRO'] as const) {
-      const month = mpesa ? this.payableQuote(tenant, plan, 'MONTH') : undefined;
-      const year = mpesa ? this.payableQuote(tenant, plan, 'YEAR') : undefined;
-      if (mpesa && (!month || !year)) continue;
+      const month = local ? this.localQuote(tenant, plan, 'MONTH') : undefined;
+      const year = local ? this.localQuote(tenant, plan, 'YEAR') : undefined;
+      if (local && (!month || !year)) continue;
       if (month) currencyCode = month.currencyCode;
       plans.push({
         plan,
@@ -266,6 +291,7 @@ export class PaymentsService {
       currentPlan: normalizePlan(tenant?.plan),
       currencyCode,
       rail,
+      localMethod: local ? (localMethodFor(tenant?.countryCode)?.label ?? null) : null,
       rails,
       payable: rails.length > 0 && plans.length > 0,
       plans,
@@ -273,9 +299,174 @@ export class PaymentsService {
     };
   }
 
-  /** Ways to pay here, best first: M-Pesa in Kenya, then Paddle wherever it sells. */
+  /**
+   * Ways to pay here, best first (owner standing order 19/11/26): the way most
+   * people in the country pay (when its provider is on and the owner approved
+   * the price), then the card through Paddle.
+   */
   private railsFor(tenant: SessionTenant): SubscriptionRail[] {
-    return subscriptionRails({ country: tenant?.countryCode, paddleOn: paddleConfig(process.env) !== null });
+    const country = tenant?.countryCode;
+    const local = localMethodFor(country);
+    const quote = tenant ? quoteSubscription({ countryCode: tenant.countryCode, env: process.env }) : null;
+    return subscriptionRails({
+      country,
+      switches: { pawapay: pawapayOn(process.env), paystack: paystackOn(process.env), paddle: paddleConfig(process.env) !== null },
+      localPriceApproved: !!quote && !!local && quote.approved && quote.currencyCode === local.currency,
+    });
+  }
+
+  /**
+   * Mobile money (pawaPay prompt on the payer's own verified phone) or bank
+   * transfer / USSD / EFT (Paystack's own page). The price is the server's;
+   * the plan only changes once the provider confirms the payment.
+   */
+  private async startLocalCheckout(
+    context: Awaited<ReturnType<AuthService['getSession']>>,
+    rail: 'MOBILE_MONEY' | 'BANK_TRANSFER',
+    plan: SubscriptionPlan,
+    period: BillingPeriod,
+  ): Promise<CheckoutResult> {
+    const tenant = context.tenant as SessionTenant;
+    const quote = this.localQuote(tenant, plan, period);
+    if (!quote || !tenant) return { ok: false, reason: 'no_price' };
+    if (!(await this.auth.hasCurrentTermsAcceptance(context.session.userId, context.session.tenantId))) {
+      return { ok: false, reason: 'terms' };
+    }
+    const phone = context.user?.phoneVerifiedAt ? context.user.phone?.trim() : undefined;
+    if (rail === 'MOBILE_MONEY' && !phone) return { ok: false, reason: 'no_phone' };
+
+    const txn = this.newTxn({
+      kind: 'CHECKOUT',
+      provider: rail === 'MOBILE_MONEY' ? 'pawapay' : 'paystack',
+      phone: phone ?? '',
+      amount: quote.amount,
+      currency: quote.currencyCode,
+      reason: `${SUBSCRIPTION_PLANS[plan].name} plan, ${period === 'YEAR' ? 'a year' : 'a month'}`,
+      userId: context.session.userId,
+      tenantId: context.session.tenantId,
+      metadata: { purpose: 'SUBSCRIPTION', plan, period },
+    });
+    await this.repository.createPaymentTxn(txn);
+
+    let providerTxnId: string | undefined;
+    let redirectUrl: string | undefined;
+    if (rail === 'MOBILE_MONEY') {
+      const res = await pawapayDeposit({
+        env: process.env,
+        amount: quote.amount,
+        currency: quote.currencyCode,
+        phone: phone!,
+        message: 'SellFindConnect plan',
+        reference: txn.id,
+      });
+      if (res.ok) providerTxnId = res.depositId;
+    } else {
+      const email = context.user?.email?.trim() || `${context.session.userId}@payer.sellfindconnect.com`;
+      const res = await paystackInitialize({
+        env: process.env,
+        email,
+        amount: quote.amount,
+        currency: quote.currencyCode,
+        reference: txn.id,
+        country: tenant.countryCode,
+        callbackUrl: process.env.WEB_ORIGIN ? `${process.env.WEB_ORIGIN.replace(/\/$/, '')}/#plan` : undefined,
+        metadata: { tenantId: context.session.tenantId, plan, period },
+      });
+      if (res.ok) {
+        providerTxnId = txn.id;
+        redirectUrl = res.url;
+      }
+    }
+    await this.repository.updatePaymentTxn({
+      ...txn,
+      status: providerTxnId ? 'PENDING' : 'FAILED',
+      providerTxnId,
+      updatedAt: new Date().toISOString(),
+    });
+    await this.auth.recordTenantAudit({
+      tenantId: context.session.tenantId,
+      actorUserId: context.session.userId,
+      action: 'PAYMENT_CHECKOUT_REQUESTED',
+      entityType: 'PAYMENT',
+      entityId: txn.id,
+      metadata: {
+        kind: 'CHECKOUT',
+        provider: txn.provider,
+        amount: quote.amount,
+        currency: quote.currencyCode,
+        plan,
+        period,
+        ok: Boolean(providerTxnId),
+        status: providerTxnId ? 'PENDING' : 'FAILED',
+      },
+    });
+    return providerTxnId
+      ? { ok: true, txnId: txn.id, providerTxnId, redirectUrl }
+      : { ok: false, reason: 'provider_error', txnId: txn.id };
+  }
+
+  /**
+   * pawaPay deposit callback. Never trusted on its own: the deposit is re-read
+   * from pawaPay, and only a full, successful payment changes the plan, once.
+   */
+  async handlePawapayCallback(rawBody: string): Promise<{ ok: boolean; status?: LocalStatus | 'ignored' }> {
+    if (!pawapayOn(process.env)) return { ok: false };
+    const depositId = pawapayCallbackDepositId(rawBody);
+    if (!depositId) return { ok: true, status: 'ignored' };
+    const txn = await this.repository.findPaymentTxnByProviderTxnId(depositId);
+    if (!txn || txn.provider !== 'pawapay') return { ok: true, status: 'ignored' };
+    const checked = await pawapayCheck({ env: process.env, depositId });
+    await this.settleLocal(txn, checked);
+    return { ok: true, status: checked.status };
+  }
+
+  /** Paystack webhook: signed (HMAC-SHA512), then the transaction is re-verified. */
+  async handlePaystackWebhook(rawBody: string, signature: string | undefined): Promise<{ ok: boolean; status?: LocalStatus | 'ignored' }> {
+    if (!paystackOn(process.env)) return { ok: false };
+    if (!verifyPaystackSignature(rawBody, signature, (process.env.PAYSTACK_SECRET_KEY ?? '').trim())) return { ok: false };
+    const reference = paystackEventReference(rawBody);
+    if (!reference) return { ok: true, status: 'ignored' };
+    const txn = await this.repository.findPaymentTxnByProviderTxnId(reference);
+    if (!txn || txn.provider !== 'paystack') return { ok: true, status: 'ignored' };
+    const checked = await paystackVerify({ env: process.env, reference });
+    await this.settleLocal(txn, checked);
+    return { ok: true, status: checked.status };
+  }
+
+  private async settleLocal(
+    txn: PaymentTxnRecord,
+    checked: { status: LocalStatus; amount: number | null; currency: string | null },
+  ): Promise<void> {
+    if (txn.status === 'SUCCESS' || txn.status === 'FAILED') return;
+    const paidInFull =
+      checked.status === 'success' &&
+      (checked.currency ?? '').toUpperCase() === txn.currency.toUpperCase() &&
+      localPaymentCovers(checked.amount, txn.amount);
+    if (checked.status === 'pending' || checked.status === 'unknown') return;
+    await this.repository.updatePaymentTxn({
+      ...txn,
+      status: paidInFull ? 'SUCCESS' : 'FAILED',
+      updatedAt: new Date().toISOString(),
+    });
+    if (paidInFull) await this.applySubscription(txn);
+  }
+
+  /** This tenant's approved price in its country's local currency (the one its local way charges). */
+  private localQuote(tenant: SessionTenant, plan: SubscriptionPlan, period: BillingPeriod): PlanQuote | undefined {
+    if (!tenant) return undefined;
+    const local = localMethodFor(tenant.countryCode);
+    if (!local) return undefined;
+    if (local.rail === 'MPESA') return this.payableQuote(tenant, plan, period);
+    const quote = quoteSubscription({
+      countryCode: tenant.countryCode,
+      plan,
+      period,
+      startedAt: new Date(tenant.trialStartedAt),
+      status: tenant.status,
+      env: process.env,
+    });
+    if (!quote || !quote.approved || quote.currencyCode !== local.currency) return undefined;
+    return quote;
   }
 
   /**
@@ -468,6 +659,8 @@ export class PaymentsService {
 
   private newTxn(input: {
     kind: PaymentTxnRecord['kind'];
+    provider?: string;
+    currency?: string;
     phone: string;
     amount: number;
     reason?: string;
@@ -478,12 +671,12 @@ export class PaymentsService {
     const now = new Date().toISOString();
     return {
       id: randomUUID(),
-      provider: 'africastalking',
+      provider: input.provider ?? 'africastalking',
       kind: input.kind,
       status: 'REQUESTED',
       phone: input.phone,
       amount: input.amount,
-      currency: 'KES',
+      currency: input.currency ?? 'KES',
       reason: input.reason,
       userId: input.userId,
       tenantId: input.tenantId,
