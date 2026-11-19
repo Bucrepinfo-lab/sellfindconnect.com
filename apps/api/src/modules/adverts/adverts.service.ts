@@ -1790,7 +1790,9 @@ export class AdvertsService {
 
   /** Media items one listing may show on the tenant's plan (Basic 10, Pro 20). */
   private async mediaLimit(tenantId: string): Promise<number> {
-    return planEntitlements(await this.auth?.tenantPlan(tenantId)).maxMediaPerListing;
+    // No auth service (or a partial one) means no known plan: Basic.
+    const plan = typeof this.auth?.tenantPlan === 'function' ? await this.auth.tenantPlan(tenantId) : undefined;
+    return planEntitlements(plan).maxMediaPerListing;
   }
 
   private mediaSlots(media: MediaAsset[], max: number = mediaPolicy.maxItemsPerOwner): MediaSlots {
