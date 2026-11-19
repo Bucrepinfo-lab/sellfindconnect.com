@@ -1186,6 +1186,14 @@ export class AuthService {
   }
 
   /**
+   * Sets the tenant's plan. Called only by PaymentsService once the provider
+   * confirms a subscription payment; never from a client request.
+   */
+  async setTenantPlan(tenantId: string, plan: SubscriptionPlan): Promise<void> {
+    await this.repository.setTenantPlan(tenantId, plan);
+  }
+
+  /**
    * The user's membership in this tenant, or undefined when they are not a
    * member. Used to refuse assigning tenant work to someone outside the tenant.
    */

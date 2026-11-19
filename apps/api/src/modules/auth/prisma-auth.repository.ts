@@ -535,6 +535,10 @@ export class PrismaAuthRepository implements AuthRepository {
     return records.map((record) => this.mapAuditLog(record));
   }
 
+  async setTenantPlan(tenantId: string, plan: 'BASIC' | 'PRO'): Promise<void> {
+    await this.prisma.tenant.update({ where: { id: tenantId }, data: { subscriptionPlan: plan } });
+  }
+
   async listTenants(): Promise<AuthTenantRecord[]> {
     const tenants = await this.prisma.tenant.findMany({
       include: { country: true },

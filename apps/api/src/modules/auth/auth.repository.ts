@@ -65,4 +65,6 @@ export interface AuthRepository {
   createAccessDecisionAudit(record: AccessDecisionAuditRecord): RepositoryResult<void>;
   listAuditLogsForTenant(tenantId: string): RepositoryResult<AuthAuditRecord[]>;
   listTenants(): RepositoryResult<AuthTenantRecord[]>;
+  /** Sets the tenant's subscription plan (only after a confirmed subscription payment). */
+  setTenantPlan(tenantId: string, plan: 'BASIC' | 'PRO'): RepositoryResult<void>;
 }

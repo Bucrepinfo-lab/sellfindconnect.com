@@ -62,6 +62,11 @@ export class InMemoryAuthRepository implements AuthRepository {
     return this.tenants.get(tenantId);
   }
 
+  setTenantPlan(tenantId: string, plan: 'BASIC' | 'PRO'): void {
+    const tenant = this.tenants.get(tenantId);
+    if (tenant) this.tenants.set(tenantId, { ...tenant, plan });
+  }
+
   findTermsAcceptance(userId: string, tenantId: string): TermsAcceptanceEvidence | undefined {
     return this.listTermsAcceptance({ tenantId, userId })[0];
   }
