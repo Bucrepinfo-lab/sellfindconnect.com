@@ -1,4 +1,16 @@
-import { Body, Controller, Get, Headers, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  HttpException,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+  type RawBodyRequest,
+} from '@nestjs/common';
+import type { Request } from 'express';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 
 import { AndroidAppCheckoutGuard } from '../../common/android-app-checkout.guard';
@@ -28,6 +40,17 @@ export class PaymentsController {
   @ApiHeader({ name: 'x-session-token', required: true })
   payout(@Headers('x-session-token') sessionToken: string, @Body() body: PayoutDto) {
     return this.payments.requestPayout(sessionToken, body);
+  }
+
+  /** Paddle notifications (card sales). Signature-checked on the raw body. */
+  @Post('paddle/webhook')
+  async paddleWebhook(
+    @Req() request: RawBodyRequest<Request>,
+    @Headers('paddle-signature') signature: string | undefined,
+  ) {
+    const result = await this.payments.handlePaddleWebhook(request.rawBody?.toString('utf8') ?? '', signature);
+    if (!result.ok) throw new HttpException({ error: result.error }, result.status);
+    return result;
   }
 
   @Post('at/callback')

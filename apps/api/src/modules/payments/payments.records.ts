@@ -1,6 +1,7 @@
 import type { PaymentStatus } from '@telpen/domain';
 
-export type PaymentKind = 'CHECKOUT' | 'B2C' | 'C2B';
+/** CARD = a Paddle card sale (Paddle is the merchant of record). */
+export type PaymentKind = 'CHECKOUT' | 'B2C' | 'C2B' | 'CARD';
 
 export type PaymentTxnRecord = {
   id: string;

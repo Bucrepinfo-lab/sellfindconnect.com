@@ -1185,6 +1185,10 @@ export class AuthService {
     return normalizePlan(tenant?.plan);
   }
 
+  async tenantExists(tenantId: string): Promise<boolean> {
+    return Boolean(await this.repository.findTenantById(tenantId));
+  }
+
   /**
    * Sets the tenant's plan. Called only by PaymentsService once the provider
    * confirms a subscription payment; never from a client request.

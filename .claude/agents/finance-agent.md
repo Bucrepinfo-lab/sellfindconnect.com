@@ -19,6 +19,11 @@ Pure logic: `packages/domain/src/finance.ts`, `kenya-tax-profile.ts`,
 Repositories: `in-memory-finance.repository.ts` (default) and
 `prisma-finance.repository.ts` (opt-in via `PERSISTENCE_DRIVER=prisma`).
 
+### Payment and tax model (owner decision 19/11/26)
+Cards: Paddle is merchant of record and remits the tax. M-Pesa: direct sale,
+no VAT until VAT-registered; the gate below applies to M-Pesa checkout only
+once `SELLER_VAT_REGISTERED=true`. See `docs/GROUP_TAX_OPERATING_MODEL.md`.
+
 ### The tax_profile DRAFT→APPROVED gate
 - `taxProfileStatuses = ['DRAFT','APPROVED','SUSPENDED']`
   (`packages/domain/src/finance.ts`).

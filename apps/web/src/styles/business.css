@@ -323,8 +323,11 @@
 }
 
 .biz-plan button {
-  margin-top: auto;
   min-height: 44px;
+}
+
+.biz-plan button:first-of-type {
+  margin-top: auto;
 }
 
 .biz-card .biz-plan h3 {

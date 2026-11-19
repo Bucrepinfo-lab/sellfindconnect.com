@@ -4,8 +4,14 @@ import {
   SUBSCRIPTION_PLANS,
   isValidPaymentAmount,
   mapAtPaymentStatus,
+  mpesaSaleNeedsApprovedTaxProfile,
   normalizePlan,
+  paddleConfig,
+  paddlePublicConfig,
+  paidPlanFromPaddleEvent,
   quoteSubscription,
+  verifyPaddleSignature,
+  type PaddlePublicConfig,
   type BillingPeriod,
   type PlanQuote,
   type SubscriptionPlan,
@@ -48,10 +54,16 @@ export type SubscriptionOption = {
 export type SubscriptionOptions = {
   currentPlan: SubscriptionPlan;
   currencyCode: string | null;
-  /** False when this country has no approved price (or isn't payable in KES yet). */
+  /** False when this country has no approved M-Pesa price (KES). */
   payable: boolean;
   plans: SubscriptionOption[];
+  /** Paddle card checkout (Paddle is the seller and remits the tax), or null when off. */
+  card: (PaddlePublicConfig & { customData: { tenantId: string } }) | null;
 };
+
+export type PaddleWebhookResult =
+  | { ok: true; applied?: boolean; ignored?: boolean; duplicate?: boolean }
+  | { ok: false; status: 401 | 404 | 400; error: string };
 
 export type PayoutResult =
   | { ok: true; txnId: string }
@@ -113,7 +125,12 @@ export class PaymentsService {
       return { ok: false, reason: 'invalid_amount' };
     }
 
-    const launch = await this.finance?.getPaidLaunchReadiness('KE');
+    // Owner 19/11/26: an M-Pesa sale is a direct sale with no VAT while the
+    // company is not VAT-registered; once registered it needs the APPROVED
+    // Kenya tax profile (and files on iTax). Cards go through Paddle instead.
+    const launch = mpesaSaleNeedsApprovedTaxProfile(process.env)
+      ? await this.finance?.getPaidLaunchReadiness('KE')
+      : { allowed: true };
     if (!launch?.allowed) {
       await this.auth.recordTenantAudit({
         tenantId: context.session.tenantId,
@@ -229,7 +246,64 @@ export class PaymentsService {
         locked: month.locked,
       });
     }
-    return { currentPlan: normalizePlan(tenant?.plan), currencyCode, payable: plans.length > 0, plans };
+    const card = paddlePublicConfig(paddleConfig(process.env));
+    return {
+      currentPlan: normalizePlan(tenant?.plan),
+      currencyCode,
+      payable: plans.length > 0,
+      plans,
+      card: card ? { ...card, customData: { tenantId: context.session.tenantId } } : null,
+    };
+  }
+
+  /**
+   * Paddle notification. Records a plan the buyer already paid at Paddle's own
+   * checkout; never starts a payment. Signature-checked; each Paddle
+   * transaction is applied at most once (ledger row keyed by its id).
+   */
+  async handlePaddleWebhook(rawBody: string, signature: string | undefined): Promise<PaddleWebhookResult> {
+    const cfg = paddleConfig(process.env);
+    if (!cfg) return { ok: false, status: 404, error: 'not enabled' };
+    if (!verifyPaddleSignature(rawBody, signature, cfg.webhookSecret)) {
+      return { ok: false, status: 401, error: 'bad signature' };
+    }
+    let event: unknown;
+    try {
+      event = JSON.parse(rawBody);
+    } catch {
+      return { ok: false, status: 400, error: 'bad json' };
+    }
+    const paid = paidPlanFromPaddleEvent(event, cfg.priceIds);
+    if (!paid) return { ok: true, ignored: true };
+    if (!(await this.auth.tenantExists(paid.tenantId))) return { ok: true, ignored: true };
+    if (await this.repository.findPaymentTxnByProviderTxnId(paid.transactionId)) {
+      return { ok: true, duplicate: true };
+    }
+
+    const now = new Date().toISOString();
+    const txn: PaymentTxnRecord = {
+      id: randomUUID(),
+      provider: 'paddle',
+      kind: 'CARD',
+      status: 'SUCCESS',
+      providerTxnId: paid.transactionId,
+      phone: '',
+      amount: paid.amount ?? 0,
+      currency: paid.currency ?? 'USD',
+      reason: `${SUBSCRIPTION_PLANS[paid.plan].name} plan, ${paid.period === 'YEAR' ? 'a year' : 'a month'} (card, Paddle)`,
+      tenantId: paid.tenantId,
+      metadata: { purpose: 'SUBSCRIPTION', plan: paid.plan, period: paid.period },
+      createdAt: now,
+      updatedAt: now,
+    };
+    try {
+      await this.repository.createPaymentTxn(txn);
+    } catch {
+      // A concurrent delivery of the same transaction got there first.
+      return { ok: true, duplicate: true };
+    }
+    await this.applySubscription(txn);
+    return { ok: true, applied: true };
   }
 
   /** B2C payout to a user's phone — OWNER only (refunds, disbursements). */
@@ -338,7 +412,7 @@ export class PaymentsService {
    * callback body. Only a SUBSCRIPTION checkout changes a tenant's plan.
    */
   private async applySubscription(txn: PaymentTxnRecord): Promise<void> {
-    if (txn.kind !== 'CHECKOUT' || txn.metadata?.purpose !== 'SUBSCRIPTION' || !txn.tenantId) {
+    if ((txn.kind !== 'CHECKOUT' && txn.kind !== 'CARD') || txn.metadata?.purpose !== 'SUBSCRIPTION' || !txn.tenantId) {
       return;
     }
     const plan = normalizePlan(txn.metadata.plan);

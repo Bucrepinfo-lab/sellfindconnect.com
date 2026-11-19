@@ -23,6 +23,14 @@ Epic 8.
   (default) / `prisma-finance.repository.ts`.
 - Checkout gate: `apps/api/src/modules/payments/payments.service.ts`.
 
+## Payment and tax model (owner decision 19/11/26)
+- Cards: Paddle is merchant of record (charges, files and remits the tax).
+  `packages/domain/src/paddle.ts`; webhook `POST /v1/payments/paddle/webhook`.
+- M-Pesa: direct sale, no VAT while not VAT-registered. The tax-profile gate
+  below applies to M-Pesa checkout only when `SELLER_VAT_REGISTERED=true`
+  (`mpesaSaleNeedsApprovedTaxProfile`).
+- Canonical: `docs/GROUP_TAX_OPERATING_MODEL.md`.
+
 ## tax_profile DRAFT → APPROVED flow
 - Statuses: `taxProfileStatuses = ['DRAFT','APPROVED','SUSPENDED']`
   (`packages/domain/src/finance.ts`).

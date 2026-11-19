@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { AuthService } from '../auth/auth.service';
@@ -108,7 +109,9 @@ describe('PaymentsService product audit', () => {
     expect(mobileCheckout).not.toHaveBeenCalled();
   });
 
-  it('refuses checkout when the Kenya tax profile is not approved', async () => {
+  it('refuses M-Pesa checkout when VAT-registered and the Kenya tax profile is not approved', async () => {
+    // Owner 19/11/26: the approved tax profile is required once the company is VAT-registered.
+    vi.stubEnv('SELLER_VAT_REGISTERED', 'true');
     const audits: Array<{ action: string; metadata?: Record<string, unknown> }> = [];
     const service = new PaymentsService(
       {
@@ -134,6 +137,34 @@ describe('PaymentsService product audit', () => {
       }),
     ]);
     expect(JSON.stringify(audits)).not.toContain('+254700000001');
+    vi.unstubAllEnvs();
+  });
+
+  it('allows M-Pesa checkout without tax approval while the company is not VAT-registered', async () => {
+    vi.stubEnv('SELLER_VAT_REGISTERED', '');
+    const charges: number[] = [];
+    const service = new PaymentsService(
+      {
+        getSession: async () => ({
+          session: { userId: 'user-1', tenantId, role: 'OWNER' },
+          user: { phone: '+254700000001', phoneVerifiedAt: '2026-10-01T00:00:00.000Z' },
+        }),
+        hasCurrentTermsAcceptance: async () => true,
+        recordTenantAudit: async () => undefined,
+      } as unknown as AuthService,
+      new InMemoryPaymentsRepository(),
+      {
+        mobileCheckout: async (input: { amount: number }) => {
+          charges.push(input.amount);
+          return { ok: true, transactionId: 'at-1', raw: {} };
+        },
+        mobileB2C: async () => ({ ok: true, raw: {} }),
+      },
+    );
+
+    await expect(service.requestCheckout('session-token', { amount: 1500 })).resolves.toMatchObject({ ok: true });
+    expect(charges).toEqual([1500]);
+    vi.unstubAllEnvs();
   });
 
   it('refuses checkout when stored terms acceptance is stale', async () => {
@@ -307,5 +338,78 @@ describe('PaymentsService subscription checkout', () => {
       ['BASIC', 499, 4990, 10],
       ['PRO', 1499, 14990, 20],
     ]);
+  });
+});
+
+describe('PaymentsService Paddle card sales', () => {
+  const paddleEnv = {
+    PADDLE_ENABLED: 'true',
+    PADDLE_CLIENT_TOKEN: 'test_client',
+    PADDLE_WEBHOOK_SECRET: 'whsec',
+    PADDLE_PRICE_BASIC_MONTH: 'pri_bm',
+    PADDLE_PRICE_BASIC_YEAR: 'pri_by',
+    PADDLE_PRICE_PRO_MONTH: 'pri_pm',
+    PADDLE_PRICE_PRO_YEAR: 'pri_py',
+  };
+
+  function signed(body: string) {
+    const ts = String(Math.floor(Date.now() / 1000));
+    return `ts=${ts};h1=${createHmac('sha256', 'whsec').update(`${ts}:${body}`).digest('hex')}`;
+  }
+
+  function service(known = true) {
+    const plans: string[] = [];
+    const svc = new PaymentsService(
+      {
+        tenantExists: async () => known,
+        setTenantPlan: async (_tenantId: string, plan: string) => {
+          plans.push(plan);
+        },
+        recordTenantAudit: async () => undefined,
+      } as unknown as AuthService,
+      new InMemoryPaymentsRepository(),
+    );
+    return { svc, plans };
+  }
+
+  const body = JSON.stringify({
+    event_type: 'transaction.completed',
+    data: {
+      id: 'txn_card_1',
+      status: 'completed',
+      custom_data: { tenantId },
+      items: [{ price: { id: 'pri_pm' } }],
+      currency_code: 'USD',
+      details: { totals: { grand_total: '1199' } },
+    },
+  });
+
+  it('is off until Paddle is configured', async () => {
+    const { svc } = service();
+    await expect(svc.handlePaddleWebhook(body, signed(body))).resolves.toMatchObject({ ok: false, status: 404 });
+  });
+
+  it('applies a signed card payment once and sets the plan from our price id', async () => {
+    for (const [key, value] of Object.entries(paddleEnv)) vi.stubEnv(key, value);
+    try {
+      const { svc, plans } = service();
+      await expect(svc.handlePaddleWebhook(body, 'ts=1;h1=00')).resolves.toMatchObject({ ok: false, status: 401 });
+      await expect(svc.handlePaddleWebhook(body, signed(body))).resolves.toEqual({ ok: true, applied: true });
+      await expect(svc.handlePaddleWebhook(body, signed(body))).resolves.toEqual({ ok: true, duplicate: true });
+      expect(plans).toEqual(['PRO']);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('ignores a payment for an unknown tenant', async () => {
+    for (const [key, value] of Object.entries(paddleEnv)) vi.stubEnv(key, value);
+    try {
+      const { svc, plans } = service(false);
+      await expect(svc.handlePaddleWebhook(body, signed(body))).resolves.toEqual({ ok: true, ignored: true });
+      expect(plans).toEqual([]);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

@@ -8,7 +8,7 @@ country. Advertisers build rich profiles + media listings; a precision-matching
 engine with explainable reason codes + in-app chat/RFQ closes the loop.
 Business model: first month free, then Basic KES 499/month (KES 4,990/year) or
 Pro KES 1,499/month (KES 14,990/year), founding price locked
-(`packages/domain/src/subscription-pricing.ts`, owner decision 18/11/26). Kenya-first (M-Pesa STK via Africa's Talking + Stripe).
+(`packages/domain/src/subscription-pricing.ts`, owner decision 18/11/26). Kenya-first (M-Pesa STK via Africa's Talking; cards through Paddle as merchant of record).
 
 ## Repo map (npm-workspaces monorepo, scope `@telpen/*`)
 - `apps/web` — Next.js 16 / React 19 web + PWA (`@telpen/web`).
@@ -43,10 +43,13 @@ Keep `packages/domain` tests green: it is the safety and finance core. Database:
   in `packages/domain/src/safety.ts`. Fail closed on safety/moderation paths.
 - **Tenant isolation.** Tenant routes require `x-tenant-id` + `x-session-token`
   with MFA (`apps/api/src/modules/tenant/tenant-session.guard.ts`).
-- **Finance/legal gates.** No paid use in a country without an APPROVED tax
-  profile (`approvedBy` set by a human); no publish/upload/chat/pay without
-  current terms acceptance + zero-tolerance clearance. Do not onboard paying
-  subscribers until Kenya `tax_profile` is APPROVED.
+- **Finance/legal gates.** Cards go through Paddle as merchant of record
+  (Paddle remits the tax); M-Pesa is a direct sale with no VAT until the
+  company is VAT-registered, after which (`SELLER_VAT_REGISTERED=true`) M-Pesa
+  needs an APPROVED Kenya tax profile (`approvedBy` set by a human). Owner
+  decision 19/11/26, `docs/GROUP_TAX_OPERATING_MODEL.md`. No
+  publish/upload/chat/pay without current terms acceptance + zero-tolerance
+  clearance.
 - **LF / encoding.** UTF-8, LF line endings only (`.gitattributes` enforces
   `eol=lf`). Never introduce CRLF or line-ending-only churn in a diff.
 - **Commits** small, coherent, reviewable; update the PRD, backlog, and the

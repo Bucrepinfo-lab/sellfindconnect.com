@@ -5,24 +5,31 @@ import {
   assertSelfMerchantOfRecordProvider,
   describeTaxOperatingModel,
   isForbiddenMerchantOfRecordProvider,
+  mpesaSaleNeedsApprovedTaxProfile,
+  sellerVatRegistered,
 } from './tax-operating-model';
 
 describe('group tax operating model', () => {
-  it('locks self merchant of record, Kenya iTax, STK, finance+Stripe Tax, EU OSS later', () => {
+  it('cards through Paddle as merchant of record, M-Pesa direct with no VAT until registered (owner 19/11/26)', () => {
     expect(TAX_OPERATING_MODEL).toMatchObject({
-      merchantOfRecord: 'self',
+      cardMerchantOfRecord: 'paddle',
+      mpesaMerchantOfRecord: 'self',
       firstCountryCode: 'KE',
-      kenyaCompliancePath: 'itax_simplified_or_tax_representative',
-      paymentRails: ['africastalking_stk', 'stripe'],
-      rateEngine: 'finance_module_and_stripe_tax',
-      laterExpansion: 'eu_oss',
-      stripeTaxRole: 'rate_engine_not_remitter',
-      etimsRequiredForNonResidentDigitalVat: false,
+      paymentRails: ['africastalking_stk', 'paddle'],
+      mpesaVat: 'none_until_vat_registered',
+      vatRegistrationThresholdKes: 5_000_000,
     });
-    expect(describeTaxOperatingModel()).toBe('This platform — not Paddle');
+    expect(describeTaxOperatingModel()).toContain('Paddle');
   });
 
-  it('rejects Paddle, Lemon Squeezy, and Dodo as merchant-of-record checkouts', () => {
+  it('an M-Pesa sale needs the approved tax profile only once VAT-registered', () => {
+    expect(sellerVatRegistered({})).toBe(false);
+    expect(mpesaSaleNeedsApprovedTaxProfile({})).toBe(false);
+    expect(mpesaSaleNeedsApprovedTaxProfile({ SELLER_VAT_REGISTERED: 'false' })).toBe(false);
+    expect(mpesaSaleNeedsApprovedTaxProfile({ SELLER_VAT_REGISTERED: 'TRUE' })).toBe(true);
+  });
+
+  it('rejects Paddle, Lemon Squeezy, and Dodo as an STK payment provider', () => {
     expect(isForbiddenMerchantOfRecordProvider('paddle')).toBe(true);
     expect(isForbiddenMerchantOfRecordProvider('Paddle Billing')).toBe(true);
     expect(isForbiddenMerchantOfRecordProvider('lemon-squeezy')).toBe(true);

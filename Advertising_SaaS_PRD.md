@@ -1045,9 +1045,10 @@ Core requirements:
 - Calculate tax at checkout, subscription renewal, invoice generation, credit note, refund, adjustment, manual payment, app-store receipt import, and off-platform payment import.
 - Use seller/platform location, customer billing country, customer tax ID, business/consumer status, product tax code, performance/location-of-supply rules, payment method evidence, currency, exemption certificate, reverse-charge status, and marketplace liability rules to compute tax.
 - Store an immutable tax calculation snapshot per transaction: gross amount, taxable amount, non-taxable amount, net revenue, tax type, tax rate, tax amount, filing currency, exchange rate, jurisdiction, customer evidence, rule version, calculation provider, and timestamp.
-- Support Stripe Tax through the finance adapter as the rate engine. The
-  operator stays merchant of record; Stripe Tax does not file or remit.
-  Paddle / Lemon Squeezy / Dodo are forbidden. See
+- Card subscriptions go through Paddle as merchant of record: Paddle charges,
+  files and remits the tax (owner decision 19/11/26). M-Pesa subscriptions
+  are a direct sale with no VAT until the company is VAT-registered; then
+  (`SELLER_VAT_REGISTERED=true`) the approved tax profile and iTax apply. See
   `docs/GROUP_TAX_OPERATING_MODEL.md`.
 - Support manual tax-rule override only with dual approval, reason, document attachment, effective date, expiry date, and audit log.
 - Reconcile payment provider data, app-store proceeds, local payment rails, bank deposits, refunds, failed payments, chargebacks, and tax liability.
@@ -1099,7 +1100,7 @@ Finance roles and controls:
 Acceptance criteria:
 
 - Before any country becomes paid-live, it must have an approved country tax profile, pricing row, payment provider setup, invoice template, tax calendar, responsible finance owner, and filing/remittance workflow.
-- The operator stays merchant of record. Kenya files on iTax (or through one Kenyan tax representative). STK remains the local rail. Rates come from the finance module and Stripe Tax. EU OSS is later expansion. Merchant-of-record checkouts are forbidden.
+- Cards: Paddle is merchant of record and remits the tax. M-Pesa (STK) is a direct sale by the operator: no VAT until VAT-registered (KES 5m threshold), then iTax with the approved Kenya tax profile (owner decision 19/11/26).
 - Every paid transaction must produce an invoice/receipt and an immutable tax snapshot.
 - Finance users can see the exact VAT/GST/sales tax or other obliged tax computed for each country and period.
 - The system alerts responsible users before every filing and remittance deadline.
@@ -1574,7 +1575,7 @@ Tooling and vendor candidates:
 - Realtime chat: WebSockets/Socket.IO for custom MVP; evaluate Twilio Conversations, Stream, or similar if cross-channel chat and agent workflows need faster launch.
 - Notifications: Firebase Cloud Messaging for Android/web, APNs for iOS, plus email/SMS/WhatsApp providers by country.
 - Payments: Stripe where supported, Google Play Billing and Apple In-App Purchase where required, and local payment rails such as mobile money providers for launch countries.
-- Tax automation: finance-module country tax rules plus Stripe Tax for rates; Kenyan iTax or one tax representative files; EU Non-Union OSS later. Stripe Tax does not become the seller. Paddle / Lemon Squeezy / Dodo are forbidden merchant-of-record checkouts.
+- Tax automation: finance-module country tax rules plus Stripe Tax for rates; Kenyan iTax or one tax representative files; EU Non-Union OSS later. Superseded 19/11/26: card sales go through Paddle as merchant of record; M-Pesa has no VAT until the operator is VAT-registered.
 - Media: S3-compatible object storage, CDN, image resizing, video transcoding, malware scanning, and content moderation APIs.
 - Analytics: event collector, warehouse, BI dashboard, and product analytics. Candidate tools include PostHog, Mixpanel, Amplitude, Segment, ClickHouse, BigQuery, Metabase, and Superset.
 - Safety operations: moderation queue, audit log, blocked keyword libraries, media review tools, report handling, escalation workflow, and evidence preservation.

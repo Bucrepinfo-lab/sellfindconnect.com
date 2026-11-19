@@ -1,6 +1,6 @@
 ---
 name: ship-workflow
-description: Use when preparing to deliver a change in the SellFindConnect.com / Telpen Adverts repo — to run the gate commands in the right order, keep one feature per PR, keep packages/domain tests green, update Product_Memory.md, and honour the launch gate (no paying subscribers until Kenya tax_profile is APPROVED).
+description: Use when preparing to deliver a change in the SellFindConnect.com / Telpen Adverts repo — to run the gate commands in the right order, keep one feature per PR, keep packages/domain tests green, update Product_Memory.md, and honour the payment rules (Paddle for cards; M-Pesa without VAT until VAT-registered, then the APPROVED Kenya tax_profile).
 ---
 
 # Ship workflow — the delivery loop
@@ -46,11 +46,13 @@ Pipeline order mirrors the gate: typecheck → test → lint → build. Deploy t
 are Fly.io Frankfurt (`fly.api.toml`, `fly.web.toml`). Don't merge red.
 
 ## Launch gate — hard stop
-**Do not onboard paying subscribers until the Kenya `tax_profile` is APPROVED.**
-Paid checkout fails closed with reason `tax_profile` until a human sets
-`approvedBy` on the country tax profile; invoice generation throws
-"Country tax profile is not approved." See `finance-tax-reference`. Shipping
-code is fine; enabling paid use before APPROVED is not.
+Owner decision 19/11/26 (`docs/GROUP_TAX_OPERATING_MODEL.md`): **cards go
+through Paddle as merchant of record** (Paddle remits the tax; off until
+`PADDLE_ENABLED=true` with every key set). **M-Pesa is a direct sale with no
+VAT until the company is VAT-registered.** Once `SELLER_VAT_REGISTERED=true`,
+M-Pesa checkout fails closed with reason `tax_profile` until a human sets
+`approvedBy` on the Kenya tax profile. Invoice generation still throws
+"Country tax profile is not approved." See `finance-tax-reference`.
 
 ## Guardrails
 - Never skip the gate or merge with `packages/domain` red.

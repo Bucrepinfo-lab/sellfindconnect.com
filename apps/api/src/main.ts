@@ -10,7 +10,8 @@ import { ConversationsIoAdapter } from "./modules/conversations/conversations-io
 import { AppModule } from "./modules/app.module";
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // rawBody: the Paddle webhook signature is checked over the exact bytes received.
+  const app = await NestFactory.create(AppModule, { rawBody: true });
   const config = app.get(ConfigService);
   const webOrigins = resolveCorsOrigins(
     config.get<string>("WEB_ORIGIN") ?? "http://localhost:3000",
