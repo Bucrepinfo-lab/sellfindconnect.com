@@ -21,11 +21,13 @@ import {
 } from '@telpen/domain';
 
 import { ApiError, apiRequest, isTermsError } from '../lib/api-client';
+import { WebOnlyCheckout } from '../lib/app-context';
 import { formatDmy } from '../lib/dates';
 import { advertStatusLabel, codeLabel, industryLabel } from '../lib/labels';
 import type { PreparedPhoto } from '../lib/prepare-photo';
 import { publicApiBaseUrl, readTenantSession } from '../lib/public-api';
 import { PhotoPreview } from './PhotoPreview';
+import { PlanCard } from './PlanCard';
 import '../styles/business.css';
 
 type MediaItem = {
@@ -948,6 +950,11 @@ export function BusinessManager() {
           </>
         ) : null}
       </div>
+
+      {/* Google Play policy: no non-Play checkout inside the Android app. */}
+      <WebOnlyCheckout>
+        <PlanCard />
+      </WebOnlyCheckout>
 
       <div className="biz-card">
         <h2>Account</h2>

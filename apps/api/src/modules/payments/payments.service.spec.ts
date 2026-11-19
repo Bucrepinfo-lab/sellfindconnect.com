@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { AuthService } from '../auth/auth.service';
@@ -108,7 +109,9 @@ describe('PaymentsService product audit', () => {
     expect(mobileCheckout).not.toHaveBeenCalled();
   });
 
-  it('refuses checkout when the Kenya tax profile is not approved', async () => {
+  it('refuses M-Pesa checkout when VAT-registered and the Kenya tax profile is not approved', async () => {
+    // Owner 19/11/26: the approved tax profile is required once the company is VAT-registered.
+    vi.stubEnv('SELLER_VAT_REGISTERED', 'true');
     const audits: Array<{ action: string; metadata?: Record<string, unknown> }> = [];
     const service = new PaymentsService(
       {
@@ -134,6 +137,34 @@ describe('PaymentsService product audit', () => {
       }),
     ]);
     expect(JSON.stringify(audits)).not.toContain('+254700000001');
+    vi.unstubAllEnvs();
+  });
+
+  it('allows M-Pesa checkout without tax approval while the company is not VAT-registered', async () => {
+    vi.stubEnv('SELLER_VAT_REGISTERED', '');
+    const charges: number[] = [];
+    const service = new PaymentsService(
+      {
+        getSession: async () => ({
+          session: { userId: 'user-1', tenantId, role: 'OWNER' },
+          user: { phone: '+254700000001', phoneVerifiedAt: '2026-10-01T00:00:00.000Z' },
+        }),
+        hasCurrentTermsAcceptance: async () => true,
+        recordTenantAudit: async () => undefined,
+      } as unknown as AuthService,
+      new InMemoryPaymentsRepository(),
+      {
+        mobileCheckout: async (input: { amount: number }) => {
+          charges.push(input.amount);
+          return { ok: true, transactionId: 'at-1', raw: {} };
+        },
+        mobileB2C: async () => ({ ok: true, raw: {} }),
+      },
+    );
+
+    await expect(service.requestCheckout('session-token', { amount: 1500 })).resolves.toMatchObject({ ok: true });
+    expect(charges).toEqual([1500]);
+    vi.unstubAllEnvs();
   });
 
   it('refuses checkout when stored terms acceptance is stale', async () => {
@@ -206,5 +237,179 @@ describe('PaymentsService product audit', () => {
       service.requestPayout('session-token', { toUserId: 'member-1', amount: 500 }),
     ).resolves.toMatchObject({ ok: true });
     expect(calls).toEqual(['b2c']);
+  });
+});
+
+describe('PaymentsService subscription checkout', () => {
+  function subscriptionService(countryCode = 'KE') {
+    const charges: number[] = [];
+    const plans: string[] = [];
+    const audits: string[] = [];
+    const repository = new InMemoryPaymentsRepository();
+    const service = new PaymentsService(
+      {
+        getSession: async () => ({
+          session: { userId: 'user-1', tenantId, role: 'OWNER' },
+          user: { phone: '+254700000001', phoneVerifiedAt: '2026-10-01T00:00:00.000Z' },
+          tenant: { countryCode, trialStartedAt: '2026-11-01T00:00:00.000Z', status: 'TRIAL_ACTIVE' },
+        }),
+        hasCurrentTermsAcceptance: async () => true,
+        recordTenantAudit: async (record: { action: string }) => {
+          audits.push(record.action);
+        },
+        setTenantPlan: async (_tenantId: string, plan: string) => {
+          plans.push(plan);
+        },
+      } as unknown as AuthService,
+      repository,
+      {
+        mobileCheckout: async (input: { amount: number }) => {
+          charges.push(input.amount);
+          return { ok: true, transactionId: `at-sub-${charges.length}`, raw: {} };
+        },
+        mobileB2C: async () => ({ ok: true, raw: {} }),
+      },
+      undefined,
+      approvedFinance(),
+    );
+    return { service, repository, charges, plans, audits };
+  }
+
+  it('prices a plan from the price list and ignores the client amount', async () => {
+    const { service, repository, charges } = subscriptionService();
+
+    const result = await service.requestCheckout('session-token', { plan: 'PRO', amount: 1 });
+    expect(result).toMatchObject({ ok: true });
+    expect(charges).toEqual([1499]);
+    const txn = await repository.findPaymentTxnByProviderTxnId('at-sub-1');
+    expect(txn?.metadata).toEqual({ purpose: 'SUBSCRIPTION', plan: 'PRO', period: 'MONTH' });
+
+    await service.requestCheckout('session-token', { plan: 'BASIC', period: 'YEAR' });
+    expect(charges).toEqual([1499, 4990]);
+  });
+
+  it('switches the plan once, only after the provider confirms success', async () => {
+    const previous = process.env.AT_PAYMENTS_CALLBACK_SECRET;
+    process.env.AT_PAYMENTS_CALLBACK_SECRET = 'cb-secret';
+    try {
+      const { service, plans, audits } = subscriptionService();
+      await service.requestCheckout('session-token', { plan: 'PRO' });
+
+      await service.reconcileCallback('cb-secret', { transactionId: 'at-sub-1', status: 'Pending' });
+      expect(plans).toEqual([]);
+      await service.reconcileCallback('cb-secret', { transactionId: 'at-sub-1', status: 'Success' });
+      await service.reconcileCallback('cb-secret', { transactionId: 'at-sub-1', status: 'Success' });
+      expect(plans).toEqual(['PRO']);
+      expect(audits.filter((action) => action === 'SUBSCRIPTION_PLAN_CHANGED')).toHaveLength(1);
+    } finally {
+      process.env.AT_PAYMENTS_CALLBACK_SECRET = previous;
+    }
+  });
+
+  it('a failed payment or a plain top-up never changes the plan', async () => {
+    const previous = process.env.AT_PAYMENTS_CALLBACK_SECRET;
+    process.env.AT_PAYMENTS_CALLBACK_SECRET = 'cb-secret';
+    try {
+      const { service, plans } = subscriptionService();
+      await service.requestCheckout('session-token', { plan: 'PRO' });
+      await service.reconcileCallback('cb-secret', { transactionId: 'at-sub-1', status: 'Failed' });
+      await service.requestCheckout('session-token', { amount: 1500 });
+      await service.reconcileCallback('cb-secret', { transactionId: 'at-sub-2', status: 'Success' });
+      expect(plans).toEqual([]);
+    } finally {
+      process.env.AT_PAYMENTS_CALLBACK_SECRET = previous;
+    }
+  });
+
+  it('refuses a plan in a country without an approved price', async () => {
+    const { service, charges } = subscriptionService('UG');
+    await expect(service.requestCheckout('session-token', { plan: 'BASIC' })).resolves.toEqual({
+      ok: false,
+      reason: 'no_price',
+    });
+    expect(charges).toEqual([]);
+  });
+
+  it('lists both plans with month and year prices for a Kenyan tenant', async () => {
+    const { service } = subscriptionService();
+    const options = await service.getSubscriptionOptions('session-token');
+    expect(options).toMatchObject({ currentPlan: 'BASIC', currencyCode: 'KES', payable: true });
+    expect(options.plans.map((plan) => [plan.plan, plan.monthly, plan.yearly, plan.maxMediaPerListing])).toEqual([
+      ['BASIC', 499, 4990, 10],
+      ['PRO', 1499, 14990, 20],
+    ]);
+  });
+});
+
+describe('PaymentsService Paddle card sales', () => {
+  const paddleEnv = {
+    PADDLE_ENABLED: 'true',
+    PADDLE_CLIENT_TOKEN: 'test_client',
+    PADDLE_WEBHOOK_SECRET: 'whsec',
+    PADDLE_PRICE_BASIC_MONTH: 'pri_bm',
+    PADDLE_PRICE_BASIC_YEAR: 'pri_by',
+    PADDLE_PRICE_PRO_MONTH: 'pri_pm',
+    PADDLE_PRICE_PRO_YEAR: 'pri_py',
+  };
+
+  function signed(body: string) {
+    const ts = String(Math.floor(Date.now() / 1000));
+    return `ts=${ts};h1=${createHmac('sha256', 'whsec').update(`${ts}:${body}`).digest('hex')}`;
+  }
+
+  function service(known = true) {
+    const plans: string[] = [];
+    const svc = new PaymentsService(
+      {
+        tenantExists: async () => known,
+        setTenantPlan: async (_tenantId: string, plan: string) => {
+          plans.push(plan);
+        },
+        recordTenantAudit: async () => undefined,
+      } as unknown as AuthService,
+      new InMemoryPaymentsRepository(),
+    );
+    return { svc, plans };
+  }
+
+  const body = JSON.stringify({
+    event_type: 'transaction.completed',
+    data: {
+      id: 'txn_card_1',
+      status: 'completed',
+      custom_data: { tenantId },
+      items: [{ price: { id: 'pri_pm' } }],
+      currency_code: 'USD',
+      details: { totals: { grand_total: '1199' } },
+    },
+  });
+
+  it('is off until Paddle is configured', async () => {
+    const { svc } = service();
+    await expect(svc.handlePaddleWebhook(body, signed(body))).resolves.toMatchObject({ ok: false, status: 404 });
+  });
+
+  it('applies a signed card payment once and sets the plan from our price id', async () => {
+    for (const [key, value] of Object.entries(paddleEnv)) vi.stubEnv(key, value);
+    try {
+      const { svc, plans } = service();
+      await expect(svc.handlePaddleWebhook(body, 'ts=1;h1=00')).resolves.toMatchObject({ ok: false, status: 401 });
+      await expect(svc.handlePaddleWebhook(body, signed(body))).resolves.toEqual({ ok: true, applied: true });
+      await expect(svc.handlePaddleWebhook(body, signed(body))).resolves.toEqual({ ok: true, duplicate: true });
+      expect(plans).toEqual(['PRO']);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('ignores a payment for an unknown tenant', async () => {
+    for (const [key, value] of Object.entries(paddleEnv)) vi.stubEnv(key, value);
+    try {
+      const { svc, plans } = service(false);
+      await expect(svc.handlePaddleWebhook(body, signed(body))).resolves.toEqual({ ok: true, ignored: true });
+      expect(plans).toEqual([]);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

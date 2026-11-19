@@ -7,6 +7,7 @@ export * from './discovery';
 export * from './finance';
 export * from './kenya-tax-profile';
 export * from './tax-operating-model';
+export * from './paddle';
 export * from './stripe-tax-rate';
 export * from './geography';
 export * from './subscription-pricing';

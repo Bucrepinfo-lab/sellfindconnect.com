@@ -40,12 +40,12 @@ describe('FinanceService', () => {
       status: null,
       reason: 'missing_profile',
       proposedVatRate: 0.16,
+      // Owner decision 19/11/26: Paddle is the seller for cards; M-Pesa is direct.
       operatingModel: {
-        merchantOfRecord: 'self',
+        cardMerchantOfRecord: 'paddle',
+        mpesaMerchantOfRecord: 'self',
         firstCountryCode: 'KE',
-        kenyaCompliancePath: 'itax_simplified_or_tax_representative',
-        rateEngine: 'finance_module_and_stripe_tax',
-        laterExpansion: 'eu_oss',
+        mpesaVat: 'none_until_vat_registered',
       },
     });
 

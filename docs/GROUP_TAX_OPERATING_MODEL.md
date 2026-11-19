@@ -1,8 +1,36 @@
-# Group tax operating model (locked)
+# Group tax operating model
 
-Status: **Locked** 2026-08-22. Not legal advice. Owner/CPA still names the
-Kenyan agent and confirms non-resident / SEP facts before any profile is
-APPROVED.
+Status: **Changed 2026-11-19 by the owner** ("we had agreed we use firms like
+Paddle that do an auto remittance of the tax"; choice: Paddle for cards plus
+M-Pesa direct). It replaces the 2026-08-22 "stay merchant of record, Paddle
+forbidden" model, kept below for history. Not legal advice.
+
+## The current model (19/11/26)
+
+1. **Cards: Paddle is the merchant of record.** Paddle is the seller on the
+   card receipt, charges the tax for the buyer's country, and files and remits
+   it. Each app opens Paddle's own checkout (Paddle.js); card details never
+   reach our servers. A signed Paddle notification (`transaction.completed`)
+   activates the plan once per Paddle transaction. Off until
+   `PADDLE_ENABLED=true` with every key set (Fly secrets, owner only).
+2. **M-Pesa: a direct sale by Telpen Systems Ltd.** Paddle has no M-Pesa
+   (its payment methods list cards, wallets, PayPal and a few local methods).
+   STK goes to the verified login phone only.
+3. **No VAT on M-Pesa sales until the company is VAT-registered.** An
+   unregistered person may not issue a VAT invoice (VAT Act 2013 s.42(2)).
+   Registration is due within 30 days once taxable sales reach KES 5 million
+   in 12 months (s.34). From then, set `SELLER_VAT_REGISTERED=true`: M-Pesa
+   checkout then needs the APPROVED Kenya tax profile, shows VAT, and files on
+   iTax. Card sales stay with Paddle either way.
+4. **Income tax** on profits stays with the company on both rails.
+5. Lemon Squeezy / Dodo stay unused; Paddle is never configured as an STK
+   `PAYMENT_PROVIDER`.
+
+Applies to every owner product that charges a subscription: SellFindConnect,
+HarvestHub, Stawi, InsurOS (My Cover Plus only, never premiums) and Telpen
+Edu (already on Paddle for cards).
+
+## Superseded: the 2026-08-22 model (history)
 
 This rule applies to the **SaaS subscription** on every owner product that
 charges tenants. Tax regulators come after this compliance packet — not the

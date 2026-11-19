@@ -1,5 +1,21 @@
 import { Inject, Injectable, Optional, UnauthorizedException } from '@nestjs/common';
-import { isValidPaymentAmount, mapAtPaymentStatus } from '@telpen/domain';
+import {
+  PLAN_ENTITLEMENTS,
+  SUBSCRIPTION_PLANS,
+  isValidPaymentAmount,
+  mapAtPaymentStatus,
+  mpesaSaleNeedsApprovedTaxProfile,
+  normalizePlan,
+  paddleConfig,
+  paddlePublicConfig,
+  paidPlanFromPaddleEvent,
+  quoteSubscription,
+  verifyPaddleSignature,
+  type PaddlePublicConfig,
+  type BillingPeriod,
+  type PlanQuote,
+  type SubscriptionPlan,
+} from '@telpen/domain';
 import { randomUUID } from 'node:crypto';
 
 import { AUTH_REPOSITORY, type AuthRepository } from '../auth/auth.repository';
@@ -17,7 +33,37 @@ import type { CheckoutDto, PayoutDto } from './dto/payments.dto';
 
 export type CheckoutResult =
   | { ok: true; txnId: string; providerTxnId: string | null }
-  | { ok: false; reason: 'no_phone' | 'invalid_amount' | 'provider_error' | 'tax_profile' | 'terms'; txnId?: string };
+  | {
+      ok: false;
+      reason: 'no_phone' | 'invalid_amount' | 'no_price' | 'provider_error' | 'tax_profile' | 'terms';
+      txnId?: string;
+    };
+
+type SessionTenant = { countryCode: string; trialStartedAt: string; status: string; plan?: string } | undefined;
+
+export type SubscriptionOption = {
+  plan: SubscriptionPlan;
+  name: string;
+  summary: string;
+  maxMediaPerListing: number;
+  monthly: number;
+  yearly: number;
+  locked: boolean;
+};
+
+export type SubscriptionOptions = {
+  currentPlan: SubscriptionPlan;
+  currencyCode: string | null;
+  /** False when this country has no approved M-Pesa price (KES). */
+  payable: boolean;
+  plans: SubscriptionOption[];
+  /** Paddle card checkout (Paddle is the seller and remits the tax), or null when off. */
+  card: (PaddlePublicConfig & { customData: { tenantId: string } }) | null;
+};
+
+export type PaddleWebhookResult =
+  | { ok: true; applied?: boolean; ignored?: boolean; duplicate?: boolean }
+  | { ok: false; status: 401 | 404 | 400; error: string };
 
 export type PayoutResult =
   | { ok: true; txnId: string }
@@ -63,11 +109,28 @@ export class PaymentsService {
     if (!phone) {
       return { ok: false, reason: 'no_phone' };
     }
-    if (!isValidPaymentAmount(input.amount)) {
+    // A subscription checkout is priced by the server from the price list; the
+    // client's amount is ignored. Other checkouts keep the client amount.
+    let amount = input.amount;
+    let subscription: { plan: SubscriptionPlan; period: BillingPeriod } | undefined;
+    if (input.plan) {
+      const quote = this.payableQuote(context.tenant, input.plan, input.period ?? 'MONTH');
+      if (!quote) {
+        return { ok: false, reason: 'no_price' };
+      }
+      amount = quote.amount;
+      subscription = { plan: quote.plan, period: quote.period };
+    }
+    if (amount === undefined || !isValidPaymentAmount(amount)) {
       return { ok: false, reason: 'invalid_amount' };
     }
 
-    const launch = await this.finance?.getPaidLaunchReadiness('KE');
+    // Owner 19/11/26: an M-Pesa sale is a direct sale with no VAT while the
+    // company is not VAT-registered; once registered it needs the APPROVED
+    // Kenya tax profile (and files on iTax). Cards go through Paddle instead.
+    const launch = mpesaSaleNeedsApprovedTaxProfile(process.env)
+      ? await this.finance?.getPaidLaunchReadiness('KE')
+      : { allowed: true };
     if (!launch?.allowed) {
       await this.auth.recordTenantAudit({
         tenantId: context.session.tenantId,
@@ -77,7 +140,7 @@ export class PaymentsService {
         entityId: context.session.tenantId,
         metadata: {
           kind: 'CHECKOUT',
-          amount: input.amount,
+          amount,
           currency: 'KES',
           ok: false,
           status: 'BLOCKED',
@@ -96,7 +159,7 @@ export class PaymentsService {
         entityId: context.session.tenantId,
         metadata: {
           kind: 'CHECKOUT',
-          amount: input.amount,
+          amount,
           currency: 'KES',
           ok: false,
           status: 'BLOCKED',
@@ -109,16 +172,23 @@ export class PaymentsService {
     const txn = this.newTxn({
       kind: 'CHECKOUT',
       phone,
-      amount: input.amount,
-      reason: input.reason,
+      amount,
+      reason:
+        input.reason ??
+        (subscription
+          ? `${SUBSCRIPTION_PLANS[subscription.plan].name} plan, ${subscription.period === 'YEAR' ? 'a year' : 'a month'}`
+          : undefined),
       userId: context.session.userId,
       tenantId: context.session.tenantId,
+      metadata: subscription
+        ? { purpose: 'SUBSCRIPTION', plan: subscription.plan, period: subscription.period }
+        : undefined,
     });
     await this.repository.createPaymentTxn(txn);
 
     const result = await this.provider.mobileCheckout({
       phoneNumber: phone,
-      amount: input.amount,
+      amount,
       metadata: { ledgerId: txn.id },
     });
 
@@ -138,8 +208,10 @@ export class PaymentsService {
       entityId: txn.id,
       metadata: {
         kind: 'CHECKOUT',
-        amount: input.amount,
+        amount,
         currency: 'KES',
+        plan: subscription?.plan ?? null,
+        period: subscription?.period ?? null,
         ok: result.ok,
         status: result.ok ? 'PENDING' : 'FAILED',
       },
@@ -148,6 +220,90 @@ export class PaymentsService {
     return result.ok
       ? { ok: true, txnId: txn.id, providerTxnId: result.transactionId }
       : { ok: false, reason: 'provider_error', txnId: txn.id };
+  }
+
+  /**
+   * The plans this tenant can pay for, priced from the price list (founding
+   * price kept while subscribed), plus its current plan. Read-only.
+   */
+  async getSubscriptionOptions(sessionToken: string): Promise<SubscriptionOptions> {
+    const context = await this.auth.getSession(sessionToken);
+    const tenant = context.tenant as SessionTenant;
+    const plans: SubscriptionOption[] = [];
+    let currencyCode: string | null = null;
+    for (const plan of ['BASIC', 'PRO'] as const) {
+      const month = this.payableQuote(tenant, plan, 'MONTH');
+      const year = this.payableQuote(tenant, plan, 'YEAR');
+      if (!month || !year) continue;
+      currencyCode = month.currencyCode;
+      plans.push({
+        plan,
+        name: SUBSCRIPTION_PLANS[plan].name,
+        summary: SUBSCRIPTION_PLANS[plan].summary,
+        maxMediaPerListing: PLAN_ENTITLEMENTS[plan].maxMediaPerListing,
+        monthly: month.amount,
+        yearly: year.amount,
+        locked: month.locked,
+      });
+    }
+    const card = paddlePublicConfig(paddleConfig(process.env));
+    return {
+      currentPlan: normalizePlan(tenant?.plan),
+      currencyCode,
+      payable: plans.length > 0,
+      plans,
+      card: card ? { ...card, customData: { tenantId: context.session.tenantId } } : null,
+    };
+  }
+
+  /**
+   * Paddle notification. Records a plan the buyer already paid at Paddle's own
+   * checkout; never starts a payment. Signature-checked; each Paddle
+   * transaction is applied at most once (ledger row keyed by its id).
+   */
+  async handlePaddleWebhook(rawBody: string, signature: string | undefined): Promise<PaddleWebhookResult> {
+    const cfg = paddleConfig(process.env);
+    if (!cfg) return { ok: false, status: 404, error: 'not enabled' };
+    if (!verifyPaddleSignature(rawBody, signature, cfg.webhookSecret)) {
+      return { ok: false, status: 401, error: 'bad signature' };
+    }
+    let event: unknown;
+    try {
+      event = JSON.parse(rawBody);
+    } catch {
+      return { ok: false, status: 400, error: 'bad json' };
+    }
+    const paid = paidPlanFromPaddleEvent(event, cfg.priceIds);
+    if (!paid) return { ok: true, ignored: true };
+    if (!(await this.auth.tenantExists(paid.tenantId))) return { ok: true, ignored: true };
+    if (await this.repository.findPaymentTxnByProviderTxnId(paid.transactionId)) {
+      return { ok: true, duplicate: true };
+    }
+
+    const now = new Date().toISOString();
+    const txn: PaymentTxnRecord = {
+      id: randomUUID(),
+      provider: 'paddle',
+      kind: 'CARD',
+      status: 'SUCCESS',
+      providerTxnId: paid.transactionId,
+      phone: '',
+      amount: paid.amount ?? 0,
+      currency: paid.currency ?? 'USD',
+      reason: `${SUBSCRIPTION_PLANS[paid.plan].name} plan, ${paid.period === 'YEAR' ? 'a year' : 'a month'} (card, Paddle)`,
+      tenantId: paid.tenantId,
+      metadata: { purpose: 'SUBSCRIPTION', plan: paid.plan, period: paid.period },
+      createdAt: now,
+      updatedAt: now,
+    };
+    try {
+      await this.repository.createPaymentTxn(txn);
+    } catch {
+      // A concurrent delivery of the same transaction got there first.
+      return { ok: true, duplicate: true };
+    }
+    await this.applySubscription(txn);
+    return { ok: true, applied: true };
   }
 
   /** B2C payout to a user's phone — OWNER only (refunds, disbursements). */
@@ -235,15 +391,57 @@ export class PaymentsService {
 
     const txn = await this.repository.findPaymentTxnByProviderTxnId(body.transactionId);
     if (txn) {
+      const status = mapAtPaymentStatus(body.status ?? '');
       await this.repository.updatePaymentTxn({
         ...txn,
-        status: mapAtPaymentStatus(body.status ?? ''),
+        status,
         rawCallback: body,
         updatedAt: new Date().toISOString(),
       });
+      // First confirmed success only: a repeated callback changes nothing.
+      if (status === 'SUCCESS' && txn.status !== 'SUCCESS') {
+        await this.applySubscription(txn);
+      }
     }
 
     return { status: 'Success' };
+  }
+
+  /**
+   * The plan comes from the ledger row written at checkout, never from the
+   * callback body. Only a SUBSCRIPTION checkout changes a tenant's plan.
+   */
+  private async applySubscription(txn: PaymentTxnRecord): Promise<void> {
+    if ((txn.kind !== 'CHECKOUT' && txn.kind !== 'CARD') || txn.metadata?.purpose !== 'SUBSCRIPTION' || !txn.tenantId) {
+      return;
+    }
+    const plan = normalizePlan(txn.metadata.plan);
+    await this.auth.setTenantPlan(txn.tenantId, plan);
+    await this.auth.recordTenantAudit({
+      tenantId: txn.tenantId,
+      actorUserId: txn.userId,
+      action: 'SUBSCRIPTION_PLAN_CHANGED',
+      entityType: 'TENANT',
+      entityId: txn.tenantId,
+      metadata: { plan, period: txn.metadata.period ?? 'MONTH', paymentId: txn.id, amount: txn.amount },
+    });
+  }
+
+  /** A price for this tenant's country that can be charged by STK (whole KES), or undefined. */
+  private payableQuote(tenant: SessionTenant, plan: SubscriptionPlan, period: BillingPeriod): PlanQuote | undefined {
+    if (!tenant) return undefined;
+    const quote = quoteSubscription({
+      countryCode: tenant.countryCode,
+      plan,
+      period,
+      startedAt: new Date(tenant.trialStartedAt),
+      status: tenant.status,
+      env: process.env,
+    });
+    if (!quote || !quote.approved || quote.currencyCode !== 'KES' || !Number.isInteger(quote.amount)) {
+      return undefined;
+    }
+    return quote;
   }
 
   private newTxn(input: {
@@ -253,6 +451,7 @@ export class PaymentsService {
     reason?: string;
     userId?: string;
     tenantId?: string;
+    metadata?: Record<string, string>;
   }): PaymentTxnRecord {
     const now = new Date().toISOString();
     return {
@@ -266,6 +465,7 @@ export class PaymentsService {
       reason: input.reason,
       userId: input.userId,
       tenantId: input.tenantId,
+      metadata: input.metadata,
       createdAt: now,
       updatedAt: now,
     };
