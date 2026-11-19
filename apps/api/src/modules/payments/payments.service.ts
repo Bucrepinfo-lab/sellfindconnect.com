@@ -122,8 +122,9 @@ export class PaymentsService {
     if (input.plan) {
       // Owner rules 19/11/26: M-Pesa where it is the leading local method
       // (Kenya); elsewhere plans are paid by card through Paddle.
-      if (!this.railsFor(context.tenant as SessionTenant).includes('MPESA')) {
-        return { ok: false, reason: 'use_card' };
+      const rails = this.railsFor(context.tenant as SessionTenant);
+      if (!rails.includes('MPESA')) {
+        return { ok: false, reason: rails.includes('PADDLE') ? 'use_card' : 'no_price' };
       }
       const quote = this.payableQuote(context.tenant, input.plan, input.period ?? 'MONTH');
       if (!quote) {
