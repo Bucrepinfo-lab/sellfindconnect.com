@@ -25,7 +25,10 @@ export const mediaTransformStatuses = ['PENDING', 'READY', 'FAILED', 'NOT_REQUIR
 export type MediaTransformStatus = (typeof mediaTransformStatuses)[number];
 
 export const mediaPolicy = {
+  /** Media items per listing on the Basic plan (and for chat attachments). */
   maxItemsPerOwner: 10,
+  /** Media items per listing on the top plan (Pro); see planEntitlements. */
+  maxItemsPerOwnerTopPlan: 20,
   maxImageBytes: 10 * 1024 * 1024,
   maxVideoBytes: 100 * 1024 * 1024,
   maxVideoDurationSeconds: 60,
@@ -136,7 +139,10 @@ function photoScreenReasons(input: {
   return screenPhoto(input, [], { logo: input.caption === 'Logo' }).reasons.filter((reason) => reason !== 'UNSAFE_PHOTO_TEXT');
 }
 
-export function evaluateMediaAssetInput(input: MediaAssetInput): MediaPolicyDecision {
+export function evaluateMediaAssetInput(
+  input: MediaAssetInput,
+  maxItems: number = mediaPolicy.maxItemsPerOwner,
+): MediaPolicyDecision {
   const reasons: string[] = [];
   const kind = detectMediaKind(input.mimeType);
 
@@ -166,7 +172,7 @@ export function evaluateMediaAssetInput(input: MediaAssetInput): MediaPolicyDeci
 
   if (
     input.displayOrder !== undefined &&
-    (input.displayOrder < 0 || input.displayOrder >= mediaPolicy.maxItemsPerOwner)
+    (input.displayOrder < 0 || input.displayOrder >= maxItems)
   ) {
     reasons.push('DISPLAY_ORDER_OUT_OF_RANGE');
   }

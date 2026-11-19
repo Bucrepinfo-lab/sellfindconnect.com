@@ -136,7 +136,7 @@ export class CreateProfileMediaDto {
   @Type(() => Number)
   @IsInt()
   @Min(0)
-  @Max(mediaPolicy.maxItemsPerOwner - 1)
+  @Max(mediaPolicy.maxItemsPerOwnerTopPlan - 1)
   declare displayOrder?: number;
 
   @ApiPropertyOptional({ enum: mediaVisibilityStates, example: 'PUBLIC' })

@@ -40,6 +40,8 @@ export type AuthTenantRecord = {
   nextBillingAt: string;
   monthlyAmount: number;
   currencyCode: string;
+  /** BASIC or PRO; missing means BASIC (see planEntitlements). */
+  plan?: 'BASIC' | 'PRO';
   createdAt: string;
 };
 

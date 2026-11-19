@@ -24,6 +24,7 @@ import {
   presentTermsAcceptanceLookup,
   staleTermsAcceptancePolicies,
   termsAcceptancePolicyKeys,
+  normalizePlan,
   normalizeResourceScope,
   requiresMfa,
   roleHasPermission,
@@ -42,6 +43,7 @@ import {
   type AccessResourceScope,
   type ProductAuditQuery,
   type TenantAccessRole,
+  type SubscriptionPlan,
 } from '@telpen/domain';
 import { createHash, pbkdf2Sync, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 
@@ -1172,6 +1174,15 @@ export class AuthService {
       termsAcceptance,
       termsGate: describeTermsAcceptanceGate(termsAcceptance),
     };
+  }
+
+  /**
+   * The tenant's subscription plan (BASIC or PRO). A tenant with no stored
+   * plan, or one that can't be found, is BASIC: the lower plan, never more.
+   */
+  async tenantPlan(tenantId: string): Promise<SubscriptionPlan> {
+    const tenant = await this.repository.findTenantById(tenantId);
+    return normalizePlan(tenant?.plan);
   }
 
   /**
