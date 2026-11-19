@@ -5,7 +5,28 @@ Paddle that do an auto remittance of the tax"; choice: Paddle for cards plus
 M-Pesa direct). It replaces the 2026-08-22 "stay merchant of record, Paddle
 forbidden" model, kept below for history. Not legal advice.
 
-## The current model (19/11/26)
+## Which way a customer pays (owner rules 19/11/26, final)
+
+1. **The most convenient local method leads where we can charge it.**
+   Kenya: M-Pesa (89.1% of 53.4 million mobile money subscriptions, CA Kenya
+   Q3 FY 2025/26). M-Pesa is a direct sale with no VAT until the company is
+   VAT-registered.
+2. **Paddle wherever it sells**: second for card payers where a local method
+   leads (Kenya), and first everywhere else. Paddle deducts and remits the tax
+   before the money reaches us.
+3. **Where Paddle does not sell**, another merchant of record that remits the
+   tax. Checked 19/11/26: none takes M-Pesa or African mobile money, and they
+   block the same sanctioned countries. None to add today.
+
+Paddle's blocked countries (help centre, read 19/11/26): Afghanistan,
+Antarctica, Belarus, Burma, Central African Republic, Cuba, DR Congo, Haiti,
+Iran, Iraq, Libya, Mali, Netherlands Antilles, Nicaragua, North Korea, Russia,
+Somalia, South Sudan, Sudan, Syria, Venezuela, Yemen, Zimbabwe, and occupied
+regions of Ukraine. Code: `packages/domain/src/payment-rails.ts`
+(`subscriptionRail`); the server refuses M-Pesa plan checkout where Paddle is
+the way to pay.
+
+## The tax model behind it (19/11/26)
 
 1. **Cards: Paddle is the merchant of record.** Paddle is the seller on the
    card receipt, charges the tax for the buyer's country, and files and remits

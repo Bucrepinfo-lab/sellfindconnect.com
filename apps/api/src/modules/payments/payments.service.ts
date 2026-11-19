@@ -10,7 +10,9 @@ import {
   paddlePublicConfig,
   paidPlanFromPaddleEvent,
   quoteSubscription,
+  subscriptionRails,
   verifyPaddleSignature,
+  type SubscriptionRail,
   type PaddlePublicConfig,
   type BillingPeriod,
   type PlanQuote,
@@ -35,7 +37,7 @@ export type CheckoutResult =
   | { ok: true; txnId: string; providerTxnId: string | null }
   | {
       ok: false;
-      reason: 'no_phone' | 'invalid_amount' | 'no_price' | 'provider_error' | 'tax_profile' | 'terms';
+      reason: 'no_phone' | 'invalid_amount' | 'no_price' | 'use_card' | 'provider_error' | 'tax_profile' | 'terms';
       txnId?: string;
     };
 
@@ -46,15 +48,19 @@ export type SubscriptionOption = {
   name: string;
   summary: string;
   maxMediaPerListing: number;
-  monthly: number;
-  yearly: number;
+  /** M-Pesa price in KES, or null where M-Pesa is not the way to pay (the card price shows at Paddle's checkout). */
+  monthly: number | null;
+  yearly: number | null;
   locked: boolean;
 };
 
 export type SubscriptionOptions = {
   currentPlan: SubscriptionPlan;
   currencyCode: string | null;
-  /** False when this country has no approved M-Pesa price (KES). */
+  /** The leading way to pay here: M-Pesa in Kenya, else Paddle where it sells, else NONE. */
+  rail: SubscriptionRail;
+  /** Every way to pay here, best first. */
+  rails: SubscriptionRail[];
   payable: boolean;
   plans: SubscriptionOption[];
   /** Paddle card checkout (Paddle is the seller and remits the tax), or null when off. */
@@ -114,6 +120,12 @@ export class PaymentsService {
     let amount = input.amount;
     let subscription: { plan: SubscriptionPlan; period: BillingPeriod } | undefined;
     if (input.plan) {
+      // Owner rules 19/11/26: M-Pesa where it is the leading local method
+      // (Kenya); elsewhere plans are paid by card through Paddle.
+      const rails = this.railsFor(context.tenant as SessionTenant);
+      if (!rails.includes('MPESA')) {
+        return { ok: false, reason: rails.includes('PADDLE') ? 'use_card' : 'no_price' };
+      }
       const quote = this.payableQuote(context.tenant, input.plan, input.period ?? 'MONTH');
       if (!quote) {
         return { ok: false, reason: 'no_price' };
@@ -229,31 +241,41 @@ export class PaymentsService {
   async getSubscriptionOptions(sessionToken: string): Promise<SubscriptionOptions> {
     const context = await this.auth.getSession(sessionToken);
     const tenant = context.tenant as SessionTenant;
+    const rails = this.railsFor(tenant);
+    const rail: SubscriptionRail = rails[0] ?? 'NONE';
+    const mpesa = rails.includes('MPESA');
     const plans: SubscriptionOption[] = [];
     let currencyCode: string | null = null;
     for (const plan of ['BASIC', 'PRO'] as const) {
-      const month = this.payableQuote(tenant, plan, 'MONTH');
-      const year = this.payableQuote(tenant, plan, 'YEAR');
-      if (!month || !year) continue;
-      currencyCode = month.currencyCode;
+      const month = mpesa ? this.payableQuote(tenant, plan, 'MONTH') : undefined;
+      const year = mpesa ? this.payableQuote(tenant, plan, 'YEAR') : undefined;
+      if (mpesa && (!month || !year)) continue;
+      if (month) currencyCode = month.currencyCode;
       plans.push({
         plan,
         name: SUBSCRIPTION_PLANS[plan].name,
         summary: SUBSCRIPTION_PLANS[plan].summary,
         maxMediaPerListing: PLAN_ENTITLEMENTS[plan].maxMediaPerListing,
-        monthly: month.amount,
-        yearly: year.amount,
-        locked: month.locked,
+        monthly: month?.amount ?? null,
+        yearly: year?.amount ?? null,
+        locked: month?.locked ?? false,
       });
     }
-    const card = paddlePublicConfig(paddleConfig(process.env));
+    const card = rails.includes('PADDLE') ? paddlePublicConfig(paddleConfig(process.env)) : null;
     return {
       currentPlan: normalizePlan(tenant?.plan),
       currencyCode,
-      payable: plans.length > 0,
+      rail,
+      rails,
+      payable: rails.length > 0 && plans.length > 0,
       plans,
       card: card ? { ...card, customData: { tenantId: context.session.tenantId } } : null,
     };
+  }
+
+  /** Ways to pay here, best first: M-Pesa in Kenya, then Paddle wherever it sells. */
+  private railsFor(tenant: SessionTenant): SubscriptionRail[] {
+    return subscriptionRails({ country: tenant?.countryCode, paddleOn: paddleConfig(process.env) !== null });
   }
 
   /**
