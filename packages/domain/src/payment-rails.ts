@@ -49,7 +49,7 @@ export const LOCAL_METHOD: Readonly<Record<string, { rail: Exclude<PayRail, 'PAD
   GH: { rail: 'MOBILE_MONEY', label: 'MTN MoMo, Telecel Cash or AirtelTigo Money', currency: 'GHS' },
   ZM: { rail: 'MOBILE_MONEY', label: 'MTN MoMo, Airtel Money or Zamtel Kwacha', currency: 'ZMW' },
   MW: { rail: 'MOBILE_MONEY', label: 'Airtel Money or TNM Mpamba', currency: 'MWK' },
-  MZ: { rail: 'MOBILE_MONEY', label: 'M-Pesa or e-Mola', currency: 'MZN' },
+  MZ: { rail: 'MOBILE_MONEY', label: 'M-Pesa (Vodacom)', currency: 'MZN' },
   CM: { rail: 'MOBILE_MONEY', label: 'MTN MoMo or Orange Money', currency: 'XAF' },
   CI: { rail: 'MOBILE_MONEY', label: 'Orange Money, MTN MoMo, Moov or Wave', currency: 'XOF' },
   SN: { rail: 'MOBILE_MONEY', label: 'Wave, Orange Money or Free Money', currency: 'XOF' },
