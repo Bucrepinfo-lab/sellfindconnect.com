@@ -1,5 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
+import { FOUNDING_SUBSCRIPTION_PRICES } from '@telpen/domain';
 
 import type { AuthService } from '../auth/auth.service';
 import type { FinanceService } from '../finance/finance.service';
@@ -322,13 +323,19 @@ describe('PaymentsService subscription checkout', () => {
   });
 
   it('refuses a plan in a country without an approved price', async () => {
-    // Zambia has a local way (pawaPay) but no approved SFC price yet.
-    const { service, charges } = subscriptionService('ZM');
-    await expect(service.requestCheckout('session-token', { plan: 'BASIC' })).resolves.toEqual({
-      ok: false,
-      reason: 'no_price',
-    });
-    expect(charges).toEqual([]);
+    // Every pawaPay country is approved (20/11/26), so withdraw Zambia's approval for this check.
+    const zambia = FOUNDING_SUBSCRIPTION_PRICES.ZM;
+    FOUNDING_SUBSCRIPTION_PRICES.ZM = { ...zambia, approved: false };
+    try {
+      const { service, charges } = subscriptionService('ZM');
+      await expect(service.requestCheckout('session-token', { plan: 'BASIC' })).resolves.toEqual({
+        ok: false,
+        reason: 'no_price',
+      });
+      expect(charges).toEqual([]);
+    } finally {
+      FOUNDING_SUBSCRIPTION_PRICES.ZM = zambia;
+    }
   });
 
   it('lists both plans with month and year prices for a Kenyan tenant', async () => {
@@ -482,12 +489,18 @@ describe('PaymentsService local ways to pay (owner standing order 19/11/26)', ()
   it('keeps a local way closed until the owner approves that country price', async () => {
     vi.stubEnv('PAWAPAY_ENABLED', 'true');
     vi.stubEnv('PAWAPAY_API_TOKEN', 'tok');
+    // Every pawaPay country is approved (20/11/26), so withdraw Zambia's approval for this check.
+    const zambia = FOUNDING_SUBSCRIPTION_PRICES.ZM;
+    FOUNDING_SUBSCRIPTION_PRICES.ZM = { ...zambia, approved: false };
     try {
-      // Zambia: pawaPay covers it, but its price is not approved yet.
       const { service } = localService('ZM');
       const options = await service.getSubscriptionOptions('session-token');
       expect(options.rails).not.toContain('MOBILE_MONEY');
+      FOUNDING_SUBSCRIPTION_PRICES.ZM = zambia;
+      const { service: open } = localService('ZM');
+      expect((await open.getSubscriptionOptions('session-token')).rails[0]).toBe('MOBILE_MONEY');
     } finally {
+      FOUNDING_SUBSCRIPTION_PRICES.ZM = zambia;
       vi.unstubAllEnvs();
     }
   });

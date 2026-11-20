@@ -26,13 +26,15 @@ describe('subscription pricing (owner decision 18/11/26)', () => {
   });
 
   it('the owner-approved African prices; USD stays unapproved; a country with no row has no price', () => {
-    const approved = ['KE', 'UG', 'TZ', 'RW', 'NG', 'GH', 'ZA'];
+    const approved = ['KE', 'UG', 'TZ', 'RW', 'NG', 'GH', 'ZA',
+      'ZM', 'MW', 'MZ', 'CM', 'CG', 'GA', 'CI', 'SN', 'BJ', 'BF', 'CD', 'LS', 'SL', 'ZW', 'ET'];
     for (const [code, row] of Object.entries(FOUNDING_SUBSCRIPTION_PRICES)) {
       expect(row.approved).toBe(approved.includes(code));
       expect(row.pro).toBeGreaterThan(row.basic);
     }
     expect(quoteSubscription({ countryCode: 'UG' })).toMatchObject({ approved: true, amount: 14000, currencyCode: 'UGX' });
     expect(quoteSubscription({ countryCode: 'ZA', plan: 'PRO' })).toMatchObject({ approved: true, amount: 210, currencyCode: 'ZAR' });
+    expect(quoteSubscription({ countryCode: 'ZW' })).toMatchObject({ approved: true, amount: 3.99, currencyCode: 'USD' });
     expect(quoteSubscription({ countryCode: 'US' })?.approved).toBe(false);
     expect(quoteSubscription({ countryCode: 'ZZ' })).toBeNull();
   });

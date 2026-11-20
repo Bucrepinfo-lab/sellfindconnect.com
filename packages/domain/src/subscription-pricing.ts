@@ -20,7 +20,8 @@
  *   (CANCELED ends it). Later prices reach only tenants that start after the
  *   founding window, through SFC_PRICES.
  * - Approved by the owner: Kenya (18/11/26); Uganda, Tanzania, Rwanda, Nigeria,
- *   Ghana and South Africa (20/11/26, "approve all prices"). A country with no
+ *   Ghana and South Africa (20/11/26, "approve all prices"); then the pawaPay
+ *   countries (20/11/26, "approve the second-round prices"). A country with no
  *   row, or a row left unapproved (the USD row), has no local price.
  *
  * Nothing here moves money: it only says what a tenant would be asked to pay.
@@ -98,6 +99,22 @@ export const FOUNDING_SUBSCRIPTION_PRICES: Record<string, PlanPriceList> = {
   NG: row('NG', 'NGN', 6000, 18000, true),
   GH: row('GH', 'GHS', 50, 150, true),
   ZA: row('ZA', 'ZAR', 70, 210, true),
+  // Second round, approved by the owner 20/11/26: the pawaPay countries.
+  ZM: row('ZM', 'ZMW', 80, 240, true),
+  MW: row('MW', 'MWK', 6700, 20000, true),
+  MZ: row('MZ', 'MZN', 250, 750, true),
+  CM: row('CM', 'XAF', 2200, 6600, true),
+  CG: row('CG', 'XAF', 2200, 6600, true),
+  GA: row('GA', 'XAF', 2200, 6600, true),
+  CI: row('CI', 'XOF', 2200, 6600, true),
+  SN: row('SN', 'XOF', 2200, 6600, true),
+  BJ: row('BJ', 'XOF', 2200, 6600, true),
+  BF: row('BF', 'XOF', 2200, 6600, true),
+  CD: row('CD', 'CDF', 8900, 27000, true),
+  LS: row('LS', 'LSL', 65, 190, true),
+  SL: row('SL', 'SLE', 90, 270, true),
+  ZW: row('ZW', 'USD', 3.99, 11.99, true),
+  ET: row('ET', 'ETB', 630, 1900, true),
   US: row('US', 'USD', 3.99, 11.99),
 };
 
