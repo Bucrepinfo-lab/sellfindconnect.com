@@ -325,6 +325,7 @@ describe('PaymentsService subscription checkout', () => {
   it('refuses a plan in a country without an approved price', async () => {
     // Every pawaPay country is approved (20/11/26), so withdraw Zambia's approval for this check.
     const zambia = FOUNDING_SUBSCRIPTION_PRICES.ZM;
+    if (!zambia) throw new Error('Zambia price row missing');
     FOUNDING_SUBSCRIPTION_PRICES.ZM = { ...zambia, approved: false };
     try {
       const { service, charges } = subscriptionService('ZM');
@@ -491,6 +492,7 @@ describe('PaymentsService local ways to pay (owner standing order 19/11/26)', ()
     vi.stubEnv('PAWAPAY_API_TOKEN', 'tok');
     // Every pawaPay country is approved (20/11/26), so withdraw Zambia's approval for this check.
     const zambia = FOUNDING_SUBSCRIPTION_PRICES.ZM;
+    if (!zambia) throw new Error('Zambia price row missing');
     FOUNDING_SUBSCRIPTION_PRICES.ZM = { ...zambia, approved: false };
     try {
       const { service } = localService('ZM');
