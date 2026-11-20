@@ -374,6 +374,12 @@ export class AuthService {
   }
 
 
+  // ── Phone-first sign-in support (used by PhoneAuthService) ─────────────────
+
+  isPhoneOnlyEmail(email: string | undefined): boolean {
+    return Boolean(email?.toLowerCase().endsWith(`@${PHONE_ONLY_EMAIL_DOMAIN}`));
+  }
+
   async findUserByVerifiablePhone(phone: string): Promise<AuthUserRecord | undefined> {
     return (await this.repository.findUserByPhone(phone)) ?? undefined;
   }

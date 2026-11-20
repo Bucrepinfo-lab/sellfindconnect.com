@@ -961,7 +961,7 @@ describe('AuthService', () => {
         throw new Error('provider unavailable');
       },
     };
-    const service = new AuthService(new InMemoryAuthRepository(), undefined, sender);
+    const service = new AuthService(new InMemoryAuthRepository(), sender);
     const result = await service.registerTenantOwner({
       email: 'owner@example.com',
       password: strongPassword,
@@ -1183,7 +1183,7 @@ describe('AuthService', () => {
       UnprocessableEntityException,
     );
 
-    const unknownAccount = new AuthService(new InMemoryAuthRepository(), undefined, undefined, {
+    const unknownAccount = new AuthService(new InMemoryAuthRepository(), undefined, {
       verifyIdToken: async () => ({
         issuer: 'https://auth.sellfindconnect.test',
         audience: 'https://api.sellfindconnect.test/v1',
@@ -1196,7 +1196,7 @@ describe('AuthService', () => {
       'No matching tenant account.',
     );
 
-    const registeredService = new AuthService(new InMemoryAuthRepository(), undefined, undefined, {
+    const registeredService = new AuthService(new InMemoryAuthRepository(), undefined, {
       verifyIdToken: async () => {
         throw new Error('INVALID_SIGNATURE');
       },
