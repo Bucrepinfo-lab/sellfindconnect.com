@@ -3,12 +3,13 @@ import { ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 
 import {
+  IssueResetCodeDto,
   PinSignInDto,
+  RedeemResetCodeDto,
   RegisterPhoneOwnerDto,
-  RequestPhoneCodeDto,
   RevokeDevicesDto,
   SetPinDto,
-  VerifyPhoneCodeDto,
+  StartPhoneSignInDto,
 } from './dto/phone-auth.dto';
 import { PhoneAuthService, TRUSTED_DEVICE_TTL_MS } from './phone-auth.service';
 
@@ -54,35 +55,40 @@ function clearDeviceCookie(response: Response) {
 }
 
 /**
- * Phone-first sign-in. The trusted-device token only ever travels in an
- * httpOnly cookie scoped to /v1/auth/phone; it is never in a response body.
+ * Phone + PIN sign-in, no SMS (owner 20/11/26). The trusted-device token only
+ * ever travels in an httpOnly cookie scoped to /v1/auth/phone; it is never in
+ * a response body.
  */
 @ApiTags('auth-phone')
 @Controller('auth/phone')
 export class PhoneAuthController {
   constructor(private readonly phoneAuth: PhoneAuthService) {}
 
-  @Post('code/request')
-  requestCode(@Req() request: Request, @Body() body: RequestPhoneCodeDto) {
-    return this.phoneAuth.requestCode(body.phone, clientIp(request));
+  @Post('start')
+  start(@Req() request: Request, @Body() body: StartPhoneSignInDto) {
+    return this.phoneAuth.start(body.phone, clientIp(request));
   }
 
-  @Post('code/verify')
-  async verifyCode(
+  @Post('reset')
+  async redeemResetCode(
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
-    @Body() body: VerifyPhoneCodeDto,
+    @Body() body: RedeemResetCodeDto,
   ) {
-    const verified = await this.phoneAuth.verifyCode(body.phone, body.code, clientIp(request), body.deviceLabel);
-    if ('deviceToken' in verified) {
-      setDeviceCookie(response, verified.deviceToken);
-    }
-    return verified.result;
+    const redeemed = await this.phoneAuth.redeemResetCode(body.phone, body.code, clientIp(request), body.deviceLabel);
+    setDeviceCookie(response, redeemed.deviceToken);
+    return redeemed.result;
+  }
+
+  /** Support staff only (checked in the service): a one-time PIN reset code for a business owner. */
+  @Post('reset-code')
+  issueResetCode(@Body() body: IssueResetCodeDto) {
+    return this.phoneAuth.issueResetCode(body.sessionToken, body.phone);
   }
 
   @Post('register')
   async register(@Res({ passthrough: true }) response: Response, @Body() body: RegisterPhoneOwnerDto) {
-    const registered = await this.phoneAuth.register(body);
+    const registered = await this.phoneAuth.register(body, 'Phone sign-up');
     setDeviceCookie(response, registered.deviceToken);
     return registered.result;
   }
@@ -106,15 +112,17 @@ export class PhoneAuthController {
     @Res({ passthrough: true }) response: Response,
     @Body() body: PinSignInDto,
   ) {
-    try {
-      return await this.phoneAuth.signInWithPin(body.pin, readDeviceCookie(request), clientIp(request));
-    } catch (error) {
-      const code = (error as { response?: { code?: string } })?.response?.code;
-      if (code === 'SMS_REQUIRED') {
-        clearDeviceCookie(response);
-      }
-      throw error;
+    const signedIn = await this.phoneAuth.signInWithPin(
+      body.pin,
+      readDeviceCookie(request),
+      clientIp(request),
+      body.phone,
+      body.deviceLabel,
+    );
+    if (signedIn.deviceToken) {
+      setDeviceCookie(response, signedIn.deviceToken);
     }
+    return signedIn.result;
   }
 
   @Get('device')

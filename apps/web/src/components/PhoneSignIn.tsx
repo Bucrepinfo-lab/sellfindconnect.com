@@ -11,12 +11,12 @@ import { saveSession } from '../lib/use-session';
 
 type Session = { token?: string; tenantId: string; role: string; mfaVerified: boolean };
 type SignedIn = { status: 'SIGNED_IN'; session: Session; pinSet: boolean; user?: { displayName?: string } };
-type VerifyResult = SignedIn | { status: 'REGISTRATION_REQUIRED'; registrationToken: string };
+type StartResult = { next: 'pin' | 'reset' } | { next: 'register'; registrationToken: string };
 type DeviceStatus =
   | { trusted: false }
   | { trusted: true; pinSet: boolean; pinLocked: boolean; phoneHint?: string; displayName?: string };
 
-type Step = 'loading' | 'pin' | 'phone' | 'code' | 'register' | 'set-pin';
+type Step = 'loading' | 'pin' | 'phone' | 'reset' | 'register' | 'set-pin';
 
 const base = publicApiBaseUrl.replace(/\/$/, '');
 
@@ -71,8 +71,10 @@ function finish(result: SignedIn) {
 }
 
 /**
- * Primary sign-in and sign-up: phone number + 6-digit SMS code on a new device,
- * then a 4-digit PIN on this trusted device. Email sign-in stays available.
+ * Primary sign-in and sign-up without SMS (owner 20/11/26): phone number, then
+ * the person's own 4-digit PIN on any device. A new number registers a business
+ * with a PIN; a forgotten or locked PIN uses a reset code from support.
+ * Email sign-in stays available.
  */
 export function PhoneSignIn({ onUseEmail }: { onUseEmail: () => void }) {
   const [step, setStep] = useState<Step>('loading');
@@ -85,7 +87,6 @@ export function PhoneSignIn({ onUseEmail }: { onUseEmail: () => void }) {
   const [pendingSession, setPendingSession] = useState<SignedIn | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [info, setInfo] = useState('');
   const [business, setBusiness] = useState({
     tenantDisplayName: '',
     displayName: '',
@@ -119,7 +120,10 @@ export function PhoneSignIn({ onUseEmail }: { onUseEmail: () => void }) {
       await action();
     } catch (caught) {
       const failure = caught instanceof PhoneApiError ? caught : new PhoneApiError('Something went wrong. Try again.', 0);
-      if (failure.code === 'PIN_LOCKED' || failure.code === 'SMS_REQUIRED' || failure.code === 'PIN_NOT_SET') {
+      if (failure.code === 'PIN_LOCKED' || failure.code === 'PIN_NOT_SET') {
+        setStep('reset');
+        setPin('');
+      } else if (failure.code === 'RESET_REQUIRED') {
         setStep('phone');
         setPin('');
       }
@@ -140,33 +144,35 @@ export function PhoneSignIn({ onUseEmail }: { onUseEmail: () => void }) {
     setStep('set-pin');
   };
 
-  const requestCode = () =>
+  const start = () =>
     act(async () => {
-      const response = await phoneApi<{ sent: boolean; developmentCode?: string }>('/code/request', { phone });
-      setCode(response.developmentCode ?? '');
-      setInfo('We sent a 6-digit code by SMS. It expires in 5 minutes.');
-      setStep('code');
-    });
-
-  const verifyCode = () =>
-    act(async () => {
-      const result = await phoneApi<VerifyResult>('/code/verify', { phone, code, deviceLabel: 'Phone sign-in' });
-      setInfo('');
-      if (result.status === 'REGISTRATION_REQUIRED') {
+      const result = await phoneApi<StartResult>('/start', { phone });
+      setPin('');
+      setPinConfirm('');
+      setCode('');
+      if (result.next === 'register') {
         setRegistrationToken(result.registrationToken);
         setStep('register');
         return;
       }
+      setStep(result.next);
+    });
+
+  const redeemReset = () =>
+    act(async () => {
+      const result = await phoneApi<SignedIn>('/reset', { phone, code, deviceLabel: 'Phone sign-in' });
       signedIn(result);
     });
 
   const register = () =>
     act(async () => {
       const { email, ...rest } = business;
+      if (pin !== pinConfirm) throw new PhoneApiError('The two PINs do not match.', 0);
       const result = await phoneApi<SignedIn>('/register', {
         ...rest,
         countryCode: 'KE',
         registrationToken,
+        pin,
         tenantDisplayName: rest.tenantDisplayName.trim(),
         displayName: rest.displayName.trim(),
         ...(email.trim() ? { email: email.trim() } : {}),
@@ -184,7 +190,7 @@ export function PhoneSignIn({ onUseEmail }: { onUseEmail: () => void }) {
 
   const pinSignIn = () =>
     act(async () => {
-      const result = await phoneApi<SignedIn>('/pin/sign-in', { pin });
+      const result = await phoneApi<SignedIn>('/pin/sign-in', phone.trim() ? { pin, phone, deviceLabel: 'Phone sign-in' } : { pin });
       finish(result);
     });
 
@@ -201,7 +207,7 @@ export function PhoneSignIn({ onUseEmail }: { onUseEmail: () => void }) {
 
   return (
     <div className="phone-sign-in">
-      {step === 'pin' && device.trusted ? (
+      {step === 'pin' ? (
         <form
           onSubmit={(event) => {
             event.preventDefault();
@@ -209,9 +215,11 @@ export function PhoneSignIn({ onUseEmail }: { onUseEmail: () => void }) {
           }}
         >
           <div className="panel-heading tight">
-            <h2>Welcome back{device.displayName ? `, ${device.displayName}` : ''}</h2>
+            <h2>Welcome back{device.trusted && device.displayName && !phone.trim() ? `, ${device.displayName}` : ''}</h2>
           </div>
-          <p className="form-note">Enter your 4-digit PIN for {device.phoneHint ?? 'this phone'}.</p>
+          <p className="form-note">
+            Enter your 4-digit PIN for {phone.trim() || (device.trusted ? device.phoneHint : undefined) || 'this phone'}.
+          </p>
           <label className="field compact-field">
             <span>PIN</span>
             <input
@@ -229,8 +237,8 @@ export function PhoneSignIn({ onUseEmail }: { onUseEmail: () => void }) {
             </button>
           </div>
           <p className="form-note">
-            <button className="text-link" type="button" onClick={() => setStep('phone')}>
-              Forgot PIN? Get an SMS code
+            <button className="text-link" type="button" onClick={() => setStep('reset')}>
+              Forgot PIN?
             </button>{' '}
             ·{' '}
             <button className="text-link" type="button" onClick={() => void forgetDevice()}>
@@ -244,13 +252,13 @@ export function PhoneSignIn({ onUseEmail }: { onUseEmail: () => void }) {
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            void requestCode();
+            void start();
           }}
         >
           <div className="panel-heading tight">
             <h2>Sign in or create an account</h2>
           </div>
-          <p className="form-note">Use your phone number. We send a 6-digit code by SMS. No email needed.</p>
+          <p className="form-note">Use your phone number and your own 4-digit PIN. No email, no SMS.</p>
           <label className="field compact-field">
             <span>Phone number</span>
             <input
@@ -264,25 +272,32 @@ export function PhoneSignIn({ onUseEmail }: { onUseEmail: () => void }) {
           </label>
           <div className="terms-actions">
             <button className="primary-button" type="submit" disabled={busy || phone.replace(/\D/g, '').length < 9}>
-              {busy ? 'Sending…' : 'Send code'}
+              {busy ? 'Please wait…' : 'Continue'}
             </button>
           </div>
         </form>
       ) : null}
 
-      {step === 'code' ? (
+      {step === 'reset' ? (
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            void verifyCode();
+            void redeemReset();
           }}
         >
           <div className="panel-heading tight">
-            <h2>Enter the SMS code</h2>
+            <h2>Reset your PIN</h2>
           </div>
-          {info ? <p className="form-note">{info}</p> : null}
+          <p className="form-note">
+            Forgot your PIN, or locked it after 5 wrong tries? Contact SellFindConnect support. After checking it is you,
+            they give you a 6-digit reset code. Then you choose a new PIN.
+          </p>
           <label className="field compact-field">
-            <span>6-digit code sent to {phone}</span>
+            <span>Phone number</span>
+            <input type="tel" inputMode="tel" autoComplete="tel" placeholder="07XX XXX XXX" value={phone} onChange={(event) => setPhone(event.target.value)} />
+          </label>
+          <label className="field compact-field">
+            <span>Reset code</span>
             <input
               inputMode="numeric"
               autoComplete="one-time-code"
@@ -292,16 +307,13 @@ export function PhoneSignIn({ onUseEmail }: { onUseEmail: () => void }) {
             />
           </label>
           <div className="terms-actions">
-            <button className="primary-button" type="submit" disabled={busy || code.length !== 6}>
+            <button className="primary-button" type="submit" disabled={busy || code.length !== 6 || phone.replace(/\D/g, '').length < 9}>
               {busy ? 'Checking…' : 'Continue'}
-            </button>
-            <button className="secondary-button" type="button" disabled={busy} onClick={() => void requestCode()}>
-              Send a new code
             </button>
           </div>
           <p className="form-note">
-            <button className="text-link" type="button" onClick={() => setStep('phone')}>
-              Change number
+            <button className="text-link" type="button" onClick={() => setStep('pin')}>
+              I remember my PIN
             </button>
           </p>
         </form>
@@ -317,7 +329,7 @@ export function PhoneSignIn({ onUseEmail }: { onUseEmail: () => void }) {
           <div className="panel-heading tight">
             <h2>Create your business account</h2>
           </div>
-          <p className="form-note">Your number is confirmed. Tell us about your business.</p>
+          <p className="form-note">Welcome! This number has no account yet. Tell us about your business and choose a PIN.</p>
           <label className="field compact-field">
             <span>Business name</span>
             <input
@@ -371,6 +383,28 @@ export function PhoneSignIn({ onUseEmail }: { onUseEmail: () => void }) {
               onChange={(event) => setBusiness({ ...business, email: event.target.value })}
             />
           </label>
+          <label className="field compact-field">
+            <span>Choose a 4-digit PIN</span>
+            <input
+              type="password"
+              inputMode="numeric"
+              autoComplete="new-password"
+              maxLength={4}
+              value={pin}
+              onChange={(event) => setPin(event.target.value.replace(/\D/g, ''))}
+            />
+          </label>
+          <label className="field compact-field">
+            <span>Repeat the PIN</span>
+            <input
+              type="password"
+              inputMode="numeric"
+              autoComplete="new-password"
+              maxLength={4}
+              value={pinConfirm}
+              onChange={(event) => setPinConfirm(event.target.value.replace(/\D/g, ''))}
+            />
+          </label>
           <label className="check-field">
             <input
               type="checkbox"
@@ -391,7 +425,9 @@ export function PhoneSignIn({ onUseEmail }: { onUseEmail: () => void }) {
                 busy ||
                 !business.acceptedTerms ||
                 business.tenantDisplayName.trim().length < 2 ||
-                business.displayName.trim().length < 2
+                business.displayName.trim().length < 2 ||
+                pin.length !== 4 ||
+                pinConfirm.length !== 4
               }
             >
               {busy ? 'Creating account…' : 'Create account'}
@@ -411,7 +447,7 @@ export function PhoneSignIn({ onUseEmail }: { onUseEmail: () => void }) {
             <h2>Set a 4-digit PIN</h2>
           </div>
           <p className="form-note">
-            Next time on this phone, sign in with your PIN. On a new phone, or if you forget it, we send an SMS code.
+            From now on, sign in on any phone with your number and this PIN. If you forget it, support gives you a reset code.
           </p>
           <label className="field compact-field">
             <span>New PIN</span>
@@ -438,14 +474,6 @@ export function PhoneSignIn({ onUseEmail }: { onUseEmail: () => void }) {
           <div className="terms-actions">
             <button className="primary-button" type="submit" disabled={busy || pin.length !== 4 || pinConfirm.length !== 4}>
               {busy ? 'Saving…' : 'Save PIN'}
-            </button>
-            <button
-              className="secondary-button"
-              type="button"
-              disabled={busy}
-              onClick={() => pendingSession && finish(pendingSession)}
-            >
-              Skip for now
             </button>
           </div>
         </form>

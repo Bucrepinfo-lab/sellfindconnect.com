@@ -534,7 +534,7 @@ export function BusinessManager() {
         body: JSON.stringify({ sessionToken }),
       }).catch(() => null);
       if (!response?.ok) throw new Error('Could not remove trusted devices. Try again.');
-      return 'Trusted devices removed. Next time, sign in with an SMS code.';
+      return 'Trusted devices removed. Next time, sign in with your phone number and PIN.';
     });
 
   if (loading) {
@@ -973,7 +973,7 @@ export function BusinessManager() {
           </button>
         </div>
         <p className="biz-sub" style={{ marginTop: 10 }}>
-          Removing trusted devices means every phone, including this one, needs a new SMS code before the PIN works.
+          Removing trusted devices means every phone, including this one, forgets your number; sign in again with your phone number and PIN.
         </p>
       </div>
     </section>

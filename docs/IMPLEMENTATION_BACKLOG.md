@@ -710,3 +710,7 @@ Progress:
       `packages/domain/src/privacy.ts` (month-name format);
     - keep the staff analytics filters (scope, industry, format, data source)
       in the URL.
+- 2026-11-20: Sign-in without SMS (phone + PIN, support PIN reset codes). Still open:
+  a support-console form for `POST /v1/auth/phone/reset-code` (today staff call
+  the API with their session), and Daraja STK for subscriptions in place of
+  Africa's Talking checkout.

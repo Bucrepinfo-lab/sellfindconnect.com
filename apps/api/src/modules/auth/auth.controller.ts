@@ -13,9 +13,7 @@ import {
   RegisterTenantOwnerDto,
   RequestEmailVerificationDto,
   RequestPasswordResetDto,
-  RequestPhoneOtpDto,
   VerifyMfaDto,
-  VerifyPhoneOtpDto,
   EnrollTotpDto,
   ConfirmTotpDto,
   RegenerateRecoveryCodesDto,
@@ -40,16 +38,6 @@ export class AuthController {
   @Post('identity/session')
   exchangeHostedIdentity(@Body() body: ExchangeHostedIdentityDto) {
     return this.auth.exchangeHostedIdentity(body);
-  }
-
-  @Post('phone-otp/request')
-  requestPhoneOtp(@Body() body: RequestPhoneOtpDto) {
-    return this.auth.requestPhoneOtp(body);
-  }
-
-  @Post('phone-otp/verify')
-  verifyPhoneOtp(@Body() body: VerifyPhoneOtpDto) {
-    return this.auth.verifyPhoneOtp(body);
   }
 
   @Post('email-verification/request')

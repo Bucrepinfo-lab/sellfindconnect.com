@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { requireDatabaseUrl, resolvePersistenceMode } from '../../persistence';
-import { AfricasTalkingSmsSender, SMS_SENDER } from './africastalking-sms';
 import { AuthController } from './auth.controller';
 import { AUTH_REPOSITORY } from './auth.repository';
 import { AuthService } from './auth.service';
@@ -35,7 +34,6 @@ import {
         return new PrismaPhoneAuthRepository(createAuthPrismaClient(databaseUrl));
       },
     },
-    { provide: SMS_SENDER, useClass: AfricasTalkingSmsSender },
     {
       provide: EMAIL_SENDER,
       inject: [ConfigService],

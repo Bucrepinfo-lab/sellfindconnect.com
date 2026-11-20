@@ -66,7 +66,6 @@ import type {
   TenantMembershipRecord,
 } from './auth.records';
 import { AUTH_REPOSITORY, type AuthRepository } from './auth.repository';
-import { SMS_SENDER, type SmsSender } from './africastalking-sms';
 import { PHONE_AUTH_REPOSITORY, type PhoneAuthRepository } from './phone-auth.repository';
 import {
   EMAIL_SENDER,
@@ -86,9 +85,7 @@ import type {
   RegisterTenantOwnerDto,
   RequestEmailVerificationDto,
   RequestPasswordResetDto,
-  RequestPhoneOtpDto,
   VerifyMfaDto,
-  VerifyPhoneOtpDto,
   EnrollTotpDto,
   ConfirmTotpDto,
   ExchangeHostedIdentityDto,
@@ -104,7 +101,6 @@ const MFA_CHALLENGE_TTL_MS = 10 * 60 * 1000;
 const MFA_MAX_FAILED_ATTEMPTS = 5;
 const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 const PASSWORD_RESET_TTL_MS = 30 * 60 * 1000;
-const PHONE_OTP_TTL_MS = 5 * 60 * 1000;
 /** Phone-only accounts get a non-routable placeholder (RFC 2606 .invalid); email is optional. */
 export const PHONE_ONLY_EMAIL_DOMAIN = 'phone.sellfindconnect.invalid';
 const TENANT_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -118,9 +114,6 @@ export class AuthService {
     @Optional()
     @Inject(AUTH_REPOSITORY)
     private readonly repository: AuthRepository = new InMemoryAuthRepository(),
-    @Optional()
-    @Inject(SMS_SENDER)
-    private readonly smsSender?: SmsSender,
     @Optional()
     @Inject(EMAIL_SENDER)
     emailSender?: AuthEmailSender | null,
@@ -380,111 +373,6 @@ export class AuthService {
     };
   }
 
-  /**
-   * Phone-OTP login — request. Normalises the phone to E.164 and, if it belongs to
-   * an existing account, mints a 6-digit code, stores it as a PHONE_LOGIN challenge
-   * and sends it via SMS (Africa's Talking). Always returns `{ requested: true }`
-   * so callers cannot probe which numbers exist. In non-production the code is
-   * returned inline for testing.
-   */
-  async requestPhoneOtp(input: RequestPhoneOtpDto) {
-    const phone = toE164(input.phone);
-    if (!phone) {
-      throw new UnprocessableEntityException('Enter a valid phone number.');
-    }
-
-    const user = await this.repository.findUserByPhone(phone);
-    let developmentCode: string | undefined;
-
-    if (user) {
-      const code = await this.createPhoneOtpChallenge(user, phone);
-      developmentCode = this.isProductionRuntime() ? undefined : code;
-
-      if (this.smsSender) {
-        await this.smsSender
-          .sendSms(
-            phone,
-            `${code} is your SellFindConnect sign-in code. It expires in 5 minutes. Never share it.`,
-          )
-          .catch(() => undefined);
-      }
-
-      const membership = await this.repository.findFirstMembershipForUser(user.id);
-      await this.recordAudit({
-        tenantId: membership?.tenantId,
-        actorUserId: user.id,
-        action: 'AUTH_PHONE_OTP_REQUESTED',
-        entityType: 'USER',
-        entityId: user.id,
-        metadata: { phoneHash: this.hashAuditIdentifier(phone) },
-      });
-    }
-
-    return { requested: true, developmentCode };
-  }
-
-  /**
-   * Phone-OTP login — verify. Validates the code, marks the phone verified, and
-   * issues the SAME session the email/password login issues (tenant + role + MFA
-   * challenge if required). The phone the user logs in with is also their M-Pesa
-   * number for payments.
-   */
-  async verifyPhoneOtp(input: VerifyPhoneOtpDto) {
-    const phone = toE164(input.phone);
-    if (!phone) {
-      throw new UnauthorizedException('Invalid or expired login code.');
-    }
-
-    const challenge = await this.repository.findAccountChallengeByTokenHash(
-      this.hashPhoneOtp(phone, input.code),
-    );
-    if (
-      !challenge ||
-      challenge.purpose !== 'PHONE_LOGIN' ||
-      challenge.consumedAt ||
-      Date.parse(challenge.expiresAt) <= Date.now()
-    ) {
-      throw new UnauthorizedException('Invalid or expired login code.');
-    }
-
-    const user = await this.repository.findUserById(challenge.userId);
-    if (!user) {
-      throw new UnauthorizedException('Invalid or expired login code.');
-    }
-
-    const membership = await this.repository.findFirstMembershipForUser(user.id);
-    if (!membership) {
-      throw new UnauthorizedException('No tenant membership is attached to this account.');
-    }
-
-    const now = new Date().toISOString();
-    await this.repository.updateAccountChallenge({ ...challenge, consumedAt: now });
-    if (!user.phoneVerifiedAt) {
-      await this.repository.markUserPhoneVerified(user.id, now);
-    }
-
-    const session = await this.createSession(user, membership.tenantId, membership.role);
-    await this.recordAudit({
-      tenantId: membership.tenantId,
-      actorUserId: user.id,
-      action: 'AUTH_PHONE_OTP_LOGIN_SUCCEEDED',
-      entityType: 'AUTH_SESSION',
-      entityId: session.id,
-      metadata: { role: membership.role, mfaRequired: session.mfaRequired },
-    });
-
-    return {
-      user: this.presentUser({ ...user, phoneVerifiedAt: user.phoneVerifiedAt ?? now }),
-      tenant: await this.repository.findTenantById(membership.tenantId),
-      session,
-    };
-  }
-
-  // ── Phone-first sign-in support (used by PhoneAuthService) ─────────────────
-
-  isPhoneOnlyEmail(email: string | undefined): boolean {
-    return Boolean(email?.toLowerCase().endsWith(`@${PHONE_ONLY_EMAIL_DOMAIN}`));
-  }
 
   async findUserByVerifiablePhone(phone: string): Promise<AuthUserRecord | undefined> {
     return (await this.repository.findUserByPhone(phone)) ?? undefined;
@@ -500,16 +388,17 @@ export class AuthService {
   }
 
   /**
-   * Issues a tenant session whose MFA is already satisfied: by a fresh SMS code
-   * (first sign-in on a device) or by PIN + trusted device token afterwards.
+   * Issues a tenant session whose MFA is already satisfied (owner 20/11/26, no
+   * SMS): by the account's own PIN, by a staff PIN reset code, or right after
+   * registering with a new PIN.
    */
-  async issuePhoneVerifiedSession(user: AuthUserRecord, method: 'SMS_CODE' | 'PIN' | 'PLAY_REVIEW') {
+  async issuePhoneVerifiedSession(user: AuthUserRecord, method: 'REGISTRATION' | 'RESET_CODE' | 'PIN' | 'PLAY_REVIEW') {
     const membership = await this.repository.findFirstMembershipForUser(user.id);
     if (!membership) {
       throw new UnauthorizedException('No tenant membership is attached to this account.');
     }
     const now = new Date().toISOString();
-    if (method !== 'PIN' && !user.phoneVerifiedAt) {
+    if ((method === 'RESET_CODE' || method === 'PLAY_REVIEW') && !user.phoneVerifiedAt) {
       await this.repository.markUserPhoneVerified(user.id, now);
     }
     const session = await this.createSession(user, membership.tenantId, membership.role, { mfaVerified: true });
@@ -529,9 +418,10 @@ export class AuthService {
   }
 
   /**
-   * Sign-up with a phone number that was just proven by an SMS code. Email is
-   * optional; without one the account gets a non-routable placeholder that is
-   * never shown or emailed. No password: later sign-ins use SMS code or PIN.
+   * Sign-up with a phone number and a new PIN (owner 20/11/26: no SMS). The
+   * phone is the login and the M-Pesa number: an M-Pesa prompt asks its owner
+   * to approve with their own M-Pesa PIN. Email is optional; without one the
+   * account gets a non-routable placeholder that is never shown or emailed.
    */
   async registerPhoneOwner(
     input: Omit<RegisterTenantOwnerDto, 'email' | 'password' | 'phone'> & { email?: string },
@@ -558,7 +448,7 @@ export class AuthService {
     const now = new Date().toISOString();
     const userId = randomUUID();
     const tenantId = randomUUID();
-    // Unusable random password: phone accounts sign in with SMS code or PIN only.
+    // Unusable random password: phone accounts sign in with phone + PIN only.
     const password = this.hashPassword(randomBytes(32).toString('base64url'));
     const subscription = calculateTrialSubscription({
       startedAt: now,
@@ -629,7 +519,7 @@ export class AuthService {
         emailProvided: Boolean(input.email),
       },
     });
-    const signedIn = await this.issuePhoneVerifiedSession(user, 'SMS_CODE');
+    const signedIn = await this.issuePhoneVerifiedSession(user, 'REGISTRATION');
     return { ...signedIn, membership, termsAcceptance };
   }
 
@@ -1620,29 +1510,6 @@ export class AuthService {
 
   private hashAccountChallengeToken(purpose: AuthAccountChallengePurpose, token: string): string {
     return createHash('sha256').update(`${purpose}:${token}`).digest('base64url');
-  }
-
-  /** Scope the OTP hash by phone so short 6-digit codes never collide across users. */
-  private hashPhoneOtp(phone: string, code: string): string {
-    return createHash('sha256').update(`PHONE_LOGIN:${phone}:${code}`).digest('base64url');
-  }
-
-  private async createPhoneOtpChallenge(user: AuthUserRecord, phone: string): Promise<string> {
-    const now = new Date().toISOString();
-    const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
-    const challenge: AuthAccountChallengeRecord = {
-      id: randomUUID(),
-      userId: user.id,
-      email: user.email,
-      phone,
-      purpose: 'PHONE_LOGIN',
-      tokenHash: this.hashPhoneOtp(phone, code),
-      expiresAt: new Date(Date.parse(now) + PHONE_OTP_TTL_MS).toISOString(),
-      createdAt: now,
-    };
-
-    await this.repository.createAccountChallenge(challenge);
-    return code;
   }
 
   private hashTenantInviteToken(token: string): string {

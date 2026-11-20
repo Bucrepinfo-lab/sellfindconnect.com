@@ -24,7 +24,6 @@ import { NotificationsService } from './notifications.service';
           EMAIL_FROM: config.get<string>('EMAIL_FROM'),
           AT_API_KEY: config.get<string>('AT_API_KEY'),
           AT_USERNAME: config.get<string>('AT_USERNAME'),
-          AT_SENDER_ID: config.get<string>('AT_SENDER_ID'),
           AT_WHATSAPP_FROM: config.get<string>('AT_WHATSAPP_FROM'),
           AT_WHATSAPP_PRODUCT_ID: config.get<string>('AT_WHATSAPP_PRODUCT_ID'),
           FCM_SERVICE_ACCOUNT_JSON: config.get<string>('FCM_SERVICE_ACCOUNT_JSON'),

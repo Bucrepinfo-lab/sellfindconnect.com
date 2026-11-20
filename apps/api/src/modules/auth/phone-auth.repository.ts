@@ -1,9 +1,9 @@
-/** Storage for phone sign-in: SMS codes, PINs and trusted devices. */
+/** Storage for phone sign-in: staff PIN reset codes, registration tickets, PINs and trusted devices (no SMS, owner 20/11/26). */
 export const PHONE_AUTH_REPOSITORY = Symbol('PHONE_AUTH_REPOSITORY');
 
 type RepositoryResult<T> = T | Promise<T>;
 
-export type PhoneCodePurpose = 'SMS_CODE' | 'REGISTRATION_TICKET';
+export type PhoneCodePurpose = 'RESET_CODE' | 'REGISTRATION_TICKET';
 
 export type PhoneCodeRecord = {
   id: string;
