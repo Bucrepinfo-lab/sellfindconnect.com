@@ -16,6 +16,15 @@ describe('the way most people pay leads; the card comes later (owner standing or
     expect(localMethodFor('CI')?.currency).toBe('XOF');
   });
 
+  it('pawaPay-only countries (20/11/26): DR Congo and Zimbabwe pay by mobile money, Paddle does not sell there', () => {
+    expect(subscriptionRails({ country: 'CD', switches: allOn })).toEqual(['MOBILE_MONEY']);
+    expect(subscriptionRails({ country: 'ZW', switches: allOn })).toEqual(['MOBILE_MONEY']);
+    expect(localMethodFor('ZW')?.currency).toBe('USD');
+    expect(subscriptionRails({ country: 'LS', switches: allOn })).toEqual(['MOBILE_MONEY', 'PADDLE']);
+    expect(localMethodFor('ET')?.currency).toBe('ETB');
+    expect(localMethodFor('ML')).toBeNull();
+  });
+
   it('Nigeria and South Africa: bank transfer / EFT first, card second', () => {
     expect(subscriptionRails({ country: 'NG', switches: allOn })).toEqual(['BANK_TRANSFER', 'PADDLE']);
     expect(subscriptionRails({ country: 'ZA', switches: allOn })).toEqual(['BANK_TRANSFER', 'PADDLE']);
