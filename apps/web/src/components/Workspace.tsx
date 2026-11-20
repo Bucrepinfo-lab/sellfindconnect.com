@@ -411,7 +411,7 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
   const hideDemoInApp = showMember && appContext !== 'web';
   const landing = useHomeWorkspaceLanding();
   const [authModeChoice, setAuthMode] = useState<'sign-in' | 'sign-up' | null>(null);
-  // Owner standing rule (07/11/26): phone + SMS code / PIN is the primary sign-in; email is optional.
+  // Owner 20/11/26: phone + PIN is the primary sign-in (no SMS); email is optional.
   const [authMethod, setAuthMethod] = useState<'phone' | 'email'>('phone');
   const signupRequested = useSyncExternalStore(
     subscribeToLocation,

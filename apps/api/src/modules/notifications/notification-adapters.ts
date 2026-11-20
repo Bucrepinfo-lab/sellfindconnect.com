@@ -1,6 +1,5 @@
 import { NotificationAdapterRegistry, type NotificationChannel } from '@telpen/domain';
 
-import { AfricasTalkingSmsAdapter } from './adapters/sms.adapter';
 import { FcmPushAdapter } from './adapters/push.adapter';
 import { InAppAdapter, type InAppPersistencePort } from './adapters/inapp.adapter';
 import { MemoryNotificationAdapter } from './adapters/memory.adapter';
@@ -30,9 +29,8 @@ export function createDefaultNotificationAdapters(
     registry.register(new ResendEmailAdapter(env, fetchImpl));
   }
 
-  if (env.AT_API_KEY && env.AT_USERNAME) {
-    registry.register(new AfricasTalkingSmsAdapter(env, fetchImpl));
-  }
+  // No SMS delivery (owner 20/11/26): notifications go in-app, by email or push.
+  // The SMS channel stays a no-op memory adapter so old events never fail.
 
   if (env.FCM_SERVICE_ACCOUNT_JSON) {
     registry.register(new FcmPushAdapter(env, fetchImpl));

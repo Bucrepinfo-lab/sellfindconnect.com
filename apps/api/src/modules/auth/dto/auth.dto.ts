@@ -84,26 +84,6 @@ export class LoginDto {
   declare password: string;
 }
 
-export class RequestPhoneOtpDto {
-  @ApiProperty({ example: '0712345678' })
-  @IsString()
-  @Length(6, 80)
-  declare phone: string;
-}
-
-export class VerifyPhoneOtpDto {
-  @ApiProperty({ example: '0712345678' })
-  @IsString()
-  @Length(6, 80)
-  declare phone: string;
-
-  @ApiProperty({ example: '492817' })
-  @IsString()
-  @Length(6, 6)
-  @Matches(/^\d{6}$/)
-  declare code: string;
-}
-
 export class RequestEmailVerificationDto {
   @ApiProperty({ example: 'owner@example.com' })
   @IsEmail()

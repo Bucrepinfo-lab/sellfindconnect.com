@@ -40,16 +40,16 @@ functionality is restricted** and add:
 
 - Name: `Play reviewer`
 - Username: the review phone number (`PLAY_REVIEW_PHONE`, e.g. 07XX XXX XXX)
-- Password: the 6-digit review code (`PLAY_REVIEW_CODE`)
+- Password: the 4-digit review PIN (`PLAY_REVIEW_PIN`)
 - Instructions:
 
 ```
-Open the app and tap "Sign in" (or "Your business"). Enter the phone number above and tap "Send code". No SMS is sent to this review number: type the 6-digit code above and tap Continue. When asked to set a PIN you can tap "Skip for now". Source Finder is on the home screen; open a listing to Report or Block it. Account deletion is under Account (or https://sellfindconnect.com/account/delete).
+Open the app and tap "Sign in" (or "Your business"). Enter the phone number above, tap Continue, then enter the 4-digit PIN above and tap Sign in. No SMS or one-time code is used. Source Finder is on the home screen; open a listing to Report or Block it. Account deletion is under Account (or https://sellfindconnect.com/account/delete).
 ```
 
-Sign-in for everyone is phone number + 6-digit SMS code (5 minutes, single use)
-on a new device, then a 4-digit PIN on that trusted device (5 wrong PINs = new
-SMS code). Email is optional. The older email review login
+Sign-in for everyone is phone number + their own 4-digit PIN on any device, no
+SMS (owner 20/11/26). A forgotten or locked PIN (5 wrong tries) is reset with a
+one-time code from support staff. Email is optional. The older email review login
 (`PLAY_REVIEW_EMAIL` + `PLAY_REVIEW_MFA_CODE`, "Sign in with email instead")
 still works if you prefer it.
 
@@ -57,10 +57,10 @@ Setup (owner, once):
 1. In the app, sign up with **the review phone number** (any Kenyan mobile
    number you control). Do not give it a staff role.
 2. Fly → `sellfindconnect-api` → Secrets: set `PLAY_REVIEW_PHONE` to that
-   number and `PLAY_REVIEW_CODE` to six random digits. Deploy secrets.
+   number and `PLAY_REVIEW_PIN` to four random digits (not 1234). Deploy secrets.
 3. Paste those values into this card only (not into chat or the repo).
 
-The fixed code works only for that one account, and never for an account
+The fixed PIN works only for that one account, and never for an account
 with staff (platform) access.
 
 ## 2. Ads
