@@ -19,7 +19,9 @@
  *   launch keeps the founding price for as long as it stays subscribed
  *   (CANCELED ends it). Later prices reach only tenants that start after the
  *   founding window, through SFC_PRICES.
- * - Kenya is approved; other countries are INDICATIVE until the owner approves.
+ * - Approved by the owner: Kenya (18/11/26); Uganda, Tanzania, Rwanda, Nigeria,
+ *   Ghana and South Africa (20/11/26, "approve all prices"). A country with no
+ *   row, or a row left unapproved (the USD row), has no local price.
  *
  * Nothing here moves money: it only says what a tenant would be asked to pay.
  * Paid use still needs an APPROVED tax profile (finance-tax-reference).
@@ -90,12 +92,12 @@ const row = (country: string, currencyCode: string, basic: number, pro: number, 
 /** The founding price list. Changing a founding price breaks the lock: don't. */
 export const FOUNDING_SUBSCRIPTION_PRICES: Record<string, PlanPriceList> = {
   KE: row('KE', 'KES', 499, 1499, true),
-  UG: row('UG', 'UGX', 14000, 42000),
-  TZ: row('TZ', 'TZS', 10000, 30000),
-  RW: row('RW', 'RWF', 5000, 15000),
-  NG: row('NG', 'NGN', 6000, 18000),
-  GH: row('GH', 'GHS', 50, 150),
-  ZA: row('ZA', 'ZAR', 70, 210),
+  UG: row('UG', 'UGX', 14000, 42000, true),
+  TZ: row('TZ', 'TZS', 10000, 30000, true),
+  RW: row('RW', 'RWF', 5000, 15000, true),
+  NG: row('NG', 'NGN', 6000, 18000, true),
+  GH: row('GH', 'GHS', 50, 150, true),
+  ZA: row('ZA', 'ZAR', 70, 210, true),
   US: row('US', 'USD', 3.99, 11.99),
 };
 

@@ -322,7 +322,8 @@ describe('PaymentsService subscription checkout', () => {
   });
 
   it('refuses a plan in a country without an approved price', async () => {
-    const { service, charges } = subscriptionService('UG');
+    // Zambia has a local way (pawaPay) but no approved SFC price yet.
+    const { service, charges } = subscriptionService('ZM');
     await expect(service.requestCheckout('session-token', { plan: 'BASIC' })).resolves.toEqual({
       ok: false,
       reason: 'no_price',
@@ -482,9 +483,24 @@ describe('PaymentsService local ways to pay (owner standing order 19/11/26)', ()
     vi.stubEnv('PAWAPAY_ENABLED', 'true');
     vi.stubEnv('PAWAPAY_API_TOKEN', 'tok');
     try {
-      const { service } = localService('UG');
+      // Zambia: pawaPay covers it, but its price is not approved yet.
+      const { service } = localService('ZM');
       const options = await service.getSubscriptionOptions('session-token');
       expect(options.rails).not.toContain('MOBILE_MONEY');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('opens mobile money first in Uganda once pawaPay is on (price approved 20/11/26)', async () => {
+    try {
+      const { service: closed } = localService('UG');
+      expect((await closed.getSubscriptionOptions('session-token')).rails).not.toContain('MOBILE_MONEY');
+      vi.stubEnv('PAWAPAY_ENABLED', 'true');
+      vi.stubEnv('PAWAPAY_API_TOKEN', 'tok');
+      const { service } = localService('UG');
+      const options = await service.getSubscriptionOptions('session-token');
+      expect(options.rails[0]).toBe('MOBILE_MONEY');
     } finally {
       vi.unstubAllEnvs();
     }
