@@ -74,11 +74,40 @@ describe('Source Finder Anthropic explanation overlay', () => {
     ).toThrow(/Unsupported/);
   });
 
+  it('accepts the Claude Fable 5.2 premium model but rejects an unknown model (fail closed)', () => {
+    // Premium flagship is an approved opt-in tier.
+    expect(
+      createConfiguredSourceFinderExplainer({
+        get: (key) =>
+          ({
+            MATCH_EXPLANATION_PROVIDER: 'anthropic',
+            ANTHROPIC_API_KEY: 'sk-ant-test',
+            MATCH_EXPLANATION_MODEL: 'claude-fable-5-2',
+          })[key],
+      }),
+    ).toBeInstanceOf(AnthropicSourceFinderExplainer);
+
+    // An unrecognised model must never be billed silently.
+    expect(() =>
+      createConfiguredSourceFinderExplainer({
+        get: (key) =>
+          ({
+            MATCH_EXPLANATION_PROVIDER: 'anthropic',
+            ANTHROPIC_API_KEY: 'sk-ant-test',
+            MATCH_EXPLANATION_MODEL: 'gpt-4o',
+          })[key],
+      }),
+    ).toThrow(/Unsupported MATCH_EXPLANATION_MODEL/);
+  });
+
   it('returns the cleaned model text on success', async () => {
     const explainer = new AnthropicSourceFinderExplainer(
       'sk-ant-test',
       'claude-haiku-5-5',
-      anthropicFetch(200, textMessage('Matches your avocado export search — Kenyan packer with cold storage.')),
+      anthropicFetch(
+        200,
+        textMessage('Matches your avocado export search — Kenyan packer with cold storage.'),
+      ),
     );
     const out = await explainer.explain(input);
     expect(out).toBe('Matches your avocado export search — Kenyan packer with cold storage.');
@@ -91,12 +120,20 @@ describe('Source Finder Anthropic explanation overlay', () => {
         { type: 'text', text: 'A Kenyan avocado packer that fits your search.' },
       ],
     };
-    const explainer = new AnthropicSourceFinderExplainer('sk-ant-test', 'claude-haiku-5-5', anthropicFetch(200, body));
+    const explainer = new AnthropicSourceFinderExplainer(
+      'sk-ant-test',
+      'claude-haiku-5-5',
+      anthropicFetch(200, body),
+    );
     expect(await explainer.explain(input)).toBe('A Kenyan avocado packer that fits your search.');
   });
 
   it('falls back (undefined) on a non-ok response', async () => {
-    const explainer = new AnthropicSourceFinderExplainer('sk-ant-test', 'claude-haiku-5-5', anthropicFetch(401, { error: {} }));
+    const explainer = new AnthropicSourceFinderExplainer(
+      'sk-ant-test',
+      'claude-haiku-5-5',
+      anthropicFetch(401, { error: {} }),
+    );
     expect(await explainer.explain(input)).toBeUndefined();
   });
 
@@ -112,7 +149,11 @@ describe('Source Finder Anthropic explanation overlay', () => {
   });
 
   it('falls back (undefined) when the model returns no text', async () => {
-    const explainer = new AnthropicSourceFinderExplainer('sk-ant-test', 'claude-haiku-5-5', anthropicFetch(200, textMessage('   ')));
+    const explainer = new AnthropicSourceFinderExplainer(
+      'sk-ant-test',
+      'claude-haiku-5-5',
+      anthropicFetch(200, textMessage('   ')),
+    );
     expect(await explainer.explain(input)).toBeUndefined();
   });
 });

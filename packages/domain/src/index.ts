@@ -63,6 +63,7 @@ export * from './sanitization';
 export * from './safety';
 export * from './source-finder';
 export * from './match-explanation';
+export * from './source-finder-model-tier';
 export * from './phone';
 export * from './payments';
 export * from './product-audit';

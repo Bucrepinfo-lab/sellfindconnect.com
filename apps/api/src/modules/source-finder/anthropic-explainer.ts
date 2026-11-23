@@ -3,6 +3,7 @@ import {
   parseMatchExplanation,
   MATCH_EXPLANATION_MODEL,
   MATCH_EXPLANATION_MAX_TOKENS,
+  isSupportedExplanationModel,
   type MatchExplanationInput,
 } from '@telpen/domain';
 
@@ -140,6 +141,17 @@ export function createConfiguredSourceFinderExplainer(
   }
   if (LIVE_PROVIDERS.has(provider)) {
     assertSourceFinderExplainerConfig(config);
+    // Fail closed on an unrecognised model: a premium flagship (e.g.
+    // claude-fable-5-2) is allowed as an opt-in tier, but an unknown string
+    // must never be billed silently. See source-finder-model-tier.ts.
+    const configuredModel =
+      optionalConfig(config, 'MATCH_EXPLANATION_MODEL') ?? MATCH_EXPLANATION_MODEL;
+    if (!isSupportedExplanationModel(configuredModel)) {
+      throw new Error(
+        `Unsupported MATCH_EXPLANATION_MODEL "${configuredModel}". ` +
+          'Add it to EXPLANATION_MODEL_TIERS (packages/domain) before enabling it.',
+      );
+    }
   } else if (provider) {
     throw new Error(
       `Unsupported MATCH_EXPLANATION_PROVIDER "${provider}". Approve and wire anthropic before enabling it.`,
