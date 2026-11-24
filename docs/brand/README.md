@@ -55,3 +55,14 @@ phone's system font, and "Inter" was named but never loaded.)
 
 Signature: the hero carries a faint connection map (points joined by lines)
 and a three-band stripe along its foot, tangerine, cobalt, berry.
+
+## Light on the dark (24/11/26)
+
+Owner: "apply some yellow in the darkish areas… illuminating or crystalline".
+Yellow (sun `#ffc23d`, crystal-gold gradient `#fff6c7` → `#ffd84d` →
+`#ffc23d`) is the light in the product, not a fourth verb: a sunrise glow and
+two soft light shafts in the hero, golden crystal points on the connection
+map, "anywhere in Kenya." lit in the gold gradient, a gold halo round the
+search card, a gold "Use my location", a sunrise at the top of the business
+sidebar with a gold-lit current section, and the same sunrise on the dark
+onboarding and privacy screens. Gold text on ink is 10.4:1.

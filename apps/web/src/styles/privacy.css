@@ -67,3 +67,6 @@
 .sfc-ps__signed-out{display:flex;flex-wrap:wrap;gap:12px;margin:8px 0 24px;}
 .sfc-ps__btn--primary{background:var(--signal);color:#161a3d;}
 body:has(.sfc-ps){background:#0f1230;}.sfc-ps{min-height:100vh;}.sfc-ps a:not(.sfc-ps__btn){color:var(--signal);}.sfc-ps a.sfc-ps__btn--primary{color:#161a3d;}
+
+/* Sunrise on the dark (owner 24/11/26). */
+body:has(.sfc-ps),body:has(.sfc-privacy),body:has(.sfc-delete){background:radial-gradient(90% 35% at 50% 0%,rgba(255,210,90,.16),transparent 70%),#0f1230;}

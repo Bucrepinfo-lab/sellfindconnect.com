@@ -66,3 +66,9 @@
 .ob__card--sell .ob__card-icon{color:var(--sell);}
 .ob__card--find .ob__card-icon{color:var(--find);}
 .ob__why .sfc-icon{color:var(--signal);}
+
+/* Sunrise on the dark (owner 24/11/26: yellow, illuminating, crystalline). */
+.ob{background:radial-gradient(90% 40% at 50% 0%,rgba(255,210,90,.22),transparent 70%),linear-gradient(115deg,transparent 40%,rgba(255,220,120,.06) 46%,transparent 52%),var(--bg);}
+.ob__headline em{font-style:normal;color:#ffc23d;}
+@supports ((-webkit-background-clip:text) or (background-clip:text)){.ob__headline em{background:linear-gradient(100deg,#fff6c7 0%,#ffd84d 35%,#ffc23d 60%,#fff0a6 100%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 12px rgba(255,196,61,.35));}}
+.ob__logo{color:#ffd34d;}
