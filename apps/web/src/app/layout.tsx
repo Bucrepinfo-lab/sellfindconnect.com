@@ -1,15 +1,23 @@
 import type { Metadata, Viewport } from 'next';
 
-import { Familjen_Grotesk } from 'next/font/google';
+import { Bricolage_Grotesque, Plus_Jakarta_Sans } from 'next/font/google';
 
 import { ServiceWorkerRegister } from '../components/ServiceWorkerRegister';
 
 import './globals.css';
 
-const display = Familjen_Grotesk({
+const display = Bricolage_Grotesque({
   subsets: ['latin'],
-  weight: ['500', '600', '700'],
+  weight: ['500', '600', '700', '800'],
   variable: '--font-display',
+  display: 'swap',
+});
+
+// Body text (identity 24/11/26): friendly, very legible on small phones.
+const body = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700', '800'],
+  variable: '--font-body',
   display: 'swap',
 });
 
@@ -27,12 +35,12 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#1d4f45',
+  themeColor: '#161a3d',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={display.variable}>
+    <html lang="en" className={`${display.variable} ${body.variable}`}>
       <body>
         {children}
         <ServiceWorkerRegister />
