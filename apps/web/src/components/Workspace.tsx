@@ -28,7 +28,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import {
   accessPermissions,
@@ -153,6 +153,7 @@ import { WebOnly, WebOnlyCheckout, useClientAppContext } from '../lib/app-contex
 import { BusinessManager } from './BusinessManager';
 import { PhoneSignIn } from './PhoneSignIn';
 import { useHomeWorkspaceLanding } from '../lib/use-home-workspace-landing';
+import { useSectionFollow } from '../lib/use-section-follow';
 
 const tenantId = '11111111-1111-4111-8111-111111111111';
 const counterpartTenantId = '22222222-2222-4222-8222-222222222222';
@@ -410,6 +411,15 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
   const appContext = useClientAppContext();
   const hideDemoInApp = showMember && appContext !== 'web';
   const landing = useHomeWorkspaceLanding();
+  // The menu mark follows the section on screen (owner 24/11/26), not just the first link.
+  const navRef = useRef<HTMLElement>(null);
+  const firstSection = area === 'admin' ? 'access' : area === 'member' ? 'business' : 'source-finder';
+  const currentSection = useSectionFollow(navRef, firstSection, [area, signedIn, isStaff]);
+  const sectionLink = (id: string) => ({
+    href: `#${id}`,
+    className: id === currentSection ? 'nav-item active' : 'nav-item',
+    'aria-current': id === currentSection ? ('location' as const) : undefined
+  });
   const [authModeChoice, setAuthMode] = useState<'sign-in' | 'sign-up' | null>(null);
   // Owner 20/11/26: phone + PIN is the primary sign-in (no SMS); email is optional.
   const [authMethod, setAuthMethod] = useState<'phone' | 'email'>('phone');
@@ -1672,14 +1682,14 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
           <Building2 size={24} />
           <span>SellFindConnect</span>
         </Link>
-        <nav className="nav-stack">
+        <nav className="nav-stack" ref={navRef}>
           {area === 'public' ? (
             <>
-              <a className="nav-item active" href="#source-finder">
+              <a {...sectionLink('source-finder')}>
                 <Search size={18} />
                 <span>Find businesses</span>
               </a>
-              <a className="nav-item" href="#zero-tolerance">
+              <a {...sectionLink('zero-tolerance')}>
                 <ShieldCheck size={18} />
                 <span>What we never allow</span>
               </a>
@@ -1703,24 +1713,24 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
                 <Search size={18} />
                 <span>Find businesses</span>
               </Link>
-              <a className="nav-item active" href="#business">
+              <a {...sectionLink('business')}>
                 <Building2 size={18} />
                 <span>Business profile</span>
               </a>
-              <a className="nav-item" href="#adverts">
+              <a {...sectionLink('adverts')}>
                 <Send size={18} />
                 <span>My adverts</span>
               </a>
               <WebOnly>
-              <a className="nav-item" href="#leads">
+              <a {...sectionLink('leads')}>
                 <Inbox size={18} />
                 <span>Leads</span>
               </a>
-              <a className="nav-item" href="#messages">
+              <a {...sectionLink('messages')}>
                 <MessageSquareText size={18} />
                 <span>Messages</span>
               </a>
-              <a className="nav-item" href="#relationship-graph">
+              <a {...sectionLink('relationship-graph')}>
                 <Link2 size={18} />
                 <span>Connections</span>
               </a>
@@ -1733,19 +1743,19 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
           ) : null}
           {area === 'admin' ? (
             <>
-              <a className="nav-item active" href="#access">
+              <a {...sectionLink('access')}>
                 <Scale size={18} />
                 <span>Access</span>
               </a>
-              <a className="nav-item" href="#analytics">
+              <a {...sectionLink('analytics')}>
                 <ChartNoAxesCombined size={18} />
                 <span>Analytics</span>
               </a>
-              <a className="nav-item" href="#finance">
+              <a {...sectionLink('finance')}>
                 <ClipboardList size={18} />
                 <span>Finance</span>
               </a>
-              <a className="nav-item" href="#moderation">
+              <a {...sectionLink('moderation')}>
                 <ShieldCheck size={18} />
                 <span>Moderation</span>
               </a>
