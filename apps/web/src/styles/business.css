@@ -99,11 +99,11 @@
 }
 
 .biz-note.warn {
-  background: #fbf1dc;
+  background: var(--sun-soft);
 }
 
 .biz-note.error {
-  background: #f7e1e1;
+  background: var(--danger-soft);
   color: var(--red);
 }
 
@@ -118,7 +118,7 @@
 }
 
 .biz-pill.muted {
-  background: #eceeed;
+  background: #efeef5;
   color: var(--muted);
 }
 
