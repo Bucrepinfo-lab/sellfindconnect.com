@@ -1386,3 +1386,117 @@ a.nav-item:focus-visible,
 .ob {
   --icon-accent: #e0b040;
 }
+
+/* ---------------------------------------------------------------------------
+   Menu, tabs and touch feel (owner, 24/11/26). Kept last so it refines the
+   rules above. The current section now differs from hover (a maize bar and a
+   maize icon); icons lift on hover; on phones the sideways menu strip has no
+   scrollbar, a soft fade and snap; taps get no grey flash; buttons press in;
+   every control shows a keyboard focus ring. Reduced motion turns motion off.
+   --------------------------------------------------------------------------- */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.nav-item {
+  position: relative;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.nav-item svg {
+  flex-shrink: 0;
+  transition: transform 0.18s ease, color 0.18s ease;
+}
+
+.nav-item:hover {
+  background: #1d2b28;
+}
+
+.nav-item:hover svg {
+  color: var(--maize);
+  transform: scale(1.1);
+}
+
+.nav-item.active,
+.nav-item[aria-current='page'] {
+  background: #24332f;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.nav-item.active svg,
+.nav-item[aria-current='page'] svg {
+  color: var(--maize);
+}
+
+.nav-item.active::before,
+.nav-item[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 9px;
+  bottom: 9px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--maize);
+}
+
+.chip {
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+:where(button, [role='button'], summary):not(:disabled):active {
+  transform: translateY(1px) scale(0.985);
+}
+
+:where(button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+.sidebar :where(button):focus-visible {
+  outline-color: var(--maize);
+}
+
+@media (max-width: 760px) {
+  .nav-stack {
+    scrollbar-width: none;
+    scroll-snap-type: x proximity;
+    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+  }
+
+  .nav-stack::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-item {
+    min-width: 44px;
+    justify-content: center;
+    scroll-snap-align: start;
+    flex-shrink: 0;
+  }
+
+  .nav-item.active::before,
+  .nav-item[aria-current='page']::before {
+    left: 10px;
+    right: 10px;
+    top: auto;
+    bottom: 2px;
+    width: auto;
+    height: 3px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  :where(button, [role='button'], summary):active {
+    transform: none;
+  }
+}
