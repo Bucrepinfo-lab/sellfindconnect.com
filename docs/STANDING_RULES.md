@@ -77,3 +77,12 @@ logs keep their own date format.
 ## 12. Schedules cost minutes
 Each scheduled workflow states why its frequency is needed; prefer the least
 frequent schedule that meets the need (GitHub Actions minutes are a budget).
+
+## 13. Our own pictures, with the words kept
+Owner standing rule, 24/11/26 (all products, including future ones). Menu and
+tab pictures are our own simple drawings or this app's one icon set, never emoji:
+emoji are drawn differently by every phone maker and Android version (older
+phones show an empty box) and are read differently by age and culture. The
+words always stay with the picture, in the person's language. A new or changed
+picture is shown to real users without its words first; one that most people
+do not name correctly is redrawn before it ships widely.
