@@ -40,8 +40,9 @@
 }
 
 .home-nav__links a.home-nav__cta {
-  background: var(--green);
-  color: #ffffff;
+  background: var(--sell);
+  color: var(--ink);
+  box-shadow: 0 6px 16px -8px rgba(255, 106, 61, 0.9);
   padding: 9px 14px;
   border-radius: 999px;
 }
@@ -61,9 +62,10 @@
 
 .brand-logo__name {
   font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
-  font-weight: 700;
-  font-size: 1.1rem;
-  color: var(--green);
+  font-weight: 800;
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+  color: var(--ink);
 }
 
 .brand-logo__tag {
@@ -95,14 +97,68 @@
   }
 }
 
+/* Narrow phones: the mark alone carries the brand so Sign in and the button fit. */
+@media (max-width: 400px) {
+  .home-nav .brand-logo__words {
+    display: none;
+  }
+}
+
 /* Hero */
 .home-hero {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
   background:
-    radial-gradient(120% 90% at 100% 0%, rgba(224, 176, 64, 0.22), transparent 55%),
-    var(--green);
+    radial-gradient(45% 55% at 12% 0%, rgba(255, 210, 90, 0.38), transparent 70%),
+    linear-gradient(115deg, transparent 38%, rgba(255, 220, 120, 0.1) 44%, transparent 50%),
+    linear-gradient(115deg, transparent 56%, rgba(255, 220, 120, 0.07) 60%, transparent 66%),
+    radial-gradient(60% 70% at 100% 0%, rgba(209, 36, 107, 0.45), transparent 70%),
+    radial-gradient(55% 60% at 0% 100%, rgba(43, 76, 240, 0.55), transparent 70%),
+    radial-gradient(40% 45% at 85% 100%, rgba(255, 106, 61, 0.35), transparent 70%),
+    var(--ink);
   color: #ffffff;
   border-radius: 20px;
   padding: 24px 16px 18px;
+}
+
+/* The connection map behind the hero: points joined by lines, as the
+   matching engine joins sellers, finders and connectors. */
+.home-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='160' viewBox='0 0 240 160'%3E%3Cg fill='none' stroke='%23ffe08a' stroke-opacity='.22' stroke-width='1'%3E%3Cpath d='M20 30L90 60L160 20L220 70M90 60L70 130L150 110L220 70M150 110L160 20'/%3E%3C/g%3E%3Cg%3E%3Ccircle cx='20' cy='30' r='3' fill='%23ff6a3d'/%3E%3Ccircle cx='90' cy='60' r='3.5' fill='%23ffd34d'/%3E%3Ccircle cx='160' cy='20' r='3' fill='%23ffe9a3'/%3E%3Ccircle cx='220' cy='70' r='3.5' fill='%23d1246b'/%3E%3Ccircle cx='70' cy='130' r='3' fill='%238aa2ff'/%3E%3Ccircle cx='150' cy='110' r='3.5' fill='%23ffd34d'/%3E%3C/g%3E%3Cg fill='%23fff1b8' fill-opacity='.85'%3E%3Cpath d='M120 82l3 5-3 5-3-5z'/%3E%3Cpath d='M44 92l2 3.5-2 3.5-2-3.5z'/%3E%3Cpath d='M200 128l2.5 4-2.5 4-2.5-4z'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 240px 160px;
+  mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.35) 70%, transparent 100%);
+}
+
+/* The signature: Sell, Find, Connect as three bands along the hero's foot. */
+.home-hero::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 5px;
+  background: linear-gradient(90deg, var(--sell) 0 33.34%, var(--find) 33.34% 66.67%, var(--connect) 66.67% 100%);
+}
+
+/* The lit words: a crystal-gold gradient, as if catching the light. */
+.home-hero__glow {
+  color: var(--sun);
+}
+
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .home-hero__glow {
+    background: linear-gradient(100deg, #fff6c7 0%, #ffd84d 35%, #ffc23d 55%, #fff0a6 80%, #ffd84d 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 0 14px rgba(255, 196, 61, 0.35));
+  }
 }
 
 .home-hero__heading h1 {
@@ -116,7 +172,7 @@
 .home-hero__heading p {
   margin: 0 0 18px;
   max-width: 56ch;
-  color: rgba(255, 255, 255, 0.86);
+  color: rgba(255, 255, 255, 0.88);
   line-height: 1.45;
 }
 
@@ -124,7 +180,8 @@
   display: grid;
   gap: 8px;
   background: #ffffff;
-  border-radius: 14px;
+  border-radius: 16px;
+  box-shadow: 0 18px 40px -18px rgba(5, 8, 40, 0.65), 0 0 0 1px rgba(255, 214, 102, 0.55), 0 0 32px -6px rgba(255, 196, 61, 0.35);
   padding: 10px;
   color: var(--ink);
 }
@@ -164,8 +221,9 @@
   min-height: 48px;
   border: 0;
   border-radius: 10px;
-  background: #e0b040;
-  color: #1d2425;
+  background: var(--find);
+  color: #ffffff;
+  transition: background-color 0.18s ease, box-shadow 0.18s ease;
   font: inherit;
   font-weight: 700;
   display: inline-flex;
@@ -174,6 +232,11 @@
   gap: 8px;
   padding: 0 20px;
   cursor: pointer;
+}
+
+.hero-search__go:hover:not(:disabled) {
+  background: var(--find-strong);
+  box-shadow: 0 8px 20px -10px rgba(43, 76, 240, 0.9);
 }
 
 .hero-search__go:disabled {
@@ -186,7 +249,7 @@
 .sort-tab:focus-visible,
 .result-card__link:focus-visible,
 .sell-band__cta:focus-visible {
-  outline: 3px solid #e0b040;
+  outline: 3px solid var(--sun);
   outline-offset: 2px;
 }
 
@@ -249,21 +312,22 @@
 }
 
 .chip.is-active {
-  background: var(--green);
-  border-color: var(--green);
+  background: var(--ink);
+  border-color: var(--ink);
   color: #ffffff;
 }
 
 .chip--on-dark {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(2px);
   color: #ffffff;
 }
 
 .chip--on-dark.is-active {
-  background: #ffffff;
-  border-color: #ffffff;
-  color: var(--green);
+  background: var(--sun);
+  border-color: var(--sun);
+  color: var(--ink);
 }
 
 .chip--market {
@@ -342,7 +406,7 @@
 
 .sort-tabs {
   display: inline-flex;
-  background: #e9eeeb;
+  background: #eeedf5;
   border-radius: 999px;
   padding: 3px;
 }
@@ -363,7 +427,7 @@
 .sort-tab.is-active {
   background: var(--surface);
   color: var(--ink);
-  box-shadow: 0 1px 3px rgba(31, 45, 42, 0.16);
+  box-shadow: 0 1px 3px rgba(22, 26, 61, 0.16);
 }
 
 /* Result cards */
@@ -488,13 +552,13 @@
   border-radius: 6px;
   font-size: 0.74rem;
   font-weight: 700;
-  background: #eceeed;
+  background: #efeef5;
   color: var(--ink);
 }
 
 .badge--featured {
-  background: #f6e7bd;
-  color: #5c3d06;
+  background: var(--sun-soft);
+  color: var(--sun-text);
 }
 
 .badge--new {
@@ -503,13 +567,13 @@
 }
 
 .badge--ending {
-  background: #f7e1e1;
+  background: var(--danger-soft);
   color: var(--red);
 }
 
 .result-card--skeleton .result-card__media,
 .skeleton-line {
-  background: linear-gradient(90deg, #e9eeeb 25%, #f4f7f5 50%, #e9eeeb 75%);
+  background: linear-gradient(90deg, #eeedf5 25%, #f7f6fb 50%, #eeedf5 75%);
   background-size: 200% 100%;
 }
 
@@ -586,10 +650,20 @@
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  background: var(--green-soft);
-  color: var(--green);
+  background: var(--find-soft);
+  color: var(--find-text);
   display: grid;
   place-items: center;
+}
+
+.reason:nth-child(3n + 2) .reason__icon {
+  background: var(--connect-soft);
+  color: var(--connect-text);
+}
+
+.reason:nth-child(3n + 3) .reason__icon {
+  background: var(--sell-soft);
+  color: var(--sell-text);
 }
 
 .reason h3,
@@ -611,21 +685,44 @@
 }
 
 .step-list li {
+  --step: var(--find);
   counter-increment: step;
-  border-top: 3px solid var(--green);
+  border-top: 4px solid var(--step);
   padding-top: 10px;
 }
 
+.step-list li:nth-child(2) {
+  --step: var(--sun);
+}
+
+.step-list li:nth-child(3) {
+  --step: var(--connect);
+}
+
 .step-list h3::before {
-  content: counter(step) '. ';
-  color: var(--green);
+  content: counter(step);
+  display: inline-grid;
+  place-items: center;
+  width: 1.6em;
+  height: 1.6em;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--step);
+  color: #ffffff;
+  font-size: 0.85em;
+}
+
+.step-list li:nth-child(2) h3::before {
+  color: var(--ink);
 }
 
 /* Seller band */
 .sell-band {
   margin-top: 32px;
-  background: #fbf3dc;
-  border: 1px solid #ecd9a2;
+  background:
+    radial-gradient(80% 120% at 100% 0%, rgba(255, 106, 61, 0.18), transparent 60%),
+    var(--sell-soft);
+  border: 1px solid #ffd2bf;
   border-radius: 20px;
   padding: 20px 16px;
   display: grid;
@@ -651,10 +748,17 @@
   align-items: center;
   padding: 0 20px;
   border-radius: 10px;
-  background: var(--green);
-  color: #ffffff;
-  font-weight: 700;
+  background: var(--sell);
+  color: var(--ink);
+  font-weight: 800;
   text-decoration: none;
+  box-shadow: 0 8px 20px -10px rgba(255, 106, 61, 0.9);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.sell-band__cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px -10px rgba(255, 106, 61, 0.95);
 }
 
 @media (min-width: 720px) {
@@ -774,12 +878,13 @@
   min-height: 40px;
   padding: 0 12px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  background: transparent;
-  color: #ffffff;
+  border: 1px solid rgba(255, 214, 102, 0.7);
+  background: rgba(255, 196, 61, 0.1);
+  color: #fff3c4;
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+  transition: background-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .hero-locate__button:disabled {
@@ -788,7 +893,7 @@
 }
 
 .hero-locate__button:focus-visible {
-  outline: 3px solid #e0b040;
+  outline: 3px solid var(--sun);
   outline-offset: 2px;
 }
 
@@ -808,7 +913,7 @@
 }
 
 .result-card__rating svg {
-  color: var(--maize, #c99a2e);
+  color: var(--sun);
   fill: currentColor;
 }
 
@@ -824,7 +929,7 @@
 }
 
 .stars__on {
-  color: var(--maize, #c99a2e);
+  color: var(--sun);
   fill: currentColor;
 }
 
@@ -881,7 +986,7 @@
 .reviews__bar span {
   display: block;
   height: 100%;
-  background: var(--maize, #c99a2e);
+  background: var(--sun);
 }
 
 .reviews__list {
@@ -991,4 +1096,13 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+.hero-locate__button:hover {
+  background: rgba(255, 196, 61, 0.2);
+  box-shadow: 0 0 18px -4px rgba(255, 196, 61, 0.6);
+}
+
+.hero-locate__button svg {
+  color: var(--sun);
 }

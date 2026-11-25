@@ -1,6 +1,6 @@
 'use client';
 
-import { enhancePhotoPixels, targetPhotoSize } from '@telpen/domain';
+import { applyPhotoLook, targetPhotoSize, type PhotoLook } from '@telpen/domain';
 
 export type PreparedPhoto = {
   file: File;
@@ -9,6 +9,7 @@ export type PreparedPhoto = {
   /** Object URL of the photo as it will be posted. Revoke when done. */
   previewUrl: string;
   improved: boolean;
+  look: PhotoLook;
 };
 
 async function decode(file: File): Promise<{ source: CanvasImageSource; width: number; height: number; close: () => void }> {
@@ -38,8 +39,11 @@ async function decode(file: File): Promise<{ source: CanvasImageSource; width: n
  */
 export async function preparePhoto(
   file: File,
-  options: { improve: boolean; keepPng?: boolean },
+  /** `look` wins; `improve` (older callers) means Fresh, false means As taken. */
+  options: { improve?: boolean; look?: PhotoLook; keepPng?: boolean },
 ): Promise<PreparedPhoto> {
+  const look: PhotoLook = options.look ?? (options.improve === false ? 'asTaken' : 'fresh');
+  const improve = look !== 'asTaken';
   let decoded: Awaited<ReturnType<typeof decode>>;
   try {
     decoded = await decode(file);
@@ -50,7 +54,7 @@ export async function preparePhoto(
   const canvas = document.createElement('canvas');
   canvas.width = size.width;
   canvas.height = size.height;
-  const context = canvas.getContext('2d', { willReadFrequently: options.improve });
+  const context = canvas.getContext('2d', { willReadFrequently: improve });
   if (!context) {
     decoded.close();
     throw new Error('This browser cannot prepare photos. Try another browser.');
@@ -59,9 +63,9 @@ export async function preparePhoto(
   context.drawImage(decoded.source, 0, 0, size.width, size.height);
   decoded.close();
 
-  if (options.improve) {
+  if (improve) {
     const image = context.getImageData(0, 0, size.width, size.height);
-    enhancePhotoPixels(image.data);
+    applyPhotoLook(image.data, look);
     context.putImageData(image, 0, 0);
   }
 
@@ -76,6 +80,7 @@ export async function preparePhoto(
     width: size.width,
     height: size.height,
     previewUrl: URL.createObjectURL(prepared),
-    improved: options.improve,
+    improved: improve,
+    look,
   };
 }

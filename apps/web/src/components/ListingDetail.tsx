@@ -185,7 +185,7 @@ function ListingBody(props: {
 
         <h2>Contact {advert.displayName}</h2>
         {advert.phone || advert.email || advert.website ? (
-          <div className="biz-actions">
+          <div className="biz-actions connect-actions">
             {advert.phone ? (
               <a onClick={() => recordListingEvent(advert.id, 'INQUIRY')} className="primary-button" href={`tel:${advert.phone.replace(/\s/g, '')}`}>
                 Call

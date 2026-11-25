@@ -99,11 +99,11 @@
 }
 
 .biz-note.warn {
-  background: #fbf1dc;
+  background: var(--sun-soft);
 }
 
 .biz-note.error {
-  background: #f7e1e1;
+  background: var(--danger-soft);
   color: var(--red);
 }
 
@@ -118,7 +118,7 @@
 }
 
 .biz-pill.muted {
-  background: #eceeed;
+  background: #efeef5;
   color: var(--muted);
 }
 
@@ -332,4 +332,62 @@
 
 .biz-card .biz-plan h3 {
   margin: 0;
+}
+
+/* Photo looks + crop (owner standing rule 25/11/26) */
+.photo-preview__looks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+.photo-preview__crop {
+  margin-top: 10px;
+}
+.photo-cropper {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background: rgba(22, 26, 61, 0.96);
+  padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+}
+.photo-cropper__stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.photo-cropper__bar {
+  display: grid;
+  gap: 10px;
+  padding: 14px max(16px, env(safe-area-inset-left, 0px));
+  background: var(--paper, #fbfaf7);
+}
+.photo-cropper__shapes {
+  display: flex;
+  gap: 6px;
+}
+.photo-cropper__zoom {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.photo-cropper__zoom input {
+  flex: 1;
+}
+.read-text {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+.read-text__result {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--line, #e6e3dc);
+  border-radius: 12px;
+}
+.read-text__result textarea {
+  width: 100%;
 }

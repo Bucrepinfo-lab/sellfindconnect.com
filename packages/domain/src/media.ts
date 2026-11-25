@@ -29,8 +29,9 @@ export const mediaPolicy = {
   maxItemsPerOwner: 10,
   /** Media items per listing on the top plan (Pro); see planEntitlements. */
   maxItemsPerOwnerTopPlan: 20,
-  maxImageBytes: 10 * 1024 * 1024,
-  maxVideoBytes: 100 * 1024 * 1024,
+  /** After the phone shrinks a photo (auto-fit) it is ~1 MB; this is the ceiling. */
+  maxImageBytes: 15 * 1024 * 1024,
+  maxVideoBytes: 150 * 1024 * 1024,
   maxVideoDurationSeconds: 60,
   allowedImageMimeTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/heic'],
   allowedVideoMimeTypes: ['video/mp4', 'video/quicktime'],

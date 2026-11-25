@@ -72,7 +72,7 @@ export function PublicHome({ initial }: { initial: SearchFilters }) {
 
       <LiveSearch initial={initial}>
         <header className="home-hero__heading">
-          <h1>Find who sells it, buys it or moves it, anywhere in Kenya.</h1>
+          <h1>Find who sells it, buys it or moves it, <span className="home-hero__glow">anywhere in Kenya.</span></h1>
           <p>Suppliers, wholesalers, transporters and service providers in all 47 counties. Search free, then contact them directly.</p>
         </header>
       </LiveSearch>
