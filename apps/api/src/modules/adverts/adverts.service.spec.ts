@@ -107,7 +107,7 @@ describe('AdvertsService', () => {
     expect(preview.preview.mediaSlots).toEqual({
       used: 1,
       max: mediaPolicy.maxItemsPerOwner,
-      remaining: 9,
+      remaining: mediaPolicy.maxItemsPerOwner - 1,
     });
     expect(published).toMatchObject({
       sourceDraftId: draft.id,
@@ -393,7 +393,7 @@ describe('AdvertsService', () => {
     expect(result.mediaSlots).toEqual({
       used: 0,
       max: mediaPolicy.maxItemsPerOwner,
-      remaining: 10,
+      remaining: mediaPolicy.maxItemsPerOwner,
     });
     expect(auditLogs.some((record) => record.action === 'ADVERT_MEDIA_UPLOAD_PREPARED')).toBe(true);
   });
@@ -464,7 +464,7 @@ describe('AdvertsService', () => {
       },
     });
     expect(result.media).not.toHaveProperty('moderationReason');
-    expect(result.mediaSlots).toEqual({ used: 1, max: mediaPolicy.maxItemsPerOwner, remaining: 9 });
+    expect(result.mediaSlots).toEqual({ used: 1, max: mediaPolicy.maxItemsPerOwner, remaining: mediaPolicy.maxItemsPerOwner - 1 });
     await expect(service.listAdvertMedia(tenantId, advert.id)).resolves.toHaveLength(1);
     expect(adverts[0]?.media).toHaveLength(1);
     expect(adverts[0]?.mediaSlots).toEqual(result.mediaSlots);
@@ -529,7 +529,7 @@ describe('AdvertsService', () => {
     await expect(service.listAdvertMedia(tenantId, advert.id)).resolves.toHaveLength(0);
   });
 
-  it('enforces the ten item media display limit per advert', async () => {
+  it('enforces the Basic media display limit per advert (15, owner 25/11/26)', async () => {
     const { service, advert } = await createService();
 
     for (let index = 0; index < mediaPolicy.maxItemsPerOwner; index += 1) {
@@ -551,13 +551,13 @@ describe('AdvertsService', () => {
     ).rejects.toThrow('maximum');
     const adverts = await service.listAdverts(tenantId);
     expect(adverts[0]?.mediaSlots).toEqual({
-      used: 10,
+      used: mediaPolicy.maxItemsPerOwner,
       max: mediaPolicy.maxItemsPerOwner,
       remaining: 0,
     });
   });
 
-  it('lets a Pro tenant show twenty media items per advert', async () => {
+  it('lets a Pro tenant show 30 media items per advert (owner 25/11/26)', async () => {
     const service = new AdvertsService(undefined, {
       hasCurrentTermsAcceptance: async () => true,
       recordTenantAudit: async () => undefined,
@@ -589,9 +589,9 @@ describe('AdvertsService', () => {
         mimeType: 'image/jpeg',
         fileSizeBytes: 800_000,
       }),
-    ).rejects.toThrow('maximum of 20');
+    ).rejects.toThrow(`maximum of ${mediaPolicy.maxItemsPerOwnerTopPlan}`);
     const adverts = await service.listAdverts(tenantId);
-    expect(adverts[0]?.mediaSlots).toEqual({ used: 20, max: 20, remaining: 0 });
+    expect(adverts[0]?.mediaSlots).toEqual({ used: 30, max: 30, remaining: 0 });
   });
 
   it('creates one renewal alert on day 35 and does not duplicate it', async () => {

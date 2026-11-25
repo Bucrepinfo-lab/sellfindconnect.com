@@ -351,7 +351,7 @@ describe('ProfilesService', () => {
     ).rejects.toThrow('media policy');
   });
 
-  it('enforces the ten item media display limit per profile draft', async () => {
+  it('enforces the Basic media display limit per profile draft (15, owner 25/11/26)', async () => {
     const service = new ProfilesService();
     const draft = await service.createDraft(tenantId, {
       displayName: 'Nairobi Fresh Produce',
@@ -379,7 +379,7 @@ describe('ProfilesService', () => {
       }),
     ).rejects.toThrow('maximum');
     expect((await service.previewDraft(tenantId, draft.id)).preview.mediaSlots).toEqual({
-      used: 10,
+      used: mediaPolicy.maxItemsPerOwner,
       max: mediaPolicy.maxItemsPerOwner,
       remaining: 0,
     });
