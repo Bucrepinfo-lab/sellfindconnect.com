@@ -27,6 +27,7 @@ import { advertStatusLabel, codeLabel, industryLabel } from '../lib/labels';
 import type { PreparedPhoto } from '../lib/prepare-photo';
 import { publicApiBaseUrl, readTenantSession } from '../lib/public-api';
 import { PhotoPreview } from './PhotoPreview';
+import { ReadTextButton } from './ReadTextButton';
 import { PlanCard } from './PlanCard';
 import '../styles/business.css';
 
@@ -653,6 +654,15 @@ export function BusinessManager() {
               <span>What you do (at least 20 characters)</span>
               <textarea value={profileForm.description} onChange={set('description')} maxLength={2000} required />
             </label>
+            <ReadTextButton
+              label="Read a flyer, card or price list"
+              onText={(words) =>
+                setProfileForm((current) => ({
+                  ...current,
+                  description: (current.description ? `${current.description.trimEnd()}\n${words}` : words).slice(0, 2000),
+                }))
+              }
+            />
             <h3>Contacts</h3>
             <div className="biz-grid two">
               <label className="biz-field">

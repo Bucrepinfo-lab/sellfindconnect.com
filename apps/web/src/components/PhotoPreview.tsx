@@ -2,9 +2,18 @@
 
 import { useEffect, useState } from 'react';
 
-import { photoScreenMessage, screenPhoto } from '@telpen/domain';
+import {
+  DEFAULT_PHOTO_LOOK,
+  MAX_ORIGINAL_PHOTO_BYTES,
+  PHOTO_LOOK_IDS,
+  PHOTO_LOOKS,
+  photoScreenMessage,
+  screenPhoto,
+  type PhotoLook,
+} from '@telpen/domain';
 
 import { preparePhoto, type PreparedPhoto } from '../lib/prepare-photo';
+import { PhotoCropper } from './PhotoCropper';
 import { SfcIcon } from './SfcIcon';
 
 type State =
@@ -30,15 +39,22 @@ export function PhotoPreview(props: {
   onUse: (photo: PreparedPhoto) => void;
   onCancel: () => void;
 }) {
-  const { file, keepPng, caption, existing, logo } = props;
+  const { keepPng, caption, existing, logo } = props;
   const noun = props.noun ?? 'photo';
-  const [improve, setImprove] = useState(props.improveByDefault ?? true);
+  // The seller's own crop replaces the chosen file; looks apply on top.
+  // A crop belongs to the file it was made from; a new file starts uncropped.
+  const [cropped, setCropped] = useState<{ from: File; file: File } | null>(null);
+  const file = cropped && cropped.from === props.file ? cropped.file : props.file;
+  const tooBig = file.size > MAX_ORIGINAL_PHOTO_BYTES;
+  const [cropping, setCropping] = useState(false);
+  const [look, setLook] = useState<PhotoLook>(props.improveByDefault === false ? 'asTaken' : DEFAULT_PHOTO_LOOK);
   const [state, setState] = useState<State>({ status: 'working' });
 
   useEffect(() => {
     let cancelled = false;
     let url = '';
-    preparePhoto(file, { improve, keepPng })
+    if (tooBig) return;
+    preparePhoto(file, { look, keepPng })
       .then((photo) => {
         url = photo.previewUrl;
         if (cancelled) {
@@ -68,10 +84,10 @@ export function PhotoPreview(props: {
       cancelled = true;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [file, improve, keepPng, caption, existing, logo]);
+  }, [file, tooBig, look, keepPng, caption, existing, logo]);
 
   // A result for an earlier file or switch position is treated as still preparing.
-  const ready = state.status === 'ready' && state.file === file && state.photo.improved === improve ? state : null;
+  const ready = state.status === 'ready' && state.file === file && state.photo.look === look ? state : null;
   const ok = Boolean(ready && ready.problems.length === 0);
 
   return (
@@ -106,15 +122,46 @@ export function PhotoPreview(props: {
           )}
         </ul>
       ) : null}
-      {state.status === 'error' ? <p className="biz-note error">{state.message}</p> : null}
+      {tooBig ? (
+        <p className="biz-note error">
+          This photo is over {Math.round(MAX_ORIGINAL_PHOTO_BYTES / (1024 * 1024))} MB. Choose a smaller one.
+        </p>
+      ) : state.status === 'error' ? (
+        <p className="biz-note error">{state.message}</p>
+      ) : null}
 
-      <label className="photo-preview__toggle">
-        <input type="checkbox" checked={improve} onChange={(event) => setImprove(event.target.checked)} />
-        <span>
-          Improve light and colour
-          <small>A gentle tidy-up so the {noun} looks true and clear. It never changes what is in the picture.</small>
-        </span>
-      </label>
+      <div className="photo-preview__looks" role="radiogroup" aria-label="Look">
+        {PHOTO_LOOK_IDS.map((id) => (
+          <button
+            key={id}
+            type="button"
+            role="radio"
+            aria-checked={look === id}
+            title={PHOTO_LOOKS[id].help}
+            className={look === id ? 'chip is-active' : 'chip'}
+            onClick={() => setLook(id)}
+          >
+            {PHOTO_LOOKS[id].label}
+          </button>
+        ))}
+      </div>
+      <p className="biz-sub">
+        {PHOTO_LOOKS[look].help} Looks are gentle and capped; they never change what is in the picture.
+      </p>
+      <button type="button" className="secondary-button photo-preview__crop" onClick={() => setCropping(true)}>
+        Crop and rotate
+      </button>
+      {cropping ? (
+        <PhotoCropper
+          file={file}
+          square={Boolean(logo)}
+          onDone={(cropped) => {
+            setCropped({ from: props.file, file: cropped });
+            setCropping(false);
+          }}
+          onCancel={() => setCropping(false)}
+        />
+      ) : null}
 
       <p className="biz-sub">Our team still checks every {noun} before the public sees it.</p>
       <div className="biz-actions">
