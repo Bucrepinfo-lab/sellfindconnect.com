@@ -151,6 +151,7 @@ import { clearSession, isStaffRole, saveSession, useStoredSession } from '../lib
 import { SignUpForm } from './SignUpForm';
 import { WebOnly, WebOnlyCheckout, useClientAppContext } from '../lib/app-context';
 import { BusinessManager } from './BusinessManager';
+import { ThemeToggle } from './ThemeToggle';
 import { PhoneSignIn } from './PhoneSignIn';
 import { useHomeWorkspaceLanding } from '../lib/use-home-workspace-landing';
 import { useSectionFollow } from '../lib/use-section-follow';
@@ -1774,6 +1775,7 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
           ) : (
             <Link href="/dashboard">Sign in</Link>
           )}
+          <ThemeToggle />
         </div>
       </aside>
 

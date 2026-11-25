@@ -116,7 +116,7 @@
     radial-gradient(60% 70% at 100% 0%, rgba(209, 36, 107, 0.45), transparent 70%),
     radial-gradient(55% 60% at 0% 100%, rgba(43, 76, 240, 0.55), transparent 70%),
     radial-gradient(40% 45% at 85% 100%, rgba(255, 106, 61, 0.35), transparent 70%),
-    var(--ink);
+    var(--band);
   color: #ffffff;
   border-radius: 20px;
   padding: 24px 16px 18px;
@@ -179,7 +179,7 @@
 .hero-search {
   display: grid;
   gap: 8px;
-  background: #ffffff;
+  background: var(--surface);
   border-radius: 16px;
   box-shadow: 0 18px 40px -18px rgba(5, 8, 40, 0.65), 0 0 0 1px rgba(255, 214, 102, 0.55), 0 0 32px -6px rgba(255, 196, 61, 0.35);
   padding: 10px;
@@ -312,7 +312,7 @@
 }
 
 .chip.is-active {
-  background: var(--ink);
+  background: var(--band);
   border-color: var(--ink);
   color: #ffffff;
 }
@@ -406,7 +406,7 @@
 
 .sort-tabs {
   display: inline-flex;
-  background: #eeedf5;
+  background: var(--surface-2);
   border-radius: 999px;
   padding: 3px;
 }
@@ -552,7 +552,7 @@
   border-radius: 6px;
   font-size: 0.74rem;
   font-weight: 700;
-  background: #efeef5;
+  background: var(--surface-2);
   color: var(--ink);
 }
 

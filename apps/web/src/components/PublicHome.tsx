@@ -10,6 +10,7 @@ import { SfcIcon, type SfcIconName } from './SfcIcon';
 import { ShareBar } from './ShareBar';
 import '../styles/business.css';
 import '../styles/home.css';
+import { ThemeToggle } from './ThemeToggle';
 
 /**
  * Each reason answers a complaint people make about other directories and
@@ -144,6 +145,7 @@ export function PublicHome({ initial }: { initial: SearchFilters }) {
         <Link href="/community">Community standards</Link>
         <Link href="/prohibited">Prohibited content</Link>
         <Link href="/account/delete">Delete account</Link>
+        <ThemeToggle tone="page" />
       </footer>
     </main>
   );

@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next';
 import { Bricolage_Grotesque, Plus_Jakarta_Sans } from 'next/font/google';
 
 import { ServiceWorkerRegister } from '../components/ServiceWorkerRegister';
+import { THEME_BOOT_SCRIPT } from '../lib/theme';
 
 import './globals.css';
 
@@ -35,12 +36,19 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#161a3d',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#161a3d' },
+    { media: '(prefers-color-scheme: dark)', color: '#0c0f2a' },
+  ],
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${display.variable} ${body.variable}`}>
+    <html lang="en" className={`${display.variable} ${body.variable}`} suppressHydrationWarning>
+      <head>
+        {/* Dark theme (owner 25/11/26): apply a saved choice before the first paint. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+      </head>
       <body>
         {children}
         <ServiceWorkerRegister />

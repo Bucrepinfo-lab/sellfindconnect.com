@@ -118,7 +118,7 @@
 }
 
 .biz-pill.muted {
-  background: #efeef5;
+  background: var(--surface-2);
   color: var(--muted);
 }
 

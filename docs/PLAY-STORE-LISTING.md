@@ -69,12 +69,21 @@ which is not built yet (see `docs/PLAY_STORE.md`).
 | Asset | File |
 | --- | --- |
 | App icon 512×512 (new mark, 11/11/26) | `docs/store-assets/app-icon-512.png` |
-| Feature graphic 1024×500 | `docs/store-assets/feature-graphic-1024x500.png` |
-| Phone screenshots 1080×1920 (9:16) — new look, put in the draft listing 11/11/26 | `docs/store-assets/screenshot-1-search.png`, `screenshot-2-trust.png`, `screenshot-3-start.png` |
+| Feature graphic 1024×500 (new identity, 25/11/26) | `docs/store-assets/feature-graphic-1024x500.png` |
+| Phone screenshots 1080×1920 (9:16), new identity, 25/11/26 | `docs/store-assets/screenshot-1-search.png` (search), `screenshot-2-trust.png` (community standards), `screenshot-3-start.png` (sign in), `screenshot-4-dark.png` (dark theme) |
 
 Play rejects screenshots that are not 16:9 or 9:16.
 
 ---
+
+### Installed app icon (25/11/26)
+
+The site's manifest icons (`apps/web/public/icons/icon-192.png`, `icon-512.png`, `icon-maskable-512.png`) carry the new mark since 24/11/26. An installed Android app keeps the icon that was baked into its `.aab`, so the phone shows the old green icon until a new `.aab` is built:
+
+1. Wait until the new icons are live at https://sellfindconnect.com/manifest.webmanifest.
+2. In PWABuilder, package for Android with the **same** package `com.sellfindconnect.app`, the **existing** signing key from the Drive copy, and a higher version code. The owner uploads the key and types its passwords; Claude never handles them.
+3. Upload the `.aab` to the testing track. Keep both SHA-256 fingerprints in `assetlinks.json`.
+4. Keep the new signing files in email and Drive, as the standing directive says.
 
 ## Building the Android app with PWABuilder (Claude in Chrome)
 

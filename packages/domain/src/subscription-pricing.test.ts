@@ -68,15 +68,15 @@ describe('subscription pricing (owner decision 18/11/26)', () => {
     expect(formatPlanPrice(3.99, 'USD')).toBe('USD 3.99');
   });
 
-  it('plan entitlements: Basic 10 media, Pro 20, RFQs on both', () => {
-    expect(planEntitlements('BASIC')).toEqual({ maxMediaPerListing: 10, sourceFinderPriority: false, rfqs: true });
-    expect(planEntitlements('PRO')).toEqual({ maxMediaPerListing: 20, sourceFinderPriority: true, rfqs: true });
+  it('plan entitlements: Basic 15 media, Pro 30 (owner 25/11/26), RFQs on both', () => {
+    expect(planEntitlements('BASIC')).toEqual({ maxMediaPerListing: 15, sourceFinderPriority: false, rfqs: true });
+    expect(planEntitlements('PRO')).toEqual({ maxMediaPerListing: 30, sourceFinderPriority: true, rfqs: true });
   });
 
   it('an unknown or missing plan falls back to Basic', () => {
     expect(normalizePlan(undefined)).toBe('BASIC');
     expect(normalizePlan('gold')).toBe('BASIC');
     expect(normalizePlan(' pro ')).toBe('PRO');
-    expect(planEntitlements(null).maxMediaPerListing).toBe(10);
+    expect(planEntitlements(null).maxMediaPerListing).toBe(15);
   });
 });

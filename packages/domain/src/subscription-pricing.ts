@@ -42,11 +42,11 @@ export type BillingPeriod = 'MONTH' | 'YEAR';
 export const SUBSCRIPTION_PLANS: Record<SubscriptionPlan, { name: string; summary: string }> = {
   BASIC: {
     name: 'Basic',
-    summary: 'Profile, listings with up to 10 photos or videos each, Source Finder, in-app chat and RFQs.',
+    summary: 'Profile, listings with up to 15 photos or videos each, Source Finder, in-app chat and RFQs.',
   },
   PRO: {
     name: 'Pro',
-    summary: 'Everything in Basic, up to 20 photos or videos per listing, and Source Finder priority.',
+    summary: 'Everything in Basic, up to 30 photos or videos per listing, and Source Finder priority.',
   },
 };
 
