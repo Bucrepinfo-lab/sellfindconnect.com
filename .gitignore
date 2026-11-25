@@ -13,3 +13,4 @@ apps/api/.nest/
 
 
 write-ps.mjs
+apps/web/public/ocr/

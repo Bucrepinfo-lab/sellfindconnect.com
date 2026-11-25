@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  applyPhotoLook,
+  DEFAULT_PHOTO_LOOK,
+  MAX_ORIGINAL_PHOTO_BYTES,
+  PHOTO_LOOK_IDS,
+  PHOTO_LOOKS,
+  photoLookCaps,
   enhancePhotoPixels,
   measurePhotoLevels,
   photoScreenMessage,
@@ -78,5 +84,36 @@ describe('photo look', () => {
     expect(pixels[8]).toBeGreaterThan(200);
     expect(pixels[10]).toBeLessThan(50);
     expect(pixels[11]).toBe(128);
+  });
+});
+
+describe('photo looks (standing rule 25/11/26)', () => {
+  it('every look stays within the true-to-life caps', () => {
+    for (const id of PHOTO_LOOK_IDS) {
+      const l = PHOTO_LOOKS[id];
+      expect(l.brightness).toBeLessThanOrEqual(photoLookCaps.maxBrightness);
+      expect(l.contrast).toBeLessThanOrEqual(photoLookCaps.maxContrast);
+      expect(l.saturation).toBeLessThanOrEqual(photoLookCaps.maxSaturation);
+      expect(l.warmth).toBeLessThanOrEqual(photoLookCaps.maxWarmth);
+    }
+    expect(PHOTO_LOOK_IDS).toContain(DEFAULT_PHOTO_LOOK);
+  });
+
+  it("'As taken' leaves the photo exactly as it was", () => {
+    const px = [10, 120, 200, 255, 250, 30, 90, 128];
+    const copy = [...px];
+    applyPhotoLook(px, 'asTaken');
+    expect(px).toEqual(copy);
+  });
+
+  it('warm light adds red over blue and never touches transparency', () => {
+    const px = [128, 128, 128, 77];
+    applyPhotoLook(px, 'warm');
+    expect(px[3]).toBe(77);
+    expect(px[0]!).toBeGreaterThan(px[2]!);
+  });
+
+  it('accepts camera photos bigger than any upload cap, to shrink them on the phone', () => {
+    expect(MAX_ORIGINAL_PHOTO_BYTES).toBeGreaterThan(20 * 1024 * 1024);
   });
 });

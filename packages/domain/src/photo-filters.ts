@@ -222,3 +222,59 @@ export function enhancePhotoPixels(
   }
   return levels;
 }
+
+/**
+ * One-tap "looks" for listing photos (owner standing rule 25/11/26, shared
+ * with HarvestHub). Each is a small, capped adjustment on top of the levels
+ * tidy-up: it can make a dull phone photo look like what the seller saw,
+ * never make a product look better than it is. A test fails if a look goes
+ * past photoLookCaps.
+ */
+export const photoLookCaps = {
+  maxBrightness: 1.12,
+  maxContrast: 1.12,
+  maxSaturation: 1.2,
+  maxWarmth: 10,
+} as const;
+
+export const PHOTO_LOOKS = {
+  asTaken: { label: 'As taken', help: 'Exactly as your camera saw it.', tidy: false, brightness: 1, contrast: 1, saturation: 1, warmth: 0 },
+  fresh: { label: 'Fresh', help: 'Clear light and true colour — best for most photos.', tidy: true, brightness: 1.04, contrast: 1.06, saturation: 1.14, warmth: 3 },
+  bright: { label: 'Bright', help: 'For photos taken indoors, in shade or on a cloudy day.', tidy: true, brightness: 1.1, contrast: 1.02, saturation: 1.08, warmth: 2 },
+  warm: { label: 'Warm', help: 'Golden light for food, wood and fabrics.', tidy: true, brightness: 1.03, contrast: 1.05, saturation: 1.1, warmth: 8 },
+  crisp: { label: 'Crisp', help: 'Sharper edges and depth for products, tools and machines.', tidy: true, brightness: 1.02, contrast: 1.12, saturation: 1.12, warmth: 0 },
+} as const;
+
+export type PhotoLook = keyof typeof PHOTO_LOOKS;
+export const PHOTO_LOOK_IDS = Object.keys(PHOTO_LOOKS) as PhotoLook[];
+export const DEFAULT_PHOTO_LOOK: PhotoLook = 'fresh';
+
+/** Phone photos up to this size are accepted and shrunk on the phone before upload. */
+export const MAX_ORIGINAL_PHOTO_BYTES = 40 * 1024 * 1024;
+
+function clampLookByte(value: number): number {
+  return value < 0 ? 0 : value > 255 ? 255 : Math.round(value);
+}
+
+/** Apply a look in place (RGBA bytes). Transparency is untouched. */
+export function applyPhotoLook(pixels: { length: number; [index: number]: number }, look: PhotoLook): void {
+  const l = PHOTO_LOOKS[look];
+  if (l.tidy) enhancePhotoPixels(pixels);
+  const b = Math.min(l.brightness, photoLookCaps.maxBrightness);
+  const c = Math.min(l.contrast, photoLookCaps.maxContrast);
+  const sat = Math.min(l.saturation, photoLookCaps.maxSaturation);
+  const w = Math.min(l.warmth, photoLookCaps.maxWarmth);
+  if (b === 1 && c === 1 && sat === 1 && w === 0) return;
+  for (let i = 0; i + 3 < pixels.length; i += 4) {
+    let r = (pixels[i] ?? 0) * b;
+    let g = (pixels[i + 1] ?? 0) * b;
+    let bl = (pixels[i + 2] ?? 0) * b;
+    r = (r - 128) * c + 128 + w;
+    g = (g - 128) * c + 128 + w * 0.3;
+    bl = (bl - 128) * c + 128 - w * 0.7;
+    const grey = 0.299 * r + 0.587 * g + 0.114 * bl;
+    pixels[i] = clampLookByte(grey + (r - grey) * sat);
+    pixels[i + 1] = clampLookByte(grey + (g - grey) * sat);
+    pixels[i + 2] = clampLookByte(grey + (bl - grey) * sat);
+  }
+}
