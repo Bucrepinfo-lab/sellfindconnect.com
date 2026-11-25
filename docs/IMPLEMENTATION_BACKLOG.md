@@ -714,3 +714,11 @@ Progress:
   a support-console form for `POST /v1/auth/phone/reset-code` (today staff call
   the API with their session), and Daraja STK for subscriptions in place of
   Africa's Talking checkout.
+- 2026-11-23: Source Finder premium explanation tier (Claude Fable 5.2) landed as a
+  pure domain selector + model allow-list (`source-finder-model-tier.ts`) on branch
+  `feat/source-finder-fable-5-2-tier` (draft PR). Still open: (1) wire per-tenant
+  Pro-only eligibility + rollout bps into `SourceFinderService.explainMatch` so the
+  A/B runs per request (touches the subscription/tenant surface — owner review);
+  (2) feed each model's provider cost into the `AiSpendCap` estimate so premium
+  usage is metered accurately; (3) replicate the tier/selector pattern in the other
+  four products' AI add-ons once approved.
