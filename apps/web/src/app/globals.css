@@ -1734,3 +1734,189 @@ html {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ------------------------------------------------------------------
+   Guest "Your business" tour (owner 25/11/26: lazy registration).
+   Bright, one colour per tool, the advert composer first in reach.
+   ------------------------------------------------------------------ */
+.guest-tour {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.guest-hero {
+  border-radius: 22px;
+  padding: 26px 24px;
+  color: #fff;
+  background:
+    radial-gradient(70% 90% at 100% 0%, rgba(255, 194, 61, 0.35), transparent 60%),
+    radial-gradient(60% 80% at 0% 100%, rgba(209, 36, 107, 0.3), transparent 65%),
+    var(--band);
+}
+
+.guest-hero h1 {
+  margin: 0 0 8px;
+  font-family: var(--font-display), sans-serif;
+  font-size: clamp(1.5rem, 4vw, 2.2rem);
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.guest-hero p {
+  margin: 0;
+  max-width: 60ch;
+  color: #dfe2f7;
+}
+
+.guest-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.guest-hero .secondary-button {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.guest-signin {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--ink);
+  max-width: 460px;
+}
+
+.guest-card {
+  --tone: var(--find);
+  --tone-soft: var(--find-soft);
+  position: relative;
+  min-width: 0;
+  border-radius: 20px;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: 6px solid var(--tone);
+  box-shadow: var(--shadow);
+  scroll-margin-top: 16px;
+}
+
+.guest-card.tone-sell { --tone: var(--sell); --tone-soft: var(--sell-soft); }
+.guest-card.tone-find { --tone: var(--find); --tone-soft: var(--find-soft); }
+.guest-card.tone-connect { --tone: var(--connect); --tone-soft: var(--connect-soft); }
+.guest-card.tone-sun { --tone: var(--sun); --tone-soft: var(--sun-soft); }
+.guest-card.tone-ok { --tone: var(--ok); --tone-soft: var(--ok-soft); }
+
+.guest-card-head {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.guest-card-head h2 {
+  margin: 0 0 4px;
+  font-size: 1.2rem;
+}
+
+.guest-card-head p {
+  margin: 0;
+  color: var(--ink-2);
+  max-width: 62ch;
+}
+
+.guest-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: var(--tone-soft);
+  color: var(--tone);
+}
+
+.guest-points {
+  margin: 14px 0 10px;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.guest-points li {
+  position: relative;
+  padding-left: 22px;
+  color: var(--ink-2);
+}
+
+.guest-points li::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 0.55em;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--tone);
+}
+
+.guest-composer,
+.guest-account {
+  margin-top: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.guest-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.guest-preview {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--tone-soft);
+  border-left: 5px solid var(--tone);
+  min-width: 0;
+}
+
+.guest-preview span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.guest-preview p {
+  margin: 4px 0 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.guest-foot {
+  color: var(--muted);
+  text-align: center;
+}
+
+.guest-composer input,
+.guest-composer select,
+.guest-composer textarea {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.guest-composer .field,
+.guest-grid > * {
+  min-width: 0;
+}
+
+.guest-hero a.primary-button {
+  text-decoration: none;
+}

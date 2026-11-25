@@ -152,6 +152,7 @@ import { SignUpForm } from './SignUpForm';
 import { WebOnly, WebOnlyCheckout, useClientAppContext } from '../lib/app-context';
 import { BusinessManager } from './BusinessManager';
 import { ThemeToggle } from './ThemeToggle';
+import { GuestBusinessTour } from './GuestBusinessTour';
 import { PhoneSignIn } from './PhoneSignIn';
 import { useHomeWorkspaceLanding } from '../lib/use-home-workspace-landing';
 import { useSectionFollow } from '../lib/use-section-follow';
@@ -1800,14 +1801,19 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
               <a className="primary-button" href="#source-finder">
                 <Search size={16} /> Search businesses
               </a>
-              <Link className="secondary-button" href="/dashboard?signup=1">
+              <Link className="secondary-button" href="/dashboard#adverts">
                 List your business
               </Link>
             </div>
           </header>
         ) : null}
 
-        {needsSignIn ? (
+        {needsSignIn && area === 'member' && authMethod === 'phone' ? (
+          // Lazy registration (owner 25/11/26): look around first, account only at Publish.
+          <GuestBusinessTour onUseEmail={() => setAuthMethod('email')} />
+        ) : null}
+
+        {needsSignIn && (area !== 'member' || authMethod !== 'phone') ? (
           <header className="area-intro">
             <h1>{area === 'admin' ? 'Staff console' : 'Your business'}</h1>
             <p>
@@ -2172,7 +2178,7 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
           ) : null}
 
           <aside className="right-rail">
-            {needsSignIn ? (
+            {needsSignIn && (area !== 'member' || authMethod !== 'phone') ? (
               <section className="side-panel sign-in-panel" id="sign-in">
                 {area === 'member' && authMethod === 'phone' ? (
                   <PhoneSignIn onUseEmail={() => setAuthMethod('email')} />
