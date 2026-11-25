@@ -26,9 +26,9 @@ export type MediaTransformStatus = (typeof mediaTransformStatuses)[number];
 
 export const mediaPolicy = {
   /** Media items per listing on the Basic plan (and for chat attachments). */
-  maxItemsPerOwner: 10,
+  maxItemsPerOwner: 15,
   /** Media items per listing on the top plan (Pro); see planEntitlements. */
-  maxItemsPerOwnerTopPlan: 20,
+  maxItemsPerOwnerTopPlan: 30,
   /** After the phone shrinks a photo (auto-fit) it is ~1 MB; this is the ceiling. */
   maxImageBytes: 15 * 1024 * 1024,
   maxVideoBytes: 150 * 1024 * 1024,

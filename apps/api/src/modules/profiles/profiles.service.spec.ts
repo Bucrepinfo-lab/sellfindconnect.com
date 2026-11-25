@@ -143,7 +143,7 @@ describe('ProfilesService', () => {
       displayOrder: 0,
       moderationStatus: 'PASSED',
     });
-    expect(result.mediaSlots).toEqual({ used: 1, max: mediaPolicy.maxItemsPerOwner, remaining: 9 });
+    expect(result.mediaSlots).toEqual({ used: 1, max: mediaPolicy.maxItemsPerOwner, remaining: mediaPolicy.maxItemsPerOwner - 1 });
     expect(preview.preview.media).toHaveLength(1);
     expect(preview.preview.mediaSlots).toEqual(result.mediaSlots);
     expect(await service.listDraftMedia(tenantId, draft.id)).toHaveLength(1);
@@ -187,7 +187,7 @@ describe('ProfilesService', () => {
       },
     });
     expect(result.upload.objectKey).toContain(`profile_draft/${tenantId}/${draft.id}/`);
-    expect(result.mediaSlots).toEqual({ used: 0, max: mediaPolicy.maxItemsPerOwner, remaining: 10 });
+    expect(result.mediaSlots).toEqual({ used: 0, max: mediaPolicy.maxItemsPerOwner, remaining: mediaPolicy.maxItemsPerOwner });
     expect(auditLogs.some((record) => record.action === 'PROFILE_MEDIA_UPLOAD_PREPARED')).toBe(
       true,
     );
@@ -351,7 +351,7 @@ describe('ProfilesService', () => {
     ).rejects.toThrow('media policy');
   });
 
-  it('enforces the ten item media display limit per profile draft', async () => {
+  it('enforces the Basic media display limit per profile draft (15, owner 25/11/26)', async () => {
     const service = new ProfilesService();
     const draft = await service.createDraft(tenantId, {
       displayName: 'Nairobi Fresh Produce',
@@ -379,7 +379,7 @@ describe('ProfilesService', () => {
       }),
     ).rejects.toThrow('maximum');
     expect((await service.previewDraft(tenantId, draft.id)).preview.mediaSlots).toEqual({
-      used: 10,
+      used: mediaPolicy.maxItemsPerOwner,
       max: mediaPolicy.maxItemsPerOwner,
       remaining: 0,
     });
@@ -475,7 +475,7 @@ describe('ProfilesService', () => {
       status: 'LIVE',
       displayOrder: 0,
     });
-    expect(live.mediaSlots).toEqual({ used: 1, max: mediaPolicy.maxItemsPerOwner, remaining: 9 });
+    expect(live.mediaSlots).toEqual({ used: 1, max: mediaPolicy.maxItemsPerOwner, remaining: mediaPolicy.maxItemsPerOwner - 1 });
   });
 
   it('archives the previous live profile when a newer draft is published', async () => {

@@ -344,8 +344,8 @@ describe('PaymentsService subscription checkout', () => {
     const options = await service.getSubscriptionOptions('session-token');
     expect(options).toMatchObject({ currentPlan: 'BASIC', currencyCode: 'KES', payable: true });
     expect(options.plans.map((plan) => [plan.plan, plan.monthly, plan.yearly, plan.maxMediaPerListing])).toEqual([
-      ['BASIC', 499, 4990, 10],
-      ['PRO', 1499, 14990, 20],
+      ['BASIC', 499, 4990, 15],
+      ['PRO', 1499, 14990, 30],
     ]);
     expect(options.rail).toBe('MPESA');
   });
