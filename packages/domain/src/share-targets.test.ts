@@ -16,8 +16,8 @@ describe('shareTargets', () => {
     expect(by.x).toContain('https://x.com/intent/post?text=Fresh%20maize%20in%20Nakuru&url=https%3A%2F%2Fexample.com%2Fl%2F1');
     expect(by.telegram).toContain('https://t.me/share/url?url=https%3A%2F%2Fexample.com%2Fl%2F1');
     expect(by.linkedin).toContain('linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fexample.com%2Fl%2F1');
-    expect(by.sms.startsWith('sms:?&body=')).toBe(true);
-    expect(by.email.startsWith('mailto:?subject=Fresh%20maize%20in%20Nakuru&body=')).toBe(true);
+    expect(by.sms!.startsWith('sms:?&body=')).toBe(true);
+    expect(by.email!.startsWith('mailto:?subject=Fresh%20maize%20in%20Nakuru&body=')).toBe(true);
   });
 
   it('never posts a private link to Facebook, X or LinkedIn', () => {
