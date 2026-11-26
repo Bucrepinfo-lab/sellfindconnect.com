@@ -9,6 +9,9 @@ This file must be updated whenever product strategy, pricing, compliance, archit
 ## 26/11/26 — Fonts self-hosted (build no longer needs Google Fonts)
 - After PR #111 merged, the main build failed: `next/font/google` could not reach Google Fonts (`queries have exactly one entry`). The rerun passed, but the build should never depend on it. Bricolage Grotesque and Plus Jakarta Sans (OFL-1.1, variable, Latin) now live in `apps/web/src/app/fonts/` and load through `next/font/local`; same CSS variables, same look.
 
+## 26/11/26 — Seen by Google: robots.txt and sitemap.xml
+- Audit: sellfindconnect.com, www and api resolve to Fly with Issued certificates; assetlinks live. `/robots.txt` and `/sitemap.xml` were 404. Added `apps/web/src/app/robots.ts` (public pages allowed; api, admin, dashboard, account, onboarding kept out) and `sitemap.ts` (home, subscription, community, terms, privacy, prohibited). Search Console domain property to be verified by a GoDaddy TXT record.
+
 ## Current Product Definition
 
 Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS for web, PWA, Android, and iOS. It is not only a directory or classifieds product. Its market niche is commercial relationship intelligence: helping people quickly find who produces, supplies, buys, consumes, installs, repairs, ships, finances, certifies, or distributes an item or service in a country.
