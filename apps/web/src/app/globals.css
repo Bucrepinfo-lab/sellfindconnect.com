@@ -1920,3 +1920,54 @@ html {
 .guest-hero a.primary-button {
   text-decoration: none;
 }
+
+/* Tap to speak and the language chips (owner 26/11/26). */
+.speak {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  margin-top: 8px;
+}
+.speak__langs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.speak__lang,
+.speak__mic {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.speak__lang.is-on {
+  background: #1f6f4a;
+  border-color: #1f6f4a;
+  color: #fff;
+}
+.speak__mic.is-live {
+  background: #c4452f;
+  border-color: #c4452f;
+  color: #fff;
+}
+.speak__mic:focus-visible,
+.speak__lang:focus-visible {
+  outline: 3px solid #f5a700;
+  outline-offset: 2px;
+}
+.guest-speak {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px dashed currentColor;
+  border-radius: 14px;
+}

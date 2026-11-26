@@ -156,6 +156,8 @@ import { GuestBusinessTour } from './GuestBusinessTour';
 import { PhoneSignIn } from './PhoneSignIn';
 import { useHomeWorkspaceLanding } from '../lib/use-home-workspace-landing';
 import { useSectionFollow } from '../lib/use-section-follow';
+import { SpeakButton } from './SpeakButton';
+import { appendSpoken } from '@telpen/domain';
 
 const tenantId = '11111111-1111-4111-8111-111111111111';
 const counterpartTenantId = '22222222-2222-4222-8222-222222222222';
@@ -2302,6 +2304,7 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
                   rows={7}
                 />
               </label>
+              <SpeakButton onWords={(words) => setProfileDescription((current) => appendSpoken(current, words, 2000))} />
               <div className={safetyDecision.allowed ? 'policy-box ok' : 'policy-box block'}>
                 {safetyDecision.allowed ? <ShieldCheck size={18} /> : <CircleAlert size={18} />}
                 <div>
@@ -3067,6 +3070,7 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
                   rows={3}
                 />
               </label>
+              <SpeakButton onWords={(words) => setRelationshipNote((current) => appendSpoken(current, words, 1000))} />
               <div className="terms-actions">
                 <button
                   className="primary-button"
@@ -3293,6 +3297,12 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
                   aria-invalid={!chatSafetyDecision.allowed}
                 />
               </label>
+              <SpeakButton
+                onWords={(words) => {
+                  setChatMessage((current) => appendSpoken(current, words, 2000));
+                  setChatTypingAt(new Date().toISOString());
+                }}
+              />
               <div className="saved-reply-list" aria-label="Saved replies">
                 {savedReplies.slice(0, 3).map((reply) => (
                   <button

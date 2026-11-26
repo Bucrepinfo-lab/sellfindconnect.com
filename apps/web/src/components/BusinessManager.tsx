@@ -32,6 +32,8 @@ import { PhotoPreview } from './PhotoPreview';
 import { ReadTextButton } from './ReadTextButton';
 import { PlanCard } from './PlanCard';
 import '../styles/business.css';
+import { SpeakButton } from './SpeakButton';
+import { appendSpoken } from '@telpen/domain';
 
 type MediaItem = {
   id: string;
@@ -679,6 +681,11 @@ export function BusinessManager() {
               <span>What you do (at least 20 characters)</span>
               <textarea value={profileForm.description} onChange={set('description')} maxLength={2000} required />
             </label>
+            <SpeakButton
+              onWords={(words) =>
+                setProfileForm((current) => ({ ...current, description: appendSpoken(current.description, words, 2000) }))
+              }
+            />
             <ReadTextButton
               label="Read a flyer, card or price list"
               onText={(words) =>
@@ -877,6 +884,14 @@ export function BusinessManager() {
                 required
               />
             </label>
+            <SpeakButton
+              showLanguages
+              onWords={(words) =>
+                setAdvertForm((current) =>
+                  current ? { ...current, description: appendSpoken(current.description, words, 2000) } : current,
+                )
+              }
+            />
             <div className="biz-actions" style={{ marginTop: 8 }}>
               <button
                 className="secondary-button"
@@ -996,6 +1011,9 @@ export function BusinessManager() {
         <div className="biz-actions" style={{ marginTop: 0 }}>
           <Link className="secondary-button" href="/">
             Search businesses
+          </Link>
+          <Link className="secondary-button" href="/account">
+            My profile
           </Link>
           <Link className="secondary-button" href="/account/privacy-settings">
             Data and privacy
