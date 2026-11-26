@@ -1,23 +1,24 @@
 import type { Metadata, Viewport } from 'next';
 
-import { Bricolage_Grotesque, Plus_Jakarta_Sans } from 'next/font/google';
+import localFont from 'next/font/local';
 
 import { ServiceWorkerRegister } from '../components/ServiceWorkerRegister';
 import { THEME_BOOT_SCRIPT } from '../lib/theme';
 
 import './globals.css';
 
-const display = Bricolage_Grotesque({
-  subsets: ['latin'],
-  weight: ['500', '600', '700', '800'],
+// Self-hosted (fonts/README.md): the build never depends on Google Fonts.
+const display = localFont({
+  src: './fonts/bricolage-grotesque-latin-wght.woff2',
+  weight: '200 800',
   variable: '--font-display',
   display: 'swap',
 });
 
 // Body text (identity 24/11/26): friendly, very legible on small phones.
-const body = Plus_Jakarta_Sans({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800'],
+const body = localFont({
+  src: './fonts/plus-jakarta-sans-latin-wght.woff2',
+  weight: '200 800',
   variable: '--font-body',
   display: 'swap',
 });
