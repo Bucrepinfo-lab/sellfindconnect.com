@@ -48,8 +48,10 @@ Open the app and tap "Sign in" (or "Your business"). Enter the phone number abov
 ```
 
 Sign-in for everyone is phone number + their own 4-digit PIN on any device, no
-SMS (owner 20/11/26). A forgotten or locked PIN (5 wrong tries) is reset with a
-one-time code from support staff. Email is optional. The older email review login
+SMS and no codes (owner 20/11/26, 26/11/26). A number with no PIN yet chooses one
+at sign-in; a forgotten or locked PIN (5 wrong tries) is cleared by support staff
+and the person chooses a new one. Email sign-in ("SellFindConnect staff? Sign in
+with email") is for staff. The older email review login
 (`PLAY_REVIEW_EMAIL` + `PLAY_REVIEW_MFA_CODE`, "Sign in with email instead")
 still works if you prefer it.
 

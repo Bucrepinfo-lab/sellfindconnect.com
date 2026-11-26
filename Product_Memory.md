@@ -6,6 +6,10 @@ Purpose: Persistent decision log and strategic memory for the Telpen Adverts mul
 
 This file must be updated whenever product strategy, pricing, compliance, architecture, market positioning, or execution decisions change.
 
+## 26/11/26 — Wording: nothing suggests a code is sent (owner: "correct wording even from others")
+- The phone sign-in's "Sign in with email instead" link (staff email sign-in, which uses an emailed code and an authenticator) now reads "SellFindConnect staff? Sign in with email", so testers and business owners are not led into a code step.
+- Docs: `PLAY-APP-CONTENT-REVIEW.md` (support clears a PIN, no reset code), `PLAY_STORE.md` (no SMS OTP; phone + PIN), and the `issuePhoneVerifiedSession` comment.
+
 ## 26/11/26 — Sign-in with no codes at all (owner: "correct the login ... just the way we have agreed")
 - A tester was asked for a code: a number with an account but no PIN (opened in the SMS days), or a forgotten PIN, went to "enter the 6-digit reset code". The owner's agreed model (HarvestHub, 25/11/26, now every app): phone, then the person's own 4-digit PIN; nothing sent, nothing typed but the PIN.
 - `start`: `pin` · `register` (new number) · `set` (account with no PIN: a 30-minute ticket, then `POST /auth/phone/pin/first` chooses the PIN; refused whenever a PIN exists) · `locked` (5 wrong PINs: "ask support to clear your PIN").

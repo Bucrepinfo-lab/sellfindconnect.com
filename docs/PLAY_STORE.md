@@ -15,8 +15,9 @@ First written: 2026-08-21
 The verified E.164 phone number is the **login identity** and the **only**
 M-Pesa / Africa's Talking STK Push destination.
 
-- SMS OTP and STK Push both target the same number (`packages/domain/src/phone.ts`,
-  `AuthService.verifyPhoneOtp`, `PaymentsService.requestCheckout`).
+- Sign-in (phone + the person's own 4-digit PIN; no SMS, no codes since 26/11/26)
+  and STK Push both use the same number (`packages/domain/src/phone.ts`,
+  `PhoneAuthService`, `PaymentsService.requestCheckout`).
 - Checkout does **not** accept a payer phone in the request body. The signed-in
   user's stored phone is used. If that phone is missing, checkout returns
   `no_phone`. Invoice pay (`POST /v1/finance/payment-invoices/pay`) rejects an
@@ -64,10 +65,9 @@ Billing adapter behind the existing `PAYMENT_PROVIDER` boundary.
 
 ## SMS, OTP, and sensitive permissions
 
-Phone login is allowed. The implementation must stay on:
-
-- User-typed OTP, or
-- SMS Retriever / user-consent SMS APIs that do **not** require `READ_SMS`.
+Phone login is allowed. SellFindConnect sends no SMS and asks for no code
+(phone + PIN, owner 26/11/26). If an SMS step is ever added again it must stay on
+SMS Retriever / user-consent SMS APIs that do **not** require `READ_SMS`.
 
 Do **not** request `READ_SMS` or `READ_CALL_LOG`. Google Play's SMS and Call Log
 policy (updated July 2026) no longer treats account verification via call log as
