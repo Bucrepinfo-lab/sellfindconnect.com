@@ -6,6 +6,9 @@ Purpose: Persistent decision log and strategic memory for the Telpen Adverts mul
 
 This file must be updated whenever product strategy, pricing, compliance, architecture, market positioning, or execution decisions change.
 
+## 26/11/26 — Seen by Google: robots.txt and sitemap.xml
+- Audit: sellfindconnect.com, www and api resolve to Fly with Issued certificates; assetlinks live. `/robots.txt` and `/sitemap.xml` were 404. Added `apps/web/src/app/robots.ts` (public pages allowed; api, admin, dashboard, account, onboarding kept out) and `sitemap.ts` (home, subscription, community, terms, privacy, prohibited). Search Console domain property to be verified by a GoDaddy TXT record.
+
 ## Current Product Definition
 
 Telpen Adverts is a multi-tenant advertising, discovery, and matchmaking SaaS for web, PWA, Android, and iOS. It is not only a directory or classifieds product. Its market niche is commercial relationship intelligence: helping people quickly find who produces, supplies, buys, consumes, installs, repairs, ships, finances, certifies, or distributes an item or service in a country.
