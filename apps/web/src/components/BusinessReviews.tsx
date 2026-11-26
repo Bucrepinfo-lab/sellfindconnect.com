@@ -15,6 +15,8 @@ import { ApiError, apiRequest, isTermsError } from '../lib/api-client';
 import { formatDmy } from '../lib/dates';
 import { codeLabel } from '../lib/labels';
 import { SfcIcon } from './SfcIcon';
+import { SpeakButton } from './SpeakButton';
+import { appendSpoken } from '@telpen/domain';
 
 type ReviewsPayload = { summary: BusinessRatingSummary; reviews: PublicBusinessReview[] };
 type OwnReview = { id: string; tenantId: string; rating: number; comment?: string; status: 'VISIBLE' | 'HIDDEN' };
@@ -279,6 +281,7 @@ export function BusinessReviews(props: { tenantId: string; businessName: string;
               onChange={(event) => setComment(event.target.value)}
             />
           </label>
+          <SpeakButton onWords={(words) => setComment((current) => appendSpoken(current, words, BUSINESS_REVIEW_COMMENT_MAX))} />
           <p className="biz-sub reviews__rules">
             Rate your own experience only. No phone numbers, insults or anything our{' '}
             <Link href="/community">community standards</Link> forbid.

@@ -4,11 +4,14 @@ import { BarChart3, Inbox, Megaphone, MessageCircle, Network, Store } from 'luci
 import Link from 'next/link';
 import { useState, type ReactNode } from 'react';
 
-import { industryCategories, kenyaCounties, supplyChainRoles } from '@telpen/domain';
+import { appendSpoken, industryCategories, kenyaCounties, speechWord, supplyChainRoles } from '@telpen/domain';
 
 import { codeLabel } from '../lib/labels';
 import { pendingAdvertProblem, readPendingAdvert, savePendingAdvert, type PendingAdvert } from '../lib/pending-advert';
+import { useLanguage } from '../lib/speech';
 import { PhoneSignIn } from './PhoneSignIn';
+import { ReadTextButton } from './ReadTextButton';
+import { SpeakButton } from './SpeakButton';
 
 /**
  * "Your business" for a visitor who has no account yet (owner 25/11/26: lazy
@@ -138,6 +141,7 @@ function GuestAdvertComposer({ onUseEmail }: { onUseEmail: () => void }) {
   const [problem, setProblem] = useState('');
   const [step, setStep] = useState<'write' | 'account'>('write');
   const set = (patch: Partial<PendingAdvert>) => setForm((current) => ({ ...current, ...patch }));
+  const language = useLanguage();
 
   const publish = () => {
     const why = pendingAdvertProblem(form);
@@ -193,6 +197,23 @@ function GuestAdvertComposer({ onUseEmail }: { onUseEmail: () => void }) {
           onChange={(e) => set({ description: e.target.value })}
         />
       </label>
+      <div className="guest-speak">
+        <strong>{speechWord(language, 'sayTitle')}</strong>
+        <span className="biz-sub">{speechWord(language, 'sayBody')}</span>
+        <SpeakButton
+          showLanguages
+          onWords={(words) => setForm((current) => ({ ...current, description: appendSpoken(current.description, words, 2000) }))}
+        />
+        <ReadTextButton
+          label="Read a flyer, card or price list"
+          onText={(words) =>
+            setForm((current) => ({
+              ...current,
+              description: (current.description ? `${current.description.trimEnd()}\n${words}` : words).slice(0, 2000),
+            }))
+          }
+        />
+      </div>
       <div className="guest-grid">
         <label className="field compact-field">
           <span>Business name</span>

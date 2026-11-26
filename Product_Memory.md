@@ -24,6 +24,14 @@ This file must be updated whenever product strategy, pricing, compliance, archit
 ## 26/11/26 — Fonts self-hosted (build no longer needs Google Fonts)
 - After PR #111 merged, the main build failed: `next/font/google` could not reach Google Fonts (`queries have exactly one entry`). The rerun passed, but the build should never depend on it. Bricolage Grotesque and Plus Jakarta Sans (OFL-1.1, variable, Latin) now live in `apps/web/src/app/fonts/` and load through `next/font/local`; same CSS variables, same look.
 
+## 26/11/26 — Speak instead of type, language, My profile (owner, 21:33)
+- Owner: sellers who cannot type must be able to speak; bring the profile, language, OCR and upload polish from Stawi and HarvestHub here.
+- Audit: already here were OCR (`ReadTextButton`), photo preview and cropper, and "write the advert first, account at Publish" (`pending-advert.ts`, words only). Missing were speaking, a language setting and a personal profile page.
+- Tap to speak (`components/SpeakButton.tsx`, `lib/speech.ts`, rules in `packages/domain/src/speech.ts`): the phone's own speech recognition, Kiswahili or English, on every free-text box: guest advert, advert description, business description, review, relationship note, chat reply. The guest advert form also gets "Read a flyer, card or price list" (OCR), so a visitor can speak or photograph the advert before any account.
+- Language: Kiswahili or English, kept on the phone (`sfc.language`); speaking and its on-screen words follow it. Kikuyu, Dholuo, Kalenjin and Luhya are not offered because phones cannot write them down yet; the picker says so.
+- My profile (`/account`, linked from the business Account card): who I am signed in as, language, my business page and photos, my records and export, delete.
+- Not done here, needs a separate reviewed change in the sign-in API (protected): editing the personal name and phone number from the profile, and a personal photo (needs a database column). Photos chosen before the account exists are also not kept yet (the guest advert keeps words only).
+
 ## 26/11/26 — Seen by Google: robots.txt and sitemap.xml
 - Audit: sellfindconnect.com, www and api resolve to Fly with Issued certificates; assetlinks live. `/robots.txt` and `/sitemap.xml` were 404. Added `apps/web/src/app/robots.ts` (public pages allowed; api, admin, dashboard, account, onboarding kept out) and `sitemap.ts` (home, subscription, community, terms, privacy, prohibited). Search Console domain property to be verified by a GoDaddy TXT record.
 
