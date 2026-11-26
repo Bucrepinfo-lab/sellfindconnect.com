@@ -9,9 +9,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
+import { appendSpoken } from "@telpen/domain";
+
 import { LanguagePicker } from "../../components/LanguagePicker";
+import { SpeakButton } from "../../components/SpeakButton";
 import { formatDmy } from "../../lib/dates";
-import { publicApiBaseUrl, tenantSessionHeaders } from "../../lib/public-api";
+import { publicApiBaseUrl, readTenantSession, tenantSessionHeaders } from "../../lib/public-api";
 import { useStoredSession } from "../../lib/use-session";
 import "../../styles/privacy.css";
 
@@ -20,10 +23,80 @@ type Me = {
   tenant?: { displayName?: string; name?: string } | null;
 };
 
+type Note = { ok: boolean; text: string } | null;
+
+/** POST to the sign-in API as the signed-in person; the answer's message, or why it was refused. */
+async function post(path: string, body: Record<string, string>): Promise<{ ok: boolean; data: Record<string, unknown> }> {
+  try {
+    const response = await fetch(`${publicApiBaseUrl}${path}`, {
+      method: "POST",
+      headers: tenantSessionHeaders(),
+      credentials: "include",
+      body: JSON.stringify({ sessionToken: readTenantSession().sessionToken, ...body }),
+    });
+    const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+    return { ok: response.ok, data };
+  } catch {
+    return { ok: false, data: { message: "No network. Try again." } };
+  }
+}
+
+function messageOf(data: Record<string, unknown>, fallback: string): string {
+  const m = data.message;
+  if (typeof m === "string") return m;
+  if (Array.isArray(m) && typeof m[0] === "string") return m[0];
+  return fallback;
+}
+
+function Feedback({ note }: { note: Note }) {
+  if (!note) return null;
+  return (
+    <p role="status" className={note.ok ? "sfc-ps__note sfc-ps__note--ok" : "sfc-ps__note sfc-ps__note--bad"}>
+      {note.text}
+    </p>
+  );
+}
+
 export default function MyProfilePage() {
   const session = useStoredSession();
   const [me, setMe] = useState<Me | null>(null);
   const [failed, setFailed] = useState(false);
+  const [name, setName] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const [pin, setPin] = useState("");
+  const [busy, setBusy] = useState("");
+  const [nameNote, setNameNote] = useState<Note>(null);
+  const [phoneNote, setPhoneNote] = useState<Note>(null);
+
+  async function saveName(event: React.FormEvent) {
+    event.preventDefault();
+    setBusy("name");
+    const result = await post("/auth/phone/me/name", { displayName: name });
+    setBusy("");
+    if (result.ok && typeof result.data.displayName === "string") {
+      const saved = result.data.displayName;
+      setMe((current) => (current ? { ...current, user: { ...current.user, displayName: saved } } : current));
+      setNameNote({ ok: true, text: `Saved. You now show as ${saved}.` });
+    } else {
+      setNameNote({ ok: false, text: messageOf(result.data, "Could not save your name. Try again.") });
+    }
+  }
+
+  async function changePhone(event: React.FormEvent) {
+    event.preventDefault();
+    setBusy("phone");
+    const result = await post("/auth/phone/me/phone", { phone: newPhone, pin });
+    setBusy("");
+    setPin("");
+    if (result.ok && typeof result.data.phone === "string") {
+      const moved = result.data.phone;
+      setMe((current) => (current ? { ...current, user: { ...current.user, phone: moved } } : current));
+      setNewPhone("");
+      setPhoneNote({ ok: true, text: messageOf(result.data, "Done. Sign in with your new number and the same PIN.") });
+    } else {
+      setPhoneNote({ ok: false, text: messageOf(result.data, "Could not change the number. Try again.") });
+    }
+  }
 
   useEffect(() => {
     if (!session) return;
@@ -31,7 +104,9 @@ export default function MyProfilePage() {
     fetch(`${publicApiBaseUrl}/auth/session`, { headers: tenantSessionHeaders() })
       .then((response) => (response.ok ? (response.json() as Promise<Me>) : Promise.reject(new Error("session"))))
       .then((body) => {
-        if (live) setMe(body);
+        if (!live) return;
+        setMe(body);
+        setName(body.user?.displayName ?? "");
       })
       .catch(() => {
         if (live) setFailed(true);
@@ -108,10 +183,42 @@ export default function MyProfilePage() {
         ) : (
           <div className="sfc-ps__skeleton" aria-busy="true" />
         )}
-        <p className="sfc-ps__section-footnote">
-          To change your name or phone number, write to <span style={{ userSelect: "all" }}>telpeninfo@gmail.com</span> from
-          your registered contact.
+      </section>
+
+      <section className="sfc-ps__section" aria-labelledby="nm">
+        <h2 id="nm">Change my name</h2>
+        <form onSubmit={saveName} className="sfc-ps__form">
+          <label className="sfc-ps__field">
+            <span>My name</span>
+            <input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} autoComplete="name" required />
+          </label>
+          <SpeakButton onWords={(words) => setName((current) => appendSpoken(current, words, 80))} />
+          <button type="submit" className="sfc-ps__btn sfc-ps__btn--primary" disabled={busy === "name"}>
+            {busy === "name" ? "Saving…" : "Save my name"}
+          </button>
+          <Feedback note={nameNote} />
+        </form>
+      </section>
+
+      <section className="sfc-ps__section" aria-labelledby="ph">
+        <h2 id="ph">Change my phone number</h2>
+        <p className="sfc-ps__section-desc">
+          You will sign in with the new number and the same PIN. This needs your PIN. No SMS is sent.
         </p>
+        <form onSubmit={changePhone} className="sfc-ps__form">
+          <label className="sfc-ps__field">
+            <span>New phone number</span>
+            <input value={newPhone} onChange={(event) => setNewPhone(event.target.value)} type="tel" inputMode="tel" autoComplete="off" placeholder="0712 345 678" required />
+          </label>
+          <label className="sfc-ps__field sfc-ps__field--pin">
+            <span>Your 4-digit PIN</span>
+            <input value={pin} onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))} type="password" inputMode="numeric" autoComplete="off" maxLength={4} required />
+          </label>
+          <button type="submit" className="sfc-ps__btn sfc-ps__btn--primary" disabled={busy === "phone"}>
+            {busy === "phone" ? "Changing…" : "Change my number"}
+          </button>
+          <Feedback note={phoneNote} />
+        </form>
       </section>
 
       <section className="sfc-ps__section" aria-labelledby="lang">
@@ -123,7 +230,7 @@ export default function MyProfilePage() {
       <section className="sfc-ps__section" aria-labelledby="biz">
         <h2 id="biz">My business page, photos and adverts</h2>
         <p className="sfc-ps__section-desc">
-          Change your business name, logo, photos, description and contacts, and manage your adverts. You can speak any
+Your picture is your business logo. Change it, your business name, description and contacts, and manage your adverts. You can speak any
           description instead of typing it.
         </p>
         <Link href="/dashboard" className="sfc-ps__btn sfc-ps__btn--primary">

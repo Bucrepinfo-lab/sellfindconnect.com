@@ -444,6 +444,16 @@ export class PrismaAuthRepository implements AuthRepository {
     });
   }
 
+  async updateUserContact(userId: string, contact: { displayName?: string; phone?: string }): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(contact.displayName ? { displayName: contact.displayName } : {}),
+        ...(contact.phone ? { phone: contact.phone } : {}),
+      },
+    });
+  }
+
   async updateUserPassword(userId: string, password: PasswordUpdateRecord): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },

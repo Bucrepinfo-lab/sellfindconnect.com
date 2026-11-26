@@ -8,7 +8,7 @@ import {
   UnauthorizedException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { toE164 } from '@telpen/domain';
+import { cleanPersonName, evaluateSafetyText, phoneChangeProblem, toE164 } from '@telpen/domain';
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 
 import { AuthService } from './auth.service';
@@ -309,6 +309,79 @@ export class PhoneAuthService {
       await this.repository.updateDevice({ ...device, revokedAt: new Date().toISOString() });
     }
     return { forgotten: true };
+  }
+
+  /** My profile: change my own name. Safety-screened like every public text. */
+  async changeOwnName(sessionToken: string, rawName: string) {
+    const current = await this.auth.getSession(sessionToken);
+    if (!current.session.mfaVerified || !current.user) {
+      throw new UnauthorizedException('Sign in first.');
+    }
+    const checked = cleanPersonName(rawName);
+    if (!checked.ok) {
+      throw new UnprocessableEntityException(checked.error);
+    }
+    if (!evaluateSafetyText(checked.name).allowed) {
+      throw new UnprocessableEntityException('Please use your real name.');
+    }
+    await this.auth.updateOwnContact(current.session, { displayName: checked.name });
+    return { displayName: checked.name };
+  }
+
+  /**
+   * My profile: move my account to a new phone number. Needs my PIN, with the
+   * same lockout (five wrong tries) and limits as sign-in. Refused for staff
+   * (they never use the phone path) and when the number already has an
+   * account. The PIN stays the same.
+   */
+  async changeOwnPhone(sessionToken: string, rawPhone: string, pinValue: string, ip: string) {
+    if (!this.pinChecksByIp.hit(ip)) {
+      throw tooMany();
+    }
+    const current = await this.auth.getSession(sessionToken);
+    if (!current.session.mfaVerified || !current.user) {
+      throw new UnauthorizedException('Sign in first.');
+    }
+    const userId = current.session.userId;
+    if (await this.auth.isStaffUser(userId)) {
+      throw new ForbiddenException('Staff accounts do not sign in by phone.');
+    }
+    const next = toE164(rawPhone);
+    const problem = phoneChangeProblem(current.user.phone, next);
+    if (problem || !next) {
+      throw new UnprocessableEntityException(problem ?? 'Enter a valid phone number.');
+    }
+    if (!this.pinChecksByPhone.hit(current.user.phone ?? userId)) {
+      throw tooMany();
+    }
+    const pin = await this.repository.findPin(userId);
+    if (!pin) {
+      throw new UnprocessableEntityException('Set a PIN first, then change your number.');
+    }
+    if (pin.lockedAt || pin.failedAttempts >= PIN_MAX_ATTEMPTS) {
+      throw resetRequired('PIN_LOCKED', `Too many wrong PINs. ${ASK_SUPPORT}`);
+    }
+    const now = new Date().toISOString();
+    if (!/^\d{4}$/.test(pinValue) || !this.equal(pin.pinHash, this.hashPin(userId, pinValue, pin.pinSalt))) {
+      const failedAttempts = pin.failedAttempts + 1;
+      const locked = failedAttempts >= PIN_MAX_ATTEMPTS;
+      await this.repository.savePin({ ...pin, failedAttempts, lockedAt: locked ? now : undefined, updatedAt: now });
+      if (locked) {
+        throw resetRequired('PIN_LOCKED', `Too many wrong PINs. ${ASK_SUPPORT}`);
+      }
+      throw new UnauthorizedException({
+        code: 'PIN_WRONG',
+        message: `That PIN is not right. ${PIN_MAX_ATTEMPTS - failedAttempts} tries left.`,
+        attemptsLeft: PIN_MAX_ATTEMPTS - failedAttempts,
+      });
+    }
+    await this.repository.savePin({ ...pin, failedAttempts: 0, lockedAt: undefined, updatedAt: now });
+    const owner = await this.auth.findUserByVerifiablePhone(next);
+    if (owner && owner.id !== userId) {
+      throw new UnprocessableEntityException('That number already has a SellFindConnect account. Use another number.');
+    }
+    await this.auth.updateOwnContact(current.session, { phone: next });
+    return { phone: next, message: `Done. From now on sign in with ${next} and your same PIN.` };
   }
 
   async revokeAllDevices(sessionToken: string) {

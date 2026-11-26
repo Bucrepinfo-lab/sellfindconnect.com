@@ -81,3 +81,14 @@ body:has(.sfc-ps),body:has(.sfc-privacy),body:has(.sfc-delete){background:radial
 .sfc-ps__inventory-item:hover{background:var(--surface2);}
 @media (max-width:520px){.sfc-ps{padding:32px 16px 64px;}.sfc-ps__btn{display:block;width:100%;text-align:center;}}
 @media (prefers-reduced-motion:reduce){.sfc-ps__inventory-item{transition:none;}}
+.sfc-ps__form{display:grid;gap:14px;max-width:420px;}
+.sfc-ps__field{display:grid;gap:6px;font-size:.9rem;color:var(--dim);}
+.sfc-ps__field input{min-height:46px;padding:10px 14px;border-radius:var(--radius);border:1px solid var(--line);background:var(--surface);color:var(--text);font:inherit;font-size:1rem;transition:border-color .15s ease,box-shadow .15s ease;}
+.sfc-ps__field input:hover{border-color:var(--info);}
+.sfc-ps__field input:focus-visible{outline:none;border-color:var(--signal);box-shadow:0 0 0 3px rgba(255,122,77,.3);}
+.sfc-ps__field--pin input{max-width:160px;letter-spacing:.5em;}
+.sfc-ps__note{margin:0;padding:12px 14px;border-radius:var(--radius);font-weight:600;color:#fff;}
+.sfc-ps__note--ok{background:#2f7d52;}
+.sfc-ps__note--bad{background:#c4452f;}
+.sfc-ps .speak__mic{background:var(--surface2);border-color:var(--signal);color:var(--text);}
+.sfc-ps .speak__mic:hover{background:var(--surface);}

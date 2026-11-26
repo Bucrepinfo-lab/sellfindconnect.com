@@ -82,3 +82,4 @@ export * from './ai-capability';
 export * from './section-follow';
 export * from './share-targets';
 export * from './speech';
+export * from './my-profile';

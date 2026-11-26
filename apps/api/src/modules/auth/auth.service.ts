@@ -388,6 +388,26 @@ export class AuthService {
     return (await this.repository.findUserById(userId)) ?? undefined;
   }
 
+  /**
+   * My profile: the signed-in person changes their OWN name or sign-in phone.
+   * The caller (PhoneAuthService) has already checked the session, the rules
+   * and, for a phone change, the PIN. Recorded in the audit log.
+   */
+  async updateOwnContact(
+    session: { userId: string; tenantId?: string },
+    contact: { displayName?: string; phone?: string },
+  ): Promise<void> {
+    await this.repository.updateUserContact(session.userId, contact);
+    await this.recordAudit({
+      tenantId: session.tenantId,
+      actorUserId: session.userId,
+      action: contact.phone ? 'AUTH_OWN_PHONE_CHANGED' : 'AUTH_OWN_NAME_CHANGED',
+      entityType: 'USER',
+      entityId: session.userId,
+      metadata: { changedName: Boolean(contact.displayName), changedPhone: Boolean(contact.phone) },
+    });
+  }
+
   /** Staff (platform access assignments) never use the phone/PIN path or review shortcuts. */
   async isStaffUser(userId: string): Promise<boolean> {
     return (await this.repository.listAccessAssignmentsForUser(userId)).length > 0;

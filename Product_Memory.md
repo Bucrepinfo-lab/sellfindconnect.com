@@ -24,6 +24,12 @@ This file must be updated whenever product strategy, pricing, compliance, archit
 ## 26/11/26 — Fonts self-hosted (build no longer needs Google Fonts)
 - After PR #111 merged, the main build failed: `next/font/google` could not reach Google Fonts (`queries have exactly one entry`). The rerun passed, but the build should never depend on it. Bricolage Grotesque and Plus Jakarta Sans (OFL-1.1, variable, Latin) now live in `apps/web/src/app/fonts/` and load through `next/font/local`; same CSS variables, same look.
 
+## 26/11/26 — My profile: change my name and phone number; a photo before sign-up (owner "fix everything", 22:08)
+- `POST /v1/auth/phone/me/name` and `/me/phone` (`PhoneAuthService.changeOwnName` / `changeOwnPhone`). Name: letters only, safety-screened. Phone: needs the PIN with the same five-try lockout and limits as sign-in; refused for staff and for a number that already has an account; the PIN stays the same; nothing is sent by SMS. Both write an audit log line. New repository method `updateUserContact` (in-memory and Prisma). No database change.
+- `/account` has the two forms; the name can be spoken.
+- A visitor can choose one photo with the advert. It waits on the phone (IndexedDB, `lib/pending-photo.ts`); after sign-up it is offered as the business picture and uploads through the usual logo checks on one tap.
+- Judgement call: no separate personal photo. On SellFindConnect the account is the business, so the business logo is the picture buyers see; a second photo would need a new database column and upload path for little gain.
+
 ## 26/11/26 — Speak instead of type, language, My profile (owner, 21:33)
 - Owner: sellers who cannot type must be able to speak; bring the profile, language, OCR and upload polish from Stawi and HarvestHub here.
 - Audit: already here were OCR (`ReadTextButton`), photo preview and cropper, and "write the advert first, account at Publish" (`pending-advert.ts`, words only). Missing were speaking, a language setting and a personal profile page.

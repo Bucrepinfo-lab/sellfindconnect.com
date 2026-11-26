@@ -22,6 +22,7 @@ import {
 
 import { ApiError, apiRequest, isTermsError } from '../lib/api-client';
 import { clearPendingAdvert, readPendingAdvert } from '../lib/pending-advert';
+import { clearPendingPhoto, readPendingPhoto } from '../lib/pending-photo';
 import { publishPendingAdvert } from '../lib/quick-publish';
 import { WebOnlyCheckout } from '../lib/app-context';
 import { formatDmy } from '../lib/dates';
@@ -271,6 +272,13 @@ export function BusinessManager() {
       .then(async (data) => {
         if (cancelled) return;
         apply(data);
+        // A photo chosen before sign-up (owner 26/11/26) is offered as the
+        // business picture: one tap on "Use" uploads it through the usual checks.
+        void readPendingPhoto().then((file) => {
+          if (!file || cancelled) return;
+          setPendingLogo(file);
+          void clearPendingPhoto();
+        });
         // An advert written before sign-up (lazy registration, owner 25/11/26)
         // goes live as soon as the account exists.
         const pending = readPendingAdvert();

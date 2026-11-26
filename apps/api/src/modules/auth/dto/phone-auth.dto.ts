@@ -103,6 +103,34 @@ export class SetPinDto {
   declare pin: string;
 }
 
+export class ChangeOwnNameDto {
+  @ApiProperty()
+  @IsString()
+  @Length(10, 200)
+  declare sessionToken: string;
+
+  @ApiProperty({ example: 'Amina Wanjiru' })
+  @IsString()
+  @Length(2, 80)
+  declare displayName: string;
+}
+
+export class ChangeOwnPhoneDto {
+  @ApiProperty()
+  @IsString()
+  @Length(10, 200)
+  declare sessionToken: string;
+
+  @ApiProperty({ example: '0722000111' })
+  @IsString()
+  @Length(7, 20)
+  declare phone: string;
+
+  @ApiProperty({ example: '4829' })
+  @Matches(/^\d{4}$/)
+  declare pin: string;
+}
+
 export class PinSignInDto {
   @ApiProperty({ example: '4829' })
   @Matches(/^\d{4}$/)
