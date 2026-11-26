@@ -6,7 +6,7 @@ import { InMemoryAuthRepository } from './in-memory-auth.repository';
 import { InMemoryPhoneAuthRepository } from './in-memory-phone-auth.repository';
 import { PhoneAuthService } from './phone-auth.service';
 
-/** Owner 20/11/26: phone + PIN, staff PIN reset codes, no SMS. */
+/** Owner 20/11/26: phone + PIN, no SMS. 26/11/26: no codes; no PIN yet → choose one; support clears a forgotten PIN. */
 const ip = '203.0.113.7';
 const details = {
   displayName: 'Amina Wanjiru',
@@ -114,57 +114,77 @@ describe('PhoneAuthService (no SMS)', () => {
     await expect(phone.signInWithPin('4829', undefined, '198.51.100.3', '0712345678')).rejects.toMatchObject({
       response: { code: 'PIN_LOCKED' },
     });
-    await expect(phone.start('0712345678', ip)).resolves.toEqual({ next: 'reset' });
+    await expect(phone.start('0712345678', ip)).resolves.toEqual({ next: 'locked' });
   });
 
-  it('a support reset code unlocks: one phone, once, then a new PIN', async () => {
+  it('an account with no PIN chooses one at sign-in: no code, and never over an existing PIN', async () => {
+    const { phone, phoneRepository } = setup();
+    const owner = await signUp(phone);
+    await phoneRepository.deletePin(owner.result.user.id); // e.g. opened in the SMS days
+
+    await expect(phone.signInWithPin('4829', undefined, ip, '0712345678')).rejects.toMatchObject({ response: { code: 'PIN_NOT_SET' } });
+    const first = await phone.start('0712345678', ip);
+    const second = await phone.start('0712345678', ip);
+    if (first.next !== 'set' || second.next !== 'set') throw new Error('expected first-PIN step');
+
+    await expect(phone.setFirstPin(first.pinToken, '1234', ip)).rejects.toBeInstanceOf(UnprocessableEntityException);
+    const chosen = await phone.setFirstPin(first.pinToken, '6071', ip);
+    expect(chosen.result.pinSet).toBe(true);
+    expect(chosen.result.session.mfaVerified).toBe(true);
+    // The other open ticket cannot replace the PIN now that one exists.
+    await expect(phone.setFirstPin(second.pinToken, '3958', ip)).rejects.toBeInstanceOf(UnprocessableEntityException);
+    await expect(phone.start('0712345678', ip)).resolves.toEqual({ next: 'pin' });
+    await expect(phone.signInWithPin('6071', undefined, ip, '0712345678')).resolves.toMatchObject({ result: { status: 'SIGNED_IN' } });
+  });
+
+  it('keeps the two tickets apart: a first-PIN ticket cannot register, a registration ticket cannot set a PIN', async () => {
+    const { phone, phoneRepository } = setup();
+    const owner = await signUp(phone);
+    await phoneRepository.deletePin(owner.result.user.id);
+    const set = await phone.start('0712345678', ip);
+    const fresh = await phone.start('0733444555', ip);
+    if (set.next !== 'set' || fresh.next !== 'register') throw new Error('unexpected steps');
+
+    await expect(phone.register({ ...details, registrationToken: set.pinToken, pin: '4829' })).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(phone.setFirstPin(fresh.registrationToken, '4829', ip)).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('a first-PIN ticket expires after 30 minutes', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-26T09:00:00.000Z'));
+    const { phone, phoneRepository } = setup();
+    const owner = await signUp(phone);
+    await phoneRepository.deletePin(owner.result.user.id);
+    const set = await phone.start('0712345678', ip);
+    if (set.next !== 'set') throw new Error('expected first-PIN step');
+    vi.setSystemTime(new Date('2026-11-26T09:30:01.000Z'));
+    await expect(phone.setFirstPin(set.pinToken, '6071', ip)).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('support clears a locked PIN; the person then chooses a new one with no code', async () => {
     const { auth, phone } = setup();
     const owner = await signUp(phone);
     for (let attempt = 0; attempt < 5; attempt += 1) {
       await phone.signInWithPin('9999', owner.deviceToken, ip).catch(() => undefined);
     }
+    await expect(phone.start('0712345678', ip)).resolves.toEqual({ next: 'locked' });
 
     asStaff(auth);
-    const issued = await phone.issueResetCode('staff-session-token', '0712345678');
-    expect(issued.code).toMatch(/^\d{6}$/);
-    expect(issued.message).toContain(issued.code);
-    expect(issued.message).not.toMatch(/https?:/);
+    const cleared = await phone.clearPin('staff-session-token', '0712345678');
+    expect(cleared.cleared).toBe(true);
+    expect(cleared.message).not.toMatch(/\d{6}/);
     vi.restoreAllMocks();
 
-    await expect(phone.redeemResetCode('0722000111', issued.code, ip)).rejects.toBeInstanceOf(UnauthorizedException);
-    const redeemed = await phone.redeemResetCode('0712345678', issued.code, ip);
-    expect(redeemed.result.pinSet).toBe(false);
-    expect(redeemed.result.session.mfaVerified).toBe(true);
-    await expect(phone.redeemResetCode('0712345678', issued.code, ip)).rejects.toBeInstanceOf(UnauthorizedException);
-
-    await phone.setPin(redeemed.result.session.token ?? '', '6071', redeemed.deviceToken);
-    await expect(phone.signInWithPin('6071', undefined, ip, '0712345678')).resolves.toMatchObject({
-      result: { status: 'SIGNED_IN' },
-    });
+    const set = await phone.start('0712345678', ip);
+    if (set.next !== 'set') throw new Error('expected first-PIN step after clearing');
+    await phone.setFirstPin(set.pinToken, '6071', ip);
+    await expect(phone.signInWithPin('6071', undefined, ip, '0712345678')).resolves.toMatchObject({ result: { status: 'SIGNED_IN' } });
   });
 
-  it('burns a reset code after 5 wrong tries and expires it after 48 hours', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-11-20T09:00:00.000Z'));
-    const { auth, phone } = setup();
-    await signUp(phone);
-    asStaff(auth);
-    const first = await phone.issueResetCode('staff-session-token', '0712345678');
-    const wrong = first.code === '111111' ? '222222' : '111111';
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      await expect(phone.redeemResetCode('0712345678', wrong, `198.51.100.${attempt}`)).rejects.toBeInstanceOf(UnauthorizedException);
-    }
-    await expect(phone.redeemResetCode('0712345678', first.code, ip)).rejects.toBeInstanceOf(UnauthorizedException);
-
-    const second = await phone.issueResetCode('staff-session-token', '0712345678');
-    vi.setSystemTime(new Date('2026-11-22T09:00:01.000Z'));
-    await expect(phone.redeemResetCode('0712345678', second.code, ip)).rejects.toBeInstanceOf(UnauthorizedException);
-  });
-
-  it('only MFA-verified support staff may give reset codes', async () => {
+  it('only MFA-verified support staff may clear a PIN', async () => {
     const { phone } = setup();
     const owner = await signUp(phone);
-    await expect(phone.issueResetCode(owner.result.session.token ?? '', '0712345678')).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(phone.clearPin(owner.result.session.token ?? '', '0712345678')).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('revokes devices and the PIN on account deletion', async () => {

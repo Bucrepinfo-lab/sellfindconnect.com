@@ -11,12 +11,15 @@ import { saveSession } from '../lib/use-session';
 
 type Session = { token?: string; tenantId: string; role: string; mfaVerified: boolean };
 type SignedIn = { status: 'SIGNED_IN'; session: Session; pinSet: boolean; user?: { displayName?: string } };
-type StartResult = { next: 'pin' | 'reset' } | { next: 'register'; registrationToken: string };
+type StartResult =
+  | { next: 'pin' | 'locked' }
+  | { next: 'set'; pinToken: string }
+  | { next: 'register'; registrationToken: string };
 type DeviceStatus =
   | { trusted: false }
   | { trusted: true; pinSet: boolean; pinLocked: boolean; phoneHint?: string; displayName?: string };
 
-type Step = 'loading' | 'pin' | 'phone' | 'reset' | 'register' | 'set-pin';
+type Step = 'loading' | 'pin' | 'phone' | 'locked' | 'register' | 'set-pin';
 
 const base = publicApiBaseUrl.replace(/\/$/, '');
 
@@ -71,9 +74,10 @@ function finish(result: SignedIn) {
 }
 
 /**
- * Primary sign-in and sign-up without SMS (owner 20/11/26): phone number, then
- * the person's own 4-digit PIN on any device. A new number registers a business
- * with a PIN; a forgotten or locked PIN uses a reset code from support.
+ * Primary sign-in and sign-up without SMS or codes (owner 20/11/26, 26/11/26):
+ * phone number, then the person's own 4-digit PIN on any device. A new number
+ * registers a business with a PIN; an account with no PIN chooses one here; a
+ * forgotten or locked PIN is cleared by support, then a new one is chosen.
  * Email sign-in stays available.
  */
 export function PhoneSignIn({
@@ -93,7 +97,7 @@ export function PhoneSignIn({
   const [step, setStep] = useState<Step>('loading');
   const [device, setDevice] = useState<DeviceStatus>({ trusted: false });
   const [phone, setPhone] = useState('');
-  const [code, setCode] = useState('');
+  const [pinToken, setPinToken] = useState('');
   const [pin, setPin] = useState('');
   const [pinConfirm, setPinConfirm] = useState('');
   const [registrationToken, setRegistrationToken] = useState('');
@@ -133,10 +137,10 @@ export function PhoneSignIn({
       await action();
     } catch (caught) {
       const failure = caught instanceof PhoneApiError ? caught : new PhoneApiError('Something went wrong. Try again.', 0);
-      if (failure.code === 'PIN_LOCKED' || failure.code === 'PIN_NOT_SET') {
-        setStep('reset');
+      if (failure.code === 'PIN_LOCKED') {
+        setStep('locked');
         setPin('');
-      } else if (failure.code === 'RESET_REQUIRED') {
+      } else if (failure.code === 'RESET_REQUIRED' || failure.code === 'PIN_NOT_SET') {
         setStep('phone');
         setPin('');
       }
@@ -162,19 +166,17 @@ export function PhoneSignIn({
       const result = await phoneApi<StartResult>('/start', { phone });
       setPin('');
       setPinConfirm('');
-      setCode('');
       if (result.next === 'register') {
         setRegistrationToken(result.registrationToken);
         setStep('register');
         return;
       }
+      if (result.next === 'set') {
+        setPinToken(result.pinToken);
+        setStep('set-pin');
+        return;
+      }
       setStep(result.next);
-    });
-
-  const redeemReset = () =>
-    act(async () => {
-      const result = await phoneApi<SignedIn>('/reset', { phone, code, deviceLabel: 'Phone sign-in' });
-      signedIn(result);
     });
 
   const register = () =>
@@ -196,6 +198,13 @@ export function PhoneSignIn({
   const savePin = () =>
     act(async () => {
       if (pin !== pinConfirm) throw new PhoneApiError('The two PINs do not match.', 0);
+      if (pinToken) {
+        // An account with no PIN yet: choose it now, no code.
+        const result = await phoneApi<SignedIn>('/pin/first', { pinToken, pin, deviceLabel: 'Phone sign-in' });
+        setPinToken('');
+        finish(result);
+        return;
+      }
       if (!pendingSession?.session.token) throw new PhoneApiError('Sign in again.', 0);
       await phoneApi('/pin', { sessionToken: pendingSession.session.token, pin });
       finish(pendingSession);
@@ -250,7 +259,7 @@ export function PhoneSignIn({
             </button>
           </div>
           <p className="form-note">
-            <button className="text-link" type="button" onClick={() => setStep('reset')}>
+            <button className="text-link" type="button" onClick={() => setStep('locked')}>
               Forgot PIN?
             </button>{' '}
             ·{' '}
@@ -292,45 +301,22 @@ export function PhoneSignIn({
         </form>
       ) : null}
 
-      {step === 'reset' ? (
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            void redeemReset();
-          }}
-        >
+      {step === 'locked' ? (
+        <div>
           <div className="panel-heading tight">
-            <h2>Reset your PIN</h2>
+            <h2>Forgot your PIN?</h2>
           </div>
           <p className="form-note">
-            Forgot your PIN, or locked it after 5 wrong tries? Contact SellFindConnect support. After checking it is you,
-            they give you a 6-digit reset code. Then you choose a new PIN.
+            Email SellFindConnect support at <a href="mailto:telpeninfo@gmail.com?subject=Please%20clear%20my%20PIN">telpeninfo@gmail.com</a>{' '}
+            from the number&apos;s owner. After checking it is you, they clear your PIN. Then enter your phone number again and
+            choose a new one. No code is sent and you never type one.
           </p>
-          <label className="field compact-field">
-            <span>Phone number</span>
-            <input type="tel" inputMode="tel" autoComplete="tel" placeholder="07XX XXX XXX" value={phone} onChange={(event) => setPhone(event.target.value)} />
-          </label>
-          <label className="field compact-field">
-            <span>Reset code</span>
-            <input
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-              value={code}
-              onChange={(event) => setCode(event.target.value.replace(/\D/g, ''))}
-            />
-          </label>
           <div className="terms-actions">
-            <button className="primary-button" type="submit" disabled={busy || code.length !== 6 || phone.replace(/\D/g, '').length < 9}>
-              {busy ? 'Checking…' : 'Continue'}
+            <button className="primary-button" type="button" onClick={() => setStep('phone')}>
+              Enter my phone number
             </button>
           </div>
-          <p className="form-note">
-            <button className="text-link" type="button" onClick={() => setStep('pin')}>
-              I remember my PIN
-            </button>
-          </p>
-        </form>
+        </div>
       ) : null}
 
       {step === 'register' ? (
@@ -466,10 +452,11 @@ export function PhoneSignIn({
           }}
         >
           <div className="panel-heading tight">
-            <h2>Set a 4-digit PIN</h2>
+            <h2>Choose your 4-digit PIN</h2>
           </div>
           <p className="form-note">
-            From now on, sign in on any phone with your number and this PIN. If you forget it, support gives you a reset code.
+            {pinToken ? 'Welcome back. This number has an account but no PIN yet. ' : ''}From now on, sign in on any phone with
+            your number and this PIN. If you forget it, support clears it and you choose a new one. No code needed.
           </p>
           <label className="field compact-field">
             <span>New PIN</span>

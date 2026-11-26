@@ -6,6 +6,13 @@ Purpose: Persistent decision log and strategic memory for the Telpen Adverts mul
 
 This file must be updated whenever product strategy, pricing, compliance, architecture, market positioning, or execution decisions change.
 
+## 26/11/26 — Sign-in with no codes at all (owner: "correct the login ... just the way we have agreed")
+- A tester was asked for a code: a number with an account but no PIN (opened in the SMS days), or a forgotten PIN, went to "enter the 6-digit reset code". The owner's agreed model (HarvestHub, 25/11/26, now every app): phone, then the person's own 4-digit PIN; nothing sent, nothing typed but the PIN.
+- `start`: `pin` · `register` (new number) · `set` (account with no PIN: a 30-minute ticket, then `POST /auth/phone/pin/first` chooses the PIN; refused whenever a PIN exists) · `locked` (5 wrong PINs: "ask support to clear your PIN").
+- Support staff (email + authenticator) clear a forgotten/locked PIN with `POST /auth/phone/pin/clear` (MFA staff only, never a staff number); the person then chooses a new one. Removed: `/auth/phone/reset`, `/auth/phone/reset-code`, the reset-code screen.
+- No schema change: the first-PIN ticket is stored as a `REGISTRATION_TICKET` row hashed in its own namespace (`phone-first-pin:`), so it can never register and a registration ticket can never set a PIN (tested). The `RESET_CODE` enum value stays in the database, unused.
+- Risk the owner accepted for HarvestHub, same here: an account with no PIN can be claimed by whoever first sets one for that number (only SMS-era accounts, or ones support cleared on purpose).
+
 ## 26/11/26 — Fonts self-hosted (build no longer needs Google Fonts)
 - After PR #111 merged, the main build failed: `next/font/google` could not reach Google Fonts (`queries have exactly one entry`). The rerun passed, but the build should never depend on it. Bricolage Grotesque and Plus Jakarta Sans (OFL-1.1, variable, Latin) now live in `apps/web/src/app/fonts/` and load through `next/font/local`; same CSS variables, same look.
 

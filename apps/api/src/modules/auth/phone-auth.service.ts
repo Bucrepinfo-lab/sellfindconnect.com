@@ -9,7 +9,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { toE164 } from '@telpen/domain';
-import { createHash, randomBytes, randomInt, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 
 import { AuthService } from './auth.service';
 import type { RegisterPhoneOwnerDto } from './dto/phone-auth.dto';
@@ -21,16 +21,17 @@ import {
 } from './phone-auth.repository';
 import { SlidingWindowLimiter } from './rate-limiter';
 
-export const RESET_CODE_TTL_MS = 48 * 60 * 60 * 1000;
-export const RESET_CODE_MAX_ATTEMPTS = 5;
 export const PIN_MAX_ATTEMPTS = 5;
 const REGISTRATION_TICKET_TTL_MS = 30 * 60 * 1000;
+/** A number with an account but no PIN chooses one within this time after step 1. */
+const FIRST_PIN_TICKET_TTL_MS = 30 * 60 * 1000;
 export const TRUSTED_DEVICE_TTL_MS = 180 * 24 * 60 * 60 * 1000;
 const WEAK_PINS = new Set(['0000', '1111', '2222', '3333', '4444', '5555', '6666', '7777', '8888', '9999', '1234', '4321', '1212', '0123', '9876']);
 
 const NO_MATCH = 'That phone number and PIN do not match.';
-const ASK_SUPPORT = 'Ask SellFindConnect support for a PIN reset code.';
-const GENERIC_CODE_ERROR = 'That reset code is wrong or has expired. Ask support for a new one.';
+const ASK_SUPPORT =
+  'Ask SellFindConnect support to clear your PIN. Then enter your phone number again and choose a new one.';
+const NO_PIN_YET = 'This number has no PIN yet. Enter your phone number to choose one.';
 
 export type PhoneSignInResult = Awaited<ReturnType<AuthService['issuePhoneVerifiedSession']>> & {
   status: 'SIGNED_IN';
@@ -46,17 +47,20 @@ function resetRequired(code: 'RESET_REQUIRED' | 'PIN_LOCKED' | 'PIN_NOT_SET', me
 }
 
 /**
- * Phone sign-in without SMS (owner 20/11/26). Step 1 the phone number, step 2
- * the person's own 4-digit PIN — on any device. A new number registers a
- * business and chooses a PIN. A forgotten or locked PIN is reset with a
- * one-time code from SellFindConnect support staff (staff sign in with email
- * and an authenticator app): 6 digits, one phone, once, 48 hours, 5 tries.
- * Email is optional. Staff never use the phone/PIN path.
+ * Phone sign-in with no codes at all (owner 20/11/26 no SMS; 26/11/26 the
+ * HarvestHub model everywhere: "no reset codes"). Step 1 the phone number,
+ * step 2 the person's own 4-digit PIN, on any device.
+ * - A new number registers a business and chooses a PIN.
+ * - A number with an account but no PIN (opened in the SMS days, or cleared by
+ *   support) chooses its PIN right there. Refused whenever a PIN exists.
+ * - A forgotten or locked PIN: support staff (email + authenticator app) clear
+ *   it after checking it is the person; the person then chooses a new one.
+ * Nothing is sent and no code is typed. Staff never use the phone/PIN path.
  */
 @Injectable()
 export class PhoneAuthService {
   private readonly startsByIp = new SlidingWindowLimiter(20, 10 * 60 * 1000);
-  private readonly codeChecksByIp = new SlidingWindowLimiter(30, 10 * 60 * 1000);
+  private readonly firstPinByIp = new SlidingWindowLimiter(30, 10 * 60 * 1000);
   private readonly pinChecksByIp = new SlidingWindowLimiter(30, 10 * 60 * 1000);
   private readonly pinChecksByPhone = new SlidingWindowLimiter(10, 10 * 60 * 1000);
 
@@ -68,13 +72,18 @@ export class PhoneAuthService {
   ) {}
 
   /**
-   * Step 1: which step comes next for this number — its PIN, a reset code (no
-   * PIN yet, or locked), or registering a new business (with a ticket).
+   * Step 1: which step comes next for this number: its PIN, choosing a first
+   * PIN (account with none, with a short-lived ticket), "ask support" (locked),
+   * or registering a new business (with a ticket).
    */
   async start(
     rawPhone: string,
     ip: string,
-  ): Promise<{ next: 'pin' | 'reset' } | { next: 'register'; registrationToken: string; expiresInSeconds: number }> {
+  ): Promise<
+    | { next: 'pin' | 'locked' }
+    | { next: 'set'; pinToken: string; expiresInSeconds: number }
+    | { next: 'register'; registrationToken: string; expiresInSeconds: number }
+  > {
     const phone = toE164(rawPhone);
     if (!phone) {
       throw new UnprocessableEntityException('Enter a valid phone number.');
@@ -92,7 +101,23 @@ export class PhoneAuthService {
         throw new ForbiddenException('Staff accounts sign in with email and an authenticator app.');
       }
       const pin = await this.repository.findPin(user.id);
-      return { next: pin && !pin.lockedAt && pin.failedAttempts < PIN_MAX_ATTEMPTS ? 'pin' : 'reset' };
+      if (pin) {
+        return { next: pin.lockedAt || pin.failedAttempts >= PIN_MAX_ATTEMPTS ? 'locked' : 'pin' };
+      }
+      const pinToken = randomBytes(32).toString('base64url');
+      const issuedAt = Date.now();
+      await this.repository.createCode({
+        id: randomUUID(),
+        phone,
+        // Stored with the ticket purpose but hashed in its own namespace, so it
+        // can never be used to register, and a registration ticket can never set a PIN.
+        purpose: 'REGISTRATION_TICKET',
+        codeHash: this.hashFirstPinTicket(pinToken),
+        expiresAt: new Date(issuedAt + FIRST_PIN_TICKET_TTL_MS).toISOString(),
+        failedAttempts: 0,
+        createdAt: new Date(issuedAt).toISOString(),
+      });
+      return { next: 'set', pinToken, expiresInSeconds: FIRST_PIN_TICKET_TTL_MS / 1000 };
     }
     const registrationToken = randomBytes(32).toString('base64url');
     const now = Date.now();
@@ -128,7 +153,7 @@ export class PhoneAuthService {
     return { result: { ...registered, status: 'SIGNED_IN' as const, pinSet: true }, deviceToken };
   }
 
-  /** Sets (or resets) the PIN. Needs a session whose MFA was satisfied (PIN or a staff reset code). */
+  /** Changes the PIN of a signed-in person. Needs a session whose MFA was satisfied. */
   async setPin(sessionToken: string, pinValue: string, deviceToken?: string) {
     const current = await this.auth.getSession(sessionToken);
     if (!current.session.mfaVerified || !current.user) {
@@ -146,7 +171,7 @@ export class PhoneAuthService {
 
   /**
    * Step 2: phone + PIN, on any device. A trusted device may leave the phone
-   * out (it remembers the number). Five wrong PINs lock it until a reset code.
+   * out (it remembers the number). Five wrong PINs lock it until support clears it.
    */
   async signInWithPin(pinValue: string, deviceToken: string | undefined, ip: string, rawPhone?: string, deviceLabel?: string) {
     if (!this.pinChecksByIp.hit(ip)) {
@@ -178,7 +203,7 @@ export class PhoneAuthService {
     }
     const pin = await this.repository.findPin(user.id);
     if (!pin) {
-      throw resetRequired('PIN_NOT_SET', `No PIN is set for this number yet. ${ASK_SUPPORT}`);
+      throw resetRequired('PIN_NOT_SET', NO_PIN_YET);
     }
     if (pin.lockedAt || pin.failedAttempts >= PIN_MAX_ATTEMPTS) {
       throw resetRequired('PIN_LOCKED', `Too many wrong PINs. ${ASK_SUPPORT}`);
@@ -209,80 +234,56 @@ export class PhoneAuthService {
   }
 
   /**
-   * Support staff give a business owner a one-time PIN reset code, to hand over
-   * on a call or WhatsApp after checking it is them. Staff only (platform access
-   * assignment) with a session whose MFA is satisfied; never for a staff number.
+   * An account with no PIN (opened in the SMS days, or cleared by support)
+   * chooses its first PIN right after step 1. Never replaces an existing PIN.
    */
-  async issueResetCode(sessionToken: string, rawPhone: string) {
+  async setFirstPin(pinToken: string, pinValue: string, ip: string, deviceLabel?: string) {
+    if (!this.firstPinByIp.hit(ip)) {
+      throw tooMany();
+    }
+    const ticket = await this.repository.findOpenCodeByHash('REGISTRATION_TICKET', this.hashFirstPinTicket(pinToken));
+    if (!ticket || Date.parse(ticket.expiresAt) <= Date.now()) {
+      throw new UnauthorizedException('That took too long. Enter your phone number again.');
+    }
+    if (!/^\d{4}$/.test(pinValue) || WEAK_PINS.has(pinValue)) {
+      throw new UnprocessableEntityException('Choose a 4-digit PIN that is not easy to guess (not 1234 or 0000).');
+    }
+    const user = await this.auth.findUserByVerifiablePhone(ticket.phone);
+    if (!user || (await this.auth.isStaffUser(user.id))) {
+      throw new UnauthorizedException('Enter your phone number again.');
+    }
+    await this.repository.updateCode({ ...ticket, consumedAt: new Date().toISOString() });
+    if (await this.repository.findPin(user.id)) {
+      throw new UnprocessableEntityException('This number already has a PIN. Sign in with it.');
+    }
+    await this.savePinFor(user.id, pinValue);
+    const deviceToken = await this.createDevice(user.id, deviceLabel);
+    const signedIn = await this.auth.issuePhoneVerifiedSession(user, 'PIN');
+    return { result: { ...signedIn, status: 'SIGNED_IN' as const, pinSet: true }, deviceToken };
+  }
+
+  /**
+   * Support staff clear a business owner's forgotten or locked PIN after
+   * checking it is them (call or WhatsApp). The person then chooses a new PIN
+   * at sign-in. Staff only, with an MFA-verified session; never a staff number.
+   * Their signed-in devices stay signed in.
+   */
+  async clearPin(sessionToken: string, rawPhone: string) {
     const current = await this.auth.getSession(sessionToken);
     if (!current.session.mfaVerified || !(await this.auth.isStaffUser(current.session.userId))) {
-      throw new ForbiddenException('Only SellFindConnect support staff can give PIN reset codes.');
+      throw new ForbiddenException('Only SellFindConnect support staff can clear a PIN.');
     }
     const phone = toE164(rawPhone);
     const user = phone ? await this.auth.findUserByVerifiablePhone(phone) : undefined;
     if (!phone || !user || (await this.auth.isStaffUser(user.id))) {
       throw new UnprocessableEntityException('No business account uses that phone number.');
     }
-    const now = Date.now();
-    const open = await this.repository.findLatestOpenCode(phone, 'RESET_CODE');
-    if (open) {
-      await this.repository.updateCode({ ...open, consumedAt: new Date(now).toISOString() });
-    }
-    const code = randomInt(1, 1_000_000).toString().padStart(6, '0');
-    await this.repository.createCode({
-      id: randomUUID(),
-      phone,
-      purpose: 'RESET_CODE',
-      codeHash: this.hashCode(phone, code),
-      expiresAt: new Date(now + RESET_CODE_TTL_MS).toISOString(),
-      failedAttempts: 0,
-      createdAt: new Date(now).toISOString(),
-    });
+    await this.repository.deletePin(user.id);
     const first = (user.displayName ?? '').trim().split(/\s+/)[0] || 'there';
     return {
-      code,
-      expiresInSeconds: RESET_CODE_TTL_MS / 1000,
-      message: `Hello ${first}. Your SellFindConnect PIN reset code is ${code}. Open sellfindconnect.com, sign in with your phone number, choose "Forgot PIN?", enter this code and set a new PIN. It works once within 48 hours. Never share it.`,
+      cleared: true as const,
+      message: `Hello ${first}. Your SellFindConnect PIN has been cleared. Open the app, enter your phone number and choose a new 4-digit PIN. No code is needed.`,
     };
-  }
-
-  /** Forgotten or locked PIN: phone + the support reset code → signed in, then choose a new PIN. */
-  async redeemResetCode(rawPhone: string, code: string, ip: string, deviceLabel?: string) {
-    if (!this.codeChecksByIp.hit(ip)) {
-      throw tooMany();
-    }
-    const phone = toE164(rawPhone);
-    if (!phone || !/^\d{6}$/.test(code)) {
-      throw new UnauthorizedException(GENERIC_CODE_ERROR);
-    }
-    const challenge = await this.repository.findLatestOpenCode(phone, 'RESET_CODE');
-    if (
-      !challenge ||
-      Date.parse(challenge.expiresAt) <= Date.now() ||
-      challenge.failedAttempts >= RESET_CODE_MAX_ATTEMPTS
-    ) {
-      throw new UnauthorizedException(GENERIC_CODE_ERROR);
-    }
-    if (!this.equal(challenge.codeHash, this.hashCode(phone, code))) {
-      const failedAttempts = challenge.failedAttempts + 1;
-      await this.repository.updateCode({
-        ...challenge,
-        failedAttempts,
-        // Burn the code after the last allowed miss.
-        consumedAt: failedAttempts >= RESET_CODE_MAX_ATTEMPTS ? new Date().toISOString() : undefined,
-      });
-      throw new UnauthorizedException(GENERIC_CODE_ERROR);
-    }
-    await this.repository.updateCode({ ...challenge, consumedAt: new Date().toISOString() });
-    const user = await this.auth.findUserByVerifiablePhone(phone);
-    if (!user || (await this.auth.isStaffUser(user.id))) {
-      throw new UnauthorizedException(GENERIC_CODE_ERROR);
-    }
-    // The old PIN (forgotten or locked) is gone; a new one is chosen next.
-    await this.repository.deletePin(user.id);
-    const signedIn = await this.auth.issuePhoneVerifiedSession(user, 'RESET_CODE');
-    const deviceToken = await this.createDevice(user.id, deviceLabel);
-    return { result: { ...signedIn, status: 'SIGNED_IN' as const, pinSet: false }, deviceToken };
   }
 
   /** What the sign-in screen should offer on this device. Reveals nothing without a valid device token. */
@@ -376,8 +377,8 @@ export class PhoneAuthService {
     return `${phone.slice(0, 4)}•••${phone.slice(-3)}`;
   }
 
-  private hashCode(phone: string, code: string): string {
-    return createHash('sha256').update(`phone-reset:${phone}:${code}`).digest('base64url');
+  private hashFirstPinTicket(token: string): string {
+    return createHash('sha256').update(`phone-first-pin:${token}`).digest('base64url');
   }
 
   private hashTicket(token: string): string {

@@ -3,11 +3,11 @@ import { ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 
 import {
-  IssueResetCodeDto,
+  ClearPinDto,
   PinSignInDto,
-  RedeemResetCodeDto,
   RegisterPhoneOwnerDto,
   RevokeDevicesDto,
+  SetFirstPinDto,
   SetPinDto,
   StartPhoneSignInDto,
 } from './dto/phone-auth.dto';
@@ -55,7 +55,7 @@ function clearDeviceCookie(response: Response) {
 }
 
 /**
- * Phone + PIN sign-in, no SMS (owner 20/11/26). The trusted-device token only
+ * Phone + PIN sign-in, no SMS and no codes (owner 20/11/26, 26/11/26). The trusted-device token only
  * ever travels in an httpOnly cookie scoped to /v1/auth/phone; it is never in
  * a response body.
  */
@@ -69,21 +69,22 @@ export class PhoneAuthController {
     return this.phoneAuth.start(body.phone, clientIp(request));
   }
 
-  @Post('reset')
-  async redeemResetCode(
+  /** A number with an account but no PIN chooses its first PIN (ticket from step 1). No code. */
+  @Post('pin/first')
+  async setFirstPin(
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
-    @Body() body: RedeemResetCodeDto,
+    @Body() body: SetFirstPinDto,
   ) {
-    const redeemed = await this.phoneAuth.redeemResetCode(body.phone, body.code, clientIp(request), body.deviceLabel);
-    setDeviceCookie(response, redeemed.deviceToken);
-    return redeemed.result;
+    const saved = await this.phoneAuth.setFirstPin(body.pinToken, body.pin, clientIp(request), body.deviceLabel);
+    setDeviceCookie(response, saved.deviceToken);
+    return saved.result;
   }
 
-  /** Support staff only (checked in the service): a one-time PIN reset code for a business owner. */
-  @Post('reset-code')
-  issueResetCode(@Body() body: IssueResetCodeDto) {
-    return this.phoneAuth.issueResetCode(body.sessionToken, body.phone);
+  /** Support staff only (checked in the service): clear a forgotten or locked PIN. */
+  @Post('pin/clear')
+  clearPin(@Body() body: ClearPinDto) {
+    return this.phoneAuth.clearPin(body.sessionToken, body.phone);
   }
 
   @Post('register')
