@@ -3,6 +3,8 @@ import { ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 
 import {
+  ChangeOwnNameDto,
+  ChangeOwnPhoneDto,
   ClearPinDto,
   PinSignInDto,
   RegisterPhoneOwnerDto,
@@ -136,6 +138,18 @@ export class PhoneAuthController {
     const result = await this.phoneAuth.forgetDevice(readDeviceCookie(request));
     clearDeviceCookie(response);
     return result;
+  }
+
+  /** My profile: change my own name. */
+  @Post('me/name')
+  changeOwnName(@Body() body: ChangeOwnNameDto) {
+    return this.phoneAuth.changeOwnName(body.sessionToken, body.displayName);
+  }
+
+  /** My profile: move my account to a new phone number (needs my PIN). */
+  @Post('me/phone')
+  changeOwnPhone(@Req() request: Request, @Body() body: ChangeOwnPhoneDto) {
+    return this.phoneAuth.changeOwnPhone(body.sessionToken, body.phone, body.pin, clientIp(request));
   }
 
   @Post('devices/revoke')

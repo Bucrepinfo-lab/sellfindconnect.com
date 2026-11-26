@@ -2017,3 +2017,43 @@ html {
   .speak__lang:hover, .speak__mic:hover, .guest-speak:hover, .guest-speak:focus-within { transform: none; }
   .speak__mic.is-live { animation: none; }
 }
+
+/* A photo chosen before sign-up (owner 26/11/26). */
+.guest-photo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--sell);
+  border-radius: 14px;
+  background: var(--sell-soft);
+  transition: box-shadow 180ms ease, transform 180ms ease;
+}
+.guest-photo:hover,
+.guest-photo:focus-within {
+  box-shadow: 0 14px 30px -20px rgba(255, 106, 61, 0.8);
+  transform: translateY(-1px);
+}
+.guest-photo__thumb {
+  width: 84px;
+  height: 84px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 2px solid var(--surface);
+  box-shadow: var(--shadow);
+}
+.guest-photo__body {
+  display: grid;
+  gap: 4px;
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.guest-photo__pick {
+  cursor: pointer;
+}
+@media (prefers-reduced-motion: reduce) {
+  .guest-photo { transition: none; }
+  .guest-photo:hover, .guest-photo:focus-within { transform: none; }
+}

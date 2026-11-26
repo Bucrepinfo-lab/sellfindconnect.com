@@ -207,4 +207,47 @@ describe('PhoneAuthService (no SMS)', () => {
     });
     await expect(phone.signInWithPin('2580', undefined, '192.0.2.99', '0700111223')).rejects.toBeInstanceOf(UnauthorizedException);
   });
+
+  // My profile (owner 26/11/26).
+  it('lets a person change their own name, and refuses numbers, websites and unsafe words', async () => {
+    const { auth, phone } = setup();
+    const owner = await signUp(phone);
+    const token = owner.result.session.token ?? '';
+
+    await expect(phone.changeOwnName(token, '  Amina   W. Kamau ')).resolves.toEqual({ displayName: 'Amina W. Kamau' });
+    expect((await auth.getSession(token)).user?.displayName).toBe('Amina W. Kamau');
+    await expect(phone.changeOwnName(token, '0712345678')).rejects.toBeInstanceOf(UnprocessableEntityException);
+    await expect(phone.changeOwnName(token, 'Buy at shop.com')).rejects.toBeInstanceOf(UnprocessableEntityException);
+    await expect(phone.changeOwnName('not-a-session', 'Amina')).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('moves the account to a new number only with the right PIN; the old number stops working', async () => {
+    const { phone } = setup();
+    const owner = await signUp(phone);
+    const token = owner.result.session.token ?? '';
+
+    await expect(phone.changeOwnPhone(token, '0722000111', '0000', ip)).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(phone.changeOwnPhone(token, '0712345678', '4829', ip)).rejects.toBeInstanceOf(UnprocessableEntityException);
+    await expect(phone.changeOwnPhone(token, '12', '4829', ip)).rejects.toBeInstanceOf(UnprocessableEntityException);
+
+    await expect(phone.changeOwnPhone(token, '0722000111', '4829', ip)).resolves.toMatchObject({ phone: '+254722000111' });
+    await expect(phone.signInWithPin('4829', undefined, ip, '0722000111')).resolves.toMatchObject({ result: { status: 'SIGNED_IN' } });
+    await expect(phone.signInWithPin('4829', undefined, ip, '0712345678')).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('refuses a number that already has an account, and locks after five wrong PINs', async () => {
+    const { phone } = setup();
+    const owner = await signUp(phone);
+    await signUp(phone, '0733000222', '6071');
+    const token = owner.result.session.token ?? '';
+
+    await expect(phone.changeOwnPhone(token, '0733000222', '4829', ip)).rejects.toBeInstanceOf(UnprocessableEntityException);
+    await expect(phone.signInWithPin('6071', undefined, ip, '0733000222')).resolves.toMatchObject({ result: { status: 'SIGNED_IN' } });
+
+    for (let i = 0; i < 5; i += 1) {
+      await expect(phone.changeOwnPhone(token, '0722000111', '0000', ip)).rejects.toBeTruthy();
+    }
+    await expect(phone.changeOwnPhone(token, '0722000111', '4829', ip)).rejects.toBeTruthy();
+    await expect(phone.signInWithPin('4829', undefined, ip, '0712345678')).rejects.toBeTruthy();
+  });
 });

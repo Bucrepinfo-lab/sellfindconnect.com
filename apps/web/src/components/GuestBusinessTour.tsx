@@ -2,12 +2,13 @@
 
 import { BarChart3, Inbox, Megaphone, MessageCircle, Network, Store } from 'lucide-react';
 import Link from 'next/link';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import { appendSpoken, industryCategories, kenyaCounties, speechWord, supplyChainRoles } from '@telpen/domain';
 
 import { codeLabel } from '../lib/labels';
 import { pendingAdvertProblem, readPendingAdvert, savePendingAdvert, type PendingAdvert } from '../lib/pending-advert';
+import { clearPendingPhoto, pendingPhotoProblem, readPendingPhoto, savePendingPhoto } from '../lib/pending-photo';
 import { useLanguage } from '../lib/speech';
 import { PhoneSignIn } from './PhoneSignIn';
 import { ReadTextButton } from './ReadTextButton';
@@ -142,6 +143,41 @@ function GuestAdvertComposer({ onUseEmail }: { onUseEmail: () => void }) {
   const [step, setStep] = useState<'write' | 'account'>('write');
   const set = (patch: Partial<PendingAdvert>) => setForm((current) => ({ ...current, ...patch }));
   const language = useLanguage();
+  // A photo chosen now waits on this phone until the account exists.
+  const [photo, setPhoto] = useState<{ name: string; url: string } | null>(null);
+  const [photoNote, setPhotoNote] = useState('');
+  useEffect(() => {
+    let url = '';
+    let live = true;
+    void readPendingPhoto().then((file) => {
+      if (!file || !live) return;
+      url = URL.createObjectURL(file);
+      setPhoto({ name: file.name, url });
+    });
+    return () => {
+      live = false;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, []);
+  const choosePhoto = async (file: File) => {
+    const refused = pendingPhotoProblem(file);
+    if (refused) return setPhotoNote(refused);
+    if (!(await savePendingPhoto(file))) {
+      return setPhotoNote('This phone could not keep the photo. You can add it right after you sign up.');
+    }
+    setPhotoNote('');
+    setPhoto((current) => {
+      if (current) URL.revokeObjectURL(current.url);
+      return { name: file.name, url: URL.createObjectURL(file) };
+    });
+  };
+  const removePhoto = () => {
+    void clearPendingPhoto();
+    setPhoto((current) => {
+      if (current) URL.revokeObjectURL(current.url);
+      return null;
+    });
+  };
 
   const publish = () => {
     const why = pendingAdvertProblem(form);
@@ -213,6 +249,41 @@ function GuestAdvertComposer({ onUseEmail }: { onUseEmail: () => void }) {
             }))
           }
         />
+      </div>
+      <div className="guest-photo">
+        {photo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={photo.url} alt="The photo you chose" className="guest-photo__thumb" />
+        ) : null}
+        <div className="guest-photo__body">
+          <strong>{photo ? 'Your photo is ready' : 'Add a photo or logo (optional)'}</strong>
+          <span className="biz-sub">Buyers trust adverts with a picture. It stays on your phone until you publish.</span>
+          <div className="biz-actions" style={{ marginTop: 4 }}>
+            <label className="secondary-button guest-photo__pick">
+              {photo ? 'Change photo' : 'Choose or take a photo'}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                hidden
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = '';
+                  if (file) void choosePhoto(file);
+                }}
+              />
+            </label>
+            {photo ? (
+              <button type="button" className="secondary-button" onClick={removePhoto}>
+                Remove
+              </button>
+            ) : null}
+          </div>
+          {photoNote ? (
+            <p className="biz-note error" role="alert">
+              {photoNote}
+            </p>
+          ) : null}
+        </div>
       </div>
       <div className="guest-grid">
         <label className="field compact-field">

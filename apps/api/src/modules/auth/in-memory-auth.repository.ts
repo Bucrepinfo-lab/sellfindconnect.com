@@ -181,6 +181,21 @@ export class InMemoryAuthRepository implements AuthRepository {
     this.saveUser({ ...user, phoneVerifiedAt });
   }
 
+  updateUserContact(userId: string, contact: { displayName?: string; phone?: string }): void {
+    const user = this.usersById.get(userId);
+    if (!user) {
+      return;
+    }
+    if (contact.phone && user.phone && user.phone !== contact.phone) {
+      this.usersByPhone.delete(user.phone);
+    }
+    this.saveUser({
+      ...user,
+      ...(contact.displayName ? { displayName: contact.displayName } : {}),
+      ...(contact.phone ? { phone: contact.phone } : {}),
+    });
+  }
+
   updateUserPassword(userId: string, password: PasswordUpdateRecord): void {
     const user = this.usersById.get(userId);
     if (!user) {
