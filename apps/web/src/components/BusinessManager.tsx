@@ -21,6 +21,8 @@ import {
 } from '@telpen/domain';
 
 import { ApiError, apiRequest, isTermsError } from '../lib/api-client';
+import { clearPendingAdvert, readPendingAdvert } from '../lib/pending-advert';
+import { publishPendingAdvert } from '../lib/quick-publish';
 import { WebOnlyCheckout } from '../lib/app-context';
 import { formatDmy } from '../lib/dates';
 import { advertStatusLabel, codeLabel, industryLabel } from '../lib/labels';
@@ -264,8 +266,26 @@ export function BusinessManager() {
     // Initial load; state is only set in the promise callbacks.
     let cancelled = false;
     fetchBusiness()
-      .then((data) => {
-        if (!cancelled) apply(data);
+      .then(async (data) => {
+        if (cancelled) return;
+        apply(data);
+        // An advert written before sign-up (lazy registration, owner 25/11/26)
+        // goes live as soon as the account exists.
+        const pending = readPendingAdvert();
+        if (!pending) return;
+        setBusy('publish-pending');
+        try {
+          const message = await publishPendingAdvert(pending);
+          clearPendingAdvert();
+          if (!cancelled) {
+            apply(await fetchBusiness());
+            setNotice({ tone: 'ok', text: message });
+          }
+        } catch (error) {
+          if (!cancelled) setNotice({ tone: 'error', text: errorText(error), terms: isTermsError(error) });
+        } finally {
+          if (!cancelled) setBusy('');
+        }
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -555,6 +575,11 @@ export function BusinessManager() {
 
   return (
     <section className="biz" id="business" aria-label="Your business">
+      {busy === 'publish-pending' ? (
+        <div className="biz-note" role="status">
+          Putting your advert live…
+        </div>
+      ) : null}
       {notice ? (
         <div className={`biz-note ${notice.tone === 'ok' ? '' : notice.tone}`} role={notice.tone === 'error' ? 'alert' : 'status'}>
           {notice.text}

@@ -76,7 +76,20 @@ function finish(result: SignedIn) {
  * with a PIN; a forgotten or locked PIN uses a reset code from support.
  * Email sign-in stays available.
  */
-export function PhoneSignIn({ onUseEmail }: { onUseEmail: () => void }) {
+export function PhoneSignIn({
+  onUseEmail,
+  prefill,
+  heading,
+  note,
+}: {
+  onUseEmail: () => void;
+  /** Business details already typed (e.g. with an advert): not asked again. */
+  prefill?: { tenantDisplayName: string; industryCode: string; primaryRole: string };
+  /** Replaces "Sign in or create an account" when this step has a reason. */
+  heading?: string;
+  /** One line under the heading saying why the account is needed now. */
+  note?: string;
+}) {
   const [step, setStep] = useState<Step>('loading');
   const [device, setDevice] = useState<DeviceStatus>({ trusted: false });
   const [phone, setPhone] = useState('');
@@ -88,11 +101,11 @@ export function PhoneSignIn({ onUseEmail }: { onUseEmail: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [business, setBusiness] = useState({
-    tenantDisplayName: '',
+    tenantDisplayName: prefill?.tenantDisplayName ?? '',
     displayName: '',
-    industryCode: 'AGRICULTURE',
-    primaryRole: 'SUPPLIER',
-    userType: 'BOTH',
+    industryCode: prefill?.industryCode ?? 'AGRICULTURE',
+    primaryRole: prefill?.primaryRole ?? 'SUPPLIER',
+    userType: prefill ? 'ADVERTISER' : 'BOTH',
     email: '',
     acceptedTerms: false,
   });
@@ -256,9 +269,10 @@ export function PhoneSignIn({ onUseEmail }: { onUseEmail: () => void }) {
           }}
         >
           <div className="panel-heading tight">
-            <h2>Sign in or create an account</h2>
+            <h2>{heading ?? 'Sign in or create an account'}</h2>
           </div>
-          <p className="form-note">Use your phone number and your own 4-digit PIN. No email, no SMS.</p>
+          {note ? <p className="form-note">{note}</p> : null}
+          {note ? null : <p className="form-note">Use your phone number and your own 4-digit PIN. No email, no SMS.</p>}
           <label className="field compact-field">
             <span>Phone number</span>
             <input
@@ -329,21 +343,27 @@ export function PhoneSignIn({ onUseEmail }: { onUseEmail: () => void }) {
           <div className="panel-heading tight">
             <h2>Create your business account</h2>
           </div>
-          <p className="form-note">Welcome! This number has no account yet. Tell us about your business and choose a PIN.</p>
-          <label className="field compact-field">
-            <span>Business name</span>
-            <input
-              autoComplete="organization"
-              value={business.tenantDisplayName}
-              onChange={(event) => setBusiness({ ...business, tenantDisplayName: event.target.value })}
-            />
-          </label>
+          <p className="form-note">
+            {prefill
+              ? `Last step: your name and a PIN for ${prefill.tenantDisplayName}. Then your advert goes live.`
+              : 'Welcome! This number has no account yet. Tell us about your business and choose a PIN.'}
+          </p>
           <label className="field compact-field">
             <span>Your name</span>
             <input
               autoComplete="name"
               value={business.displayName}
               onChange={(event) => setBusiness({ ...business, displayName: event.target.value })}
+            />
+          </label>
+          {prefill ? null : (
+            <>
+          <label className="field compact-field">
+            <span>Business name</span>
+            <input
+              autoComplete="organization"
+              value={business.tenantDisplayName}
+              onChange={(event) => setBusiness({ ...business, tenantDisplayName: event.target.value })}
             />
           </label>
           <label className="field compact-field">
@@ -374,6 +394,8 @@ export function PhoneSignIn({ onUseEmail }: { onUseEmail: () => void }) {
               <option value="BUYER_SEARCHER">Find suppliers or buyers</option>
             </select>
           </label>
+            </>
+          )}
           <label className="field compact-field">
             <span>Email (optional)</span>
             <input

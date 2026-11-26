@@ -573,7 +573,7 @@
 
 .result-card--skeleton .result-card__media,
 .skeleton-line {
-  background: linear-gradient(90deg, #eeedf5 25%, #f7f6fb 50%, #eeedf5 75%);
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--line) 50%, var(--surface-2) 75%);
   background-size: 200% 100%;
 }
 
@@ -1105,4 +1105,168 @@
 
 .hero-locate__button svg {
   color: var(--sun);
+}
+
+/* Value banners and promises (owner 25/11/26: the landing page builds appetite). */
+.value-banners {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.value-banner {
+  --tone: var(--find);
+  --tone-soft: var(--find-soft);
+  --tone-text: var(--find-text);
+  position: relative;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 22px 20px 20px;
+  border-radius: 20px;
+  background:
+    radial-gradient(90% 70% at 100% 0%, var(--tone-soft), transparent 70%),
+    var(--surface);
+  border: 1px solid var(--line);
+  border-top: 6px solid var(--tone);
+  box-shadow: var(--shadow);
+}
+
+.value-banner.tone-sell { --tone: var(--sell); --tone-soft: var(--sell-soft); --tone-text: var(--sell-text); }
+.value-banner.tone-find { --tone: var(--find); --tone-soft: var(--find-soft); --tone-text: var(--find-text); }
+.value-banner.tone-connect { --tone: var(--connect); --tone-soft: var(--connect-soft); --tone-text: var(--connect-text); }
+
+.value-banner__icon {
+  display: grid;
+  place-items: center;
+  width: 50px;
+  height: 50px;
+  border-radius: 16px;
+  background: var(--tone);
+  color: #fff;
+}
+
+.value-banner__kicker {
+  margin: 4px 0 0;
+  font-weight: 700;
+  color: var(--tone-text);
+}
+
+.value-banner h3 {
+  margin: 0;
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.25rem;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.value-banner ul {
+  margin: 4px 0 8px;
+  padding-left: 18px;
+  color: var(--ink-2);
+  display: grid;
+  gap: 4px;
+}
+
+.value-banner__cta {
+  margin-top: auto;
+  align-self: flex-start;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--tone);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.value-banner__cta:hover {
+  filter: brightness(1.08);
+}
+
+.value-banner__cta:focus-visible {
+  outline: 3px solid var(--sun);
+  outline-offset: 2px;
+}
+
+.promise-band {
+  margin: 28px 0 0;
+  padding: 22px 20px;
+  border-radius: 20px;
+  background: var(--band);
+  color: #fff;
+}
+
+.promise-band h2 {
+  margin: 0 0 12px;
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.3rem;
+}
+
+.promise-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px 20px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.promise-list li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: #e4e6f8;
+}
+
+.promise-list svg {
+  flex: 0 0 auto;
+  color: var(--sun);
+}
+
+/* Reasons as bright cards rather than a plain list. */
+.reason {
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+/* Coloured advert cards (owner 25/11/26): an accent per kind of business. */
+.result-card {
+  --tone: var(--sell);
+  --tone-soft: var(--sell-soft);
+  border-left: 5px solid var(--tone);
+  box-shadow: var(--shadow);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.result-card.tone-find { --tone: var(--find); --tone-soft: var(--find-soft); }
+.result-card.tone-connect { --tone: var(--connect); --tone-soft: var(--connect-soft); }
+.result-card.tone-sun { --tone: var(--sun); --tone-soft: var(--sun-soft); }
+
+.result-card:hover {
+  transform: translateY(-2px);
+}
+
+.result-card__media {
+  background: var(--tone-soft);
+}
+
+.result-card__initial {
+  color: var(--tone);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .result-card {
+    transition: none;
+  }
+
+  .result-card:hover {
+    transform: none;
+  }
 }

@@ -24,8 +24,8 @@ const REASONS: Array<{ icon: SfcIconName; title: string; text: string; webOnly?:
   },
   {
     icon: 'checked',
-    title: 'A checked account behind every listing',
-    text: 'A business confirms its account with a one-time code before it can publish, and its photos are checked before they show.',
+    title: 'A real business behind every listing',
+    text: 'Every listing belongs to a business signed in with its own phone number and PIN, and its photos are checked before they show.',
   },
   {
     icon: 'price',
@@ -38,6 +38,50 @@ const REASONS: Array<{ icon: SfcIconName; title: string; text: string; webOnly?:
     title: 'Report it, block it, gone',
     text: 'Every listing has Report and Block. Scams, fakes and prohibited goods are removed, and a business you block stays hidden from you.',
   },
+];
+
+/**
+ * One banner per kind of visitor, each with the value in plain words and the
+ * next step (owner 25/11/26: the front office should build appetite).
+ */
+const BANNERS: Array<{ tone: string; icon: SfcIconName; kicker: string; title: string; points: string[]; cta: string; href: string }> = [
+  {
+    tone: 'sell',
+    icon: 'sell',
+    kicker: 'For sellers',
+    title: 'Be found by buyers in all 47 counties',
+    points: ['Your advert shows in search the moment you publish', 'Buyers call or WhatsApp you directly', 'No commission on your deals'],
+    cta: 'Create an advert',
+    href: '/dashboard#adverts',
+  },
+  {
+    tone: 'find',
+    icon: 'find',
+    kicker: 'For buyers',
+    title: 'Compare suppliers near you, then call',
+    points: ['Search is free, no account needed', 'Filter by county, ward, industry and type', 'Report or block anyone in one tap'],
+    cta: 'Start searching',
+    href: '#search',
+  },
+  {
+    tone: 'connect',
+    icon: 'transporter',
+    kicker: 'Transport and services',
+    title: 'Get regular work from traders who need you',
+    points: ['List your routes, lorry sizes or services', 'Show the businesses you already work with', 'Get enquiries on your phone'],
+    cta: 'List my service',
+    href: '/dashboard#adverts',
+  },
+];
+
+/** What every member gets, as plain checks. Each one is something the product already does. */
+const PROMISES = [
+  'Free to search, no account needed',
+  'You deal directly, no middleman',
+  'No commission on your sales',
+  'Every listing tied to a business phone number',
+  'Works on any phone and in the Android app',
+  'Report and block on every listing',
 ];
 
 const STEPS = [
@@ -63,8 +107,8 @@ export function PublicHome({ initial }: { initial: SearchFilters }) {
           ) : (
             <>
               <Link href="/dashboard">Sign in</Link>
-              <Link className="home-nav__cta" href="/dashboard?signup=1">
-                List your business
+              <Link className="home-nav__cta" href="/dashboard#adverts">
+                Post an advert
               </Link>
             </>
           )}
@@ -77,6 +121,41 @@ export function PublicHome({ initial }: { initial: SearchFilters }) {
           <p>Suppliers, wholesalers, transporters and service providers in all 47 counties. Search free, then contact them directly.</p>
         </header>
       </LiveSearch>
+
+      <section className="home-section" aria-labelledby="banners-heading">
+        <h2 id="banners-heading">Made for every business in the chain</h2>
+        <ul className="value-banners">
+          {BANNERS.map((banner) => (
+            <li key={banner.title} className={`value-banner tone-${banner.tone}`}>
+              <span className="value-banner__icon" aria-hidden="true">
+                <SfcIcon name={banner.icon} size={26} />
+              </span>
+              <p className="value-banner__kicker">{banner.kicker}</p>
+              <h3>{banner.title}</h3>
+              <ul>
+                {banner.points.map((point) => (
+                  <li key={point}>{point}</li>
+                ))}
+              </ul>
+              <Link className="value-banner__cta" href={banner.href}>
+                {banner.cta}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="promise-band" aria-labelledby="promise-heading">
+        <h2 id="promise-heading">What you get with SellFindConnect</h2>
+        <ul className="promise-list">
+          {PROMISES.map((promise) => (
+            <li key={promise}>
+              <SfcIcon name="checked" size={18} />
+              <span>{promise}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       <section className="home-section" aria-labelledby="why-heading">
         <h2 id="why-heading">Why businesses use SellFindConnect</h2>
@@ -119,8 +198,8 @@ export function PublicHome({ initial }: { initial: SearchFilters }) {
           </p>
         </div>
         <div className="sell-band__actions">
-          <Link className="sell-band__cta" href={session ? '/dashboard/adverts/new' : '/dashboard?signup=1'}>
-            {session ? 'Post an advert' : 'List your business'}
+          <Link className="sell-band__cta" href={session ? '/dashboard/adverts/new' : '/dashboard#adverts'}>
+            {session ? 'Post an advert' : 'Create your advert'}
           </Link>
           <ShareBar
             label="Tell a business"

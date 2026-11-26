@@ -86,6 +86,14 @@ const QUICK_ROLES: Array<{ role: string; label: string }> = [
   { role: 'BUYER', label: 'Buyers' },
 ];
 
+/** One colour family per kind of business, so cards are easy to tell apart at a glance. */
+function roleTone(role: string): 'sell' | 'find' | 'connect' | 'sun' {
+  if (role === 'BUYER' || role === 'CONSUMER') return 'find';
+  if (['LOGISTICS_PROVIDER', 'SERVICE_PROVIDER', 'INSTALLER', 'MAINTAINER', 'AGENT'].includes(role)) return 'connect';
+  if (role === 'FINANCIER' || role === 'CERTIFIER') return 'sun';
+  return 'sell';
+}
+
 const DEFAULT_MARKETS = ['Gikomba Market', 'Kongowea Market', 'Kibuye Market', 'Nakuru Wakulima Market', 'Eastleigh', 'Karatina Market'];
 
 async function runSearch(filters: SearchFilters): Promise<SearchState> {
@@ -174,7 +182,7 @@ function ResultCard({
     ? [result.location.landmark, kenyaPlaceLabel(result.location)].filter(Boolean).join(' · ')
     : '';
   return (
-    <li className="result-card">
+    <li className={`result-card tone-${roleTone(result.role)}`}>
       <Link href={`/listing/${result.id}`} className="result-card__link" aria-label={`Open ${result.title}`}>
         <div className="result-card__media" aria-hidden={cover ? undefined : true}>
           {cover ? (
@@ -421,7 +429,7 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
 
   return (
     <>
-      <section className="home-hero" aria-label="Find businesses">
+      <section className="home-hero" id="search" aria-label="Find businesses">
         {children}
         <form
           className="hero-search"
@@ -657,7 +665,7 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
           {state.status === 'loading' && state.results.length === 0 ? <ResultSkeleton /> : null}
           {state.status === 'done' && visible.length === 0 ? (
             <div className="biz-empty empty-state">
-              <strong>No business matches yet.</strong>
+              <strong>No business matches yet. SellFindConnect is new and growing every week.</strong>
               <p>
                 {place.county
                   ? `No business in ${kenyaPlaceLabel(place)} matches yet.${
@@ -698,8 +706,8 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
                     Clear all filters
                   </button>
                 ) : null}
-                <Link className="primary-button" href="/dashboard?signup=1">
-                  List your business here
+                <Link className="primary-button" href="/dashboard#adverts">
+                  Sell this? Post the first advert
                 </Link>
               </div>
             </div>
