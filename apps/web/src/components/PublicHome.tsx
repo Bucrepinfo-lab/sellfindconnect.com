@@ -84,10 +84,20 @@ const PROMISES = [
   'Report and block on every listing',
 ];
 
+/**
+ * How it works, for both kinds of visitor (owner 26/11/26): the buyer's three
+ * steps and the seller's three steps, side by side, each in the order people
+ * really go, each ending in a button.
+ */
 const STEPS = [
-  { title: 'Search', text: 'Type what you need and pick your county.' },
+  { title: 'Search', text: 'Type what you need and pick your county. Free, no account needed.' },
   { title: 'Compare', text: 'Open listings to see photos, what they offer and where they are.' },
   { title: 'Connect', text: 'Call or WhatsApp the business directly and agree your own terms.' },
+];
+const SELL_STEPS = [
+  { title: 'Write or say your advert', text: 'What you sell, your prices and where you deliver. Tap the microphone if typing is hard.' },
+  { title: 'Publish with your phone', text: 'Your phone number and a 4-digit PIN. No SMS code. The first month is free.' },
+  { title: 'Buyers call you', text: 'Your advert shows in search at once, and buyers contact you directly. No commission.' },
 ];
 
 /** Public home: real search over published adverts, the reasons to trust it and the policies. */
@@ -122,8 +132,40 @@ export function PublicHome({ initial }: { initial: SearchFilters }) {
         </header>
       </LiveSearch>
 
+      <section className="home-section how-flow" id="how" aria-labelledby="how-heading">
+        <h2 id="how-heading">How it works</h2>
+        <div className="how-flow__cols">
+          <div className="how-flow__col">
+            <h3 className="how-flow__who">I want to buy or find</h3>
+            <ol className="step-list">
+              {STEPS.map((step) => (
+                <li key={step.title}>
+                  <h3>{step.title}</h3>
+                  <p>{step.text}</p>
+                </li>
+              ))}
+            </ol>
+            <a className="how-flow__cta how-flow__cta--find" href="#search">Start searching</a>
+          </div>
+          <div className="how-flow__col">
+            <h3 className="how-flow__who">I want to sell or offer a service</h3>
+            <ol className="step-list">
+              {SELL_STEPS.map((step) => (
+                <li key={step.title}>
+                  <h3>{step.title}</h3>
+                  <p>{step.text}</p>
+                </li>
+              ))}
+            </ol>
+            <Link className="how-flow__cta how-flow__cta--sell" href={session ? '/dashboard/adverts/new' : '/dashboard#adverts'}>
+              Post my advert
+            </Link>
+          </div>
+        </div>
+      </section>
+
       <section className="home-section" aria-labelledby="banners-heading">
-        <h2 id="banners-heading">Made for every business in the chain</h2>
+        <h2 id="banners-heading">What would you like to do?</h2>
         <ul className="value-banners">
           {BANNERS.map((banner) => (
             <li key={banner.title} className={`value-banner tone-${banner.tone}`}>
@@ -177,18 +219,6 @@ export function PublicHome({ initial }: { initial: SearchFilters }) {
         </ul>
       </section>
 
-      <section className="home-section" aria-labelledby="how-heading">
-        <h2 id="how-heading">How it works</h2>
-        <ol className="step-list">
-          {STEPS.map((step) => (
-            <li key={step.title}>
-              <h3>{step.title}</h3>
-              <p>{step.text}</p>
-            </li>
-          ))}
-        </ol>
-      </section>
-
       <section className="sell-band" aria-labelledby="sell-heading">
         <div>
           <h2 id="sell-heading">Selling something? Be found where buyers are searching.</h2>
@@ -217,6 +247,24 @@ export function PublicHome({ initial }: { initial: SearchFilters }) {
         </p>
         <Link href="/prohibited">Read the prohibited content policy</Link>
       </details>
+
+      <section className="home-section home-help" aria-labelledby="help-heading">
+        <h2 id="help-heading">Need help?</h2>
+        <p>
+          Write to <span className="home-help__mail">telpeninfo@gmail.com</span> and tell us what you tapped. We answer the
+          same day.
+        </p>
+      </section>
+
+      {/* Phones: the two main actions stay one thumb away. */}
+      <nav className="home-dock" aria-label="Quick actions">
+        <a className="home-dock__btn home-dock__btn--find" href="#search">
+          Search
+        </a>
+        <Link className="home-dock__btn home-dock__btn--sell" href={session ? '/dashboard/adverts/new' : '/dashboard#adverts'}>
+          Post an advert
+        </Link>
+      </nav>
 
       <footer className="biz-footer home-footer">
         <Link href="/terms">Terms</Link>
