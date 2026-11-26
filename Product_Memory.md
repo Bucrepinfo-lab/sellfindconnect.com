@@ -6,6 +6,9 @@ Purpose: Persistent decision log and strategic memory for the Telpen Adverts mul
 
 This file must be updated whenever product strategy, pricing, compliance, architecture, market positioning, or execution decisions change.
 
+## 26/11/26 — Fonts self-hosted (build no longer needs Google Fonts)
+- After PR #111 merged, the main build failed: `next/font/google` could not reach Google Fonts (`queries have exactly one entry`). The rerun passed, but the build should never depend on it. Bricolage Grotesque and Plus Jakarta Sans (OFL-1.1, variable, Latin) now live in `apps/web/src/app/fonts/` and load through `next/font/local`; same CSS variables, same look.
+
 ## 26/11/26 — Seen by Google: robots.txt and sitemap.xml
 - Audit: sellfindconnect.com, www and api resolve to Fly with Issued certificates; assetlinks live. `/robots.txt` and `/sitemap.xml` were 404. Added `apps/web/src/app/robots.ts` (public pages allowed; api, admin, dashboard, account, onboarding kept out) and `sitemap.ts` (home, subscription, community, terms, privacy, prohibited). Search Console domain property to be verified by a GoDaddy TXT record.
 
