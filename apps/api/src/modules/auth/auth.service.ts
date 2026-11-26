@@ -395,8 +395,8 @@ export class AuthService {
 
   /**
    * Issues a tenant session whose MFA is already satisfied (owner 20/11/26, no
-   * SMS): by the account's own PIN, by a staff PIN reset code, or right after
-   * registering with a new PIN.
+   * SMS, no codes since 26/11/26): by the account's own PIN (including a first
+   * PIN chosen at sign-in), or right after registering with a new PIN.
    */
   async issuePhoneVerifiedSession(user: AuthUserRecord, method: 'REGISTRATION' | 'RESET_CODE' | 'PIN' | 'PLAY_REVIEW') {
     const membership = await this.repository.findFirstMembershipForUser(user.id);

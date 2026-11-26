@@ -497,7 +497,7 @@ export function PhoneSignIn({
       {step === 'phone' || step === 'pin' ? (
         <p className="form-note">
           <button className="text-link" type="button" onClick={onUseEmail}>
-            Sign in with email instead
+            SellFindConnect staff? Sign in with email
           </button>
         </p>
       ) : null}
