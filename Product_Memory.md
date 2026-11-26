@@ -6,6 +6,10 @@ Purpose: Persistent decision log and strategic memory for the Telpen Adverts mul
 
 This file must be updated whenever product strategy, pricing, compliance, architecture, market positioning, or execution decisions change.
 
+## 26/11/26 — Share where people are: WhatsApp, Facebook, X, Telegram, LinkedIn, SMS, email (owner: "come up with the most popular tools")
+- Owner saw the computer's own share box (OneNote, Outlook, Copilot). `ShareBar` (listing and home) now leads with WhatsApp and Facebook (most used in Kenya: Media Council of Kenya 2026, Communications Authority, GeoPoll 2025), then X, Telegram, LinkedIn, SMS, email, "TikTok, Instagram & more" (phone share sheet on phones; copy link + hint on computers) and Copy link.
+- `packages/domain/src/share-targets.ts` (+ test): the same module in all five apps; a private link only ever gets WhatsApp, SMS and email.
+
 ## 26/11/26 — Wording: nothing suggests a code is sent (owner: "correct wording even from others")
 - The phone sign-in's "Sign in with email instead" link (staff email sign-in, which uses an emailed code and an authenticator) now reads "SellFindConnect staff? Sign in with email", so testers and business owners are not led into a code step.
 - Docs: `PLAY-APP-CONTENT-REVIEW.md` (support clears a PIN, no reset code), `PLAY_STORE.md` (no SMS OTP; phone + PIN), and the `issuePhoneVerifiedSession` comment.
