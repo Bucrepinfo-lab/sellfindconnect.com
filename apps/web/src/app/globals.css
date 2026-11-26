@@ -1921,10 +1921,12 @@ html {
   text-decoration: none;
 }
 
-/* Tap to speak and the language chips (owner 26/11/26). */
+/* Tap to speak and the language chips (owner 26/11/26). Speaking is the
+   CONNECT verb, so the microphone is berry while it listens; the chosen
+   language is FIND cobalt. Tokens only, so the dark theme follows. */
 .speak {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   justify-items: start;
   margin-top: 8px;
 }
@@ -1940,34 +1942,78 @@ html {
   align-items: center;
   gap: 8px;
   min-height: 44px;
-  padding: 8px 14px;
-  border: 1px solid currentColor;
+  padding: 8px 16px;
+  border: 1px solid var(--line);
   border-radius: 999px;
-  background: transparent;
-  color: inherit;
+  background: var(--surface);
+  color: var(--ink);
   font: inherit;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
+  transition: transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease, border-color 150ms ease;
 }
-.speak__lang.is-on {
-  background: #1f6f4a;
-  border-color: #1f6f4a;
-  color: #fff;
+.speak__mic {
+  border-color: var(--connect);
+  color: var(--connect);
 }
-.speak__mic.is-live {
-  background: #c4452f;
-  border-color: #c4452f;
-  color: #fff;
+.speak__lang:hover,
+.speak__mic:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px -12px rgba(22, 26, 61, 0.55);
+}
+.speak__lang:hover {
+  border-color: var(--find);
+  background: var(--find-soft);
+}
+.speak__mic:hover {
+  background: var(--connect-soft);
+}
+.speak__lang:active,
+.speak__mic:active {
+  transform: scale(0.97);
+}
+.speak__lang.is-on,
+.speak__lang.is-on:hover {
+  background: var(--find);
+  border-color: var(--find);
+  color: #ffffff;
+}
+.speak__mic.is-live,
+.speak__mic.is-live:hover {
+  background: var(--connect);
+  border-color: var(--connect);
+  color: #ffffff;
+  animation: speak-pulse 1.4s ease-out infinite;
 }
 .speak__mic:focus-visible,
 .speak__lang:focus-visible {
-  outline: 3px solid #f5a700;
+  outline: 3px solid var(--find);
   outline-offset: 2px;
 }
 .guest-speak {
   display: grid;
-  gap: 6px;
-  padding: 12px 14px;
-  border: 1px dashed currentColor;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--connect);
   border-radius: 14px;
+  background: var(--connect-soft);
+  transition: box-shadow 180ms ease, transform 180ms ease;
+}
+.guest-speak:hover,
+.guest-speak:focus-within {
+  box-shadow: 0 14px 30px -20px rgba(209, 36, 107, 0.7);
+  transform: translateY(-1px);
+}
+@keyframes speak-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(209, 36, 107, 0.5); }
+  100% { box-shadow: 0 0 0 14px rgba(209, 36, 107, 0); }
+}
+@media (max-width: 480px) {
+  .speak__mic { width: 100%; justify-content: center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .speak__lang, .speak__mic, .guest-speak { transition: none; }
+  .speak__lang:hover, .speak__mic:hover, .guest-speak:hover, .guest-speak:focus-within { transform: none; }
+  .speak__mic.is-live { animation: none; }
 }

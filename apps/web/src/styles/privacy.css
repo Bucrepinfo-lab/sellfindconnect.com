@@ -70,3 +70,14 @@ body:has(.sfc-ps){background:#0f1230;}.sfc-ps{min-height:100vh;}.sfc-ps a:not(.s
 
 /* Sunrise on the dark (owner 24/11/26). */
 body:has(.sfc-ps),body:has(.sfc-privacy),body:has(.sfc-delete){background:radial-gradient(90% 35% at 50% 0%,rgba(255,210,90,.16),transparent 70%),#0f1230;}
+
+/* My profile (owner 26/11/26): the language chips read on this page's dark
+   ground, rows answer the pointer, and buttons fill the width on a phone. */
+.sfc-ps .speak__lang{background:var(--surface2);border-color:var(--line);color:var(--text);}
+.sfc-ps .speak__lang:hover{background:var(--surface);border-color:var(--info);}
+.sfc-ps .speak__lang.is-on,.sfc-ps .speak__lang.is-on:hover{background:var(--signal);border-color:var(--signal);color:#0f1230;}
+.sfc-ps .biz-sub{color:var(--dim);}
+.sfc-ps__inventory-item{transition:background-color .15s ease;}
+.sfc-ps__inventory-item:hover{background:var(--surface2);}
+@media (max-width:520px){.sfc-ps{padding:32px 16px 64px;}.sfc-ps__btn{display:block;width:100%;text-align:center;}}
+@media (prefers-reduced-motion:reduce){.sfc-ps__inventory-item{transition:none;}}
