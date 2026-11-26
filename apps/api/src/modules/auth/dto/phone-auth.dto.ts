@@ -14,15 +14,15 @@ export class StartPhoneSignInDto {
   declare phone: string;
 }
 
-export class RedeemResetCodeDto {
-  @ApiProperty({ example: '0712345678' })
+export class SetFirstPinDto {
+  @ApiProperty({ description: 'Short-lived ticket from step 1 for a number with an account but no PIN.' })
   @IsString()
-  @Length(6, 80)
-  declare phone: string;
+  @Length(20, 200)
+  declare pinToken: string;
 
-  @ApiProperty({ example: '482913', description: 'One-time PIN reset code from support staff.' })
-  @Matches(/^\d{6}$/)
-  declare code: string;
+  @ApiProperty({ example: '4829' })
+  @Matches(/^\d{4}$/)
+  declare pin: string;
 
   @ApiPropertyOptional({ example: 'Android phone' })
   @IsOptional()
@@ -31,7 +31,7 @@ export class RedeemResetCodeDto {
   declare deviceLabel?: string;
 }
 
-export class IssueResetCodeDto {
+export class ClearPinDto {
   @ApiProperty({ description: 'Session token of a support staff member (MFA satisfied).' })
   @IsString()
   @Length(10, 200)

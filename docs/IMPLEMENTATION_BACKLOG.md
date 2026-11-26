@@ -711,9 +711,10 @@ Progress:
     - keep the staff analytics filters (scope, industry, format, data source)
       in the URL.
 - 2026-11-20: Sign-in without SMS (phone + PIN, support PIN reset codes). Still open:
-  a support-console form for `POST /v1/auth/phone/reset-code` (today staff call
-  the API with their session), and Daraja STK for subscriptions in place of
-  Africa's Talking checkout.
+  ~~a support-console form for `POST /v1/auth/phone/reset-code`~~ (reset codes
+  removed 26/11/26; open instead: a support-console "Clear PIN" form for
+  `POST /v1/auth/phone/pin/clear`, today staff call the API with their session),
+  and Daraja STK for subscriptions in place of Africa's Talking checkout.
 - 2026-11-23: Source Finder premium explanation tier (Claude Fable 5.2) landed as a
   pure domain selector + model allow-list (`source-finder-model-tier.ts`) on branch
   `feat/source-finder-fable-5-2-tier` (draft PR). Still open: (1) wire per-tenant
