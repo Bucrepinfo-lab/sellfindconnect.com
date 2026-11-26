@@ -24,6 +24,11 @@ This file must be updated whenever product strategy, pricing, compliance, archit
 ## 26/11/26 — Fonts self-hosted (build no longer needs Google Fonts)
 - After PR #111 merged, the main build failed: `next/font/google` could not reach Google Fonts (`queries have exactly one entry`). The rerun passed, but the build should never depend on it. Bricolage Grotesque and Plus Jakarta Sans (OFL-1.1, variable, Latin) now live in `apps/web/src/app/fonts/` and load through `next/font/local`; same CSS variables, same look.
 
+## 26/11/26 — Homepage flow for non-technical visitors (owner 22:29)
+- Order now: search hero → How it works, side by side for "I want to buy or find" (search → compare → connect) and "I want to sell or offer a service" (write or say → publish with phone + PIN → buyers call you), each with its button → "What would you like to do?" (the three visitor banners) → what you get → why → sell band → help (email) → policies. Phones get a fixed Search / Post an advert dock.
+- Fix: the search button said "Searching…" while the first results loaded on arrival, so the page looked stuck; it now says Search until the person asks.
+- Audit: no unused files or packages found (pg and rxjs are needed by the Prisma adapter and NestJS).
+
 ## 26/11/26 — My profile: change my name and phone number; a photo before sign-up (owner "fix everything", 22:08)
 - `POST /v1/auth/phone/me/name` and `/me/phone` (`PhoneAuthService.changeOwnName` / `changeOwnPhone`). Name: letters only, safety-screened. Phone: needs the PIN with the same five-try lockout and limits as sign-in; refused for staff and for a number that already has an account; the PIN stays the same; nothing is sent by SMS. Both write an audit log line. New repository method `updateUserContact` (in-memory and Prisma). No database change.
 - `/account` has the two forms; the name can be spoken.

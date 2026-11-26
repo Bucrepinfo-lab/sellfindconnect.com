@@ -293,6 +293,9 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
   const [myPlace, setMyPlace] = useState<BusinessPlace | undefined>(undefined);
   const [photosOnly, setPhotosOnly] = useState(false);
   const [state, setState] = useState<SearchState>({ status: 'loading', results: [] });
+  // The first results load by themselves; the button only says "Searching…"
+  // once the person has asked (owner 26/11/26: it looked stuck on arrival).
+  const [asked, setAsked] = useState(false);
   const [blockedTenants, setBlockedTenants] = useState<string[]>([]);
   const [locating, setLocating] = useState<'idle' | 'busy' | 'done' | 'denied' | 'outside' | 'unavailable'>('idle');
   // One clock reading per result set keeps badges stable while the list is on screen.
@@ -309,6 +312,7 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
       sort: sort === 'NEAREST' ? 'BEST' : sort,
       ...next,
     };
+    setAsked(true);
     setState((current) => ({ ...current, status: 'loading' }));
     writeFiltersToUrl(filters);
     const result = await runSearch(filters);
@@ -471,9 +475,9 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
                 ))}
             </select>
           </label>
-          <button className="hero-search__go" type="submit" disabled={state.status === 'loading'}>
+          <button className="hero-search__go" type="submit" disabled={asked && state.status === 'loading'}>
             <SfcIcon name="find" size={18} />
-            {state.status === 'loading' ? 'Searching…' : 'Search'}
+            {asked && state.status === 'loading' ? 'Searching…' : 'Search'}
           </button>
         </form>
         <div className="hero-locate">
