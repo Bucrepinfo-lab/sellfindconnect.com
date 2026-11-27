@@ -235,7 +235,7 @@ function ListingBody(props: {
           <>
             <h2>Something wrong with this listing?</h2>
             <p className="biz-sub">
-              <Link href="/dashboard">Sign in</Link> to report it to our moderators or block this business.
+              <Link href="/dashboard#sign-in">Sign in</Link> to report it to our moderators or block this business.
             </p>
           </>
         ) : (

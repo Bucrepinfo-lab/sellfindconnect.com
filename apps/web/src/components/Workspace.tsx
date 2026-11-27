@@ -1776,7 +1776,19 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
               </button>
             </>
           ) : (
-            <Link href="/dashboard">Sign in</Link>
+            <a
+              href="/dashboard#sign-in"
+              onClick={(event) => {
+                // On the business page already: open the form here (a same-page
+                // link used to do nothing). Elsewhere the browser goes there.
+                if (window.location.pathname !== '/dashboard') return;
+                event.preventDefault();
+                window.history.replaceState(null, '', '/dashboard#sign-in');
+                window.dispatchEvent(new HashChangeEvent('hashchange'));
+              }}
+            >
+              Sign in
+            </a>
           )}
           <ThemeToggle />
         </div>

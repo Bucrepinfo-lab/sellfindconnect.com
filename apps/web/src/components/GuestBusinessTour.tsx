@@ -22,6 +22,21 @@ import { SpeakButton } from './SpeakButton';
  */
 export function GuestBusinessTour({ onUseEmail }: { onUseEmail: () => void }) {
   const [signIn, setSignIn] = useState(false);
+  // Owner 27/11/26: the top "Sign in" did nothing on this page (it linked to the
+  // page already open). Every "Sign in" now links to /dashboard#sign-in, which
+  // opens the form here and brings it into view.
+  useEffect(() => {
+    const open = () => {
+      if (window.location.hash !== '#sign-in') return;
+      setSignIn(true);
+      window.requestAnimationFrame(() =>
+        document.getElementById('sign-in')?.scrollIntoView({ block: 'start' }),
+      );
+    };
+    open();
+    window.addEventListener('hashchange', open);
+    return () => window.removeEventListener('hashchange', open);
+  }, []);
   return (
     <div className="guest-tour">
       <header className="guest-hero">
@@ -39,7 +54,7 @@ export function GuestBusinessTour({ onUseEmail }: { onUseEmail: () => void }) {
           </button>
         </div>
         {signIn ? (
-          <div className="guest-signin">
+          <div className="guest-signin" id="sign-in">
             <PhoneSignIn onUseEmail={onUseEmail} heading="Welcome back" />
           </div>
         ) : null}
