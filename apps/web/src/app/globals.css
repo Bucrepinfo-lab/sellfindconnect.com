@@ -2057,3 +2057,40 @@ html {
   .guest-photo { transition: none; }
   .guest-photo:hover, .guest-photo:focus-within { transform: none; }
 }
+
+/* Share row on every page (owner 27/11/26): each channel in its own colour,
+   thumb-sized, lifting on hover. */
+.share-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.share-bar .secondary-button {
+  min-height: 44px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 150ms ease, box-shadow 150ms ease, filter 150ms ease;
+}
+.share-bar .secondary-button:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px -10px rgba(22, 26, 61, 0.55);
+}
+.share-bar .secondary-button:active {
+  transform: scale(0.97);
+}
+.share-bar .secondary-button:focus-visible {
+  outline: 3px solid var(--find);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .share-bar .secondary-button { transition: none; }
+  .share-bar .secondary-button:hover { transform: none; }
+}

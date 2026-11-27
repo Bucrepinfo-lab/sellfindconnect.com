@@ -14,18 +14,30 @@ import { SfcIcon } from './SfcIcon';
  * it copies the link with a hint (never the computer's OneNote/Outlook box).
  * Nothing is sent until the person taps; no tracking parameters are added.
  */
-export function ShareBar({ title, text, label = 'Share' }: { title: string; text: string; label?: string }) {
+export function ShareBar({
+  title,
+  text,
+  label = 'Share',
+  url: fixedUrl,
+}: {
+  title: string;
+  text: string;
+  label?: string;
+  /** A fixed address to share (e.g. the homepage from a private page); default: this page. */
+  url?: string;
+}) {
   const [note, setNote] = useState('');
   // The page address on the client ('' while rendering on the server).
-  const url = useSyncExternalStore(
+  const pageUrl = useSyncExternalStore(
     () => () => undefined,
     () => window.location.href,
     () => '',
   );
+  const url = fixedUrl ?? pageUrl;
 
   const copy = async (hint = 'Link copied') => {
     try {
-      await navigator.clipboard.writeText(url || window.location.href);
+      await navigator.clipboard.writeText(url || pageUrl || window.location.href);
       setNote(hint);
     } catch {
       setNote(url);

@@ -769,23 +769,6 @@
   }
 }
 
-.share-bar {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.share-bar .secondary-button {
-  min-height: 44px;
-  border-radius: 10px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 14px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
 .safety-note {
   border: 1px solid var(--line);
   border-radius: 12px;

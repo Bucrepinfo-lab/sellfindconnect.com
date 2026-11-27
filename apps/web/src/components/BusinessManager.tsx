@@ -31,6 +31,7 @@ import type { PreparedPhoto } from '../lib/prepare-photo';
 import { publicApiBaseUrl, readTenantSession } from '../lib/public-api';
 import { PhotoPreview } from './PhotoPreview';
 import { ReadTextButton } from './ReadTextButton';
+import { ShareBar } from './ShareBar';
 import { PlanCard } from './PlanCard';
 import '../styles/business.css';
 import { SpeakButton } from './SpeakButton';
@@ -1013,6 +1014,16 @@ export function BusinessManager() {
       <WebOnlyCheckout>
         <PlanCard />
       </WebOnlyCheckout>
+
+      <div className="biz-card">
+        <h2>Tell another business</h2>
+        <ShareBar
+          label="Share SellFindConnect"
+          title="SellFindConnect"
+          text="Find suppliers, buyers and transporters across Kenya on SellFindConnect. Free to search."
+          url="https://sellfindconnect.com/?via=share"
+        />
+      </div>
 
       <div className="biz-card">
         <h2>Account</h2>

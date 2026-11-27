@@ -12,6 +12,7 @@ import Link from "next/link";
 import { appendSpoken } from "@telpen/domain";
 
 import { LanguagePicker } from "../../components/LanguagePicker";
+import { ShareBar } from "../../components/ShareBar";
 import { SpeakButton } from "../../components/SpeakButton";
 import { formatDmy } from "../../lib/dates";
 import { publicApiBaseUrl, readTenantSession, tenantSessionHeaders } from "../../lib/public-api";
@@ -244,6 +245,16 @@ Your picture is your business logo. Change it, your business name, description a
         <Link href="/account/privacy-settings" className="sfc-ps__btn sfc-ps__btn--secondary">
           See and export my records
         </Link>
+      </section>
+
+      <section className="sfc-ps__section" aria-labelledby="share">
+        <h2 id="share">Tell another business</h2>
+        <ShareBar
+          label="Share SellFindConnect"
+          title="SellFindConnect"
+          text="Find suppliers, buyers and transporters across Kenya on SellFindConnect. Free to search."
+          url="https://sellfindconnect.com/?via=share"
+        />
       </section>
 
       <section className="sfc-ps__section" aria-labelledby="acc">
