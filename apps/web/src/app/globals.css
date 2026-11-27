@@ -2404,3 +2404,33 @@ html {
     animation: none;
   }
 }
+
+/* Share row as a tidy grid (owner 28/11/26: "WhatsApp is not on the line from
+   the others… disorganized"). The buttons had different widths and wrapped
+   raggedly. Now every channel is the same size in even columns; the long
+   "TikTok, Instagram & more" button takes its own full row underneath. */
+.share-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+}
+.share-bar > p {
+  grid-column: 1 / -1;
+}
+.share-bar .secondary-button {
+  width: 100%;
+  justify-content: center;
+  text-align: center;
+  padding: 0 8px;
+  white-space: nowrap;
+  font-size: 14px;
+}
+.share-bar > button:first-of-type {
+  grid-column: 1 / -1;
+  order: 1;
+}
+.share-bar > p[role='status'] {
+  order: 2;
+}
