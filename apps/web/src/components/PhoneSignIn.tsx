@@ -100,6 +100,16 @@ export function PhoneSignIn({
   const [pinToken, setPinToken] = useState('');
   const [pin, setPin] = useState('');
   const [pinConfirm, setPinConfirm] = useState('');
+  // Owner 27/11/26: a grey button with no reason. Say what is missing; let people see the PIN.
+  const [showPin, setShowPin] = useState(false);
+  const pinHint =
+    pin.length > 0 && pin.length < 4
+      ? `Your new PIN has ${pin.length} of 4 numbers. Add ${4 - pin.length} more.`
+      : pin.length === 4 && pinConfirm.length > 0 && pinConfirm.length < 4
+        ? `Repeat PIN has ${pinConfirm.length} of 4 numbers.`
+        : pin.length === 4 && pinConfirm.length === 4 && pin !== pinConfirm
+          ? 'The two PINs are different. Type the same 4 numbers in both boxes.'
+          : null;
   const [registrationToken, setRegistrationToken] = useState('');
   const [pendingSession, setPendingSession] = useState<SignedIn | null>(null);
   const [busy, setBusy] = useState(false);
@@ -394,7 +404,7 @@ export function PhoneSignIn({
           <label className="field compact-field">
             <span>Choose a 4-digit PIN</span>
             <input
-              type="password"
+              type={showPin ? "text" : "password"}
               inputMode="numeric"
               autoComplete="new-password"
               maxLength={4}
@@ -405,7 +415,7 @@ export function PhoneSignIn({
           <label className="field compact-field">
             <span>Repeat the PIN</span>
             <input
-              type="password"
+              type={showPin ? "text" : "password"}
               inputMode="numeric"
               autoComplete="new-password"
               maxLength={4}
@@ -425,6 +435,10 @@ export function PhoneSignIn({
               <Link href="/community">Community standards</Link> policies.
             </span>
           </label>
+          <label className="form-note">
+            <input type="checkbox" checked={showPin} onChange={(e) => setShowPin(e.target.checked)} /> Show PIN
+          </label>
+          {pinHint ? <p aria-live="polite" className="form-note">{pinHint}</p> : null}
           <div className="terms-actions">
             <button
               className="primary-button"
@@ -461,7 +475,7 @@ export function PhoneSignIn({
           <label className="field compact-field">
             <span>New PIN</span>
             <input
-              type="password"
+              type={showPin ? "text" : "password"}
               inputMode="numeric"
               autoComplete="new-password"
               maxLength={4}
@@ -472,7 +486,7 @@ export function PhoneSignIn({
           <label className="field compact-field">
             <span>Repeat PIN</span>
             <input
-              type="password"
+              type={showPin ? "text" : "password"}
               inputMode="numeric"
               autoComplete="new-password"
               maxLength={4}
@@ -480,7 +494,11 @@ export function PhoneSignIn({
               onChange={(event) => setPinConfirm(event.target.value.replace(/\D/g, ''))}
             />
           </label>
-          <div className="terms-actions">
+          <label className="form-note">
+          <input type="checkbox" checked={showPin} onChange={(e) => setShowPin(e.target.checked)} /> Show PIN
+        </label>
+        {pinHint ? <p aria-live="polite" className="form-note">{pinHint}</p> : null}
+        <div className="terms-actions">
             <button className="primary-button" type="submit" disabled={busy || pin.length !== 4 || pinConfirm.length !== 4}>
               {busy ? 'Saving…' : 'Save PIN'}
             </button>
