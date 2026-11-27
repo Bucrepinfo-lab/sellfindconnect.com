@@ -17,6 +17,10 @@ on:
         description: "Make the picture store public"
         type: boolean
         default: false
+      create_store:
+        description: "Create the public picture store for the API (only if none exists)"
+        type: boolean
+        default: false
 
 concurrency:
   group: media-bucket
@@ -32,17 +36,26 @@ jobs:
       - name: Check Fly token
         run: test -n "$FLY_API_TOKEN" || { echo "FLY_API_TOKEN not set"; exit 1; }
       - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Create the public picture store
+        if: ${{ inputs.create_store }}
+        run: |
+          # Owner 27/11/26: production had no store (photos went to a placeholder
+          # address). Fly creates a public Tigris bucket and sets its settings
+          # (AWS_*, BUCKET_NAME) as secrets on the API, which restarts it; the
+          # API reads those names (media.adapters.ts). No key passes through here.
+          flyctl storage create --public -n sellfindconnect-media -a "$APP" -y
+          sleep 20
       - name: Report store settings
         id: report
         run: |
-          out=$(flyctl ssh console -a "$APP" -C "printenv MEDIA_STORAGE_DRIVER MEDIA_STORAGE_PROVIDER MEDIA_S3_ENDPOINT MEDIA_S3_BUCKET MEDIA_S3_PUBLIC_BASE_URL MEDIA_S3_FORCE_PATH_STYLE" || true)
+          out=$(flyctl ssh console -a "$APP" -C "printenv MEDIA_STORAGE_DRIVER MEDIA_S3_ENDPOINT MEDIA_S3_BUCKET MEDIA_S3_PUBLIC_BASE_URL AWS_ENDPOINT_URL_S3 BUCKET_NAME" || true)
           echo "$out"
           driver=$(flyctl ssh console -a "$APP" -C "printenv MEDIA_STORAGE_DRIVER" 2>/dev/null | tr -d '\r' || true)
-          bucket=$(flyctl ssh console -a "$APP" -C "printenv MEDIA_S3_BUCKET" 2>/dev/null | tr -d '\r' || true)
-          endpoint=$(flyctl ssh console -a "$APP" -C "printenv MEDIA_S3_ENDPOINT" 2>/dev/null | tr -d '\r' || true)
+          bucket=$(flyctl ssh console -a "$APP" -C "sh -c 'echo \${MEDIA_S3_BUCKET:-\$BUCKET_NAME}'" 2>/dev/null | tr -d '\r' || true)
+          endpoint=$(flyctl ssh console -a "$APP" -C "sh -c 'echo \${MEDIA_S3_ENDPOINT:-\$AWS_ENDPOINT_URL_S3}'" 2>/dev/null | tr -d '\r' || true)
           base=$(flyctl ssh console -a "$APP" -C "printenv MEDIA_S3_PUBLIC_BASE_URL" 2>/dev/null | tr -d '\r' || true)
           [ -z "$base" ] && [ -n "$endpoint" ] && base="${endpoint%/}/$bucket"
-          echo "driver=${driver:-(not set: development storage, uploads are not kept)}"
+          echo "driver=${driver:-(auto)} bucket=${bucket:-(none: development storage, uploads are not kept)}"
           echo "bucket=$bucket" >> "$GITHUB_OUTPUT"
           echo "base=$base" >> "$GITHUB_OUTPUT"
       - name: Can the public read it?

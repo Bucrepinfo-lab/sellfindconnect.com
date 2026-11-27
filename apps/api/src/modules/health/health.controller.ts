@@ -1,6 +1,7 @@
 import { Controller, Get } from "@nestjs/common";
 
 import { presentPersistenceHealth } from "../../persistence";
+import { presentMediaStorageHealth } from "../media/media.adapters";
 
 @Controller("health")
 export class HealthController {
@@ -15,6 +16,8 @@ export class HealthController {
       persistence: presentPersistenceHealth({
         get: (key) => process.env[key],
       }),
+      // Owner 27/11/26: production ran without a picture store unnoticed.
+      media: presentMediaStorageHealth({ get: (key) => process.env[key] }),
     };
   }
 }
