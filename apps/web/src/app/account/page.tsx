@@ -7,6 +7,7 @@
  * about another person is shown.
  */
 import { useEffect, useState } from "react";
+import { HiddenNumber } from "../../components/HiddenNumber";
 import Link from "next/link";
 
 import { appendSpoken } from "@telpen/domain";
@@ -161,7 +162,7 @@ export default function MyProfilePage() {
             <li className="sfc-ps__inventory-item">
               <div className="sfc-ps__inventory-left">
                 <span className="sfc-ps__inventory-label">Phone number (your login, and the number buyers call)</span>
-                <span className="sfc-ps__inventory-desc">{me.user?.phone ?? me.user?.email ?? "—"}</span>
+                <span className="sfc-ps__inventory-desc"><HiddenNumber value={me.user?.phone ?? me.user?.email} /></span>
               </div>
             </li>
             {business ? (
