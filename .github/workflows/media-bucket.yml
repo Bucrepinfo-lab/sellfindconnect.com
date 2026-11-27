@@ -1,0 +1,59 @@
+name: Picture store — check, or make public (manual)
+
+# Owner 27/11/26: advert photos and business logos are public on the site, so
+# their store should be publicly readable (same decision as HarvestHub, where a
+# private Tigris bucket made every photo answer 403). Private files (IDs, tax
+# documents) must never be put in this bucket.
+#
+# make_public=false: report the store settings (names only, never keys) and
+#                    whether the public can read it (a missing file answers
+#                    404 when open, 403 when closed).
+# make_public=true : also `fly storage update <bucket> --public`, then re-check.
+
+on:
+  workflow_dispatch:
+    inputs:
+      make_public:
+        description: "Make the picture store public"
+        type: boolean
+        default: false
+
+concurrency:
+  group: media-bucket
+  cancel-in-progress: false
+
+jobs:
+  bucket:
+    runs-on: ubuntu-latest
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      APP: sellfindconnect-api
+    steps:
+      - name: Check Fly token
+        run: test -n "$FLY_API_TOKEN" || { echo "FLY_API_TOKEN not set"; exit 1; }
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Report store settings
+        id: report
+        run: |
+          out=$(flyctl ssh console -a "$APP" -C "printenv MEDIA_STORAGE_DRIVER MEDIA_STORAGE_PROVIDER MEDIA_S3_ENDPOINT MEDIA_S3_BUCKET MEDIA_S3_PUBLIC_BASE_URL MEDIA_S3_FORCE_PATH_STYLE" || true)
+          echo "$out"
+          driver=$(flyctl ssh console -a "$APP" -C "printenv MEDIA_STORAGE_DRIVER" 2>/dev/null | tr -d '\r' || true)
+          bucket=$(flyctl ssh console -a "$APP" -C "printenv MEDIA_S3_BUCKET" 2>/dev/null | tr -d '\r' || true)
+          endpoint=$(flyctl ssh console -a "$APP" -C "printenv MEDIA_S3_ENDPOINT" 2>/dev/null | tr -d '\r' || true)
+          base=$(flyctl ssh console -a "$APP" -C "printenv MEDIA_S3_PUBLIC_BASE_URL" 2>/dev/null | tr -d '\r' || true)
+          [ -z "$base" ] && [ -n "$endpoint" ] && base="${endpoint%/}/$bucket"
+          echo "driver=${driver:-(not set: development storage, uploads are not kept)}"
+          echo "bucket=$bucket" >> "$GITHUB_OUTPUT"
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+      - name: Can the public read it?
+        if: ${{ steps.report.outputs.base != '' }}
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' "${{ steps.report.outputs.base }}/sfc-public-probe-does-not-exist")
+          echo "missing-file probe: $code (404 = open to the public, 403 = closed)"
+      - name: Make public
+        if: ${{ inputs.make_public && steps.report.outputs.bucket != '' }}
+        run: |
+          flyctl storage update "${{ steps.report.outputs.bucket }}" --public
+          sleep 5
+          code=$(curl -s -o /dev/null -w '%{http_code}' "${{ steps.report.outputs.base }}/sfc-public-probe-does-not-exist")
+          echo "after: missing-file probe $code (404 = open)"
