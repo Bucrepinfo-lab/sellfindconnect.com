@@ -1782,6 +1782,13 @@ html {
   border-color: rgba(255, 255, 255, 0.3);
 }
 
+/* Owner audit 28/11/26: the hero's pale paragraph colour leaked into the white
+   sign-in card, so its hint text was almost invisible. */
+.guest-hero .guest-signin p {
+  color: var(--muted, #4a4f6a);
+  max-width: none;
+}
+
 .guest-signin {
   margin-top: 16px;
   padding: 16px;
