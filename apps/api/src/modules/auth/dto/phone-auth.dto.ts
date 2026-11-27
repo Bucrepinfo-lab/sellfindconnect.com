@@ -115,6 +115,18 @@ export class ChangeOwnNameDto {
   declare displayName: string;
 }
 
+export class ChangeOwnEmailDto {
+  @ApiProperty()
+  @IsString()
+  @Length(10, 200)
+  declare sessionToken: string;
+
+  @ApiProperty({ example: 'amina@gmail.com', description: 'Empty removes it.' })
+  @IsString()
+  @Length(0, 254)
+  declare email: string;
+}
+
 export class ChangeOwnPhoneDto {
   @ApiProperty()
   @IsString()

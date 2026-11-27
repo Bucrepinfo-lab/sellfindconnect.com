@@ -6,6 +6,10 @@ Purpose: Persistent decision log and strategic memory for the Telpen Adverts mul
 
 This file must be updated whenever product strategy, pricing, compliance, architecture, market positioning, or execution decisions change.
 
+## 27/11/26 — My email on My profile (owner: research, decide and customise)
+- Optional contact email for receipts, statements and replies to buyers; never used to sign in (phone + PIN stays; `User.email` stays the sign-in email, a `.invalid` placeholder for phone-only accounts). Hidden ("am•••@gmail.com") with Show / Hide on `/account`, editable, an empty box removes it.
+- New nullable column `User.contactEmail` (migration `20261127120000_add_user_contact_email`; the API release command runs migrations before traffic moves). `POST /v1/auth/phone/me/email` (session required), audit `AUTH_OWN_EMAIL_CHANGED`. Rules `contactEmail` / `hideEmail` in `@telpen/domain` (+ tests).
+
 ## 27/11/26 — My number on My profile is hidden, with Show / Hide (owner rule restated 27/11/26)
 - `/account` showed the full sign-in number. It now shows "07•• ••• 678" with Show / Hide (`components/HiddenNumber.tsx`); the change-number form is unchanged. Public pages already use Call / WhatsApp / Email buttons, never a printed number (`ListingDetail`).
 

@@ -8,7 +8,7 @@ import {
   UnauthorizedException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { cleanPersonName, evaluateSafetyText, phoneChangeProblem, toE164 } from '@telpen/domain';
+import { cleanPersonName, contactEmail, evaluateSafetyText, phoneChangeProblem, toE164 } from '@telpen/domain';
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 
 import { AuthService } from './auth.service';
@@ -326,6 +326,20 @@ export class PhoneAuthService {
     }
     await this.auth.updateOwnContact(current.session, { displayName: checked.name });
     return { displayName: checked.name };
+  }
+
+  /** My profile: my optional email for receipts and replies. Empty removes it. */
+  async changeOwnEmail(sessionToken: string, rawEmail: string) {
+    const current = await this.auth.getSession(sessionToken);
+    if (!current.session.mfaVerified || !current.user) {
+      throw new UnauthorizedException('Sign in first.');
+    }
+    const checked = contactEmail(rawEmail);
+    if (!checked.ok) {
+      throw new UnprocessableEntityException(checked.error);
+    }
+    await this.auth.updateOwnContact(current.session, { contactEmail: checked.email });
+    return { contactEmail: checked.email };
   }
 
   /**

@@ -181,7 +181,7 @@ export class InMemoryAuthRepository implements AuthRepository {
     this.saveUser({ ...user, phoneVerifiedAt });
   }
 
-  updateUserContact(userId: string, contact: { displayName?: string; phone?: string }): void {
+  updateUserContact(userId: string, contact: { displayName?: string; phone?: string; contactEmail?: string | null }): void {
     const user = this.usersById.get(userId);
     if (!user) {
       return;
@@ -193,6 +193,7 @@ export class InMemoryAuthRepository implements AuthRepository {
       ...user,
       ...(contact.displayName ? { displayName: contact.displayName } : {}),
       ...(contact.phone ? { phone: contact.phone } : {}),
+      ...(contact.contactEmail !== undefined ? { contactEmail: contact.contactEmail ?? undefined } : {}),
     });
   }
 
