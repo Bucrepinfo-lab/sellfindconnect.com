@@ -820,12 +820,25 @@ export function createConfiguredMediaJobProcessors(
   );
 }
 
+/**
+ * Setting names for the picture store. MEDIA_S3_* wins; otherwise the names
+ * `fly storage create` sets on the app (owner 27/11/26: production had no
+ * store at all, so every photo upload went to a placeholder address).
+ */
+const S3_KEYS = {
+  endpoint: ['MEDIA_S3_ENDPOINT', 'AWS_ENDPOINT_URL_S3'],
+  region: ['MEDIA_S3_REGION', 'AWS_REGION'],
+  bucket: ['MEDIA_S3_BUCKET', 'BUCKET_NAME'],
+  accessKeyId: ['MEDIA_S3_ACCESS_KEY_ID', 'AWS_ACCESS_KEY_ID'],
+  secretAccessKey: ['MEDIA_S3_SECRET_ACCESS_KEY', 'AWS_SECRET_ACCESS_KEY'],
+} as const;
+
 export function hasLiveObjectStorageConfig(config?: MediaAdapterConfigReader): boolean {
   return Boolean(
-    firstConfig(config, ['MEDIA_S3_ACCESS_KEY_ID']) &&
-      firstConfig(config, ['MEDIA_S3_SECRET_ACCESS_KEY']) &&
-      firstConfig(config, ['MEDIA_S3_ENDPOINT']) &&
-      firstConfig(config, ['MEDIA_S3_BUCKET']),
+    firstConfig(config, S3_KEYS.accessKeyId) &&
+      firstConfig(config, S3_KEYS.secretAccessKey) &&
+      firstConfig(config, S3_KEYS.endpoint) &&
+      firstConfig(config, S3_KEYS.bucket),
   );
 }
 
@@ -843,17 +856,20 @@ export function resolveMediaStorageDriver(config?: MediaAdapterConfigReader): 'd
 }
 
 function createS3CompatibleStorageAdapter(config?: MediaAdapterConfigReader): S3CompatibleMediaStorageAdapter {
-  const endpoint = requiredStorageConfig(config, ['MEDIA_S3_ENDPOINT']);
+  const endpoint = requiredStorageConfig(config, [...S3_KEYS.endpoint]);
   const options = {
     endpoint,
     // Set MEDIA_S3_REGION for providers that need a specific region; 'us-east-1' is the S3 default.
-    region: firstConfig(config, ['MEDIA_S3_REGION']) ?? 'us-east-1',
-    bucket: requiredStorageConfig(config, ['MEDIA_S3_BUCKET']),
-    accessKeyId: requiredStorageConfig(config, ['MEDIA_S3_ACCESS_KEY_ID']),
-    secretAccessKey: requiredStorageConfig(config, ['MEDIA_S3_SECRET_ACCESS_KEY']),
+    region: firstConfig(config, [...S3_KEYS.region]) ?? 'us-east-1',
+    bucket: requiredStorageConfig(config, [...S3_KEYS.bucket]),
+    accessKeyId: requiredStorageConfig(config, [...S3_KEYS.accessKeyId]),
+    secretAccessKey: requiredStorageConfig(config, [...S3_KEYS.secretAccessKey]),
     publicBaseUrl: firstConfig(config, ['MEDIA_S3_PUBLIC_BASE_URL']),
     providerName: firstConfig(config, ['MEDIA_S3_PROVIDER_NAME']),
-    forcePathStyle: normalizeConfigBoolean(config?.get('MEDIA_S3_FORCE_PATH_STYLE')),
+    // Tigris serves public pictures at <endpoint>/<bucket>/<key>, so it takes path-style.
+    forcePathStyle: normalizeOptionalConfigString(config?.get('MEDIA_S3_FORCE_PATH_STYLE'))
+      ? normalizeConfigBoolean(config?.get('MEDIA_S3_FORCE_PATH_STYLE'))
+      : /tigris/i.test(endpoint),
     expiresSeconds: normalizeConfigInt(config?.get('MEDIA_UPLOAD_URL_TTL_SECONDS')),
   };
   return new S3CompatibleMediaStorageAdapter(options);
@@ -1031,4 +1047,13 @@ function signingKey(secretAccessKey: string, dateStamp: string, region: string):
   const regionKey = hmac(dateKey, region);
   const serviceKey = hmac(regionKey, 's3');
   return hmac(serviceKey, 'aws4_request');
+}
+
+/** For /v1/health: which picture store is in use (names only, never keys). */
+export function presentMediaStorageHealth(config?: MediaAdapterConfigReader): {
+  driver: 'development' | 's3';
+  live: boolean;
+} {
+  const driver = resolveMediaStorageDriver(config);
+  return { driver, live: driver === 's3' && hasLiveObjectStorageConfig(config) };
 }

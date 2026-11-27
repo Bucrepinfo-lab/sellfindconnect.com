@@ -8,6 +8,7 @@ import {
   createConfiguredMediaAdaptersAsync,
   enqueueMediaProcessingJobs,
   legacySpacesConfigKeys,
+  presentMediaStorageHealth,
   resolveMediaStorageDriver,
   type MediaAdapters,
 } from './media.adapters';
@@ -131,6 +132,37 @@ describe('media adapters', () => {
       S3CompatibleMediaStorageAdapter,
     );
     expect(legacySpacesConfigKeys()).toEqual([]);
+  });
+
+  it('uses the settings `fly storage create` puts on the app, path-style for Tigris', async () => {
+    const fly = {
+      AWS_ENDPOINT_URL_S3: 'https://fly.storage.tigris.dev',
+      AWS_REGION: 'auto',
+      BUCKET_NAME: 'sfc-media',
+      AWS_ACCESS_KEY_ID: 'tid_example',
+      AWS_SECRET_ACCESS_KEY: 'tsec_example',
+    } as Record<string, string>;
+    const reader = { get: (key: string) => fly[key] };
+
+    expect(resolveMediaStorageDriver(reader)).toBe('s3');
+    expect(presentMediaStorageHealth(reader)).toEqual({ driver: 's3', live: true });
+    const storage = createConfiguredMediaAdapters(reader).storage;
+    expect(storage).toBeInstanceOf(S3CompatibleMediaStorageAdapter);
+    const upload = await storage.prepareUpload({
+      tenantId: 't1',
+      ownerType: 'ADVERT',
+      ownerId: 'a1',
+      fileName: 'logo.png',
+      mimeType: 'image/png',
+      fileSizeBytes: 1000,
+    });
+    expect(upload.publicUrl.startsWith('https://fly.storage.tigris.dev/sfc-media/')).toBe(true);
+    expect(upload.uploadUrl.startsWith('https://fly.storage.tigris.dev/sfc-media/')).toBe(true);
+    expect(JSON.stringify(presentMediaStorageHealth(reader))).not.toContain('tsec_example');
+  });
+
+  it('reports development storage when nothing is configured', () => {
+    expect(presentMediaStorageHealth({ get: () => undefined })).toEqual({ driver: 'development', live: false });
   });
 
   it('requires a database URL when durable Prisma queueing is enabled', async () => {
