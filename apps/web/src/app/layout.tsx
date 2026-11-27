@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
 
 import { ServiceWorkerRegister } from '../components/ServiceWorkerRegister';
+import { ReturnVisitPrompt } from '../components/ReturnVisitPrompt';
 import { SiteTopBar } from '../components/SiteTopBar';
 import { THEME_BOOT_SCRIPT } from '../lib/theme';
 
@@ -53,6 +54,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       </head>
       <body>
         <SiteTopBar />
+        <ReturnVisitPrompt />
         {children}
         <ServiceWorkerRegister />
       </body>

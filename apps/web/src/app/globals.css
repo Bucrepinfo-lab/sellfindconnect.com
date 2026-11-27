@@ -2290,3 +2290,110 @@ html {
     transform: none;
   }
 }
+
+/* Return-visit login invitation (owner 27/11/26): from the second visit, a
+   signed-out person is invited to create their login. Floats above the page
+   bottom, clear of the phone's home bar, and never covers the side menu. */
+.return-login {
+  position: fixed;
+  z-index: 40;
+  left: max(12px, env(safe-area-inset-left, 0px));
+  right: max(12px, env(safe-area-inset-right, 0px));
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  max-width: 560px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px 12px;
+  padding: 14px 14px 14px 16px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #1f2a6b 0%, #2b3fb8 55%, #3a6df0 100%);
+  color: #ffffff;
+  box-shadow: 0 18px 40px -16px rgba(22, 26, 61, 0.55);
+  animation: return-login-in 0.35s ease-out both;
+}
+
+.return-login__icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--maize);
+}
+
+.return-login__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.return-login__text strong {
+  font-size: 15px;
+}
+
+.return-login__go {
+  grid-column: 2 / 3;
+  justify-self: start;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: var(--maize);
+  color: #161a3d;
+  font-weight: 800;
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.return-login__go:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+}
+
+.return-login__close {
+  grid-column: 3 / 4;
+  grid-row: 1 / 2;
+  align-self: start;
+  border: 0;
+  background: transparent;
+  color: #d9ddff;
+  padding: 4px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.return-login__close:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
+.return-login :focus-visible {
+  outline: 2px solid var(--maize);
+  outline-offset: 2px;
+}
+
+@media (min-width: 761px) {
+  .return-login {
+    left: calc(236px + 24px);
+  }
+}
+
+@keyframes return-login-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .return-login {
+    animation: none;
+  }
+}
