@@ -2094,3 +2094,199 @@ html {
   .share-bar .secondary-button { transition: none; }
   .share-bar .secondary-button:hover { transform: none; }
 }
+
+/* ── Navigation audit (owner 27/11/26) ────────────────────────────────────────
+   1. The side menu stays put while the page scrolls (it used to scroll away,
+      so the next tap landed on empty space and the page "drifted").
+   2. A tapped section stops below the sticky phone bar, not under it.
+   3. Pages without the side menu get .site-topbar: Back plus the main tabs.
+   4. Hover and press feedback on cards, links and buttons.
+   --------------------------------------------------------------------------- */
+@media (min-width: 761px) {
+  .sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    height: 100dvh;
+    overflow-y: auto;
+    align-self: start;
+  }
+}
+
+.workspace [id],
+.guest-tour [id] {
+  scroll-margin-top: 16px;
+}
+
+@media (max-width: 760px) {
+  .workspace [id],
+  .guest-tour [id] {
+    scroll-margin-top: 76px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+.site-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--band);
+  color: #f2f3fb;
+  border-bottom: 1px solid #2a2e57;
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.site-topbar__inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px max(12px, env(safe-area-inset-right, 0px)) 8px max(12px, env(safe-area-inset-left, 0px));
+}
+
+.site-topbar__back,
+.site-topbar__brand,
+.site-topbar__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 12px;
+  border-radius: 10px;
+  color: #c9cce6;
+  text-decoration: none;
+  font: inherit;
+  font-weight: 600;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.site-topbar__back {
+  border: 1px solid #3a3f78;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.site-topbar__brand {
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.site-topbar__tabs {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+
+.site-topbar__back:hover,
+.site-topbar__brand:hover,
+.site-topbar__tab:hover {
+  background: #1f2350;
+  color: #ffffff;
+}
+
+.site-topbar__back:hover svg,
+.site-topbar__tab:hover svg {
+  color: var(--maize);
+}
+
+.site-topbar__tab[aria-current='page'] {
+  background: #262a59;
+  color: #ffffff;
+  box-shadow: inset 0 -3px 0 var(--maize);
+}
+
+.site-topbar__tab[aria-current='page'] svg {
+  color: var(--maize);
+}
+
+.site-topbar :focus-visible {
+  outline: 2px solid var(--maize);
+  outline-offset: 2px;
+}
+
+/* Phones: Back on the left, tabs as an icon-over-word row underneath. */
+@media (max-width: 760px) {
+  .site-topbar__inner {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .site-topbar__brand span {
+    display: none;
+  }
+
+  .site-topbar__tabs {
+    margin-left: 0;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .site-topbar__tab {
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    min-height: 52px;
+    padding: 4px 6px;
+    font-size: 12px;
+    text-align: center;
+  }
+}
+
+/* Hover and press feedback (pointer devices only, so phones get no sticky hover). */
+@media (hover: hover) {
+  .side-panel,
+  .guest-card,
+  .result-card,
+  .plan-card,
+  .biz-card {
+    transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+  }
+
+  .side-panel:hover,
+  .guest-card:hover,
+  .result-card:hover,
+  .plan-card:hover,
+  .biz-card:hover {
+    box-shadow: 0 8px 24px rgba(22, 26, 61, 0.1);
+    border-color: var(--line-2);
+  }
+
+  .result-card:hover,
+  .biz-card:hover {
+    transform: translateY(-2px);
+  }
+
+  .primary-button,
+  .secondary-button {
+    transition: filter 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+  }
+
+  .primary-button:hover {
+    filter: brightness(1.08);
+    box-shadow: 0 4px 14px rgba(22, 26, 61, 0.18);
+  }
+
+  .secondary-button:hover {
+    box-shadow: 0 2px 10px rgba(22, 26, 61, 0.12);
+  }
+
+  .sfc-privacy a:hover,
+  .workspace a:not(.primary-button):not(.secondary-button):not(.nav-item):hover {
+    text-decoration-thickness: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .result-card:hover,
+  .biz-card:hover {
+    transform: none;
+  }
+}
