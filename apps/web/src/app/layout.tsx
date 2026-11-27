@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
 
 import { ServiceWorkerRegister } from '../components/ServiceWorkerRegister';
+import { SiteTopBar } from '../components/SiteTopBar';
 import { THEME_BOOT_SCRIPT } from '../lib/theme';
 
 import './globals.css';
@@ -51,6 +52,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
       <body>
+        <SiteTopBar />
         {children}
         <ServiceWorkerRegister />
       </body>
