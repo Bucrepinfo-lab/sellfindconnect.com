@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import { HiddenNumber } from "../../components/HiddenNumber";
 import Link from "next/link";
 
-import { appendSpoken } from "@telpen/domain";
+import { appendSpoken, hideEmail } from "@telpen/domain";
 
 import { LanguagePicker } from "../../components/LanguagePicker";
 import { ShareBar } from "../../components/ShareBar";
@@ -21,7 +21,7 @@ import { useStoredSession } from "../../lib/use-session";
 import "../../styles/privacy.css";
 
 type Me = {
-  user?: { displayName?: string; phone?: string | null; email?: string; createdAt?: string };
+  user?: { displayName?: string; phone?: string | null; email?: string; contactEmail?: string | null; createdAt?: string };
   tenant?: { displayName?: string; name?: string } | null;
 };
 
@@ -69,6 +69,9 @@ export default function MyProfilePage() {
   const [busy, setBusy] = useState("");
   const [nameNote, setNameNote] = useState<Note>(null);
   const [phoneNote, setPhoneNote] = useState<Note>(null);
+  const [email, setEmail] = useState<string | null>(null);
+  const [showEmail, setShowEmail] = useState(false);
+  const [emailNote, setEmailNote] = useState<Note>(null);
 
   async function saveName(event: React.FormEvent) {
     event.preventDefault();
@@ -81,6 +84,22 @@ export default function MyProfilePage() {
       setNameNote({ ok: true, text: `Saved. You now show as ${saved}.` });
     } else {
       setNameNote({ ok: false, text: messageOf(result.data, "Could not save your name. Try again.") });
+    }
+  }
+
+  async function saveEmail(event: React.FormEvent) {
+    event.preventDefault();
+    setBusy("email");
+    const typed = email ?? me?.user?.contactEmail ?? "";
+    const result = await post("/auth/phone/me/email", { email: typed });
+    setBusy("");
+    if (result.ok && "contactEmail" in result.data) {
+      const saved = typeof result.data.contactEmail === "string" ? result.data.contactEmail : null;
+      setMe((current) => (current ? { ...current, user: { ...current.user, contactEmail: saved } } : current));
+      setEmail(null);
+      setEmailNote({ ok: true, text: saved ? "Saved. Receipts and replies can go to this email." : "Your email was removed." });
+    } else {
+      setEmailNote({ ok: false, text: messageOf(result.data, "Could not save your email. Try again.") });
     }
   }
 
@@ -199,6 +218,31 @@ export default function MyProfilePage() {
             {busy === "name" ? "Saving…" : "Save my name"}
           </button>
           <Feedback note={nameNote} />
+        </form>
+      </section>
+
+      <section className="sfc-ps__section" aria-labelledby="em">
+        <h2 id="em">My email (optional)</h2>
+        <p className="sfc-ps__section-desc">
+          For receipts, statements and replies to buyers. You never sign in with it.{" "}
+          {me?.user?.contactEmail ? (
+            <span className="hidden-number">
+              <span className="hidden-number__value">Saved: {showEmail ? me?.user?.contactEmail : hideEmail(me?.user?.contactEmail)}</span>
+              <button type="button" className="hidden-number__toggle" aria-pressed={showEmail} onClick={() => setShowEmail((v) => !v)}>
+                {showEmail ? "Hide" : "Show"}
+              </button>
+            </span>
+          ) : null}
+        </p>
+        <form onSubmit={saveEmail} className="sfc-ps__form">
+          <label className="sfc-ps__field">
+            <span>Email</span>
+            <input value={email ?? me?.user?.contactEmail ?? ""} onChange={(event) => setEmail(event.target.value)} type="email" inputMode="email" autoComplete="email" maxLength={254} placeholder="name@gmail.com" />
+          </label>
+          <button type="submit" className="sfc-ps__btn sfc-ps__btn--primary" disabled={busy === "email"}>
+            {busy === "email" ? "Saving…" : (email ?? me?.user?.contactEmail ?? "") ? "Save my email" : "Remove my email"}
+          </button>
+          <Feedback note={emailNote} />
         </form>
       </section>
 

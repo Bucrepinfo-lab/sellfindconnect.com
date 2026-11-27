@@ -58,7 +58,7 @@ export interface AuthRepository {
   markUserEmailVerified(userId: string, emailVerifiedAt: string): RepositoryResult<void>;
   markUserPhoneVerified(userId: string, phoneVerifiedAt: string): RepositoryResult<void>;
   /** The person's own name and/or sign-in phone (My profile). Only the given fields change. */
-  updateUserContact(userId: string, contact: { displayName?: string; phone?: string }): RepositoryResult<void>;
+  updateUserContact(userId: string, contact: { displayName?: string; phone?: string; contactEmail?: string | null }): RepositoryResult<void>;
   updateUserPassword(userId: string, password: PasswordUpdateRecord): RepositoryResult<void>;
   markUserMfaVerified(userId: string, mfaVerifiedAt: string): RepositoryResult<void>;
   updateUserTotpEnrollment(userId: string, enrollment: TotpEnrollmentUpdateRecord): RepositoryResult<void>;

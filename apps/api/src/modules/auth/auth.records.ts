@@ -12,6 +12,8 @@ export type AuthUserRecord = {
   email: string;
   displayName: string;
   phone?: string;
+  /** My email: optional contact address, never used to sign in. */
+  contactEmail?: string;
   passwordHash: string;
   passwordSalt: string;
   passwordIterations: number;

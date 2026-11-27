@@ -25,3 +25,27 @@ export function phoneChangeProblem(currentE164: string | null | undefined, nextE
   if (currentE164 && currentE164 === nextE164) return 'That is already your number.';
   return null;
 }
+
+/**
+ * My email (owner 27/11/26): optional, for receipts, statements and replies to
+ * buyers. Never used to sign in (phone + PIN stays). An empty box removes it.
+ */
+export type ContactEmailCheck = { ok: true; email: string | null } | { ok: false; error: string };
+
+export function contactEmail(raw: string | null | undefined): ContactEmailCheck {
+  const value = (raw ?? '').trim().toLowerCase();
+  if (!value) return { ok: true, email: null };
+  if (value.length > 254 || !/^[^\s@]{1,64}@[^\s@]{1,190}\.[a-z]{2,24}$/.test(value)) {
+    return { ok: false, error: 'Enter an email like name@gmail.com, or leave it empty.' };
+  }
+  if (value.endsWith('.invalid')) return { ok: false, error: 'Enter your own email address.' };
+  return { ok: true, email: value };
+}
+
+/** "amina@gmail.com" → "am•••@gmail.com", so someone looking at the screen cannot read it. */
+export function hideEmail(email: string | null | undefined): string {
+  if (!email) return '—';
+  const at = email.indexOf('@');
+  if (at < 1) return email;
+  return `${email.slice(0, Math.min(2, at))}•••${email.slice(at)}`;
+}

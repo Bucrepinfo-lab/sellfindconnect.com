@@ -221,6 +221,19 @@ describe('PhoneAuthService (no SMS)', () => {
     await expect(phone.changeOwnName('not-a-session', 'Amina')).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
+  it('keeps my optional email, shows it on my session, and an empty box removes it (owner 27/11/26)', async () => {
+    const { auth, phone } = setup();
+    const owner = await signUp(phone);
+    const token = owner.result.session.token ?? '';
+
+    await expect(phone.changeOwnEmail(token, ' Amina@Gmail.com ')).resolves.toEqual({ contactEmail: 'amina@gmail.com' });
+    expect((await auth.getSession(token)).user?.contactEmail).toBe('amina@gmail.com');
+    await expect(phone.changeOwnEmail(token, 'not-an-email')).rejects.toBeInstanceOf(UnprocessableEntityException);
+    await expect(phone.changeOwnEmail(token, '')).resolves.toEqual({ contactEmail: null });
+    expect((await auth.getSession(token)).user?.contactEmail).toBeUndefined();
+    await expect(phone.changeOwnEmail('not-a-session', 'a@b.co')).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
   it('moves the account to a new number only with the right PIN; the old number stops working', async () => {
     const { phone } = setup();
     const owner = await signUp(phone);

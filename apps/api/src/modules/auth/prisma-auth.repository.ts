@@ -444,12 +444,13 @@ export class PrismaAuthRepository implements AuthRepository {
     });
   }
 
-  async updateUserContact(userId: string, contact: { displayName?: string; phone?: string }): Promise<void> {
+  async updateUserContact(userId: string, contact: { displayName?: string; phone?: string; contactEmail?: string | null }): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
       data: {
         ...(contact.displayName ? { displayName: contact.displayName } : {}),
         ...(contact.phone ? { phone: contact.phone } : {}),
+        ...(contact.contactEmail !== undefined ? { contactEmail: contact.contactEmail } : {}),
       },
     });
   }
@@ -567,6 +568,7 @@ export class PrismaAuthRepository implements AuthRepository {
       email: user.email,
       displayName: user.displayName,
       phone: user.phone ?? undefined,
+      contactEmail: user.contactEmail ?? undefined,
       passwordHash: user.passwordHash,
       passwordSalt: user.passwordSalt,
       passwordIterations: user.passwordIterations,

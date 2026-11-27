@@ -201,6 +201,8 @@ model User {
   email                   String                    @unique @db.VarChar(320)
   displayName             String                    @db.VarChar(160)
   phone                   String?                   @db.VarChar(80)
+  /// My email (owner 27/11/26): optional, for receipts and replies; never used to sign in.
+  contactEmail            String?                   @db.VarChar(320)
   passwordHash            String?
   passwordSalt            String?
   passwordIterations      Int?

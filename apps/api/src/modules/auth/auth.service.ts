@@ -395,13 +395,13 @@ export class AuthService {
    */
   async updateOwnContact(
     session: { userId: string; tenantId?: string },
-    contact: { displayName?: string; phone?: string },
+    contact: { displayName?: string; phone?: string; contactEmail?: string | null },
   ): Promise<void> {
     await this.repository.updateUserContact(session.userId, contact);
     await this.recordAudit({
       tenantId: session.tenantId,
       actorUserId: session.userId,
-      action: contact.phone ? 'AUTH_OWN_PHONE_CHANGED' : 'AUTH_OWN_NAME_CHANGED',
+      action: contact.phone ? 'AUTH_OWN_PHONE_CHANGED' : contact.contactEmail !== undefined ? 'AUTH_OWN_EMAIL_CHANGED' : 'AUTH_OWN_NAME_CHANGED',
       entityType: 'USER',
       entityId: session.userId,
       metadata: { changedName: Boolean(contact.displayName), changedPhone: Boolean(contact.phone) },
@@ -1592,6 +1592,7 @@ export class AuthService {
       email: this.isPhoneOnlyEmail(user.email) ? undefined : user.email,
       displayName: user.displayName,
       phone: user.phone,
+      contactEmail: user.contactEmail,
       emailVerifiedAt: user.emailVerifiedAt,
       phoneVerifiedAt: user.phoneVerifiedAt,
       mfaRequired: user.mfaRequired,

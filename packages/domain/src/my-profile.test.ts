@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { cleanPersonName, phoneChangeProblem } from './my-profile';
+import { cleanPersonName, contactEmail, hideEmail, phoneChangeProblem } from './my-profile';
 
 describe('my profile rules', () => {
   it('accepts real names and tidies spaces', () => {
@@ -19,5 +19,18 @@ describe('my profile rules', () => {
     expect(phoneChangeProblem('+254712345678', '+254722000111')).toBeNull();
     expect(phoneChangeProblem('+254712345678', '+254712345678')).toMatch(/already/);
     expect(phoneChangeProblem('+254712345678', null)).toMatch(/full new phone number/);
+  });
+});
+
+describe('my email (owner 27/11/26)', () => {
+  it('is optional, lower-cased, and an empty box removes it', () => {
+    expect(contactEmail(' Amina@Gmail.com ')).toEqual({ ok: true, email: 'amina@gmail.com' });
+    expect(contactEmail('')).toEqual({ ok: true, email: null });
+    expect(contactEmail('amina').ok).toBe(false);
+    expect(contactEmail('2547@phone.sellfindconnect.invalid').ok).toBe(false);
+  });
+  it('is hidden on screen until Show', () => {
+    expect(hideEmail('amina@gmail.com')).toBe('am•••@gmail.com');
+    expect(hideEmail(undefined)).toBe('—');
   });
 });

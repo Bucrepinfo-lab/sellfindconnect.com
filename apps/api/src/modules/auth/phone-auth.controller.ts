@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 
 import {
+  ChangeOwnEmailDto,
   ChangeOwnNameDto,
   ChangeOwnPhoneDto,
   ClearPinDto,
@@ -144,6 +145,12 @@ export class PhoneAuthController {
   @Post('me/name')
   changeOwnName(@Body() body: ChangeOwnNameDto) {
     return this.phoneAuth.changeOwnName(body.sessionToken, body.displayName);
+  }
+
+  /** My profile: my optional email for receipts and replies (empty removes it). */
+  @Post('me/email')
+  changeOwnEmail(@Body() body: ChangeOwnEmailDto) {
+    return this.phoneAuth.changeOwnEmail(body.sessionToken, body.email);
   }
 
   /** My profile: move my account to a new phone number (needs my PIN). */
