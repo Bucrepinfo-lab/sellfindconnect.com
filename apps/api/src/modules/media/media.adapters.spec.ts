@@ -156,7 +156,7 @@ describe('media adapters', () => {
       mimeType: 'image/png',
       fileSizeBytes: 1000,
     });
-    expect(upload.publicUrl.startsWith('https://fly.storage.tigris.dev/sfc-media/')).toBe(true);
+    expect(upload.publicUrl.startsWith('https://sfc-media.fly.storage.tigris.dev/')).toBe(true);
     expect(upload.uploadUrl.startsWith('https://fly.storage.tigris.dev/sfc-media/')).toBe(true);
     expect(JSON.stringify(presentMediaStorageHealth(reader))).not.toContain('tsec_example');
   });

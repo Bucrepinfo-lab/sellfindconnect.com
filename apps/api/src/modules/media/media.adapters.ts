@@ -296,6 +296,13 @@ export class S3CompatibleMediaStorageAdapter implements MediaStorageAdapter {
     }
 
     const endpoint = new URL(this.options.endpoint);
+    // Tigris serves a public bucket only at the bucket's own host; the
+    // path-style address is refused even when the bucket is public (checked
+    // on HarvestHub's bucket 27/11/26). Uploads still sign path-style.
+    const tigrisHost = tigrisPublicHost(endpoint.host, this.options.bucket);
+    if (tigrisHost) {
+      return `https://${tigrisHost}/${encodeObjectKey(objectKey)}`;
+    }
     endpoint.pathname = `${endpoint.pathname.replace(/\/+$/g, '')}/${this.options.bucket}/${encodeObjectKey(objectKey)}`;
     endpoint.search = '';
     return endpoint.toString();
@@ -1056,4 +1063,12 @@ export function presentMediaStorageHealth(config?: MediaAdapterConfigReader): {
 } {
   const driver = resolveMediaStorageDriver(config);
   return { driver, live: driver === 's3' && hasLiveObjectStorageConfig(config) };
+}
+
+/** The public host Tigris serves a bucket at, or null for other stores. */
+export function tigrisPublicHost(endpointHost: string, bucket: string): string | null {
+  const host = endpointHost.toLowerCase();
+  if (host === 'fly.storage.tigris.dev') return `${bucket}.fly.storage.tigris.dev`;
+  if (host === 't3.storage.dev') return `${bucket}.t3.tigrisfiles.io`;
+  return null;
 }

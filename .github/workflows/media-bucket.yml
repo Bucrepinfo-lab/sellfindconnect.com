@@ -54,7 +54,14 @@ jobs:
           bucket=$(flyctl ssh console -a "$APP" -C "sh -c 'echo \${MEDIA_S3_BUCKET:-\$BUCKET_NAME}'" 2>/dev/null | tr -d '\r' || true)
           endpoint=$(flyctl ssh console -a "$APP" -C "sh -c 'echo \${MEDIA_S3_ENDPOINT:-\$AWS_ENDPOINT_URL_S3}'" 2>/dev/null | tr -d '\r' || true)
           base=$(flyctl ssh console -a "$APP" -C "printenv MEDIA_S3_PUBLIC_BASE_URL" 2>/dev/null | tr -d '\r' || true)
-          [ -z "$base" ] && [ -n "$endpoint" ] && base="${endpoint%/}/$bucket"
+          # Tigris serves a public bucket only at the bucket's own host.
+          if [ -z "$base" ] && [ -n "$bucket" ]; then
+            case "$endpoint" in
+              *fly.storage.tigris.dev*) base="https://$bucket.fly.storage.tigris.dev" ;;
+              *t3.storage.dev*) base="https://$bucket.t3.tigrisfiles.io" ;;
+              *) base="${endpoint%/}/$bucket" ;;
+            esac
+          fi
           echo "driver=${driver:-(auto)} bucket=${bucket:-(none: development storage, uploads are not kept)}"
           echo "bucket=$bucket" >> "$GITHUB_OUTPUT"
           echo "base=$base" >> "$GITHUB_OUTPUT"
