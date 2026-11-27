@@ -239,7 +239,7 @@ export function BusinessReviews(props: { tenantId: string; businessName: string;
         <p className="biz-sub">Reviews come from other businesses on SellFindConnect. You can report any that break our community standards.</p>
       ) : !props.signedIn ? (
         <p className="biz-sub">
-          <Link href="/dashboard">Sign in</Link> with your business account to rate {props.businessName}.
+          <Link href="/dashboard#sign-in">Sign in</Link> with your business account to rate {props.businessName}.
         </p>
       ) : (
         <form

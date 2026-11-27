@@ -116,7 +116,7 @@ export function PublicHome({ initial }: { initial: SearchFilters }) {
             </Link>
           ) : (
             <>
-              <Link href="/dashboard">Sign in</Link>
+              <Link href="/dashboard#sign-in">Sign in</Link>
               <Link className="home-nav__cta" href="/dashboard#adverts">
                 Post an advert
               </Link>
