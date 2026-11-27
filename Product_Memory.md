@@ -6,6 +6,9 @@ Purpose: Persistent decision log and strategic memory for the Telpen Adverts mul
 
 This file must be updated whenever product strategy, pricing, compliance, architecture, market positioning, or execution decisions change.
 
+## 27/11/26 — My number on My profile is hidden, with Show / Hide (owner rule restated 27/11/26)
+- `/account` showed the full sign-in number. It now shows "07•• ••• 678" with Show / Hide (`components/HiddenNumber.tsx`); the change-number form is unchanged. Public pages already use Call / WhatsApp / Email buttons, never a printed number (`ListingDetail`).
+
 ## 27/11/26 — Tester (+254 789 334508): no test tenant number on the business page; the owner sees their own logo
 - "Your business" showed "Tenant 11111111", the built-in demo id, under the country. Removed from the member view; staff panels keep it.
 - An uploaded logo stayed hidden until the media check passed, so the owner saw only text. The owner now always sees their own logo, with "Only you see this until our check is done" while it waits. Buyers still see it only after the check (zero-tolerance gate unchanged).
