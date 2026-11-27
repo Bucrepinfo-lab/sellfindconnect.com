@@ -6,6 +6,10 @@ Purpose: Persistent decision log and strategic memory for the Telpen Adverts mul
 
 This file must be updated whenever product strategy, pricing, compliance, architecture, market positioning, or execution decisions change.
 
+## 27/11/26 — "Tell another business" share row on My profile and the business page (owner: sharing everywhere)
+- The share row was on the homepage and listings only. Now also on `/account` and the business page (above Account). It shares the homepage (`?via=share`), not the private page: `ShareBar` takes an optional `url`.
+- Share styles moved to `globals.css` so the row looks the same on every page; hover lift, press, 44 px buttons.
+
 ## 26/11/26 — Share where people are: WhatsApp, Facebook, X, Telegram, LinkedIn, SMS, email (owner: "come up with the most popular tools")
 - Owner saw the computer's own share box (OneNote, Outlook, Copilot). `ShareBar` (listing and home) now leads with WhatsApp and Facebook (most used in Kenya: Media Council of Kenya 2026, Communications Authority, GeoPoll 2025), then X, Telegram, LinkedIn, SMS, email, "TikTok, Instagram & more" (phone share sheet on phones; copy link + hint on computers) and Copy link.
 - `packages/domain/src/share-targets.ts` (+ test): the same module in all five apps; a private link only ever gets WhatsApp, SMS and email.
