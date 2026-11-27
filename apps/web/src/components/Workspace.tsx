@@ -1857,7 +1857,6 @@ export function Workspace({ area }: { area: WorkspaceArea }) {
                   {country.currencyCode} {country.monthlySubscriptionAmount}/month after trial
                 </span>
               </WebOnlyCheckout>
-              <span>Tenant {tenantId.slice(0, 8)}</span>
             </div>
           </div>
         </header>

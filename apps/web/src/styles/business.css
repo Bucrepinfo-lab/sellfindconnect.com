@@ -157,6 +157,14 @@
   text-align: center;
 }
 
+.biz-logo-wrap {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  max-width: 150px;
+  text-align: center;
+}
+
 .biz-logo {
   width: 64px;
   height: 64px;

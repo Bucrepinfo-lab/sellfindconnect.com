@@ -580,7 +580,10 @@ export function BusinessManager() {
   }
 
   const logo = [...draftMedia, ...(liveProfile?.media ?? [])].find((item) => item.caption === 'Logo');
-  const logoUrl = logo?.review?.canPublish ? (logo.thumbnailUrl ?? logo.cdnUrl ?? logo.sourceUrl) : undefined;
+  // The owner always sees their own logo; buyers see it only once it passes the check
+  // (tester 27/11/26: "my uploaded logo does not show, only text").
+  const logoUrl = logo ? (logo.thumbnailUrl ?? logo.cdnUrl ?? logo.sourceUrl) : undefined;
+  const logoChecked = Boolean(logo?.review?.canPublish);
   const set = (key: keyof ProfileForm) => (event: { target: { value: string } }) =>
     setProfileForm((current) => ({ ...current, [key]: event.target.value }));
 
@@ -619,8 +622,13 @@ export function BusinessManager() {
             {profileDraft?.status === 'PENDING_REVIEW' ? <span className="biz-pill muted">Change waiting for review</span> : null}
             {profileDraft?.status === 'REJECTED' ? <span className="biz-pill muted">Change not approved – edit and try again</span> : null}
           </div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          {logoUrl ? <img className="biz-logo" src={logoUrl} alt={`${profileForm.displayName} logo`} /> : null}
+          {logoUrl ? (
+            <span className="biz-logo-wrap">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img className="biz-logo" src={logoUrl} alt={`${profileForm.displayName} logo`} />
+              {logoChecked ? null : <span className="biz-pill muted">Only you see this until our check is done</span>}
+            </span>
+          ) : null}
         </div>
 
         {!liveProfile && !profileDraft ? (
