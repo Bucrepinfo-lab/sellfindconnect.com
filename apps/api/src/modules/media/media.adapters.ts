@@ -875,7 +875,7 @@ function createS3CompatibleStorageAdapter(config?: MediaAdapterConfigReader): S3
   return new S3CompatibleMediaStorageAdapter(options);
 }
 
-function requiredStorageConfig(config: MediaAdapterConfigReader | undefined, keys: string[]): string {
+function requiredStorageConfig(config: MediaAdapterConfigReader | undefined, keys: readonly string[]): string {
   const value = firstConfig(config, keys);
   if (!value) {
     throw new Error(`${keys[0]} is required when MEDIA_STORAGE_DRIVER=s3.`);
@@ -883,7 +883,7 @@ function requiredStorageConfig(config: MediaAdapterConfigReader | undefined, key
   return value;
 }
 
-function firstConfig(config: MediaAdapterConfigReader | undefined, keys: string[]): string | undefined {
+function firstConfig(config: MediaAdapterConfigReader | undefined, keys: readonly string[]): string | undefined {
   for (const key of keys) {
     const value = normalizeOptionalConfigString(config?.get(key));
     if (value) {
