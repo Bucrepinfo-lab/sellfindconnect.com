@@ -6,6 +6,10 @@ Purpose: Persistent decision log and strategic memory for the Telpen Adverts mul
 
 This file must be updated whenever product strategy, pricing, compliance, architecture, market positioning, or execution decisions change.
 
+## 27/11/26 — Tester (+254 789 334508): no test tenant number on the business page; the owner sees their own logo
+- "Your business" showed "Tenant 11111111", the built-in demo id, under the country. Removed from the member view; staff panels keep it.
+- An uploaded logo stayed hidden until the media check passed, so the owner saw only text. The owner now always sees their own logo, with "Only you see this until our check is done" while it waits. Buyers still see it only after the check (zero-tolerance gate unchanged).
+
 ## 27/11/26 — "Tell another business" share row on My profile and the business page (owner: sharing everywhere)
 - The share row was on the homepage and listings only. Now also on `/account` and the business page (above Account). It shares the homepage (`?via=share`), not the private page: `ShareBar` takes an optional `url`.
 - Share styles moved to `globals.css` so the row looks the same on every page; hover lift, press, 44 px buttons.
