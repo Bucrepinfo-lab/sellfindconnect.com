@@ -315,9 +315,19 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
     setAsked(true);
     setState((current) => ({ ...current, status: 'loading' }));
     writeFiltersToUrl(filters);
-    const result = await runSearch(filters);
+    // Owner 28/11/26: "no loader, and no message comes back". The answer was
+    // rendered below the fold, so on a phone a search looked dead. Keep the
+    // "Searching…" state long enough to be seen, then bring the answer into view.
+    const [result] = await Promise.all([runSearch(filters), new Promise((done) => setTimeout(done, 450))]);
     setNow(new Date());
     setState(result);
+    window.requestAnimationFrame(() => {
+      const section = document.getElementById('source-finder');
+      if (!section) return;
+      const box = section.getBoundingClientRect();
+      const alreadyThere = box.top < window.innerHeight * 0.6 && box.bottom > 80;
+      if (!alreadyThere) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   };
 
   const { q: initialQ, industry: initialIndustry, role: initialRole } = initial;
@@ -475,11 +485,28 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
                 ))}
             </select>
           </label>
-          <button className="hero-search__go" type="submit" disabled={asked && state.status === 'loading'}>
-            <SfcIcon name="find" size={18} />
+          <button className="hero-search__go" type="submit" disabled={asked && state.status === 'loading'} aria-busy={asked && state.status === 'loading'}>
+            {asked && state.status === 'loading' ? <span className="search-spinner" aria-hidden /> : <SfcIcon name="find" size={18} />}
             {asked && state.status === 'loading' ? 'Searching…' : 'Search'}
           </button>
         </form>
+        {asked ? (
+          <p className={`hero-search__status hero-search__status--${state.status}`} role="status" aria-live="polite">
+            {state.status === 'loading' ? (
+              <>
+                <span className="search-spinner" aria-hidden />
+                {`Searching ${county || 'all of Kenya'}${query.trim() ? ` for “${query.trim()}”` : ''}…`}
+              </>
+            ) : null}
+            {state.status === 'done' && visible.length > 0
+              ? `${visible.length} ${visible.length === 1 ? 'business' : 'businesses'} found${place.county ? ` in ${kenyaPlaceLabel(place)}` : ''}. See ${visible.length === 1 ? 'it' : 'them'} below.`
+              : null}
+            {state.status === 'done' && visible.length === 0
+              ? `No match${query.trim() ? ` for “${query.trim()}”` : ''}${place.county ? ` in ${kenyaPlaceLabel(place)}` : ''} yet. See the suggestions below.`
+              : null}
+            {state.status === 'error' ? 'The search did not go through. Check your connection and tap Search again.' : null}
+          </p>
+        ) : null}
         <div className="hero-locate">
           <button type="button" className="hero-locate__button" onClick={useMyLocation} disabled={locating === 'busy'}>
             <SfcIcon name="locate" size={16} />
@@ -669,18 +696,11 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
           {state.status === 'loading' && state.results.length === 0 ? <ResultSkeleton /> : null}
           {state.status === 'done' && visible.length === 0 ? (
             <div className="biz-empty empty-state">
-              <strong>No business matches yet. SellFindConnect is new and growing every week.</strong>
-              <p>
-                {place.county
-                  ? `No business in ${kenyaPlaceLabel(place)} matches yet.${
-                      widenWithinCounty
-                        ? ` See the rest of ${place.county}, closest to ${place.ward ?? place.constituency} first.`
-                        : nearestCounties.length
-                          ? ` The nearest counties are ${nearestCounties.map((item) => item.county).join(', ')}.`
-                          : ''
-                    }`
-                  : 'Try fewer words or a different industry.'}
-              </p>
+              <strong>
+                {`No match${query.trim() ? ` for “${query.trim()}”` : ''}${place.county ? ` in ${kenyaPlaceLabel(place)}` : ''} yet.`}
+              </strong>
+              <p>SellFindConnect is new and growing every week. Try one of these:</p>
+              {place.county ? null : <p>Use fewer words, or pick a different industry.</p>}
               <div className="biz-actions">
                 {place.county ? (
                   <button
@@ -702,7 +722,36 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
                       void apply({ county: '', constituency: '', ward: '', sort: 'BEST' });
                     }}
                   >
-                    {widenWithinCounty ? `Show the nearest in ${place.county}` : 'Show the nearest businesses'}
+                    {widenWithinCounty ? `Search the rest of ${place.county}` : 'Search all of Kenya'}
+                  </button>
+                ) : null}
+                {place.county && !widenWithinCounty
+                  ? nearestCounties.map((item) => (
+                      <button
+                        key={item.county}
+                        type="button"
+                        className="secondary-button"
+                        onClick={() => {
+                          setCounty(item.county);
+                          setConstituency('');
+                          setWard('');
+                          void apply({ county: item.county, constituency: '', ward: '' });
+                        }}
+                      >
+                        {`Try ${item.county}`}
+                      </button>
+                    ))
+                  : null}
+                {query.trim() ? (
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => {
+                      setQuery('');
+                      void apply({ q: '' });
+                    }}
+                  >
+                    {`See everything${place.county ? ` in ${place.county}` : ''}`}
                   </button>
                 ) : null}
                 {anyFilter ? (
