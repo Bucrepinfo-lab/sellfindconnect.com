@@ -1,6 +1,6 @@
 'use client';
 
-import { KeyRound, X } from 'lucide-react';
+import { ArrowRight, KeyRound, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { SESSION_TOKEN_STORAGE_KEY } from '../lib/public-api';
@@ -69,10 +69,11 @@ export function ReturnVisitPrompt() {
       </span>
       <div className="return-login__text">
         <strong>Welcome back! Create your login</strong>
-        <span>Keep your adverts, messages and saved searches yours. Just your phone number and a 4-digit PIN. No SMS.</span>
+        <span>Just your phone number and a 4-digit PIN. No SMS.</span>
       </div>
       <a className="return-login__go" href="/dashboard#sign-in" onClick={() => setShow(false)}>
-        Create my login
+        Tap here to create my login
+        <ArrowRight size={18} aria-hidden />
       </a>
       <button
         type="button"

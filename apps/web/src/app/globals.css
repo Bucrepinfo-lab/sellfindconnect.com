@@ -2434,3 +2434,60 @@ html {
 .share-bar > p[role='status'] {
   order: 2;
 }
+
+/* Login invitation, second pass (owner 28/11/26): the button was hidden behind
+   the phone's bottom bar, and the blue card blended into the blue page. Now a
+   warm sun-yellow card with navy text (stands apart from the navy hero and the
+   blue buttons), lifted above the bottom bar, with a full-width button. */
+.return-login {
+  background: linear-gradient(135deg, #ffd45c 0%, #ffbf2e 100%);
+  color: #161a3d;
+  border: 2px solid #161a3d;
+  box-shadow: 0 18px 40px -14px rgba(0, 0, 0, 0.6);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+.return-login__icon {
+  background: #161a3d;
+  color: #ffd45c;
+}
+.return-login__text strong {
+  font-size: 16px;
+}
+.return-login__go {
+  grid-column: 1 / -1;
+  justify-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  border-radius: 12px;
+  background: #161a3d;
+  color: #ffffff;
+  font-size: 16px;
+}
+.return-login__go:hover {
+  background: #232a66;
+}
+.return-login__close {
+  color: #161a3d;
+}
+.return-login__close:hover {
+  background: rgba(22, 26, 61, 0.12);
+  color: #161a3d;
+}
+.return-login :focus-visible {
+  outline-color: #161a3d;
+}
+@media (max-width: 760px) {
+  body:has(.home-dock) .return-login {
+    bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  }
+}
+.return-login {
+  padding: 10px 12px 12px;
+  gap: 8px 10px;
+}
+.return-login__go {
+  min-height: 44px;
+}
