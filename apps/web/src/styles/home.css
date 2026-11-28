@@ -1370,3 +1370,54 @@
   .how-flow__col, .how-flow__cta { transition: none; }
   .how-flow__col:hover, .how-flow__col:focus-within, .how-flow__cta:hover { transform: none; }
 }
+
+/* Search feedback (owner 28/11/26): a visible "Searching…" with a spinner, then
+   a plain answer right under the search box, before the page moves to results. */
+.search-spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  border-radius: 50%;
+  border: 2.5px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #ffffff;
+  animation: search-spin 0.7s linear infinite;
+  vertical-align: -3px;
+}
+
+@keyframes search-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.hero-search__status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.hero-search__status--done {
+  border-color: var(--sun);
+  box-shadow: inset 4px 0 0 var(--sun);
+}
+
+.hero-search__status--error {
+  border-color: #ff8a8a;
+  box-shadow: inset 4px 0 0 #ff8a8a;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search-spinner {
+    animation-duration: 1.6s;
+  }
+}
