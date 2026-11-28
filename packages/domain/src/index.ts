@@ -70,6 +70,7 @@ export * from './product-audit';
 export * from './totp';
 export * from './ugc-moderation';
 export * from './kenya-places';
+export * from './search-availability';
 export * from './kenya-landmarks';
 export * from './listing-display';
 export * from './public-listing-stats';

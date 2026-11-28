@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import {
   businessDirectionsUrl,
@@ -16,7 +16,10 @@ import {
   kenyaLandmarks,
   kenyaPlaceLabel,
   listingBadges,
+  availabilityHeadline,
   listingSortModes,
+  summarizeAvailability,
+  type AvailabilitySummary,
   nearestKenyaCounty,
   placeProximity,
   placeProximityLabel,
@@ -296,6 +299,27 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
   // The first results load by themselves; the button only says "Searching…"
   // once the person has asked (owner 26/11/26: it looked stuck on arrival).
   const [asked, setAsked] = useState(false);
+  // Owner 28/11/26 (precision): while they type, show the counties that really
+  // have it — from live adverts across Kenya, never guessed.
+  const [avail, setAvail] = useState<{ query: string; status: 'loading' | 'done'; summary?: AvailabilitySummary }>();
+  const availRun = useRef(0);
+  useEffect(() => {
+    const what = query.trim();
+    if (what.length < 2) {
+      availRun.current += 1;
+      const clear = window.setTimeout(() => setAvail(undefined), 0);
+      return () => window.clearTimeout(clear);
+    }
+    const run = ++availRun.current;
+    const timer = window.setTimeout(async () => {
+      setAvail({ query: what, status: 'loading' });
+      const found = await runSearch({ q: what, industry: '', role: '' });
+      if (availRun.current !== run) return; // they kept typing
+      setAvail(found.status === 'done' ? { query: what, status: 'done', summary: summarizeAvailability(found.results) } : undefined);
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+  const availReady = avail?.status === 'done' && avail.query === query.trim() ? avail.summary : undefined;
   const [blockedTenants, setBlockedTenants] = useState<string[]>([]);
   const [locating, setLocating] = useState<'idle' | 'busy' | 'done' | 'denied' | 'outside' | 'unavailable'>('idle');
   // One clock reading per result set keeps badges stable while the list is on screen.
@@ -490,6 +514,58 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
             {asked && state.status === 'loading' ? 'Searching…' : 'Search'}
           </button>
         </form>
+        {avail ? (
+          <div className="hero-avail" role="status" aria-live="polite">
+            {avail.status === 'loading' ? (
+              <p className="hero-avail__head">
+                <span className="search-spinner" aria-hidden />
+                {`Checking where “${avail.query}” is available…`}
+              </p>
+            ) : null}
+            {avail.status === 'done' && avail.summary ? (
+              <>
+                <p className="hero-avail__head">{availabilityHeadline(avail.query, avail.summary)}</p>
+                {avail.summary.total > 0 ? (
+                  <div className="hero-avail__places">
+                    {avail.summary.places.slice(0, 8).map((item) => (
+                      <button
+                        key={item.county}
+                        type="button"
+                        className={`hero-avail__place${county === item.county ? ' is-active' : ''}`}
+                        onClick={() => {
+                          setCounty(item.county);
+                          setConstituency('');
+                          setWard('');
+                          void apply({ q: avail.query, county: item.county, constituency: '', ward: '' });
+                        }}
+                      >
+                        {item.county}
+                        <span>{item.count}</span>
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      className="hero-avail__place hero-avail__place--all"
+                      onClick={() => {
+                        setCounty('');
+                        setConstituency('');
+                        setWard('');
+                        void apply({ q: avail.query, county: '', constituency: '', ward: '' });
+                      }}
+                    >
+                      All of Kenya
+                      <span>{avail.summary.total}</span>
+                    </button>
+                  </div>
+                ) : (
+                  <p className="hero-avail__none">
+                    Try another word for it, or <Link href="/dashboard#adverts">post the first advert</Link>.
+                  </p>
+                )}
+              </>
+            ) : null}
+          </div>
+        ) : null}
         {asked ? (
           <p className={`hero-search__status hero-search__status--${state.status}`} role="status" aria-live="polite">
             {state.status === 'loading' ? (
@@ -725,7 +801,27 @@ export function LiveSearch({ initial, children }: { initial: SearchFilters; chil
                     {widenWithinCounty ? `Search the rest of ${place.county}` : 'Search all of Kenya'}
                   </button>
                 ) : null}
-                {place.county && !widenWithinCounty
+                {place.county && !widenWithinCounty && availReady?.places.some((item) => item.county !== place.county)
+                  ? availReady.places
+                      .filter((item) => item.county !== place.county)
+                      .slice(0, 4)
+                      .map((item) => (
+                        <button
+                          key={`has-${item.county}`}
+                          type="button"
+                          className="primary-button"
+                          onClick={() => {
+                            setCounty(item.county);
+                            setConstituency('');
+                            setWard('');
+                            void apply({ county: item.county, constituency: '', ward: '' });
+                          }}
+                        >
+                          {`Available in ${item.county} (${item.count})`}
+                        </button>
+                      ))
+                  : null}
+                {place.county && !widenWithinCounty && !availReady?.places.some((item) => item.county !== place.county)
                   ? nearestCounties.map((item) => (
                       <button
                         key={item.county}

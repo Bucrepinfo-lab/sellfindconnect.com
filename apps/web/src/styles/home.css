@@ -1421,3 +1421,87 @@
     animation-duration: 1.6s;
   }
 }
+
+/* "Where can I get it?" (owner 28/11/26): counties that really have what is
+   being typed, with counts, shown before a county is chosen. */
+.hero-avail {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #161a3d;
+  box-shadow: inset 4px 0 0 var(--sun), 0 10px 24px -16px rgba(0, 0, 0, 0.6);
+}
+
+.hero-avail__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-weight: 700;
+  font-size: 0.98rem;
+}
+
+.hero-avail .search-spinner {
+  border-color: rgba(22, 26, 61, 0.2);
+  border-top-color: var(--find);
+}
+
+.hero-avail__places {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.hero-avail__place {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 8px 0 14px;
+  border-radius: 999px;
+  border: 1.5px solid #cfd4f5;
+  background: #f2f4ff;
+  color: #161a3d;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.hero-avail__place span {
+  min-width: 26px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--find);
+  color: #ffffff;
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.hero-avail__place:hover,
+.hero-avail__place.is-active {
+  border-color: var(--find);
+  background: #e3e8ff;
+  transform: translateY(-1px);
+}
+
+.hero-avail__place--all {
+  background: #fff6e0;
+  border-color: var(--sun);
+}
+
+.hero-avail__place--all span {
+  background: #161a3d;
+}
+
+.hero-avail__place:focus-visible {
+  outline: 3px solid var(--sun);
+  outline-offset: 2px;
+}
+
+.hero-avail__none {
+  margin: 6px 0 0;
+  font-size: 0.92rem;
+}
